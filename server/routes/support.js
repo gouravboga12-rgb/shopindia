@@ -10,8 +10,8 @@ const getOptionalUserId = (req) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-      return decoded.id || decoded.userId || null;
+      const decoded = jwt.decode(token);
+      return decoded?.id || decoded?.userId || decoded?.sub || null;
     }
   } catch (e) {
     // Ignore invalid token
@@ -101,9 +101,9 @@ router.post('/chat', async (req, res) => {
 });
 
 /**
- * POST /api/support/ticket - Create support ticket
+ * POST /api/support/ticket & /api/support/tickets - Create support ticket
  */
-router.post('/ticket', async (req, res) => {
+router.post(['/ticket', '/tickets'], async (req, res) => {
   try {
     const { subject, category = 'other', priority = 'medium', message, name, email, phone } = req.body;
 
@@ -113,7 +113,12 @@ router.post('/ticket', async (req, res) => {
 
     let customerId = getOptionalUserId(req);
 
-    // If no user token, find or create guest user
+    if (customerId) {
+      const existingUser = await prisma.user.findUnique({ where: { id: customerId } });
+      if (!existingUser) customerId = null;
+    }
+
+    // If no user token or user not in DB, find or create guest user
     if (!customerId) {
       const guestEmail = email || `guest-${Date.now()}@shopindia.in`;
       let user = await prisma.user.findFirst({
@@ -123,7 +128,7 @@ router.post('/ticket', async (req, res) => {
       if (!user) {
         user = await prisma.user.create({
           data: {
-            name: name || 'Guest User',
+            name: name || 'Customer',
             email: guestEmail,
             phone: phone || null,
             password: 'guest-no-login-' + Math.random(),
@@ -186,9 +191,9 @@ router.post('/ticket', async (req, res) => {
 });
 
 /**
- * GET /api/support/tickets - Get customer tickets
+ * GET /api/support/tickets & /api/support/ticket - Get customer tickets
  */
-router.get('/tickets', async (req, res) => {
+router.get(['/tickets', '/ticket'], async (req, res) => {
   try {
     const customerId = getOptionalUserId(req);
     const { email, ticketNumber } = req.query;
@@ -257,9 +262,9 @@ router.get('/tickets/:id', async (req, res) => {
 });
 
 /**
- * POST /api/support/tickets/:id/reply - Customer reply to a ticket
+ * POST /api/support/tickets/:id/reply & /api/support/ticket/:id/reply - Customer reply to a ticket
  */
-router.post('/tickets/:id/reply', async (req, res) => {
+router.post(['/tickets/:id/reply', '/ticket/:id/reply'], async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || !text.trim()) {

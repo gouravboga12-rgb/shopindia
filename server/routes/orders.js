@@ -69,20 +69,17 @@ router.get('/', customerAuth, async (req, res) => {
     });
 
     const mappedOrders = orders.map((o) => {
-      let vert = o.type === 'quick_commerce' ? 'quick' : o.type === 'hvac_service' ? 'services' : o.type === 'traditional' ? 'shop' : null;
+      let vert = o.type === 'quick_commerce' ? 'quick' : (o.type === 'hvac_service' || o.type === 'hvac') ? 'services' : 'shop';
       
-      // If default traditional, verify against item details to ensure correct vertical classification
-      const firstCat = o.items?.[0]?.product?.category;
-      const catV = (firstCat?.vertical || '').toLowerCase();
-      const catN = (firstCat?.name || '').toLowerCase();
-      const itemN = (o.items?.[0]?.name || '').toLowerCase();
-
-      if (catV.startsWith('quick') || catN.includes('food') || catN.includes('grocery') || catN.includes('biryani') || itemN.includes('biryani') || itemN.includes('pizza') || itemN.includes('sdf') || itemN.includes('thali')) {
-        vert = 'quick';
-      } else if (catV.startsWith('services') || catN.includes('repair') || catN.includes('service') || catN.includes('cleaning') || itemN.includes('ac') || itemN.includes('cleaning') || itemN.includes('towing') || itemN.includes('repair')) {
-        vert = 'services';
-      } else if (!vert) {
-        vert = 'shop';
+      if (o.type === 'traditional' || !o.type) {
+        const catV = (o.items?.[0]?.product?.category?.vertical || '').toLowerCase();
+        if (catV === 'quick' || catV === 'quick_commerce') {
+          vert = 'quick';
+        } else if (catV === 'services' || catV === 'hvac_service' || catV === 'hvac') {
+          vert = 'services';
+        } else {
+          vert = 'shop';
+        }
       }
 
       return {
@@ -162,14 +159,10 @@ router.post('/', async (req, res) => {
     // Auto-detect vertical if not passed
     let resolvedVertical = vertical;
     if (!resolvedVertical && products.length > 0) {
-      const firstCat = products[0].category;
-      const catV = (firstCat?.vertical || '').toLowerCase();
-      const catN = (firstCat?.name || '').toLowerCase();
-      const prodN = (products[0].name || '').toLowerCase();
-      
-      if (catV.startsWith('quick') || catN.includes('food') || catN.includes('grocery') || catN.includes('biryani') || prodN.includes('biryani') || prodN.includes('pizza') || prodN.includes('sdf') || prodN.includes('thali')) {
+      const catV = (products[0].category?.vertical || '').toLowerCase();
+      if (catV === 'quick' || catV === 'quick_commerce') {
         resolvedVertical = 'quick';
-      } else if (catV.startsWith('services') || catN.includes('repair') || catN.includes('service') || catN.includes('cleaning') || prodN.includes('ac') || prodN.includes('cleaning') || prodN.includes('towing')) {
+      } else if (catV === 'services' || catV === 'hvac_service' || catV === 'hvac') {
         resolvedVertical = 'services';
       } else {
         resolvedVertical = 'shop';

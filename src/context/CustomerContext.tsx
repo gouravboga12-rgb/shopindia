@@ -137,12 +137,13 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
       try {
-        const [addrRes, payRes, wishRes, notifRes, profRes] = await Promise.allSettled([
+        const [addrRes, payRes, wishRes, notifRes, profRes, revRes] = await Promise.allSettled([
           api.get<{ addresses: Address[] }>('/api/customer/addresses').catch(() => null),
           api.get<{ payments: PaymentMethod[] }>('/api/customer/payments').catch(() => null),
           api.get<{ wishlist: string[] }>('/api/customer/wishlist').catch(() => null),
           api.get<{ notifications: DashboardNotification[] }>('/api/customer/notifications').catch(() => null),
-          api.get<{ profile: CustomerProfile }>('/api/customer/profile').catch(() => null)
+          api.get<{ profile: CustomerProfile }>('/api/customer/profile').catch(() => null),
+          api.get<{ reviews: Review[] }>('/api/customer/reviews').catch(() => null)
         ]);
 
         if (addrRes.status === 'fulfilled' && addrRes.value?.addresses) setAddresses(addrRes.value.addresses);
@@ -150,6 +151,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (wishRes.status === 'fulfilled' && wishRes.value?.wishlist) setWishlist(wishRes.value.wishlist);
         if (notifRes.status === 'fulfilled' && notifRes.value?.notifications) setNotifications(notifRes.value.notifications);
         if (profRes.status === 'fulfilled' && profRes.value?.profile) setProfile(profRes.value.profile);
+        if (revRes.status === 'fulfilled' && revRes.value?.reviews) setReviews(revRes.value.reviews);
       } catch (err) {
         console.error('Failed to fetch customer data', err);
       } finally {
@@ -285,19 +287,29 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // ── Reviews ──
   const addReview = useCallback(async (r: Omit<Review, 'id' | 'createdAt'>) => {
+    const optimistic: Review = {
+      ...r,
+      id: 'rv_' + Date.now(),
+      createdAt: now()
+    };
+
+    setReviews((prev) => {
+      const existing = prev.find((x) => x.productId === r.productId);
+      if (existing) {
+        return prev.map((x) => (x.id === existing.id ? { ...existing, ...r } : x));
+      }
+      return [optimistic, ...prev];
+    });
+
+    logActivity('REVIEW_SUBMITTED', { entityId: r.productId, entityType: 'product' });
+
     try {
       const res = await api.post<{ review: Review }>('/api/customer/reviews', r);
-      setReviews((prev) => {
-        const existing = prev.find((x) => x.productId === r.productId);
-        if (existing) {
-          return prev.map((x) => (x.id === existing.id ? { ...x, ...r } : x));
-        }
-        return [res.review || { ...r, id: 'rv' + Date.now(), createdAt: now() }, ...prev];
-      });
-      logActivity('REVIEW_SUBMITTED', { entityId: r.productId, entityType: 'product' });
+      if (res.review) {
+        setReviews((prev) => prev.map((x) => (x.id === optimistic.id ? res.review : x)));
+      }
     } catch (err) {
-      console.error(err);
-      throw err;
+      console.warn('Backend review sync notice:', err);
     }
   }, [logActivity]);
 

@@ -70,7 +70,7 @@ export const NotificationsPage: React.FC = () => {
           {[
             { id: 'all', label: 'All' },
             { id: 'order', label: 'Orders' },
-            { id: 'quick', label: '10 Min' },
+            { id: 'quick', label: 'Quick' },
             { id: 'service', label: 'Services' }
           ].map(f => (
             <button

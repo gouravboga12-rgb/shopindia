@@ -9,6 +9,8 @@ import { CartPage } from '../../pages/Cart';
 import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
+import { CategoriesPage } from '../../pages/Categories';
+import servicesImg from '../../assets/services.jpeg';
 import { Home, User, MapPin, X, Search, ChevronDown, ShoppingBag, Zap, Wrench, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
@@ -73,6 +75,8 @@ export const MobileApp: React.FC = () => {
         if (currentVertical === 'quick') return <VerticalQuickCommerceMobile />;
         if (currentVertical === 'services') return <VerticalServicesMobile />;
         return <VerticalShopMobile />;
+      case 'category':
+        return <CategoriesPage />;
       case 'search':
         return <SearchPage />;
       case 'detail':
@@ -92,6 +96,7 @@ export const MobileApp: React.FC = () => {
 
   const getActiveTab = () => {
     if (currentPath === 'home') return 'home';
+    if (currentPath === 'category') return 'category';
     if (currentPath === 'cart') return 'cart';
     if (currentPath === 'orders') return 'orders';
     if (currentPath === 'profile') return 'profile';
@@ -102,9 +107,7 @@ export const MobileApp: React.FC = () => {
   const isServices = currentVertical === 'services';
 
   return (
-    <div className={`min-h-screen pb-16 flex flex-col w-full relative transition-colors duration-300 ${
-      isServices ? 'bg-brand-graphite text-white font-sans' : 'bg-brand-bg text-brand-graphite font-sans'
-    }`}>
+    <div className="min-h-screen pb-16 flex flex-col w-full relative transition-colors duration-300 bg-brand-bg text-brand-graphite font-sans">
       {currentPath === 'home' && (
       <div 
         style={{ transform: showHeader ? 'translateY(0)' : 'translateY(-126px)' }}
@@ -130,7 +133,7 @@ export const MobileApp: React.FC = () => {
                   iconInactive: 'text-brand-blue'
                 },
                 quick: { 
-                  title: '10 Min', 
+                  title: 'Quick', 
                   icon: Zap,
                   activeClass: 'bg-[#FFDF00] text-black shadow-soft',
                   inactiveClass: 'bg-white text-slate-800 shadow-sm border border-black/5',
@@ -163,6 +166,14 @@ export const MobileApp: React.FC = () => {
                         src="/logo.png" 
                         alt="ShopIndia" 
                         className={`w-[85%] scale-[1.15] h-auto object-contain select-none pointer-events-none transition-all ${isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'}`}
+                      />
+                    </div>
+                  ) : v === 'services' ? (
+                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[14px]">
+                      <img 
+                        src={servicesImg} 
+                        alt="Services" 
+                        className="w-full h-full object-cover select-none pointer-events-none rounded-[14px]"
                       />
                     </div>
                   ) : (
@@ -264,16 +275,11 @@ export const MobileApp: React.FC = () => {
         <nav className={`fixed bottom-0 left-0 right-0 h-16 border-t z-45 flex justify-around items-center select-none shadow-[0_-4px_20px_rgba(0,0,0,0.04)] bg-white transition-colors duration-300 px-2`}>
           {[
           { id: 'home', label: 'Home', icon: Home, action: () => navigateTo('home') },
-          isServices ? {
-            id: 'support',
-            label: 'Support',
-            icon: MessageSquare,
-            action: () => setShowSupportDrawer(true)
-          } : {
-            id: 'search',
+          {
+            id: 'category',
             label: 'Category',
             icon: LayoutGrid,
-            action: () => { setSearchQuery(''); navigateTo('search'); }
+            action: () => navigateTo('category')
           },
           { id: 'orders', label: isServices ? 'Bookings' : 'Orders', icon: ListOrdered, action: () => navigateTo('orders') },
           { id: 'cart', label: 'Cart', icon: ShoppingCart, action: () => navigateTo('cart'), badge: true },

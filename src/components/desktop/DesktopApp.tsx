@@ -11,6 +11,7 @@ import { CartPage } from '../../pages/Cart';
 import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
+import { CategoriesPage } from '../../pages/Categories';
 import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
 
 export const DesktopApp: React.FC = () => {
@@ -22,6 +23,8 @@ export const DesktopApp: React.FC = () => {
         if (currentVertical === 'quick') return <VerticalQuickCommerce />;
         if (currentVertical === 'services') return <VerticalServices />;
         return <VerticalShop />;
+      case 'category':
+        return <CategoriesPage />;
       case 'search':
         return <SearchPage />;
       case 'detail':
@@ -41,12 +44,8 @@ export const DesktopApp: React.FC = () => {
     }
   };
 
-  const isServices = currentVertical === 'services';
-
   return (
-    <div className={`min-h-screen flex flex-col w-full transition-colors duration-400 ${
-      isServices ? 'bg-services-bg text-services-text' : 'bg-[#FAF9F6] text-gray-800'
-    }`}>
+    <div className="min-h-screen flex flex-col w-full bg-[#FAF9F6] text-gray-800">
       <DesktopHeader />
       <main className="flex-1 w-full">
         {renderContent()}

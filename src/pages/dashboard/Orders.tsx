@@ -48,12 +48,12 @@ export const OrdersPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const getOrderVertical = (o: any): VerticalType => {
-    if (o.vertical) return o.vertical;
+    if (o.vertical === 'quick' || o.vertical === 'services' || o.vertical === 'shop') return o.vertical;
     if (o.type === 'quick_commerce') return 'quick';
-    if (o.type === 'hvac_service') return 'services';
-    const text = (o.items?.map((it: any) => it.product?.title || '').join(' ') || '').toLowerCase();
-    if (text.includes('ac') || text.includes('cleaning') || text.includes('repair') || text.includes('wash') || text.includes('service') || text.includes('towing')) return 'services';
-    if (text.includes('biryani') || text.includes('grocery') || text.includes('spray') || text.includes('food') || text.includes('veggie') || text.includes('munchies') || text.includes('sdf')) return 'quick';
+    if (o.type === 'hvac_service' || o.type === 'hvac') return 'services';
+    if (o.type === 'traditional') return 'shop';
+    const prodVertical = o.items?.[0]?.product?.category?.vertical || o.items?.[0]?.product?.vertical;
+    if (prodVertical === 'quick' || prodVertical === 'services' || prodVertical === 'shop') return prodVertical;
     return 'shop';
   };
 
@@ -145,14 +145,16 @@ export const OrdersPage: React.FC = () => {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${vertBadge.bg}`}>
                         {vertBadge.label}
                       </span>
-                      <Badge tone={statusTone(o.status)}>{o.status}</Badge>
+                      <Badge tone={statusTone(o.status)}>
+                        {v === 'services' && ((o.status as string) === 'placed' || (o.status as string) === 'pending') ? 'Service Booked' : o.status === 'placed' ? 'Order Placed' : o.status}
+                      </Badge>
                     </div>
 
                     <span className="font-bold text-sm text-brand-graphite block truncate">
                       {o.items.map(it => it.product?.title || 'Item').join(', ') || 'Order Details'}
                     </span>
                     <p className="text-xs text-brand-slate mt-0.5">
-                      Order {o.orderNumber || o.id} • {o.date || 'Today'}
+                      {v === 'services' ? 'Booking' : 'Order'} {o.orderNumber || o.id} • {o.date || 'Today'}
                     </p>
                   </div>
                 </div>

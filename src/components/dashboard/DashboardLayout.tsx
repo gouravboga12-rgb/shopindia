@@ -50,7 +50,7 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-brand-graphite flex flex-col font-sans">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8 flex flex-col lg:flex-row gap-8 flex-1">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-24 pb-28 lg:py-8 flex flex-col lg:flex-row gap-8 flex-1">
         
         {/* Desktop Sidebar */}
         <aside className="hidden lg:flex w-64 flex-col self-start sticky top-8">

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useProducts } from '../../hooks/useProducts';
-import { useCategories } from '../../hooks/useCategories';
 import { 
   Heart, ShieldCheck,
   Clock, ChevronRight, Truck, Award, RotateCcw, Star,
@@ -10,8 +9,114 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
 
+const REFERENCE_CATEGORIES = [
+  {
+    id: 'all',
+    name: 'All Categories',
+    bg: 'bg-[#EEF2FF]',
+    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any, _setCurrentVertical: any) => {
+      setSearchQuery('');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'grocery',
+    name: 'Grocery',
+    bg: 'bg-[#E8F8F0]',
+    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any, setCurrentVertical: any) => {
+      setCurrentVertical('quick');
+      setSearchQuery('Grocery');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'electronics',
+    name: 'Electronics',
+    bg: 'bg-[#EBF2FE]',
+    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any) => {
+      setSearchQuery('Electronics');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'fashion',
+    name: 'Fashion',
+    bg: 'bg-[#F5F0FF]',
+    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any) => {
+      setSearchQuery('Fashion');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'beauty',
+    name: 'Beauty',
+    bg: 'bg-[#FDF2F8]',
+    image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any) => {
+      setSearchQuery('Beauty');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'pharmacy',
+    name: 'Pharmacy',
+    bg: 'bg-[#FFF1F2]',
+    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any, setCurrentVertical: any) => {
+      setCurrentVertical('quick');
+      setSearchQuery('Pharmacy');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'home-kitchen',
+    name: 'Home & Kitchen',
+    bg: 'bg-[#FFFBEB]',
+    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any) => {
+      setSearchQuery('Home & Kitchen');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'food-drinks',
+    name: 'Food & Drinks',
+    bg: 'bg-[#ECFEFF]',
+    image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any, setCurrentVertical: any) => {
+      setCurrentVertical('quick');
+      setSearchQuery('Food');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'baby-care',
+    name: 'Baby Care',
+    bg: 'bg-[#F0FDF4]',
+    image: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=160&auto=format&fit=crop&q=80',
+    action: (setSearchQuery: any, navigateTo: any) => {
+      setSearchQuery('Baby Care');
+      navigateTo('search');
+    }
+  },
+  {
+    id: 'more',
+    name: 'More',
+    bg: 'bg-[#F3F4F6]',
+    isMore: true,
+    action: (setSearchQuery: any, navigateTo: any) => {
+      setSearchQuery('');
+      navigateTo('search');
+    }
+  }
+];
+
 export const VerticalShopMobile: React.FC = () => {
-  const { navigateTo, setSearchQuery, addToCart } = useApp();
+  const { navigateTo, setSearchQuery, addToCart, setCurrentVertical } = useApp();
   const [timeLeft, setTimeLeft] = useState({ hours: 12, minutes: 44, seconds: 12 });
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -24,12 +129,7 @@ export const VerticalShopMobile: React.FC = () => {
   }, []);
 
   const { products } = useProducts();
-  const { categories } = useCategories();
   const shopProducts = products.filter(p => p.vertical === 'shop');
-  
-  const shopCategories = React.useMemo(() => {
-    return categories.filter(c => (c.vertical || '').toLowerCase() === 'shop' && c.isActive !== false);
-  }, [categories]);
 
   // Autoplay for Hero Carousel
   useEffect(() => {
@@ -60,33 +160,36 @@ export const VerticalShopMobile: React.FC = () => {
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
 
-  // 2x5 Mobile Categories circular list (styled with pastel background rings)
-  // Premium 3D Categories matching the mockup
-  // Removed hardcoded mobileCategoriesList
-
   return (
-    <div className="w-full flex flex-col gap-7 py-6 px-4 bg-brand-bg min-h-screen text-brand-graphite font-sans pb-24 transition-colors duration-300">
+    <div className="w-full flex flex-col gap-6 py-4 px-3.5 bg-brand-bg min-h-screen text-brand-graphite font-sans pb-24 transition-colors duration-300">
       
-      {/* 2. Circular Categories Grid (2x5 structure layout matching user reference) */}
-      <div className="w-full bg-white border border-brand-border rounded-card p-4 shadow-soft grid grid-cols-5 gap-y-5 gap-x-2 select-none justify-items-center">
-        {shopCategories.map((cat) => {
+      {/* 2. Circular Categories Grid (Exact 2x5 matching reference image) */}
+      <div className="w-full bg-white border border-brand-border/70 rounded-[24px] p-4 shadow-soft grid grid-cols-5 gap-y-4 gap-x-1.5 select-none justify-items-center">
+        {REFERENCE_CATEGORIES.map((cat) => {
           return (
             <div
               key={cat.id}
-              onClick={() => { 
-                setSearchQuery(cat.name); 
-                navigateTo('search'); 
-              }}
-              className="flex flex-col items-center text-center cursor-pointer active:scale-90 transition-transform w-14"
+              onClick={() => cat.action(setSearchQuery, navigateTo, setCurrentVertical)}
+              className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-all w-full"
             >
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center mb-1.5 shadow-soft bg-slate-50 text-slate-600 transition-all overflow-hidden border border-brand-border/60`}>
-                <img src={cat.image || undefined} alt={cat.name} className="w-full h-full object-cover" />
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center mb-1.5 shadow-xs transition-transform hover:scale-105 ${cat.bg}`}>
+                {cat.isMore ? (
+                  <div className="flex items-center gap-1 text-zinc-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                  </div>
+                ) : (
+                  <img 
+                    src={cat.image} 
+                    alt={cat.name} 
+                    className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-full drop-shadow-xs" 
+                  />
+                )}
               </div>
-              <div className="h-7 flex items-start justify-center w-full overflow-hidden">
-                <span className="text-[8.5px] font-semibold text-brand-graphite opacity-90 line-clamp-2 w-full tracking-tight leading-tight font-heading">
-                  {cat.name}
-                </span>
-              </div>
+              <span className="text-[9.5px] sm:text-[10.5px] font-bold text-brand-graphite leading-tight line-clamp-2 px-0.5 font-heading text-center">
+                {cat.name}
+              </span>
             </div>
           );
         })}

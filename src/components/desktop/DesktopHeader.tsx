@@ -4,6 +4,7 @@ import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { CartDrawer } from '../common/CartDrawer';
 import { LocationModal } from '../common/LocationModal';
+import servicesImg from '../../assets/services.jpeg';
 import { 
   Search, ShoppingBag, Zap, Wrench, Bell, ShoppingCart, User, 
   Mic, Camera, Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
@@ -121,7 +122,7 @@ export const DesktopHeader: React.FC = () => {
                 iconInactive: 'text-brand-blue bg-blue-50/70'
               },
               quick: { 
-                title: '10 Min', 
+                title: 'Quick', 
                 subtitle: 'Instant delivery', 
                 icon: Zap,
                 activeColor: 'text-white',
@@ -164,6 +165,14 @@ export const DesktopHeader: React.FC = () => {
                       className={`w-[85%] scale-[1.15] h-auto object-contain select-none pointer-events-none mx-auto transition-all ${
                         isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'
                       }`}
+                    />
+                  </div>
+                ) : v === 'services' ? (
+                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[12px]">
+                    <img 
+                      src={servicesImg} 
+                      alt="Services" 
+                      className="w-full h-full object-cover select-none pointer-events-none rounded-[12px]"
                     />
                   </div>
                 ) : (

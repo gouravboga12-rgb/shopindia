@@ -27,16 +27,15 @@ async function syncOrderTypes() {
   console.log(`Found ${allOrders.length} orders to inspect.`);
 
   for (const o of allOrders) {
-    const firstCat = o.items?.[0]?.product?.category;
-    const catV = (firstCat?.vertical || '').toLowerCase();
-    const catN = (firstCat?.name || '').toLowerCase();
-    const itemNames = (o.items?.map(it => it.name).join(' ') || '').toLowerCase();
+    const catV = (o.items?.[0]?.product?.category?.vertical || '').toLowerCase();
+    const prodFulfillment = (o.items?.[0]?.product?.fulfillmentType || '').toLowerCase();
+    const itemNames = (o.items?.map(it => it.name).join(', ') || 'Items');
 
     let newType = 'traditional';
 
-    if (catV.startsWith('quick') || catN.includes('food') || catN.includes('grocery') || catN.includes('biryani') || itemNames.includes('biryani') || itemNames.includes('pizza') || itemNames.includes('sdf') || itemNames.includes('thali') || itemNames.includes('spray')) {
+    if (catV === 'quick' || catV === 'quick_commerce' || prodFulfillment === 'quick_commerce') {
       newType = 'quick_commerce';
-    } else if (catV.startsWith('services') || catN.includes('repair') || catN.includes('service') || catN.includes('cleaning') || itemNames.includes('ac') || itemNames.includes('cleaning') || itemNames.includes('towing') || itemNames.includes('repair')) {
+    } else if (catV === 'services' || catV === 'hvac_service' || catV === 'hvac' || prodFulfillment === 'hvac_service' || prodFulfillment === 'hvac') {
       newType = 'hvac_service';
     } else {
       newType = 'traditional';

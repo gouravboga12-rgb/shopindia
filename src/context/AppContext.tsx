@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 import { getCustomerToken } from '../lib/customerAuth';
 
 export type VerticalType = 'shop' | 'quick' | 'services';
-export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications';
+export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category';
 
 export interface OrderItem {
   product: Product;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PageHeader, PrimaryButton, fieldCls, Badge } from '../../components/dashboard/DashboardUI';
+import { PageHeader, PrimaryButton, fieldCls, selectCls, Badge } from '../../components/dashboard/DashboardUI';
 import { 
   MessageSquare, Mail, Phone, ChevronDown, LifeBuoy, 
   Send, Ticket, CheckCircle2, Bot, ArrowLeft, RefreshCw,
@@ -62,14 +62,14 @@ export const SupportCenterPage: React.FC = () => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeTicket?.messages, sendingTicketReply]);
 
-  // Load My Tickets from backend
+  // Load My Tickets directly from backend API
   const loadTickets = async () => {
     setLoadingTickets(true);
     try {
       const res = await api.get<{ tickets: any[] }>('/api/support/tickets');
       setTickets(res.tickets || []);
     } catch (err) {
-      console.error('Failed to load tickets:', err);
+      console.error('Failed to load tickets from server:', err);
     } finally {
       setLoadingTickets(false);
     }
@@ -79,7 +79,7 @@ export const SupportCenterPage: React.FC = () => {
     loadTickets();
   }, []);
 
-  // Real-time polling for active ticket conversation (every 2.5s)
+  // Real-time polling for active ticket conversation (every 3s)
   useEffect(() => {
     if (!activeTicket) return;
     const ticketId = activeTicket.id || activeTicket.ticketNumber;
@@ -97,12 +97,12 @@ export const SupportCenterPage: React.FC = () => {
       } catch {
         // Silently catch background sync errors
       }
-    }, 2500);
+    }, 3000);
 
     return () => clearInterval(timer);
   }, [activeTicket?.id, activeTicket?.ticketNumber]);
 
-  // Submit real ticket to backend
+  // Submit real ticket directly to PostgreSQL API
   const submitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingTicket(true);
@@ -110,39 +110,38 @@ export const SupportCenterPage: React.FC = () => {
 
     try {
       const res = await api.post<{ success: boolean; ticket: any; message: string }>('/api/support/ticket', ticketForm);
-      setSubmittingTicket(false);
-
       if (res.success && res.ticket) {
         setTicketSuccessMessage(`Ticket #${res.ticket.ticketNumber} created successfully! A specialist is reviewing your issue.`);
         setTicketForm({ subject: '', category: 'order_issue', message: '', priority: 'medium', name: '', phone: '', email: '' });
-        loadTickets();
-        // Automatically open the new ticket thread
         setActiveTicket(res.ticket);
+        loadTickets();
       }
     } catch (err: any) {
-      setSubmittingTicket(false);
       alert(err.message || 'Failed to submit ticket.');
+    } finally {
+      setSubmittingTicket(false);
     }
   };
 
-  // Open single ticket thread
+  // Open single ticket thread directly from backend
   const openTicketThread = async (ticketId: string) => {
     try {
       const res = await api.get<{ ticket: any }>(`/api/support/tickets/${ticketId}`);
-      setActiveTicket(res.ticket);
+      if (res.ticket) {
+        setActiveTicket(res.ticket);
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to open ticket.');
     }
   };
 
-  // Send reply in ticket conversation
+  // Send reply in ticket conversation directly to backend
   const sendTicketReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticketReplyText.trim() || !activeTicket) return;
     const text = ticketReplyText.trim();
     setTicketReplyText('');
 
-    // Optimistic UI update: instantly append customer message
     const optimisticMsg = {
       id: 'opt-' + Date.now(),
       senderRole: 'customer',
@@ -375,32 +374,42 @@ export const SupportCenterPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10.5px] font-black uppercase text-brand-slate font-heading">Category</label>
-                  <select 
-                    className={fieldCls} 
-                    value={ticketForm.category} 
-                    onChange={(e) => setTicketForm((t) => ({ ...t, category: e.target.value }))}
-                  >
-                    <option value="order_issue">Order / Booking Issue</option>
-                    <option value="payment">Payment & Billing</option>
-                    <option value="refund">Refund & Cancellation</option>
-                    <option value="product">Service Quality / Technician</option>
-                    <option value="delivery">Delivery Status</option>
-                    <option value="other">Other Inquiry</option>
-                  </select>
+                  <div className="relative w-full">
+                    <select 
+                      className={selectCls} 
+                      value={ticketForm.category} 
+                      onChange={(e) => setTicketForm((t) => ({ ...t, category: e.target.value }))}
+                    >
+                      <option value="order_issue">Order / Booking Issue</option>
+                      <option value="payment">Payment & Billing</option>
+                      <option value="refund">Refund & Cancellation</option>
+                      <option value="product">Service Quality / Technician</option>
+                      <option value="delivery">Delivery Status</option>
+                      <option value="other">Other Inquiry</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-brand-slate">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="text-[10.5px] font-black uppercase text-brand-slate font-heading">Priority</label>
-                  <select 
-                    className={fieldCls} 
-                    value={ticketForm.priority} 
-                    onChange={(e) => setTicketForm((t) => ({ ...t, priority: e.target.value }))}
-                  >
-                    <option value="low">Standard</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                  <div className="relative w-full">
+                    <select 
+                      className={selectCls} 
+                      value={ticketForm.priority} 
+                      onChange={(e) => setTicketForm((t) => ({ ...t, priority: e.target.value }))}
+                    >
+                      <option value="low">Standard</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-brand-slate">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
               </div>
 

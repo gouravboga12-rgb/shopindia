@@ -66,6 +66,7 @@ app.use('/api/admin/offers', require('./routes/admin/offers'));
 app.use('/api/admin/notifications', require('./routes/admin/notifications'));
 app.use('/api/admin/categories', require('./routes/admin/categories'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
+app.use('/api/admin/reviews', require('./routes/admin/reviews'));
 
 // Vendor routes (guarded by verifyToken + requireRole('vendor') in each file)
 app.use('/api/vendor/auth', require('./routes/vendor/auth'));
@@ -73,6 +74,7 @@ app.use('/api/vendor/products', require('./routes/vendor/products'));
 app.use('/api/vendor/orders', require('./routes/vendor/orders'));
 app.use('/api/vendor/analytics', require('./routes/vendor/analytics'));
 app.use('/api/vendor/wallet', require('./routes/vendor/wallet'));
+app.use('/api/vendor/reviews', require('./routes/vendor/reviews'));
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {

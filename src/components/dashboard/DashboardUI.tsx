@@ -3,12 +3,12 @@ import { Skeleton } from '../common/Skeleton';
 import { AlertCircle } from 'lucide-react';
 
 export const PageHeader: React.FC<{ title: string; subtitle?: string; actions?: React.ReactNode }> = ({ title, subtitle, actions }) => (
-  <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
-    <div>
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div className="min-w-0">
       <h1 className="text-xl font-bold text-brand-graphite font-heading tracking-tight">{title}</h1>
       {subtitle && <p className="text-sm text-brand-slate font-medium mt-0.5">{subtitle}</p>}
     </div>
-    {actions && <div className="flex items-center gap-2">{actions}</div>}
+    {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
   </div>
 );
 
@@ -118,4 +118,5 @@ export const GhostButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>
   />
 );
 
-export const fieldCls = 'w-full px-3.5 py-2.5 border border-brand-border bg-slate-50/40 rounded-button text-xs font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:bg-white transition-colors';
+export const fieldCls = 'w-full px-3.5 py-2.5 border border-brand-border bg-white rounded-xl text-xs font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 transition-all shadow-sm';
+export const selectCls = 'w-full px-3.5 py-2.5 border border-brand-border bg-white rounded-xl text-xs font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 appearance-none transition-all pr-10 cursor-pointer shadow-sm';

@@ -70,16 +70,53 @@ export const OverviewPage: React.FC<{ onNavigate: (t: DashboardTab) => void }> =
           <p className="text-sm text-brand-slate font-medium">No orders placed yet. Head to the store to start shopping.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {recentOrders.map((o) => (
-              <div key={o.id} className="border border-brand-border rounded-card p-4 flex flex-col gap-2 hover:border-brand-blue/30 transition-colors">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold font-numbers text-brand-graphite truncate">{o.id}</span>
-                  <Badge tone={statusTone(o.status)}>{o.status}</Badge>
+            {recentOrders.map((o) => {
+              const firstItem = o.items?.[0];
+              const productTitle = o.items?.map(it => it.product?.title).filter(Boolean).join(', ') || o.orderNumber || 'Product Order';
+              const firstImage = firstItem?.product?.image;
+              const isService = o.vertical === 'services';
+              const statusText = isService && ((o.status as string) === 'placed' || (o.status as string) === 'pending')
+                ? 'Service Booked'
+                : o.status === 'placed'
+                ? 'Order Placed'
+                : o.status;
+
+              return (
+                <div 
+                  key={o.id} 
+                  onClick={() => onNavigate('orders')}
+                  className="border border-brand-border rounded-card p-3.5 flex flex-col justify-between gap-3 hover:border-brand-blue/40 hover:shadow-soft transition-all cursor-pointer bg-white group text-left"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 border border-brand-border/60 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                      {firstImage ? (
+                        <img src={firstImage} alt={productTitle} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package className="w-5 h-5 text-brand-blue" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-brand-graphite truncate group-hover:text-brand-blue transition-colors">
+                        {productTitle}
+                      </p>
+                      <p className="text-[11px] text-brand-slate mt-0.5">
+                        {isService ? 'Booking' : 'Order'} {o.orderNumber || o.id.slice(0, 12)} · {o.date}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-brand-border/50 text-xs">
+                    <span className="font-extrabold text-brand-graphite font-numbers">
+                      ₹{o.total.toLocaleString('en-IN')}{' '}
+                      <span className="text-[11px] font-medium text-brand-slate">
+                        · {o.items.length} {o.items.length === 1 ? 'item' : 'items'}
+                      </span>
+                    </span>
+                    <Badge tone={statusTone(o.status)}>{statusText}</Badge>
+                  </div>
                 </div>
-                <p className="text-xs text-brand-slate">{o.date}</p>
-                <p className="text-sm font-bold text-brand-graphite font-numbers">₹{o.total.toLocaleString('en-IN')} <span className="text-xs font-medium text-brand-slate">· {o.items.length} items</span></p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </SectionCard>

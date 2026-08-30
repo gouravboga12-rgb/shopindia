@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProducts } from '../hooks/useProducts';
+import { useCustomer } from '../context/CustomerContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, BadgePercent, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench } from 'lucide-react';
+import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, BadgePercent, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
-  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical } = useApp();
+  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart } = useApp();
+  const { reviews } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
   const [pincode, setPincode] = useState('');
   const [pincodeCheckResult, setPincodeCheckResult] = useState<string | null>(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
+
+  const cartItemCount = (cart || []).reduce((acc, item) => acc + item.quantity, 0);
 
   // Retrieve the selected product
   const product = products.find(p => p.id === selectedProductId);
@@ -58,10 +62,21 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
-  const mockReviews = [
-    { name: 'Aman Sharma', rating: 5, date: '12 days ago', comment: isServices ? 'Certified technician arrived on time and did a fantastic job. High quality service!' : 'Absolutely outstanding product. Reached in perfect condition, and delivery was exceptionally fast.' },
-    { name: 'Priya Patel', rating: 4, date: '1 month ago', comment: isServices ? 'Prompt doorstep service, clean execution, and transparent upfront pricing.' : 'Highly recommended! Value for money and great customer support.' }
-  ];
+  // Real live verified customer reviews matching this product
+  const liveReviews = (reviews || []).filter(r => 
+    r.productId === product?.id || 
+    (product?.title && r.productName && r.productName.toLowerCase() === product.title.toLowerCase())
+  );
+
+  const displayReviews = liveReviews.map(r => ({
+    name: 'Verified Customer',
+    rating: r.rating,
+    date: new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+    title: r.title,
+    comment: r.body,
+    images: r.images || [],
+    isVerified: true
+  }));
 
   const similarProducts = product ? products.filter(p => p.id !== product.id && p.vertical === product.vertical).slice(0, 5) : [];
 
@@ -108,9 +123,7 @@ export const ProductDetailPage: React.FC = () => {
         <div className="grid grid-cols-5 gap-8">
           {/* Left Column: Image & Checkout Buttons (Span 2) */}
           <div className="col-span-2 flex flex-col gap-5">
-            <div className={`border rounded-[20px] p-8 aspect-square flex items-center justify-center relative ${
-              isServices ? 'bg-[#2C2C2E] border-zinc-800' : 'bg-white border-brand-border shadow-premium'
-            }`}>
+            <div className="border rounded-[20px] p-8 aspect-square flex items-center justify-center relative bg-white border-brand-border shadow-premium">
               {/* Floating Wishlist Heart */}
               <motion.button
                 whileTap={{ scale: 0.85 }}
@@ -170,7 +183,7 @@ export const ProductDetailPage: React.FC = () => {
           {/* Right Column: Info details (Span 3) */}
           <div className="col-span-3 flex flex-col gap-6">
             <div>
-              <h1 className={`text-lg font-bold leading-relaxed mb-2.5 font-heading ${isServices ? 'text-white' : 'text-brand-graphite'}`}>
+              <h1 className="text-lg font-bold leading-relaxed mb-2.5 font-heading text-brand-graphite">
                 {product.title}
               </h1>
               <div className="flex items-center gap-2 mb-3 leading-none">
@@ -186,7 +199,7 @@ export const ProductDetailPage: React.FC = () => {
 
             {/* Price Details */}
             <div className="flex items-baseline gap-3 border-b border-brand-border/10 pb-5 leading-none font-numbers">
-              <span className={`text-2xl font-black ${isServices ? 'text-white' : 'text-brand-graphite'}`}>₹{product.price.toLocaleString('en-IN')}</span>
+              <span className="text-2xl font-black text-brand-graphite">₹{product.price.toLocaleString('en-IN')}</span>
               {product.originalPrice > product.price && (
                 <>
                   <span className="text-sm text-brand-slate line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
@@ -197,7 +210,7 @@ export const ProductDetailPage: React.FC = () => {
 
             {/* Bank offers */}
             <div className="flex flex-col gap-3">
-              <span className={`font-black text-xs uppercase tracking-widest font-heading ${isServices ? 'text-zinc-300' : 'text-brand-graphite'}`}>Available Offers & Discounts</span>
+              <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">Available Offers & Discounts</span>
               <div className="flex flex-col gap-2 text-xs text-brand-slate font-semibold">
                 <div className="flex gap-2.5 items-start leading-relaxed text-left">
                   <BadgePercent size={15} className="text-brand-green shrink-0 mt-0.5" />
@@ -212,7 +225,7 @@ export const ProductDetailPage: React.FC = () => {
 
             {/* Pincode checker (16px curves) */}
             <div className="py-5 border-t border-b border-brand-border/10 flex flex-col gap-3">
-              <span className={`font-black text-xs uppercase tracking-widest font-heading ${isServices ? 'text-zinc-300' : 'text-brand-graphite'}`}>
+              <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">
                 {isServices ? 'Service Availability & Slot Estimates' : 'Delivery & Slot Estimates'}
               </span>
               <form onSubmit={handlePincodeCheck} className="flex gap-2.5 max-w-sm">
@@ -247,18 +260,16 @@ export const ProductDetailPage: React.FC = () => {
             {/* Specs tables (20px curves) */}
             {product.specs && Object.keys(product.specs).length > 0 && (
               <div className="flex flex-col gap-3">
-                <span className={`font-black text-xs uppercase tracking-widest font-heading ${isServices ? 'text-zinc-300' : 'text-brand-graphite'}`}>
+                <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">
                   {isServices ? 'Service Inclusions & Scope' : 'Specifications & Features'}
                 </span>
                 <div className="border border-brand-border rounded-card overflow-hidden text-xs shadow-soft">
                   {Object.entries(product.specs).map(([key, val], idx) => (
                     <div key={key} className={`grid grid-cols-3 p-3 text-left ${
-                      idx % 2 === 0
-                        ? isServices ? 'bg-zinc-900' : 'bg-slate-50/50'
-                        : isServices ? 'bg-zinc-800/40' : 'bg-white'
+                      idx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'
                     } border-b border-brand-border last:border-0`}>
                       <span className="font-extrabold text-brand-slate">{key}</span>
-                      <span className={`col-span-2 font-bold ${isServices ? 'text-white' : 'text-brand-graphite'}`}>{val}</span>
+                      <span className="col-span-2 font-bold text-brand-graphite">{val}</span>
                     </div>
                   ))}
                 </div>
@@ -267,24 +278,53 @@ export const ProductDetailPage: React.FC = () => {
 
             {/* Reviews list */}
             <div className="flex flex-col gap-3.5">
-              <span className={`font-black text-xs uppercase tracking-widest font-heading ${isServices ? 'text-zinc-300' : 'text-brand-graphite'}`}>
-                {isServices ? 'Ratings & Service Feedback' : 'Ratings & User Reviews'}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">
+                  {isServices ? 'Ratings & Service Feedback' : 'Ratings & Customer Reviews'}
+                </span>
+                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 size={13} /> {displayReviews.length} Verified Reviews
+                </span>
+              </div>
               <div className="flex flex-col gap-3">
-                {mockReviews.map((rev, i) => (
-                  <div key={i} className={`p-5 border rounded-card text-left shadow-soft ${isServices ? 'bg-[#2C2C2E] border-zinc-800 text-white' : 'bg-white border-brand-border'}`}>
-                    <div className="flex justify-between items-center mb-2 leading-none font-heading">
-                      <span className="font-extrabold text-xs">{rev.name}</span>
-                      <span className="text-xs text-brand-slate font-bold font-numbers">{rev.date}</span>
-                    </div>
-                    <div className="flex gap-0.5 text-[#ffe500] mb-2.5">
-                      {Array.from({ length: rev.rating }).map((_, idx) => (
-                        <Star key={idx} size={11} className="fill-brand-orange text-brand-orange" />
-                      ))}
-                    </div>
-                    <p className="text-xs text-brand-slate font-semibold leading-relaxed">{rev.comment}</p>
+                {displayReviews.length === 0 ? (
+                  <div className="p-6 border border-brand-border/80 rounded-2xl text-center bg-slate-50/50">
+                    <p className="text-xs font-bold text-brand-graphite">No verified reviews for this {isServices ? 'service' : 'product'} yet.</p>
+                    <p className="text-[11px] text-brand-slate mt-1">Verified customers who booked or ordered this item can submit feedback from their account.</p>
                   </div>
-                ))}
+                ) : (
+                  displayReviews.map((rev, i) => (
+                    <div key={i} className="p-4 sm:p-5 border border-brand-border rounded-2xl text-left shadow-soft bg-white">
+                      <div className="flex justify-between items-center mb-2 leading-none font-heading">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs text-brand-graphite">{rev.name}</span>
+                          {rev.isVerified && (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200/60 flex items-center gap-0.5">
+                              <CheckCircle2 size={10} /> Verified
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-brand-slate font-bold font-numbers">{rev.date}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex gap-0.5 text-[#ffe500]">
+                          {Array.from({ length: rev.rating }).map((_, idx) => (
+                            <Star key={idx} size={12} className="fill-brand-orange text-brand-orange" />
+                          ))}
+                        </div>
+                        {rev.title && <span className="text-xs font-extrabold text-brand-graphite">{rev.title}</span>}
+                      </div>
+                      <p className="text-xs text-brand-slate font-medium leading-relaxed bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/80">{rev.comment}</p>
+                      {rev.images && rev.images.length > 0 && (
+                        <div className="flex gap-2 mt-2.5 flex-wrap">
+                          {rev.images.map((img, idx) => (
+                            <img key={idx} src={img} alt="review attachment" className="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-sm" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -293,7 +333,7 @@ export const ProductDetailPage: React.FC = () => {
         {/* Desktop Recommended Products */}
         {similarProducts.length > 0 && (
           <div className="mt-16 pt-10 border-t border-brand-border/20">
-            <h2 className={`text-xl font-bold mb-6 font-heading ${isServices ? 'text-white' : 'text-brand-graphite'}`}>
+            <h2 className="text-xl font-bold mb-6 font-heading text-brand-graphite">
               {isServices ? 'Recommended Services' : 'Recommended for you'}
             </h2>
             <div className="grid grid-cols-5 gap-5">
@@ -306,7 +346,7 @@ export const ProductDetailPage: React.FC = () => {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                       navigateTo('detail', p.id);
                     }}
-                    className={`border rounded-xl flex flex-col group cursor-pointer hover:shadow-hover-lift transition-all duration-300 overflow-hidden ${isServices ? 'bg-[#2C2C2E] border-zinc-800' : 'bg-white border-brand-border/60 hover:border-brand-blue/30'}`}
+                    className="border rounded-xl flex flex-col group cursor-pointer hover:shadow-hover-lift transition-all duration-300 overflow-hidden bg-white border-brand-border/60 hover:border-brand-blue/30"
                   >
                     <div className="w-full aspect-square flex items-center justify-center p-4 bg-white relative">
                       <img src={p.image} alt={p.title} className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300" />
@@ -317,7 +357,7 @@ export const ProductDetailPage: React.FC = () => {
                       )}
                     </div>
                     <div className="p-4 flex flex-col flex-grow">
-                      <h3 className={`text-xs font-bold line-clamp-2 leading-relaxed mb-2 font-heading ${isServices ? 'text-white' : 'text-brand-graphite group-hover:text-brand-blue'}`}>
+                      <h3 className="text-xs font-bold line-clamp-2 leading-relaxed mb-2 font-heading text-brand-graphite group-hover:text-brand-blue">
                         {p.title}
                       </h3>
                       <div className="mt-auto flex flex-col font-numbers">
@@ -364,45 +404,50 @@ export const ProductDetailPage: React.FC = () => {
     return (
       <div className="w-full flex flex-col bg-white min-h-screen text-left pb-36 select-none text-brand-graphite font-sans selection:bg-brand-blue/20">
         {/* Navigation header row */}
-        <div className={`px-4 py-3.5 sticky top-0 z-30 flex items-center justify-between border-b transition-colors ${
-          isServices ? 'bg-zinc-950 border-zinc-800 text-white shadow-md' : 'bg-white/80 backdrop-blur-xl border-slate-200/60 text-brand-graphite shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]'
-        }`}>
+        <div className="px-4 py-3.5 sticky top-0 z-30 flex items-center justify-between border-b bg-white/80 backdrop-blur-xl border-slate-200/60 text-brand-graphite shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]">
           <button 
             onClick={goBack} 
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 ${
-              isServices ? 'bg-zinc-850 hover:bg-zinc-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-zinc-700'
-            }`}
+            className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700"
           >
-            <ArrowLeft size={18} strokeWidth={2.5} className={isServices ? "text-white" : "text-zinc-700"} />
+            <ArrowLeft size={18} strokeWidth={2.5} className="text-zinc-700" />
           </button>
-          <span className={`font-extrabold text-xs tracking-wider font-heading uppercase ${
-            isServices ? 'text-white font-black drop-shadow-sm' : 'text-zinc-800'
-          }`}>
+          <span className="font-extrabold text-xs tracking-wider font-heading uppercase text-zinc-800">
             {isServices ? 'Service Details' : 'Product Details'}
           </span>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => setIsWishlisted(!isWishlisted)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 ${
-                isServices ? 'bg-zinc-850 hover:bg-zinc-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-zinc-700'
-              }`}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 cursor-pointer"
             >
-              <Heart size={16} strokeWidth={2.5} className={isWishlisted ? "fill-brand-red text-brand-red" : isServices ? "text-white" : "text-zinc-700"} />
+              <Heart size={16} strokeWidth={2.5} className={isWishlisted ? "fill-brand-red text-brand-red" : "text-zinc-700"} />
             </button>
-            <button className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 ${
-              isServices ? 'bg-zinc-850 hover:bg-zinc-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-zinc-700'
-            }`}>
-              <Share2 size={16} strokeWidth={2.5} className={isServices ? "text-white" : "text-zinc-700"} />
+            <button 
+              onClick={() => navigateTo('cart')}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 relative cursor-pointer"
+            >
+              <ShoppingCart size={16} strokeWidth={2.2} className="text-zinc-700" />
+              {cartItemCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white font-numbers shadow-sm border-2 border-white">
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({ title: product?.title || 'ShopIndia', url: window.location.href }).catch(() => {});
+                }
+              }}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 cursor-pointer"
+            >
+              <Share2 size={16} strokeWidth={2.5} className="text-zinc-700" />
             </button>
           </div>
         </div>
 
         {/* Large picture */}
-        <div className={`w-full aspect-square sm:aspect-[4/3] flex items-center justify-center p-10 border-b relative overflow-hidden ${
-          isServices ? 'bg-[#1C1C1E] border-zinc-800' : 'bg-gradient-to-b from-slate-50 via-white to-slate-50/40 border-slate-200/60'
-        }`}>
-          {/* Subtle background glow effect */}
-          {!isServices && <div className="absolute inset-0 bg-brand-blue/5 blur-3xl rounded-full scale-150 opacity-40 mix-blend-multiply"></div>}
+        <div className="w-full aspect-square sm:aspect-[4/3] flex items-center justify-center p-10 border-b relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/40 border-slate-200/60">
+          <div className="absolute inset-0 bg-brand-blue/5 blur-3xl rounded-full scale-150 opacity-40 mix-blend-multiply"></div>
           
           <img 
             src={product.image} 
@@ -533,12 +578,62 @@ export const ProductDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
+          {/* Mobile Ratings & Customer Reviews */}
+          <div className="mt-4 p-5 rounded-2xl border bg-white border-slate-200/60">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs uppercase font-black tracking-widest font-heading text-slate-400">
+                {isServices ? 'Service Feedback' : 'Customer Reviews'}
+              </span>
+              <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
+                <CheckCircle2 size={11} /> {displayReviews.length} Reviews
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {displayReviews.length === 0 ? (
+                <div className="p-5 rounded-xl border text-center bg-slate-50/50 border-slate-100">
+                  <p className="text-xs font-bold text-brand-graphite">No verified reviews yet</p>
+                  <p className="text-[11px] text-brand-slate mt-0.5">Reviews appear here once verified customers submit their ratings.</p>
+                </div>
+              ) : (
+                displayReviews.map((rev, i) => (
+                  <div key={i} className="p-4 rounded-xl border text-left bg-slate-50/50 border-slate-100">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-xs text-brand-graphite">{rev.name}</span>
+                        {rev.isVerified && (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-bold">Verified</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-brand-slate font-numbers">{rev.date}</span>
+                    </div>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <div className="flex gap-0.5 text-[#ffe500]">
+                        {Array.from({ length: rev.rating }).map((_, idx) => (
+                          <Star key={idx} size={10} className="fill-brand-orange text-brand-orange" />
+                        ))}
+                      </div>
+                      {rev.title && <span className="text-xs font-bold text-brand-graphite ml-1">{rev.title}</span>}
+                    </div>
+                    <p className="text-xs text-brand-slate leading-relaxed">{rev.comment}</p>
+                    {rev.images && rev.images.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {rev.images.map((img, idx) => (
+                          <img key={idx} src={img} alt="review" className="w-12 h-12 rounded-lg object-cover border border-slate-200" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Mobile Recommended Services/Products */}
         {similarProducts.length > 0 && (
-          <div className={`mt-2 pt-6 pb-4 border-t ${isServices ? 'bg-[#1C1C1E] border-zinc-800' : 'bg-white border-slate-200/60'}`}>
-            <h2 className={`px-5 text-sm font-black uppercase tracking-widest font-heading mb-4 ${isServices ? 'text-white' : 'text-slate-400'}`}>
+          <div className="mt-2 pt-6 pb-4 border-t bg-white border-slate-200/60">
+            <h2 className="px-5 text-sm font-black uppercase tracking-widest font-heading mb-4 text-slate-400">
               {isServices ? 'Recommended Services' : 'Recommended for you'}
             </h2>
             <div className="grid grid-cols-2 gap-3 px-4 pb-4">
@@ -551,7 +646,7 @@ export const ProductDetailPage: React.FC = () => {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                       navigateTo('detail', p.id);
                     }}
-                    className={`w-full flex-col border rounded-xl flex group cursor-pointer overflow-hidden shadow-sm ${isServices ? 'bg-[#2C2C2E] border-zinc-800' : 'bg-white border-slate-200/60'}`}
+                    className="w-full flex-col border rounded-xl flex group cursor-pointer overflow-hidden shadow-sm bg-white border-slate-200/60"
                   >
                     <div className="w-full aspect-square flex items-center justify-center p-3 bg-white relative border-b border-slate-100">
                       <img src={p.image} alt={p.title} className="max-h-full max-w-full object-contain" />
@@ -562,7 +657,7 @@ export const ProductDetailPage: React.FC = () => {
                       )}
                     </div>
                     <div className="p-3 flex flex-col flex-grow">
-                      <h3 className={`text-[11px] font-bold line-clamp-2 leading-snug mb-1.5 font-heading ${isServices ? 'text-white' : 'text-brand-graphite'}`}>
+                      <h3 className="text-[11px] font-bold line-clamp-2 leading-snug mb-1.5 font-heading text-brand-graphite">
                         {p.title}
                       </h3>
                       <div className="mt-auto flex flex-col font-numbers">

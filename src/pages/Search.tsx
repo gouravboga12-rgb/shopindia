@@ -13,10 +13,22 @@ export const SearchPage: React.FC = () => {
 
   // Filters state
   const [sortBy, setSortBy] = useState<string>('relevance');
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [minRating, setMinRating] = useState<number | null>(null);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState<number>(150000);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  const toggleBrand = (brand: string) => {
+    setSelectedBrands(prev => 
+      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
+    );
+  };
+
+  const toggleRating = (star: number) => {
+    setSelectedRatings(prev => 
+      prev.includes(star) ? prev.filter(s => s !== star) : [...prev, star]
+    );
+  };
 
   // Filter products
   const searchedProducts = useMemo(() => {
@@ -28,18 +40,22 @@ export const SearchPage: React.FC = () => {
       filtered = filtered.filter(p =>
         p.title.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        (p.brand && p.brand.toLowerCase().includes(q)) ||
+        (p.description && p.description.toLowerCase().includes(q))
       );
     }
 
-    // Apply filters
-    if (selectedBrand) {
-      filtered = filtered.filter(p => p.brand === selectedBrand);
+    // Apply multiple brands filter
+    if (selectedBrands.length > 0) {
+      filtered = filtered.filter(p => p.brand && selectedBrands.includes(p.brand));
     }
-    if (minRating) {
-      filtered = filtered.filter(p => p.rating >= minRating);
+
+    // Apply multiple ratings filter
+    if (selectedRatings.length > 0) {
+      const minStar = Math.min(...selectedRatings);
+      filtered = filtered.filter(p => p.rating >= minStar);
     }
+
     filtered = filtered.filter(p => p.price <= maxPrice);
 
     // Apply Sorting
@@ -52,11 +68,14 @@ export const SearchPage: React.FC = () => {
     }
 
     return filtered;
-  }, [allProducts, currentVertical, searchQuery, selectedBrand, minRating, maxPrice, sortBy]);
+  }, [allProducts, currentVertical, searchQuery, selectedBrands, selectedRatings, maxPrice, sortBy]);
 
   const brands = useMemo(() => {
-    const allBrands = allProducts.filter(p => p.vertical === currentVertical).map(p => p.brand);
-    return Array.from(new Set(allBrands));
+    const allBrands = allProducts
+      .filter(p => p.vertical === currentVertical)
+      .map(p => p.brand)
+      .filter((b): b is string => Boolean(b && b.trim()));
+    return Array.from(new Set(allBrands)).sort();
   }, [allProducts, currentVertical]);
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
@@ -65,8 +84,8 @@ export const SearchPage: React.FC = () => {
   };
 
   const handleResetFilters = () => {
-    setSelectedBrand(null);
-    setMinRating(null);
+    setSelectedBrands([]);
+    setSelectedRatings([]);
     setMaxPrice(150000);
     setSortBy('relevance');
   };
@@ -77,14 +96,14 @@ export const SearchPage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto w-full flex gap-8 py-8 px-12 text-left font-sans text-brand-graphite">
         {/* Left Filter Sidebar */}
-        <aside className={`w-full max-w-[260px] p-6 border rounded-card shrink-0 h-fit select-none shadow-premium ${
-          isServices ? 'bg-[#2C2C2E] border-zinc-800 text-white' : 'bg-white border-brand-border'
-        }`}>
-          <div className="flex justify-between items-center border-b pb-3.5 mb-5 border-brand-border/10">
+        <aside className="w-full max-w-[260px] p-6 border rounded-card shrink-0 h-fit select-none shadow-premium bg-white border-brand-border">
+          <div className="flex justify-between items-center border-b pb-3.5 mb-5 border-brand-border/60">
             <span className="font-black text-xs uppercase tracking-widest font-heading">Filters</span>
-            <button onClick={handleResetFilters} className="text-xs font-bold text-brand-blue hover:underline">
-              Clear All
-            </button>
+            {(selectedBrands.length > 0 || selectedRatings.length > 0 || maxPrice < 150000 || sortBy !== 'relevance') && (
+              <button onClick={handleResetFilters} className="text-xs font-bold text-brand-blue hover:underline cursor-pointer">
+                Clear All
+              </button>
+            )}
           </div>
 
           {/* Sort By Section */}
@@ -100,10 +119,10 @@ export const SearchPage: React.FC = () => {
                 <button
                   key={opt.id}
                   onClick={() => setSortBy(opt.id)}
-                  className={`text-xs text-left font-bold py-1.5 transition-all ${
+                  className={`text-xs text-left font-bold py-1.5 transition-all cursor-pointer ${
                     sortBy === opt.id
                       ? 'text-brand-blue font-extrabold pl-2 border-l-2 border-brand-blue'
-                      : 'text-brand-slate hover:text-brand-graphite dark:hover:text-white'
+                      : 'text-brand-slate hover:text-brand-graphite'
                   }`}
                 >
                   {opt.name}
@@ -122,7 +141,7 @@ export const SearchPage: React.FC = () => {
               step={100}
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-brand-blue mb-3 dark:bg-zinc-800"
+              className="w-full h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-brand-blue mb-3"
             />
             <div className="flex justify-between text-xs font-black text-brand-slate font-numbers">
               <span>₹0</span>
@@ -130,38 +149,56 @@ export const SearchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Brands Filter */}
-          <div className="mb-6">
-            <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-3 font-heading">Brand</span>
-            <div className="flex flex-col gap-2 max-h-40 overflow-y-auto no-scrollbar font-bold">
-              {brands.map(brand => (
-                <label key={brand} className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite dark:hover:text-white cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={selectedBrand === brand}
-                    onChange={() => setSelectedBrand(selectedBrand === brand ? null : brand)}
-                    className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-3.5 h-3.5"
-                  />
-                  <span>{brand}</span>
-                </label>
-              ))}
+          {/* Brands Multi-Select Filter */}
+          {brands.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-black text-xs uppercase text-brand-slate tracking-widest block font-heading">
+                  Brand {selectedBrands.length > 0 && `(${selectedBrands.length})`}
+                </span>
+                {selectedBrands.length > 0 && (
+                  <button onClick={() => setSelectedBrands([])} className="text-[10px] font-bold text-brand-blue hover:underline">
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-2.5 max-h-48 overflow-y-auto no-scrollbar font-bold pr-1">
+                {brands.map(brand => (
+                  <label key={brand} className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={selectedBrands.includes(brand)}
+                      onChange={() => toggleBrand(brand)}
+                      className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
+                    />
+                    <span className={selectedBrands.includes(brand) ? 'text-brand-graphite font-black' : 'font-semibold'}>
+                      {brand}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Customer Ratings Filter */}
           <div className="mb-2">
             <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-3 font-heading">Customer Rating</span>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {[4, 3, 2].map(star => (
-                <button
+                <label
                   key={star}
-                  onClick={() => setMinRating(minRating === star ? null : star)}
-                  className={`flex items-center gap-1.5 text-xs text-left font-bold py-1 transition-all ${
-                    minRating === star ? 'text-brand-blue font-extrabold pl-2 border-l-2 border-brand-blue' : 'text-brand-slate'
-                  }`}
+                  className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none"
                 >
-                  <span>{star}★ & above</span>
-                </button>
+                  <input
+                    type="checkbox"
+                    checked={selectedRatings.includes(star)}
+                    onChange={() => toggleRating(star)}
+                    className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
+                  />
+                  <span className={`font-bold ${selectedRatings.includes(star) ? 'text-brand-blue font-extrabold' : ''}`}>
+                    {star}★ & above
+                  </span>
+                </label>
               ))}
             </div>
           </div>
@@ -169,11 +206,9 @@ export const SearchPage: React.FC = () => {
 
         {/* Search Results Display */}
         <main className="flex-1">
-          <div className={`p-5 border rounded-card mb-6 flex justify-between items-center shadow-premium ${
-            isServices ? 'bg-[#2C2C2E] border-zinc-800 text-white' : 'bg-white border-brand-border'
-          }`}>
+          <div className="p-5 border rounded-card mb-6 flex justify-between items-center shadow-premium bg-white border-brand-border">
             <span className="text-xs font-bold text-brand-slate">
-              Showing <strong className={`font-numbers ${isServices ? 'text-white' : 'text-brand-graphite'}`}>{searchedProducts.length}</strong> results for "{searchQuery || 'All catalog'}"
+              Showing <strong className="font-numbers text-brand-graphite">{searchedProducts.length}</strong> results for "{searchQuery || 'All catalog'}"
             </span>
           </div>
 
@@ -394,49 +429,81 @@ export const SearchPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Brands selection */}
-              <span className="text-xs text-brand-slate font-black uppercase tracking-widest block mb-2.5 font-heading">Select Brand</span>
-              <div className="flex flex-wrap gap-2 mb-4 font-bold">
-                {brands.map(brand => (
-                  <button
-                    key={brand}
-                    onClick={() => setSelectedBrand(selectedBrand === brand ? null : brand)}
-                    className={`px-3.5 py-2 rounded-full text-xs border transition-all ${
-                      selectedBrand === brand
-                        ? 'bg-brand-blue text-white border-brand-blue'
-                        : 'bg-slate-50 text-brand-slate border-brand-border'
-                    }`}
-                  >
-                    {brand}
+              {/* Brands selection (Multi-Select) */}
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
+                  Select Brand {selectedBrands.length > 0 && `(${selectedBrands.length})`}
+                </span>
+                {selectedBrands.length > 0 && (
+                  <button onClick={() => setSelectedBrands([])} className="text-[11px] font-bold text-brand-blue hover:underline">
+                    Reset
                   </button>
-                ))}
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 mb-5 font-bold max-h-40 overflow-y-auto no-scrollbar pr-1">
+                {brands.map(brand => {
+                  const isChecked = selectedBrands.includes(brand);
+                  return (
+                    <button
+                      key={brand}
+                      onClick={() => toggleBrand(brand)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
+                        isChecked
+                          ? 'bg-brand-blue text-white border-brand-blue shadow-xs font-black'
+                          : 'bg-slate-50 text-brand-slate border-brand-border'
+                      }`}
+                    >
+                      {isChecked ? `✓ ${brand}` : brand}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Ratings selection */}
-              <span className="text-xs text-brand-slate font-black uppercase tracking-widest block mb-2.5 font-heading">Customer Rating</span>
+              {/* Ratings selection (Multi-Select) */}
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
+                  Customer Rating {selectedRatings.length > 0 && `(${selectedRatings.length})`}
+                </span>
+                {selectedRatings.length > 0 && (
+                  <button onClick={() => setSelectedRatings([])} className="text-[11px] font-bold text-brand-blue hover:underline">
+                    Reset
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-2 mb-6 font-bold">
-                {[4, 3, 2].map(star => (
-                  <button
-                    key={star}
-                    onClick={() => setMinRating(minRating === star ? null : star)}
-                    className={`py-2 text-center text-xs border rounded-button transition-all ${
-                      minRating === star
-                        ? 'border-brand-blue bg-blue-50/15 text-brand-blue'
-                        : 'border-brand-border bg-slate-50 text-brand-slate'
-                    }`}
-                  >
-                    {star}★ & above
-                  </button>
-                ))}
+                {[4, 3, 2].map(star => {
+                  const isChecked = selectedRatings.includes(star);
+                  return (
+                    <button
+                      key={star}
+                      onClick={() => toggleRating(star)}
+                      className={`py-2 text-center text-xs border rounded-xl transition-all cursor-pointer ${
+                        isChecked
+                          ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold shadow-xs'
+                          : 'border-brand-border bg-slate-50 text-brand-slate'
+                      }`}
+                    >
+                      {isChecked ? `✓ ${star}★ & above` : `${star}★ & above`}
+                    </button>
+                  );
+                })}
               </div>
 
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setMobileFilterOpen(false)}
-                className="w-full py-3 bg-brand-blue hover:bg-blue-600 text-white font-extrabold text-xs rounded-button uppercase tracking-wider shadow"
-              >
-                Apply Selected Filters
-              </motion.button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleResetFilters}
+                  className="w-full py-3 bg-slate-100 text-brand-graphite font-extrabold text-xs rounded-xl uppercase tracking-wider"
+                >
+                  Clear All
+                </button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setMobileFilterOpen(false)}
+                  className="w-full py-3 bg-brand-blue hover:bg-blue-600 text-white font-extrabold text-xs rounded-xl uppercase tracking-wider shadow"
+                >
+                  Apply Filters
+                </motion.button>
+              </div>
             </div>
           </div>
         )}
