@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Clock, X } from 'lucide-react';
 
 export const VendorProducts: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -22,6 +22,11 @@ export const VendorProducts: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Service Timing Slots & Duration
+  const [serviceSlots, setServiceSlots] = useState<string[]>(['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM']);
+  const [durationEstimate, setDurationEstimate] = useState('45-90 min');
+  const [newSlotInput, setNewSlotInput] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -45,6 +50,22 @@ export const VendorProducts: React.FC = () => {
     setFulfillmentType('traditional'); setSubVertical('grocery');
     setIsVeg(true); setIsRx(false); setVehicleType('car');
     setCategoryId(''); setImageFile(null);
+    setServiceSlots(['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM']);
+    setDurationEstimate('45-90 min');
+    setNewSlotInput('');
+  };
+
+  const handleAddSlot = (slotToAdd?: string) => {
+    const slot = (slotToAdd || newSlotInput).trim();
+    if (!slot) return;
+    if (!serviceSlots.includes(slot)) {
+      setServiceSlots(prev => [...prev, slot]);
+    }
+    if (!slotToAdd) setNewSlotInput('');
+  };
+
+  const handleRemoveSlot = (slotToRemove: string) => {
+    setServiceSlots(prev => prev.filter(s => s !== slotToRemove));
   };
 
   const openAdd = () => { resetForm(); setModal(true); };
@@ -71,6 +92,16 @@ export const VendorProducts: React.FC = () => {
     setVehicleType(tags.includes('bike') ? 'bike' : 'car');
     setCategoryId(p.categoryId || '');
     setImageFile(null);
+
+    // Populate service timing slots & duration if present
+    if (p.serviceSlots && p.serviceSlots.length > 0) {
+      setServiceSlots(p.serviceSlots);
+    } else {
+      setServiceSlots(['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM']);
+    }
+    setDurationEstimate(p.durationEstimate || '45-90 min');
+    setNewSlotInput('');
+
     setModal(true);
   };
 
@@ -135,6 +166,10 @@ export const VendorProducts: React.FC = () => {
         fulfillmentType: finalFulfillment,
         tags,
       };
+      if (subVertical === 'home_service' || subVertical === 'vehicle_service') {
+        payload.serviceSlots = serviceSlots;
+        payload.durationEstimate = durationEstimate;
+      }
       if (categoryId) payload.categoryId = categoryId;
       let imageUrl = '';
       if (imageFile) imageUrl = await handleImageUpload();
@@ -339,6 +374,127 @@ export const VendorProducts: React.FC = () => {
                   <option value="bike">2-Wheeler (Bike)</option>
                   <option value="both">Both (Car & Bike)</option>
                 </select>
+              </div>
+            )}
+
+            {/* Service Timing Slots & Duration Config */}
+            {(subVertical === 'home_service' || subVertical === 'vehicle_service') && (
+              <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200/80 space-y-3">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>Service Duration & Customer Booking Slots</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Duration Estimate (Shown on Service Card)
+                  </label>
+                  <input
+                    value={durationEstimate}
+                    onChange={e => setDurationEstimate(e.target.value)}
+                    placeholder="e.g. 45-90 min or 1-2 hours"
+                    className="w-full px-3 py-1.5 bg-white border border-amber-200 rounded-xl text-xs focus:ring-1 focus:ring-amber-500"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {['30-45 min', '45-90 min', '1-2 hrs', '2-3 hrs'].map(preset => (
+                      <button
+                        type="button"
+                        key={preset}
+                        onClick={() => setDurationEstimate(preset)}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${
+                          durationEstimate === preset
+                            ? 'bg-amber-600 text-white border-amber-600 font-bold'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-gray-700">
+                      Available Time Slots ({serviceSlots.length})
+                    </label>
+                    <span className="text-[10px] text-gray-500">Customers select from these slots</span>
+                  </div>
+
+                  {/* Active Slots Chips */}
+                  <div className="flex flex-wrap gap-1.5 mb-2 min-h-[36px] p-2 bg-white/80 rounded-xl border border-amber-200">
+                    {serviceSlots.length === 0 ? (
+                      <span className="text-xs text-red-500 italic">No slots added. Add at least one slot.</span>
+                    ) : (
+                      serviceSlots.map(slot => (
+                        <span
+                          key={slot}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-xs"
+                        >
+                          {slot}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSlot(slot)}
+                            className="text-amber-700 hover:text-red-600 p-0.5"
+                            title="Remove slot"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Custom Slot Input */}
+                  <div className="flex gap-2">
+                    <input
+                      value={newSlotInput}
+                      onChange={e => setNewSlotInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSlot();
+                        }
+                      }}
+                      placeholder="e.g. 09:30 AM or 05:00 PM"
+                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddSlot()}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                    >
+                      + Add Slot
+                    </button>
+                  </div>
+
+                  {/* Quick-add suggestions */}
+                  <div className="mt-2">
+                    <span className="text-[10px] text-gray-500 block mb-1">Quick Add Common Slots:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {['08:00 AM', '10:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '04:00 PM', '06:00 PM', '08:00 PM'].map(
+                        preset => {
+                          const exists = serviceSlots.includes(preset);
+                          return (
+                            <button
+                              type="button"
+                              key={preset}
+                              onClick={() => handleAddSlot(preset)}
+                              disabled={exists}
+                              className={`text-[10px] px-2 py-0.5 rounded-md border transition-all ${
+                                exists
+                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'
+                                  : 'bg-white text-gray-700 border-gray-200 hover:border-amber-400 hover:text-amber-700'
+                              }`}
+                            >
+                              + {preset}
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

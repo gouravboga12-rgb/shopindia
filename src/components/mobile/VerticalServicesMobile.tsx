@@ -56,8 +56,28 @@ export const VerticalServicesMobile: React.FC = () => {
   });
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
 
-  const dates = ['Today', 'Tomorrow', 'Saturday', 'Sunday'];
-  const times = ['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM'];
+  // Dynamically generate the next 4 calendar days (Today, Tomorrow, and upcoming weekday names)
+  const dates = useMemo(() => {
+    const result: string[] = [];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const now = new Date();
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      if (i === 0) result.push('Today');
+      else if (i === 1) result.push('Tomorrow');
+      else result.push(dayNames[d.getDay()]);
+    }
+    return result;
+  }, []);
+
+  // Dynamically resolve time slots configured by admin/vendor for the selected service
+  const times = useMemo(() => {
+    if (bookingService?.serviceSlots && bookingService.serviceSlots.length > 0) {
+      return bookingService.serviceSlots;
+    }
+    return ['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM'];
+  }, [bookingService]);
 
   const services = products.filter((p) => {
     if (p.vertical !== 'services') return false;
@@ -94,6 +114,11 @@ export const VerticalServicesMobile: React.FC = () => {
   const handleBookClick = (service: Product, e: React.MouseEvent) => {
     e.stopPropagation();
     setBookingService(service);
+    setSelectedDate('Tomorrow');
+    const slots = service.serviceSlots && service.serviceSlots.length > 0
+      ? service.serviceSlots
+      : ['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM'];
+    setSelectedTime(slots[0] || '10:00 AM');
   };
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {

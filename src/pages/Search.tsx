@@ -238,7 +238,7 @@ export const SearchPage: React.FC = () => {
                   <div
                     key={product.id}
                     onClick={() => navigateTo('detail', product.id)}
-                    className={`border rounded-card p-5 flex flex-col hover:shadow-hover-lift hover:-translate-y-1 transition-all duration-350 cursor-pointer group h-full relative ${
+                    className={`border rounded-card p-5 flex flex-col hover:shadow-hover-lift hover:-translate-y-1 transition-all duration-350 cursor-pointer group h-full relative isolate ${
                       isServices ? 'bg-[#2C2C2E] border-zinc-800 text-white' : 'bg-white border-brand-border'
                     }`}
                   >
@@ -349,7 +349,7 @@ export const SearchPage: React.FC = () => {
                 <div
                   key={product.id}
                   onClick={() => navigateTo('detail', product.id)}
-                  className="bg-white border border-brand-border rounded-[20px] p-3 flex flex-col cursor-pointer relative shadow-soft"
+                  className="bg-white border border-brand-border rounded-[20px] p-3 flex flex-col cursor-pointer relative shadow-soft isolate"
                 >
                   {/* Wishlist Button */}
                   <motion.button

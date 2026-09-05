@@ -56,7 +56,10 @@ router.get('/', async (_req, res) => {
         dosageForm: subVertical === 'pharmacy' ? (p.name.includes('Syrup') ? 'Syrup' : 'Tablet / Capsule') : undefined,
         packSize: subVertical === 'pharmacy' ? '10 Units / Strip' : undefined,
         serviceType: subVertical === 'vehicle_service' ? 'vehicle' : (vertical === 'services' ? 'home' : undefined),
-        durationEstimate: vertical === 'services' ? '45 - 90 mins' : undefined,
+        serviceSlots: p.serviceSlots && p.serviceSlots.length > 0
+          ? p.serviceSlots
+          : (vertical === 'services' ? ['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM'] : []),
+        durationEstimate: p.durationEstimate || (vertical === 'services' ? '45 - 90 mins' : undefined),
         warrantyDays: vertical === 'services' ? 30 : undefined,
         vehicleType: subVertical === 'vehicle_service' ? 'both' : undefined,
         serviceLocationType: subVertical === 'vehicle_service' ? 'both' : undefined,

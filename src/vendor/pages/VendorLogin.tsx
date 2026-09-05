@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { Store, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRegister = false }) => {
   const { login } = useAuth();
@@ -10,6 +11,7 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   // Form states
   const [email, setEmail] = useState('vendor@demo.in');
@@ -45,50 +47,63 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#10B981] via-[#059669] to-[#047857] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 mb-4 text-white">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500 text-white shadow-lg mb-4">
             <Store className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white font-heading">ShopIndia Vendor Portal</h1>
-          <p className="text-white/80 text-sm mt-1">Multi-Vendor Partner Dashboard (MOD-02)</p>
+          <h1 className="text-2xl font-bold text-gray-900 font-heading">ShopIndia Vendor Portal</h1>
+          <p className="text-gray-500 text-sm mt-1">Manage your store, products, and orders</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
-          <div className="flex items-center justify-between border-b pb-4">
-            <h2 className="text-xl font-bold text-gray-900">
-              {isRegister ? 'Register Business' : 'Vendor Sign In'}
-            </h2>
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <div className="flex border-b border-gray-200 mb-6">
             <button
-              onClick={() => { setIsRegister(!isRegister); setError(''); setSuccess(''); }}
-              className="text-xs font-semibold text-[#10B981] hover:underline"
+              onClick={() => { setIsRegister(false); setError(''); setSuccess(''); }}
+              className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+                !isRegister ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
             >
-              {isRegister ? 'Already registered? Sign In' : 'New Vendor? Apply Now'}
+              Vendor Sign In
+            </button>
+            <button
+              onClick={() => { setIsRegister(true); setError(''); setSuccess(''); }}
+              className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+                isRegister ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              Register as Vendor
             </button>
           </div>
 
-          {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs">{error}</div>}
-          {success && <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs">{success}</div>}
+          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>}
+          {success && <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">{success}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
               <>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Business / Trade Name *</label>
-                  <input required value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="e.g. Apex Electronics Ltd" className="w-full px-4 py-2.5 border rounded-xl text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Contact Person Name *</label>
-                  <input required value={name} onChange={e => setName(e.target.value)} placeholder="Full Name" className="w-full px-4 py-2.5 border rounded-xl text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number *</label>
-                  <input required value={phone} onChange={e => setPhone(e.target.value)} placeholder="10-digit mobile" className="w-full px-4 py-2.5 border rounded-xl text-sm" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">GSTIN</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Your Name *</label>
+                    <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Phone *</label>
+                    <input required value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Business / Store Name *</label>
+                  <input required value={businessName} onChange={e => setBusinessName(e.target.value)} className="w-full px-4 py-2.5 border rounded-xl text-sm" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">GST Number</label>
                     <input value={gstNumber} onChange={e => setGstNumber(e.target.value)} placeholder="Optional" className="w-full px-3 py-2 border rounded-xl text-xs uppercase" />
                   </div>
                   <div>
@@ -105,7 +120,18 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Password *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-700">Password *</label>
+                {!isRegister && (
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot(true)}
+                    className="text-xs font-semibold text-emerald-600 hover:underline cursor-pointer"
+                  >
+                    Forgot Password?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -117,7 +143,7 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -127,13 +153,19 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#10B981] text-white rounded-xl font-semibold text-sm hover:bg-[#059669] flex items-center justify-center gap-2 transition-all shadow-md"
+              className="w-full py-3 bg-[#10B981] text-white rounded-xl font-semibold text-sm hover:bg-[#059669] flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-60"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : isRegister ? 'Submit Application' : 'Vendor Sign In'}
             </button>
           </form>
         </div>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgot}
+        onClose={() => setShowForgot(false)}
+        initialEmail={email}
+      />
     </div>
   );
 };

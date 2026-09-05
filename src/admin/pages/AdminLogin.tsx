@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 export const AdminLogin: React.FC = () => {
   const { login } = useAuth();
@@ -10,6 +11,7 @@ export const AdminLogin: React.FC = () => {
   const [show, setShow]         = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
+  const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +54,16 @@ export const AdminLogin: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgot(true)}
+                  className="text-xs font-semibold text-[#0F2C59] hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div className="relative">
                 <input
                   type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
@@ -65,7 +76,7 @@ export const AdminLogin: React.FC = () => {
               </div>
             </div>
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-[#0F2C59] text-white rounded-xl font-semibold text-sm hover:bg-[#1a3d73] disabled:opacity-60 transition-all flex items-center justify-center gap-2 mt-2">
+              className="w-full py-3 bg-[#0F2C59] text-white rounded-xl font-semibold text-sm hover:bg-[#1a3d73] disabled:opacity-60 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer">
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : 'Sign In'}
             </button>
           </form>
@@ -74,6 +85,12 @@ export const AdminLogin: React.FC = () => {
           </p>
         </div>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgot}
+        onClose={() => setShowForgot(false)}
+        initialEmail={email}
+      />
     </div>
   );
 };

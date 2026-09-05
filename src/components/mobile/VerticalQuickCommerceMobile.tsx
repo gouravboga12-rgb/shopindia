@@ -217,7 +217,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
             <div
               key={product.id}
               onClick={() => navigateTo('detail', product.id)}
-              className="bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between relative"
+              className="bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between relative isolate"
             >
               <button
                 onClick={(e) => toggleWishlist(product.id, e)}

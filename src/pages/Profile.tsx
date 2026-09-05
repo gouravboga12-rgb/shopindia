@@ -5,6 +5,7 @@ import { User, ShieldCheck, Mail, Sparkles, LogIn, LogOut, Loader2 } from 'lucid
 import { motion } from 'framer-motion';
 import type { CustomerUser } from '../lib/customerAuth';
 import { DashboardInner } from './dashboard/DashboardPortal';
+import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import {
   getCustomerToken,
   getCustomerUser,
@@ -28,6 +29,7 @@ export const ProfilePage: React.FC = () => {
   const [aPass, setAPass] = useState('');
   const [aError, setAError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,19 +126,30 @@ export const ProfilePage: React.FC = () => {
                   <input type="email" value={aEmail} onChange={(e) => setAEmail(e.target.value)} placeholder="you@example.com" required className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><ShieldCheck size={12}/> Password</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><ShieldCheck size={12}/> Password</label>
+                    {authMode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPassword(true)}
+                        className="text-xs font-bold text-brand-blue hover:underline cursor-pointer"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
                   <input type="password" value={aPass} onChange={(e) => setAPass(e.target.value)} placeholder="••••••••" required className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
                 </div>
                 
                 <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-5">
                   <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={authLoading}
-                    className="w-full sm:w-auto px-8 py-3.5 bg-brand-blue hover:bg-blue-650 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all">
+                    className="w-full sm:w-auto px-8 py-3.5 bg-brand-blue hover:bg-blue-650 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer">
                     {authLoading ? <Loader2 size={18} className="animate-spin" /> : (authMode === 'login' ? <LogIn size={18} /> : <User size={18} />)}
                     {authMode === 'login' ? 'Log In Now' : 'Register Now'}
                   </motion.button>
                   
                   <button type="button" onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAError(''); }}
-                    className="text-xs text-brand-slate hover:text-brand-blue font-bold underline transition-colors w-full sm:w-auto text-center">
+                    className="text-xs text-brand-slate hover:text-brand-blue font-bold underline transition-colors w-full sm:w-auto text-center cursor-pointer">
                     {authMode === 'login' ? "New here? Create account" : 'Already registered? Log in'}
                   </button>
                 </div>
@@ -148,6 +161,12 @@ export const ProfilePage: React.FC = () => {
              </form>
           </div>
         </div>
+
+        <ForgotPasswordModal
+          isOpen={showForgotPassword}
+          onClose={() => setShowForgotPassword(false)}
+          initialEmail={aEmail}
+        />
       </div>
     );
   };
@@ -164,3 +183,4 @@ export const ProfilePage: React.FC = () => {
     </>
   );
 };
+

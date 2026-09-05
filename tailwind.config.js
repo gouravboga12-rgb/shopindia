@@ -63,6 +63,9 @@ export default {
         card: '18px',
         hero: '24px',
         'bottom-nav': '20px'
+      },
+      zIndex: {
+        '45': '45',
       }
     },
   },

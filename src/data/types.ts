@@ -44,6 +44,7 @@ export interface Product {
   durationEstimate?: string;
   warrantyDays?: number;
   includedPoints?: string[];
+  serviceSlots?: string[];
 
   // Vehicle Services specifics
   vehicleType?: 'car' | 'bike' | 'both';

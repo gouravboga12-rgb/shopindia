@@ -112,6 +112,8 @@ model User {
   permissions String[]   @default([])
   status      UserStatus @default(active)
   avatar      String?
+  resetOtp        String?
+  resetOtpExpires DateTime?
 
   branchId String?
   branch   Branch? @relation("BranchStaffUsers", fields: [branchId], references: [id])
@@ -224,6 +226,8 @@ model Product {
   ratingAvg       Float           @default(0)
   ratingCount     Int             @default(0)
   tags            String[]        @default([])
+  serviceSlots    String[]        @default([])
+  durationEstimate String?
 
   variants      ProductVariant[]
   images        ProductImage[]

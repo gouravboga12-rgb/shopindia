@@ -271,7 +271,7 @@ export const VerticalShopMobile: React.FC = () => {
               <div
                 key={product.id}
                 onClick={() => navigateTo('detail', product.id)}
-                className="w-full max-w-[110px] shrink-0 flex flex-col text-left cursor-pointer group relative"
+                className="w-full max-w-[110px] shrink-0 flex flex-col text-left cursor-pointer group relative isolate"
               >
                 {/* Wishlist Heart */}
                 <motion.button
@@ -333,7 +333,7 @@ export const VerticalShopMobile: React.FC = () => {
               <div
                 key={product.id}
                 onClick={() => navigateTo('detail', product.id)}
-                className="bg-white border border-brand-border/80 rounded-[16px] p-2.5 flex flex-col cursor-pointer relative shadow-sm active:scale-[0.98] transition-transform"
+                className="bg-white border border-brand-border/80 rounded-[16px] p-2.5 flex flex-col cursor-pointer relative shadow-sm active:scale-[0.98] transition-transform isolate"
               >
                 {/* Wishlist Heart */}
                 <motion.button

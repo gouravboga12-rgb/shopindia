@@ -272,7 +272,7 @@ export const MobileApp: React.FC = () => {
 
       {/* Native-style Mobile Bottom Navigation Tab Bar (Rounded 24px) */}
       {currentPath !== 'detail' && (
-        <nav className={`fixed bottom-0 left-0 right-0 h-16 border-t z-45 flex justify-around items-center select-none shadow-[0_-4px_20px_rgba(0,0,0,0.04)] bg-white transition-colors duration-300 px-2`}>
+        <nav className={`fixed bottom-0 left-0 right-0 h-16 border-t border-brand-border/60 z-45 flex justify-around items-center select-none shadow-[0_-4px_20px_rgba(0,0,0,0.04)] bg-white transition-colors duration-300 px-2`}>
           {[
           { id: 'home', label: 'Home', icon: Home, action: () => navigateTo('home') },
           {
