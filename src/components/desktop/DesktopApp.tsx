@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DesktopHeader } from './DesktopHeader';
 import { DesktopFooter } from './DesktopFooter';
@@ -17,6 +17,13 @@ import { CartSuccessToast } from '../common/CartSuccessToast';
 
 export const DesktopApp: React.FC = () => {
   const { currentVertical, currentPath } = useApp();
+
+  // Scroll to the top on every route/page transition
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [currentPath, currentVertical]);
 
   const renderContent = () => {
     switch (currentPath) {

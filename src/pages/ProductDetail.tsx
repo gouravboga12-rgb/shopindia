@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProducts } from '../hooks/useProducts';
 import { useCustomer } from '../context/CustomerContext';
@@ -21,6 +21,13 @@ export const ProductDetailPage: React.FC = () => {
   const isWishlisted = product ? wishlist.includes(product.id) : false;
   const discount = product ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
   const isServices = currentVertical === 'services' || product?.vertical === 'services';
+
+  // Automatically scroll to top of page whenever a product is selected/opened
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [selectedProductId]);
 
   const handlePincodeCheck = (e: React.FormEvent) => {
     e.preventDefault();

@@ -262,6 +262,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setHistory(prev => [...prev, path]);
     setCurrentPath(path);
 
+    // Scroll window and document to the top immediately
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
     if (path !== 'detail') {
       const targetUrl = path === 'home'
         ? (currentVertical === 'shop' ? '/' : `/${currentVertical}`)
@@ -274,6 +279,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const goBack = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
     if (history.length > 1) {
       const newHistory = [...history];
       newHistory.pop(); // Remove current path
@@ -292,6 +301,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setCurrentVertical = (vertical: VerticalType) => {
     setCurrentVerticalState(vertical);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     // When changing verticals on mobile/desktop, go back to home to display the correct feed
     setCurrentPath('home');
     const targetUrl = vertical === 'shop' ? '/' : `/${vertical}`;
