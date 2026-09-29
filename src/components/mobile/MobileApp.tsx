@@ -10,10 +10,11 @@ import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
-import { Home, User, MapPin, X, Search, ChevronDown, Sparkles, Zap, Wrench, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
+import { Home, User, MapPin, X, Search, ChevronDown, Zap, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
 import { LocationModal } from '../common/LocationModal';
+import servicesImg from '../../assets/services.jpeg';
 
 export const MobileApp: React.FC = () => {
   const {
@@ -127,16 +128,19 @@ export const MobileApp: React.FC = () => {
                 <button
                   key="shop"
                   onClick={() => setCurrentVertical('shop')}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                  className={`flex items-center justify-center p-1 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none overflow-hidden ${
                     isActive
-                      ? 'bg-gradient-to-r from-[#0F172A] to-[#1E293B] text-white shadow-md ring-2 ring-blue-500/40'
-                      : 'bg-white text-slate-800 shadow-xs border border-slate-200/90'
+                      ? 'bg-[#1C1C1E] shadow-md ring-2 ring-blue-500/50'
+                      : 'bg-white shadow-xs border border-slate-200/90'
                   }`}
                 >
-                  <Sparkles size={13} className={isActive ? 'text-blue-400 fill-blue-400' : 'text-blue-600'} />
-                  <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-bold text-slate-800'}`}>
-                    ShopIndia
-                  </span>
+                  <img
+                    src="/logo.png"
+                    alt="ShopIndia"
+                    className={`w-[85%] scale-[1.1] h-auto object-contain select-none pointer-events-none transition-all ${
+                      isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'
+                    }`}
+                  />
                 </button>
               );
             })()}
@@ -148,18 +152,22 @@ export const MobileApp: React.FC = () => {
                 <button
                   key="quick"
                   onClick={() => setCurrentVertical('quick')}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
                     isActive
                       ? 'bg-gradient-to-r from-[#FF0055] via-[#FF5500] to-[#FFAA00] text-white shadow-lg shadow-orange-500/30 ring-2 ring-amber-300'
                       : 'bg-gradient-to-r from-orange-50 to-amber-50 text-orange-950 border border-orange-200'
                   }`}
                 >
-                  <Zap size={13} className={isActive ? 'text-white fill-white' : 'text-orange-600 fill-orange-500'} />
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                    isActive ? 'bg-white text-orange-600' : 'bg-orange-500 text-white'
+                  }`}>
+                    <Zap size={10} className="fill-current" />
+                  </div>
                   <div className="flex flex-col text-left leading-none">
-                    <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-extrabold text-orange-950'}`}>
+                    <span className={`text-[11px] font-black tracking-wide ${isActive ? 'text-white' : 'text-slate-900'}`}>
                       Quick
                     </span>
-                    <span className={`text-[8px] font-black uppercase mt-0.5 ${isActive ? 'text-amber-200' : 'text-orange-600'}`}>
+                    <span className={`text-[8px] font-bold uppercase mt-0.5 ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
                       10 Min
                     </span>
                   </div>
@@ -174,21 +182,17 @@ export const MobileApp: React.FC = () => {
                 <button
                   key="services"
                   onClick={() => setCurrentVertical('services')}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                  className={`flex items-center justify-center p-1 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none overflow-hidden ${
                     isActive
-                      ? 'bg-gradient-to-r from-[#047857] via-[#0D9488] to-[#10B981] text-white shadow-lg ring-2 ring-emerald-300'
-                      : 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-950 border border-teal-200'
+                      ? 'bg-white shadow-md ring-2 ring-emerald-500 border border-emerald-300'
+                      : 'bg-white border border-slate-200/90'
                   }`}
                 >
-                  <Wrench size={12} strokeWidth={2.5} className={isActive ? 'text-white' : 'text-teal-700'} />
-                  <div className="flex flex-col text-left leading-none">
-                    <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-extrabold text-teal-950'}`}>
-                      Glacons
-                    </span>
-                    <span className={`text-[8px] font-black uppercase mt-0.5 ${isActive ? 'text-emerald-200' : 'text-teal-700'}`}>
-                      Services
-                    </span>
-                  </div>
+                  <img
+                    src={servicesImg}
+                    alt="Glacons"
+                    className="w-full h-full object-contain select-none pointer-events-none rounded-[8px]"
+                  />
                 </button>
               );
             })()}

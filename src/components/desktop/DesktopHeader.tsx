@@ -4,8 +4,9 @@ import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { CartDrawer } from '../common/CartDrawer';
 import { LocationModal } from '../common/LocationModal';
+import servicesImg from '../../assets/services.jpeg';
 import { 
-  Search, Zap, Wrench, Bell, ShoppingCart, User, 
+  Search, Zap, Bell, ShoppingCart, User, 
   Mic, Camera, Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
 } from 'lucide-react';
 
@@ -114,117 +115,82 @@ export const DesktopHeader: React.FC = () => {
             <span>Switch Store:</span>
           </span>
 
-          <div className="flex items-center gap-2 p-1 rounded-2xl bg-white border border-slate-200/90 shadow-sm">
-            {/* 1. ShopIndia Tab (E-Commerce) */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-slate-200/90 shadow-sm">
+            {/* 1. ShopIndia Tab (Uses exact /logo.png) */}
             {(() => {
               const isActive = currentVertical === 'shop';
               return (
                 <button
                   key="shop"
                   onClick={() => setCurrentVertical('shop')}
-                  className={`group relative flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-[12px] h-[42px] min-w-[150px] transition-all duration-300 cursor-pointer select-none focus:outline-none ${
+                  className={`group relative flex items-center justify-center px-4 py-1.5 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
                     isActive
-                      ? 'bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white shadow-md shadow-slate-900/25 ring-2 ring-blue-500/40 scale-[1.02]'
-                      : 'bg-slate-50/90 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 hover:scale-[1.01]'
+                      ? 'bg-[#1C1C1E] shadow-md shadow-slate-900/30 ring-2 ring-blue-500/50 scale-[1.02]'
+                      : 'bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 shadow-xs hover:scale-[1.01]'
                   }`}
-                  title="ShopIndia — Full E-commerce Catalog"
+                  title="ShopIndia — E-Commerce"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-blue-100 text-blue-700 group-hover:bg-blue-200'
-                    }`}>
-                      <Sparkles size={13} className={isActive ? 'fill-white' : ''} />
-                    </div>
-                    <div className="flex flex-col text-left leading-tight">
-                      <span className="text-xs font-black tracking-tight">ShopIndia</span>
-                      <span className={`text-[10px] font-medium leading-none ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>
-                        Mega Store
-                      </span>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full tracking-wider transition-all ${
-                    isActive 
-                      ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30' 
-                      : 'bg-slate-200/80 text-slate-600'
-                  }`}>
-                    E-COM
-                  </span>
+                  <img 
+                    src="/logo.png" 
+                    alt="ShopIndia" 
+                    className={`w-[85%] scale-[1.15] h-auto object-contain select-none pointer-events-none transition-all ${
+                      isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'
+                    }`}
+                  />
                 </button>
               );
             })()}
 
-            {/* 2. Quick Commerce Tab (Tadka / Instant Delivery) */}
+            {/* 2. Quick Commerce Tab (Exact format with Zap + Quick + Instant delivery) */}
             {(() => {
               const isActive = currentVertical === 'quick';
               return (
                 <button
                   key="quick"
                   onClick={() => setCurrentVertical('quick')}
-                  className={`group relative flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-[12px] h-[42px] min-w-[155px] transition-all duration-300 cursor-pointer select-none focus:outline-none ${
+                  className={`group relative flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none ${
                     isActive
                       ? 'bg-gradient-to-r from-[#FF0055] via-[#FF5500] to-[#FFAA00] text-white shadow-lg shadow-orange-500/30 ring-2 ring-amber-300 scale-[1.02]'
-                      : 'bg-gradient-to-r from-orange-50/90 to-amber-50/90 hover:from-orange-100 hover:to-amber-100 text-orange-950 border border-orange-200 hover:border-orange-300 hover:scale-[1.01]'
+                      : 'bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 text-orange-950 border border-orange-200/90 hover:border-orange-300 shadow-xs hover:scale-[1.01]'
                   }`}
-                  title="Quick — 10 Minute Grocery Delivery"
+                  title="Quick — Instant delivery"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
-                      isActive ? 'bg-white text-orange-600 shadow-sm animate-pulse' : 'bg-orange-500 text-white shadow-xs'
-                    }`}>
-                      <Zap size={13} className="fill-current" />
-                    </div>
-                    <div className="flex flex-col text-left leading-tight">
-                      <span className="text-xs font-black tracking-tight">Quick</span>
-                      <span className={`text-[10px] font-semibold leading-none ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
-                        Instant Delivery
-                      </span>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full tracking-wider transition-all ${
-                    isActive 
-                      ? 'bg-white/25 text-white border border-white/40' 
-                      : 'bg-orange-500 text-white shadow-xs'
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                    isActive ? 'bg-white text-orange-600 shadow-xs animate-pulse' : 'bg-orange-500 text-white shadow-xs'
                   }`}>
-                    10 MIN
-                  </span>
+                    <Zap size={12} className="fill-current" />
+                  </div>
+                  <div className="flex flex-col text-left leading-none">
+                    <span className={`text-xs font-black tracking-wide ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                      Quick
+                    </span>
+                    <span className={`text-[10px] mt-0.5 whitespace-nowrap font-medium ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
+                      Instant delivery
+                    </span>
+                  </div>
                 </button>
               );
             })()}
 
-            {/* 3. Glacons Services Tab */}
+            {/* 3. Glacons Services Tab (Uses exact Glacons logo image) */}
             {(() => {
               const isActive = currentVertical === 'services';
               return (
                 <button
                   key="services"
                   onClick={() => setCurrentVertical('services')}
-                  className={`group relative flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-[12px] h-[42px] min-w-[155px] transition-all duration-300 cursor-pointer select-none focus:outline-none ${
+                  className={`group relative flex items-center justify-center px-2 py-1 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
                     isActive
-                      ? 'bg-gradient-to-r from-[#047857] via-[#0D9488] to-[#10B981] text-white shadow-lg shadow-teal-900/30 ring-2 ring-emerald-300 scale-[1.02]'
-                      : 'bg-gradient-to-r from-teal-50/90 to-emerald-50/90 hover:from-teal-100 hover:to-emerald-100 text-teal-950 border border-teal-200 hover:border-teal-300 hover:scale-[1.01]'
+                      ? 'bg-white shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500 border border-emerald-300 scale-[1.02]'
+                      : 'bg-white hover:bg-teal-50/40 border border-slate-200/90 hover:border-teal-300 shadow-xs hover:scale-[1.01]'
                   }`}
-                  title="Glacons — Home, AC & Appliance Repair Services"
+                  title="Glacons — Home & AC Services"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
-                      isActive ? 'bg-white text-teal-700 shadow-sm' : 'bg-teal-600 text-white shadow-xs'
-                    }`}>
-                      <Wrench size={12} strokeWidth={2.5} />
-                    </div>
-                    <div className="flex flex-col text-left leading-tight">
-                      <span className="text-xs font-black tracking-tight">Glacons</span>
-                      <span className={`text-[10px] font-semibold leading-none ${isActive ? 'text-emerald-100' : 'text-teal-700'}`}>
-                        Home Services
-                      </span>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full tracking-wider transition-all ${
-                    isActive 
-                      ? 'bg-white/25 text-white border border-white/40' 
-                      : 'bg-teal-600 text-white shadow-xs'
-                  }`}>
-                    PRO
-                  </span>
+                  <img 
+                    src={servicesImg} 
+                    alt="Glacons" 
+                    className="w-full h-full object-contain select-none pointer-events-none rounded-[10px]"
+                  />
                 </button>
               );
             })()}
