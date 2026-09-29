@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
@@ -40,7 +41,7 @@ export const VerticalServicesMobile: React.FC = () => {
   const [bookingService, setBookingService] = useState<Product | null>(null);
   const [selectedDate, setSelectedDate] = useState('Tomorrow');
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
-  const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
+  const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
 
   // Selected Vehicle state
   const [selectedVehicle, setSelectedVehicle] = useState<{
@@ -98,10 +99,6 @@ export const VerticalServicesMobile: React.FC = () => {
     setSelectedTime(slots[0] || '10:00 AM');
   };
 
-  const toggleWishlist = (productId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setWishlist((prev) => ({ ...prev, [productId]: !prev[productId] }));
-  };
 
   const confirmBooking = (slotData?: { date: string; time: string }) => {
     if (!bookingService) return;
@@ -120,6 +117,11 @@ export const VerticalServicesMobile: React.FC = () => {
     addToCart(bookingDetails);
     setBookingService(null);
     navigateTo('cart');
+  };
+
+  const toggleWishlist = (productId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    customerToggleWishlist(productId);
   };
 
   return (
@@ -217,7 +219,7 @@ export const VerticalServicesMobile: React.FC = () => {
                 onClick={(e) => toggleWishlist(service.id, e)}
                 className="absolute top-3 right-3 p-1.5 rounded-full bg-white/90 text-slate-400 hover:text-red-500 shadow-sm z-10"
               >
-                <Heart size={13} className={wishlist[service.id] ? 'fill-red-500 text-red-500' : ''} />
+                <Heart size={13} className={wishlist.includes(service.id) ? 'fill-red-500 text-red-500' : ''} />
               </button>
 
               <div className="flex gap-3">

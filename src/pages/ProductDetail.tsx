@@ -8,17 +8,17 @@ import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
   const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart } = useApp();
-  const { reviews } = useCustomer();
+  const { reviews, wishlist, toggleWishlist } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
   const [pincode, setPincode] = useState('');
   const [pincodeCheckResult, setPincodeCheckResult] = useState<string | null>(null);
-  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const cartItemCount = (cart || []).reduce((acc, item) => acc + item.quantity, 0);
 
   // Retrieve the selected product
   const product = products.find(p => p.id === selectedProductId);
+  const isWishlisted = product ? wishlist.includes(product.id) : false;
   const discount = product ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
   const isServices = currentVertical === 'services' || product?.vertical === 'services';
 
@@ -127,7 +127,7 @@ export const ProductDetailPage: React.FC = () => {
               {/* Floating Wishlist Heart */}
               <motion.button
                 whileTap={{ scale: 0.85 }}
-                onClick={() => setIsWishlisted(!isWishlisted)}
+                onClick={() => product && toggleWishlist(product.id)}
                 className="absolute top-4 right-4 p-2.5 rounded-full bg-white text-zinc-400 hover:text-brand-red shadow-soft border border-brand-border transition-colors z-10"
               >
                 <Heart size={16} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
@@ -445,7 +445,7 @@ export const ProductDetailPage: React.FC = () => {
           </span>
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => setIsWishlisted(!isWishlisted)}
+              onClick={() => product && toggleWishlist(product.id)}
               className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 cursor-pointer"
             >
               <Heart size={16} strokeWidth={2.5} className={isWishlisted ? "fill-brand-red text-brand-red" : "text-zinc-700"} />

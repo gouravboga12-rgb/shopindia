@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
@@ -56,7 +57,7 @@ export const VerticalQuickCommerce: React.FC = () => {
 
   const [activeSubVertical, setActiveSubVertical] = useState<QuickSubVertical>('grocery');
   const [selectedCatId, setSelectedCatId] = useState<string>('');
-  const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
+  const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
 
   // Modals state
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
@@ -96,7 +97,7 @@ export const VerticalQuickCommerce: React.FC = () => {
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setWishlist((prev) => ({ ...prev, [productId]: !prev[productId] }));
+    customerToggleWishlist(productId);
   };
 
   const handleAddToCartWithCustomization = (product: Product, e: React.MouseEvent) => {
@@ -304,7 +305,7 @@ export const VerticalQuickCommerce: React.FC = () => {
                       onClick={(e) => toggleWishlist(product.id, e)}
                       className="absolute top-3 right-3 p-1.5 rounded-full bg-white/80 backdrop-blur-md text-slate-400 hover:text-red-500 shadow-soft z-10"
                     >
-                      <Heart size={14} className={wishlist[product.id] ? 'fill-red-500 text-red-500' : ''} />
+                      <Heart size={14} className={wishlist.includes(product.id) ? 'fill-red-500 text-red-500' : ''} />
                     </button>
 
                     {/* Discount Badge */}

@@ -111,7 +111,20 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [notifications]);
   const [reviews, setReviews] = useState<Review[]>(seedReviews());
   const [coupons] = usePersistent<Coupon[]>('coupons', seedCoupons());
-  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('shopindia_customer_wishlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('shopindia_customer_wishlist', JSON.stringify(wishlist));
+    } catch {}
+  }, [wishlist]);
   const [savedForLater, setSavedForLater] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
@@ -148,7 +161,9 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         if (addrRes.status === 'fulfilled' && addrRes.value?.addresses) setAddresses(addrRes.value.addresses);
         if (payRes.status === 'fulfilled' && payRes.value?.payments) setPaymentMethods(payRes.value.payments);
-        if (wishRes.status === 'fulfilled' && wishRes.value?.wishlist) setWishlist(wishRes.value.wishlist);
+        if (wishRes.status === 'fulfilled' && wishRes.value?.wishlist) {
+          setWishlist(prev => Array.from(new Set([...prev, ...(wishRes.value?.wishlist || [])])));
+        }
         if (notifRes.status === 'fulfilled' && notifRes.value?.notifications) setNotifications(notifRes.value.notifications);
         if (profRes.status === 'fulfilled' && profRes.value?.profile) setProfile(profRes.value.profile);
         if (revRes.status === 'fulfilled' && revRes.value?.reviews) setReviews(revRes.value.reviews);
@@ -335,16 +350,20 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // ── Wishlist / Saved / Recently viewed ──
   const toggleWishlist = useCallback(async (productId: string) => {
+    setWishlist((prev) => {
+      const has = prev.includes(productId);
+      const next = has ? prev.filter((id) => id !== productId) : [...prev, productId];
+      try {
+        localStorage.setItem('shopindia_customer_wishlist', JSON.stringify(next));
+      } catch {}
+      logActivity(has ? 'REMOVED_FROM_WISHLIST' : 'ADDED_TO_WISHLIST', { entityId: productId, entityType: 'product' });
+      return next;
+    });
+
     try {
-      await api.post('/api/customer/wishlist/toggle', { productId });
-      setWishlist((prev) => {
-        const has = prev.includes(productId);
-        logActivity(has ? 'REMOVED_FROM_WISHLIST' : 'ADDED_TO_WISHLIST', { entityId: productId, entityType: 'product' });
-        return has ? prev.filter((id) => id !== productId) : [...prev, productId];
-      });
-    } catch (err) {
-      console.error(err);
-      throw err;
+      await api.post('/api/customer/wishlist/toggle', { productId }).catch(() => {});
+    } catch {
+      // Backend sync error caught to maintain resilient offline/guest capability
     }
   }, [logActivity]);
 

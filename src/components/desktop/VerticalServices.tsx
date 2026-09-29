@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
@@ -60,7 +61,7 @@ export const VerticalServices: React.FC = () => {
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState<Product | null>(null);
   const [selectedDate, setSelectedDate] = useState('Tomorrow');
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
-  const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
+  const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
 
   // Filter service items
   const services = products.filter((p) => {
@@ -127,7 +128,7 @@ export const VerticalServices: React.FC = () => {
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setWishlist((prev) => ({ ...prev, [productId]: !prev[productId] }));
+    customerToggleWishlist(productId);
   };
 
   return (
@@ -308,7 +309,7 @@ export const VerticalServices: React.FC = () => {
                         onClick={(e) => toggleWishlist(service.id, e)}
                         className="absolute top-3 right-3 p-1.5 rounded-full bg-white/80 backdrop-blur-md text-slate-400 hover:text-red-500 shadow-soft z-10"
                       >
-                        <Heart size={14} className={wishlist[service.id] ? 'fill-red-500 text-red-500' : ''} />
+                        <Heart size={14} className={wishlist.includes(service.id) ? 'fill-red-500 text-red-500' : ''} />
                       </button>
 
                       {/* Image */}

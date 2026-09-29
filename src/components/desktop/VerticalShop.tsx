@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
@@ -24,10 +25,10 @@ const BRAND_LOGOS: Record<string, string> = {
 
 export const VerticalShop: React.FC = () => {
   const { navigateTo, setSearchQuery, addToCart } = useApp();
+  const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
   const { products, loading: productsLoading } = useProducts();
   const { categories } = useCategories();
   const [timeLeft, setTimeLeft] = useState({ hours: 14, minutes: 32, seconds: 45 });
-  const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHoveringCarousel, setIsHoveringCarousel] = useState(false);
   const [banners, setBanners] = useState<any[]>([]);
@@ -114,7 +115,7 @@ export const VerticalShop: React.FC = () => {
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setWishlist(prev => ({ ...prev, [productId]: !prev[productId] }));
+    customerToggleWishlist(productId);
   };
 
   // Real dynamic categories matching products for Shop vertical
@@ -385,7 +386,7 @@ export const VerticalShop: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 w-full">
               {justForYou.map(product => {
                 const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-                const isWishlisted = wishlist[product.id];
+                const isWishlisted = wishlist.includes(product.id);
                 return (
                   <div
                     key={'jfy-' + product.id}
@@ -550,7 +551,7 @@ export const VerticalShop: React.FC = () => {
             >
               {shopProducts.slice(0, 5).map(product => {
                 const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-                const isWishlisted = wishlist[product.id];
+                const isWishlisted = wishlist.includes(product.id);
                 return (
                   <div
                     key={product.id}
@@ -655,7 +656,7 @@ export const VerticalShop: React.FC = () => {
                     ) : (
                       categoryProducts.map(product => {
                         const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-                        const isWishlisted = wishlist[product.id];
+                        const isWishlisted = wishlist.includes(product.id);
                         return (
                           <div
                             key={product.id}

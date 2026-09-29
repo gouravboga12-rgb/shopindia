@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { 
   Heart, ShieldCheck,
@@ -117,8 +118,8 @@ const REFERENCE_CATEGORIES = [
 
 export const VerticalShopMobile: React.FC = () => {
   const { navigateTo, setSearchQuery, addToCart, setCurrentVertical } = useApp();
+  const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
   const [timeLeft, setTimeLeft] = useState({ hours: 12, minutes: 44, seconds: 12 });
-  const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [currentSlide, setCurrentSlide] = useState(0);
   const [banners, setBanners] = useState<any[]>([]);
 
@@ -155,7 +156,7 @@ export const VerticalShopMobile: React.FC = () => {
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setWishlist(prev => ({ ...prev, [productId]: !prev[productId] }));
+    customerToggleWishlist(productId);
   };
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
@@ -266,7 +267,7 @@ export const VerticalShopMobile: React.FC = () => {
         <div className="w-full flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
           {shopProducts.map(product => {
             const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-            const isWishlisted = wishlist[product.id];
+            const isWishlisted = wishlist.includes(product.id);
             return (
               <div
                 key={product.id}
@@ -328,7 +329,7 @@ export const VerticalShopMobile: React.FC = () => {
         <div className="grid grid-cols-2 gap-3 select-none">
           {shopProducts.map(product => {
             const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-            const isWishlisted = wishlist[product.id];
+            const isWishlisted = wishlist.includes(product.id);
             return (
               <div
                 key={product.id}
