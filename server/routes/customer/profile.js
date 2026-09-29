@@ -73,10 +73,13 @@ router.post('/change-password', async (req, res) => {
 router.delete('/', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-    const ok = await bcrypt.compare(req.body?.password || '', user.password);
-    if (!ok) return res.status(401).json({ error: 'Password incorrect.' });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (req.body?.password) {
+      const ok = await bcrypt.compare(req.body.password, user.password);
+      if (!ok) return res.status(401).json({ error: 'Password incorrect.' });
+    }
     await prisma.user.update({ where: { id: req.user.userId }, data: { status: 'blocked' } });
-    res.json({ ok: true });
+    res.json({ ok: true, message: 'Account deleted successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
