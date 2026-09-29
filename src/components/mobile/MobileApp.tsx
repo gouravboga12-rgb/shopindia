@@ -10,7 +10,7 @@ import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
-import { Home, User, MapPin, X, Search, ChevronDown, ShoppingBag, Zap, Wrench, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
+import { Home, User, MapPin, X, Search, ChevronDown, Sparkles, Zap, Wrench, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
 import { LocationModal } from '../common/LocationModal';
@@ -116,77 +116,82 @@ export const MobileApp: React.FC = () => {
       >
         
         {/* Row 1: Switcher Cards (Static height, transition opacity only) */}
-        {/* Row 1: Segmented Vertical Selector (Mobile) */}
-        <div className={`w-full transition-all duration-220 flex-shrink-0 ${
+        <div className={`w-full transition-all duration-220 h-[62px] flex-shrink-0 ${
           showHeader ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <div className="grid grid-cols-3 gap-2 w-full select-none p-1 rounded-2xl bg-slate-200/50 border border-slate-200">
-            {(['shop', 'quick', 'services'] as const).map(v => {
-              const isActive = currentVertical === v;
-              const config = {
-                shop: { 
-                  title: 'E-Commerce', 
-                  badge: 'MEGASTORE',
-                  badgeActive: 'bg-blue-500/25 text-blue-200 border-blue-400/40',
-                  badgeInactive: 'bg-blue-50 text-blue-700 border-blue-200',
-                  icon: ShoppingBag,
-                  iconActive: 'bg-blue-500 text-white',
-                  iconInactive: 'bg-blue-50 text-blue-600',
-                  activeClass: 'bg-slate-950 text-white shadow-md ring-2 ring-blue-500/30'
-                },
-                quick: { 
-                  title: 'Quick', 
-                  badge: '⚡ 10-20M',
-                  badgeActive: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40 animate-pulse',
-                  badgeInactive: 'bg-emerald-100 text-emerald-800 border-emerald-300 animate-pulse',
-                  icon: Zap,
-                  iconActive: 'bg-emerald-500 text-white',
-                  iconInactive: 'bg-emerald-50 text-emerald-600',
-                  activeClass: 'bg-slate-950 text-white shadow-md ring-2 ring-emerald-500/30'
-                },
-                services: { 
-                  title: 'Glacons', 
-                  badge: '🛠️ AC & CARE',
-                  badgeActive: 'bg-amber-500/25 text-amber-200 border-amber-400/40',
-                  badgeInactive: 'bg-amber-50 text-amber-900 border-amber-300',
-                  icon: Wrench,
-                  iconActive: 'bg-amber-500 text-slate-950',
-                  iconInactive: 'bg-amber-50 text-amber-700',
-                  activeClass: 'bg-slate-950 text-white shadow-md ring-2 ring-amber-500/30'
-                }
-              };
-              const item = config[v];
-              const Icon = item.icon;
-
+          <div className="grid grid-cols-3 gap-2 w-full select-none">
+            {/* 1. ShopIndia Mobile */}
+            {(() => {
+              const isActive = currentVertical === 'shop';
               return (
                 <button
-                  key={v}
-                  onClick={() => {
-                    setCurrentVertical(v);
-                    navigateTo('home');
-                  }}
-                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-xl text-center relative transition-all duration-200 active:scale-95 focus:outline-none ${
-                    isActive ? item.activeClass : 'bg-white text-slate-800 border border-slate-200 shadow-2xs'
+                  key="shop"
+                  onClick={() => setCurrentVertical('shop')}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#0F172A] to-[#1E293B] text-white shadow-md ring-2 ring-blue-500/40'
+                      : 'bg-white text-slate-800 shadow-xs border border-slate-200/90'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
-                      isActive ? item.iconActive : item.iconInactive
-                    }`}>
-                      <Icon size={11} strokeWidth={2.6} />
-                    </div>
-                    <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-bold text-slate-900'}`}>
-                      {item.title}
-                    </span>
-                  </div>
-                  <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded-full border tracking-wide whitespace-nowrap mt-0.5 ${
-                    isActive ? item.badgeActive : item.badgeInactive
-                  }`}>
-                    {item.badge}
+                  <Sparkles size={13} className={isActive ? 'text-blue-400 fill-blue-400' : 'text-blue-600'} />
+                  <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-bold text-slate-800'}`}>
+                    ShopIndia
                   </span>
                 </button>
               );
-            })}
+            })()}
+
+            {/* 2. Quick Mobile */}
+            {(() => {
+              const isActive = currentVertical === 'quick';
+              return (
+                <button
+                  key="quick"
+                  onClick={() => setCurrentVertical('quick')}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#FF0055] via-[#FF5500] to-[#FFAA00] text-white shadow-lg shadow-orange-500/30 ring-2 ring-amber-300'
+                      : 'bg-gradient-to-r from-orange-50 to-amber-50 text-orange-950 border border-orange-200'
+                  }`}
+                >
+                  <Zap size={13} className={isActive ? 'text-white fill-white' : 'text-orange-600 fill-orange-500'} />
+                  <div className="flex flex-col text-left leading-none">
+                    <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-extrabold text-orange-950'}`}>
+                      Quick
+                    </span>
+                    <span className={`text-[8px] font-black uppercase mt-0.5 ${isActive ? 'text-amber-200' : 'text-orange-600'}`}>
+                      10 Min
+                    </span>
+                  </div>
+                </button>
+              );
+            })()}
+
+            {/* 3. Glacons Services Mobile */}
+            {(() => {
+              const isActive = currentVertical === 'services';
+              return (
+                <button
+                  key="services"
+                  onClick={() => setCurrentVertical('services')}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#047857] via-[#0D9488] to-[#10B981] text-white shadow-lg ring-2 ring-emerald-300'
+                      : 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-950 border border-teal-200'
+                  }`}
+                >
+                  <Wrench size={12} strokeWidth={2.5} className={isActive ? 'text-white' : 'text-teal-700'} />
+                  <div className="flex flex-col text-left leading-none">
+                    <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-extrabold text-teal-950'}`}>
+                      Glacons
+                    </span>
+                    <span className={`text-[8px] font-black uppercase mt-0.5 ${isActive ? 'text-emerald-200' : 'text-teal-700'}`}>
+                      Services
+                    </span>
+                  </div>
+                </button>
+              );
+            })()}
           </div>
         </div>
 
