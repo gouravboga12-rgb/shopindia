@@ -4,12 +4,10 @@ import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { CartDrawer } from '../common/CartDrawer';
 import { LocationModal } from '../common/LocationModal';
-import servicesImg from '../../assets/services.jpeg';
 import { 
   Search, ShoppingBag, Zap, Wrench, Bell, ShoppingCart, User, 
   Mic, Camera, Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 export const DesktopHeader: React.FC = () => {
   const {
@@ -109,94 +107,103 @@ export const DesktopHeader: React.FC = () => {
     <header className="w-full flex flex-col sticky top-0 z-50 shadow-soft select-none theme-transition transition-all duration-300 bg-white text-brand-graphite border-b border-brand-border/60">
       {/* Top Vertical Selector Bar (Redesigned with Premium Segmented control matching reference, no status dots) */}
       <div className="w-full border-b flex justify-between items-center px-12 py-2.5 transition-colors duration-300 select-none bg-transparent border-brand-border/20 text-brand-slate">
-        <div className="flex gap-1 items-center p-0.5 rounded-card border relative transition-all bg-white/80 border-brand-border/60 backdrop-blur-md">
-          {(['shop', 'quick', 'services'] as const).map(v => {
-            const isActive = currentVertical === v;
-            const config = {
-              shop: { 
-                title: 'Shop', 
-                subtitle: 'Everything you need', 
-                icon: ShoppingBag,
-                activeColor: 'text-white',
-                inactiveColor: 'text-brand-slate hover:text-brand-graphite',
-                iconInactive: 'text-brand-blue bg-blue-50/70'
-              },
-              quick: { 
-                title: 'Quick', 
-                subtitle: 'Instant delivery', 
-                icon: Zap,
-                activeColor: 'text-white',
-                inactiveColor: 'text-brand-slate hover:text-brand-graphite',
-                iconInactive: 'text-brand-orange bg-orange-50/70'
-              },
-              services: { 
-                title: 'Services', 
-                subtitle: 'Home & more', 
-                icon: Wrench,
-                activeColor: 'text-white',
-                inactiveColor: 'text-brand-slate hover:text-brand-graphite',
-                iconInactive: 'text-teal-650 bg-teal-50/70'
-              }
-            };
-            const item = config[v];
-            const Icon = item.icon;
+        {/* Multi-Vertical Department Selector */}
+        <div className="flex items-center gap-2">
+          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200/80 text-slate-700 shadow-xs">
+            <Sparkles size={13} className="text-brand-orange animate-pulse" />
+            <span className="text-[11px] font-black uppercase tracking-wider">Select Department:</span>
+          </div>
 
-            return (
-              <button
-                key={v}
-                onClick={() => setCurrentVertical(v)}
-                className={`flex items-center gap-3 px-4 py-1.5 rounded-[12px] relative w-44 h-11 transition-all duration-300 focus:outline-none z-10 ${
-                  isActive ? item.activeColor : item.inactiveColor
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeDesktopVerticalSegmentPill"
-                    transition={{ type: 'tween', ease: 'easeOut', duration: 0.22 }}
-                    className="absolute inset-0 rounded-[12px] shadow-soft z-[-1] bg-[#1C1C1E]"
-                  />
-                )}
-                
-                {v === 'shop' ? (
-                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[12px]">
-                    <img 
-                      src="/logo.png" 
-                      alt="ShopIndia" 
-                      className={`w-[85%] scale-[1.15] h-auto object-contain select-none pointer-events-none mx-auto transition-all ${
-                        isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'
-                      }`}
-                    />
-                  </div>
-                ) : v === 'services' ? (
-                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[12px]">
-                    <img 
-                      src={servicesImg} 
-                      alt="Services" 
-                      className="w-full h-full object-cover select-none pointer-events-none rounded-[12px]"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    {/* Visual circle icon badge */}
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                      isActive ? 'bg-white/15 text-white' : item.iconInactive
-                    }`}>
-                      <Icon size={10} strokeWidth={2.5} />
-                    </div>
+          <div className="flex items-center gap-2 p-1 rounded-2xl bg-slate-100/70 border border-slate-200/80 shadow-inner">
+            {(['shop', 'quick', 'services'] as const).map(v => {
+              const isActive = currentVertical === v;
+              const config = {
+                shop: { 
+                  title: 'E-Commerce', 
+                  badge: 'MEGASTORE',
+                  badgeActive: 'bg-blue-500/20 text-blue-200 border-blue-400/40',
+                  badgeInactive: 'bg-blue-50 text-blue-700 border-blue-200/80',
+                  subtitle: 'Fashion, Tech & Essentials', 
+                  icon: ShoppingBag,
+                  iconActive: 'bg-blue-500 text-white',
+                  iconInactive: 'bg-blue-100 text-blue-600',
+                  activeGlow: 'ring-2 ring-blue-500/30'
+                },
+                quick: { 
+                  title: 'Quick Commerce', 
+                  badge: '⚡ 10-20 MINS',
+                  badgeActive: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40 animate-pulse',
+                  badgeInactive: 'bg-emerald-100/90 text-emerald-800 border-emerald-300 font-extrabold animate-pulse',
+                  subtitle: 'Grocery & Instant Needs', 
+                  icon: Zap,
+                  iconActive: 'bg-emerald-500 text-white',
+                  iconInactive: 'bg-emerald-100 text-emerald-700',
+                  activeGlow: 'ring-2 ring-emerald-500/30'
+                },
+                services: { 
+                  title: 'Glacons Services', 
+                  badge: '🛠️ AC & HOME CARE',
+                  badgeActive: 'bg-amber-500/20 text-amber-200 border-amber-400/40',
+                  badgeInactive: 'bg-amber-50 text-amber-800 border-amber-300/80',
+                  subtitle: 'Expert Technicians at Home', 
+                  icon: Wrench,
+                  iconActive: 'bg-amber-500 text-slate-900',
+                  iconInactive: 'bg-amber-100 text-amber-800',
+                  activeGlow: 'ring-2 ring-amber-500/30'
+                }
+              };
+              const item = config[v];
+              const Icon = item.icon;
 
-                    <div className="flex flex-col leading-none text-left">
-                      <span className="text-xs font-black tracking-wide">
+              return (
+                <button
+                  key={v}
+                  onClick={() => {
+                    setCurrentVertical(v);
+                    navigateTo('home');
+                  }}
+                  className={`group relative flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all duration-200 focus:outline-none cursor-pointer text-left ${
+                    isActive 
+                      ? 'bg-slate-900 text-white shadow-md ' + item.activeGlow
+                      : 'bg-white hover:bg-white text-slate-800 border border-slate-200/90 hover:border-slate-300 hover:shadow-sm'
+                  }`}
+                >
+                  {/* Icon Container */}
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                    isActive ? item.iconActive : item.iconInactive
+                  }`}>
+                    <Icon size={15} strokeWidth={2.4} />
+                  </div>
+
+                  {/* Text Content */}
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[12px] font-black tracking-tight leading-tight ${
+                        isActive ? 'text-white' : 'text-slate-900 group-hover:text-blue-650'
+                      }`}>
                         {item.title}
                       </span>
-                      <span className={`text-xs mt-0.5 whitespace-nowrap leading-none ${isActive ? 'opacity-85' : 'opacity-70'}`}>
-                        {item.subtitle}
+                      <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full border tracking-wide whitespace-nowrap ${
+                        isActive ? item.badgeActive : item.badgeInactive
+                      }`}>
+                        {item.badge}
                       </span>
                     </div>
-                  </>
-                )}
-              </button>
-            );
-          })}
+                    <span className={`text-[10px] leading-tight mt-0.5 truncate ${
+                      isActive ? 'text-slate-300' : 'text-slate-500'
+                    }`}>
+                      {item.subtitle}
+                    </span>
+                  </div>
+
+                  {/* Active indicator dot */}
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 absolute top-2 right-2 ring-2 ring-slate-900 animate-ping" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <button 
           onClick={() => setShowLocationModal(true)}
