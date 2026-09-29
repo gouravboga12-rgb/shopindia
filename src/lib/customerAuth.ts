@@ -28,6 +28,33 @@ export const clearCustomerSession = () => {
   localStorage.removeItem(USER_KEY);
 };
 
+// ─── Signup OTP Flow ──────────────────────────────────────────────────────────
+
+/** Step 1: Send a 6-digit OTP to the email for signup verification */
+export async function sendSignupOtp(name: string, email: string, password: string) {
+  const res = await fetch(`${API_BASE}/api/customer/send-signup-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+/** Step 2: Verify the OTP and create the account; returns { token, user } */
+export async function verifySignupOtp(email: string, otp: string) {
+  const res = await fetch(`${API_BASE}/api/customer/verify-signup-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+// ─── Legacy direct register (no OTP) ─────────────────────────────────────────
 export async function registerCustomer(name: string, email: string, password: string) {
   const res = await fetch(`${API_BASE}/api/customer/register`, {
     method: 'POST',
@@ -39,6 +66,7 @@ export async function registerCustomer(name: string, email: string, password: st
   return data;
 }
 
+// ─── Login ────────────────────────────────────────────────────────────────────
 export async function loginCustomer(email: string, password: string) {
   const res = await fetch(`${API_BASE}/api/customer/login`, {
     method: 'POST',
@@ -62,6 +90,7 @@ export async function fetchCustomerOrders(email?: string) {
   return data.orders || [];
 }
 
+// ─── Password Reset OTP Flow ──────────────────────────────────────────────────
 export async function requestPasswordReset(email: string) {
   const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
     method: 'POST',
@@ -94,4 +123,3 @@ export async function resetPassword(email: string, otp: string, newPassword: str
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
-
