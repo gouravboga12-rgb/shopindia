@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
-  Plus, Minus, ShoppingBag, Clock, ArrowRight, Heart,
+  Plus, Minus, Clock, Heart,
   Zap, UtensilsCrossed, Pill, ShieldCheck
 } from 'lucide-react';
 import type { Product } from '../../data/types';
@@ -83,9 +83,6 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
     }
   };
 
-  const activeCartItems = cart.filter((i) => i.product.vertical === 'quick');
-  const activeCartCount = activeCartItems.reduce((acc, i) => acc + i.quantity, 0);
-  const activeCartTotal = activeCartItems.reduce((acc, i) => acc + i.product.price * i.quantity, 0);
 
   // Dynamic live categories from database
   const subCategories = useMemo(() => {
@@ -319,30 +316,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
         })}
       </div>
 
-      {/* Floating Bottom Cart for Mobile */}
-      {activeCartCount > 0 && (
-        <div className="fixed bottom-16 left-3 right-3 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center justify-between z-40 border border-white/10">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-xl bg-white/15 relative">
-              <ShoppingBag size={16} />
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black text-white">
-                {activeCartCount}
-              </span>
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="font-bold text-xs">₹{activeCartTotal.toLocaleString('en-IN')}</span>
-              <span className="text-[9px] text-slate-300">Quick Delivery</span>
-            </div>
-          </div>
-          <button
-            onClick={() => navigateTo('cart')}
-            className="flex items-center gap-1 bg-emerald-500 text-slate-950 px-3.5 py-1.5 rounded-xl text-xs font-black"
-          >
-            <span>View Cart</span>
-            <ArrowRight size={12} />
-          </button>
-        </div>
-      )}
+
 
       {/* Sub-Vertical Modals */}
       <FoodCustomizationModal

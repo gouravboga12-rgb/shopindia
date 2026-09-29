@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
-import { Star, Award, Heart, ChevronLeft, ChevronRight, Clock, ShoppingCart } from 'lucide-react';
+import { Star, Award, Heart, ChevronLeft, ChevronRight, Clock, ShoppingCart, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
 
@@ -390,7 +390,7 @@ export const VerticalShop: React.FC = () => {
                   <div
                     key={'jfy-' + product.id}
                     onClick={() => navigateTo('detail', product.id)}
-                    className="w-full h-[320px] border border-brand-border/70 rounded-2xl flex flex-col justify-between bg-white p-3 hover:shadow-hover-lift hover:border-brand-blue/40 transition-all duration-300 cursor-pointer group relative shadow-soft"
+                    className="w-full min-h-[355px] border border-brand-border/70 rounded-2xl flex flex-col justify-between bg-white p-3 hover:shadow-hover-lift hover:border-brand-blue/40 transition-all duration-300 cursor-pointer group relative shadow-soft"
                   >
                     {/* Wishlist Heart */}
                     <motion.button
@@ -402,7 +402,7 @@ export const VerticalShop: React.FC = () => {
                     </motion.button>
 
                     {/* Uniform Image Frame */}
-                    <div className="w-full h-[150px] flex items-center justify-center bg-slate-50/80 rounded-xl p-3 relative overflow-hidden mb-2 border border-slate-100">
+                    <div className="w-full h-[140px] flex items-center justify-center bg-slate-50/80 rounded-xl p-3 relative overflow-hidden mb-2 border border-slate-100">
                       <img
                         src={product.image}
                         alt={product.title}
@@ -430,7 +430,7 @@ export const VerticalShop: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Price and Discount anchored to bottom */}
+                      {/* Price and Discount */}
                       <div className="pt-2 border-t border-brand-border/50 flex items-baseline justify-between font-numbers leading-none mt-2">
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-sm font-extrabold text-brand-graphite">₹{product.price.toLocaleString('en-IN')}</span>
@@ -441,6 +441,35 @@ export const VerticalShop: React.FC = () => {
                         {product.originalPrice > product.price && (
                           <span className="text-[9.5px] font-black text-brand-orange uppercase">{discount}% OFF</span>
                         )}
+                      </div>
+
+                      {/* Action buttons: Add to Cart and Buy Now */}
+                      <div className="grid grid-cols-2 gap-1.5 mt-2.5 pt-2 border-t border-brand-border/40">
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(product);
+                          }}
+                          className="py-1.5 px-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 border border-brand-orange/30 text-brand-orange font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                          title="Add to Cart"
+                        >
+                          <ShoppingCart size={11} className="text-brand-orange shrink-0" />
+                          <span>Add</span>
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(product);
+                            navigateTo('cart');
+                          }}
+                          className="py-1.5 px-1.5 rounded-lg bg-brand-blue hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                          title="Buy Now"
+                        >
+                          <Zap size={11} className="fill-amber-400 text-amber-400 shrink-0" />
+                          <span>Buy</span>
+                        </motion.button>
                       </div>
                     </div>
                   </div>
@@ -683,15 +712,33 @@ export const VerticalShop: React.FC = () => {
                                     <span className="text-xs font-extrabold text-brand-green w-max tracking-wide">{discount}% Off</span>
                                   )}
                                 </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    addToCart(product);
-                                  }}
-                                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-brand-border/60 text-brand-slate hover:bg-brand-blue hover:text-white hover:border-brand-blue transition-colors rounded-full shadow-sm"
-                                >
-                                  <ShoppingCart size={14} />
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <motion.button
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      addToCart(product);
+                                    }}
+                                    className="py-1 px-2 rounded-lg bg-orange-50 hover:bg-orange-100 border border-brand-orange/30 text-brand-orange font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                                    title="Add to Cart"
+                                  >
+                                    <ShoppingCart size={11} className="text-brand-orange" />
+                                    <span>Add</span>
+                                  </motion.button>
+                                  <motion.button
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      addToCart(product);
+                                      navigateTo('cart');
+                                    }}
+                                    className="py-1 px-2 rounded-lg bg-brand-blue hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                                    title="Buy Now"
+                                  >
+                                    <Zap size={11} className="fill-amber-400 text-amber-400" />
+                                    <span>Buy</span>
+                                  </motion.button>
+                                </div>
                               </div>
                             </div>
                           </div>

@@ -366,6 +366,35 @@ export const ProductDetailPage: React.FC = () => {
                           <span className="text-[10px] text-brand-slate line-through mt-0.5">₹{p.originalPrice.toLocaleString('en-IN')}</span>
                         )}
                       </div>
+
+                      {/* Add to Cart & Buy Now Action Buttons */}
+                      <div className="grid grid-cols-2 gap-1.5 mt-3 pt-2.5 border-t border-brand-border/40">
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p);
+                          }}
+                          className="py-1.5 px-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 border border-brand-orange/30 text-brand-orange font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                          title="Add to Cart"
+                        >
+                          <ShoppingCart size={11} className="text-brand-orange shrink-0" />
+                          <span>Add</span>
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p);
+                            navigateTo('cart');
+                          }}
+                          className="py-1.5 px-1.5 rounded-lg bg-brand-blue hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                          title="Buy Now"
+                        >
+                          <Zap size={11} className="fill-amber-400 text-amber-400 shrink-0" />
+                          <span>Buy Now</span>
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -665,6 +694,35 @@ export const ProductDetailPage: React.FC = () => {
                         {p.originalPrice > p.price && (
                           <span className="text-[9px] text-slate-400 line-through mt-0.5">₹{p.originalPrice.toLocaleString('en-IN')}</span>
                         )}
+                      </div>
+
+                      {/* Add to Cart & Buy Now Mobile Action Buttons */}
+                      <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-slate-100">
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p);
+                          }}
+                          className="py-1 px-1 rounded-lg bg-orange-50 hover:bg-orange-100 border border-brand-orange/30 text-brand-orange font-extrabold text-[10px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                          title="Add to Cart"
+                        >
+                          <ShoppingCart size={10} className="text-brand-orange shrink-0" />
+                          <span>Add</span>
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.94 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p);
+                            navigateTo('cart');
+                          }}
+                          className="py-1 px-1 rounded-lg bg-brand-blue hover:bg-blue-700 text-white font-extrabold text-[10px] flex items-center justify-center gap-1 shadow-xs transition-colors"
+                          title="Buy Now"
+                        >
+                          <Zap size={10} className="fill-amber-400 text-amber-400 shrink-0" />
+                          <span>Buy</span>
+                        </motion.button>
                       </div>
                     </div>
                   </div>
