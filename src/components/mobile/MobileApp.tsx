@@ -10,7 +10,6 @@ import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
-import servicesImg from '../../assets/services.jpeg';
 import { Home, User, MapPin, X, Search, ChevronDown, ShoppingBag, Zap, Wrench, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
@@ -117,36 +116,43 @@ export const MobileApp: React.FC = () => {
       >
         
         {/* Row 1: Switcher Cards (Static height, transition opacity only) */}
-        <div className={`w-full transition-all duration-220 h-[62px] flex-shrink-0 ${
+        {/* Row 1: Segmented Vertical Selector (Mobile) */}
+        <div className={`w-full transition-all duration-220 flex-shrink-0 ${
           showHeader ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <div className="grid grid-cols-3 gap-2.5 w-full select-none">
+          <div className="grid grid-cols-3 gap-2 w-full select-none p-1 rounded-2xl bg-slate-200/50 border border-slate-200">
             {(['shop', 'quick', 'services'] as const).map(v => {
               const isActive = currentVertical === v;
               const config = {
                 shop: { 
-                  title: 'ShopIndia', 
+                  title: 'E-Commerce', 
+                  badge: 'MEGASTORE',
+                  badgeActive: 'bg-blue-500/25 text-blue-200 border-blue-400/40',
+                  badgeInactive: 'bg-blue-50 text-blue-700 border-blue-200',
                   icon: ShoppingBag,
-                  activeClass: 'bg-black text-white shadow-soft',
-                  inactiveClass: 'bg-white text-slate-800 shadow-sm border border-black/5',
-                  iconActive: 'text-white',
-                  iconInactive: 'text-brand-blue'
+                  iconActive: 'bg-blue-500 text-white',
+                  iconInactive: 'bg-blue-50 text-blue-600',
+                  activeClass: 'bg-slate-950 text-white shadow-md ring-2 ring-blue-500/30'
                 },
                 quick: { 
                   title: 'Quick', 
+                  badge: '⚡ 10-20M',
+                  badgeActive: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40 animate-pulse',
+                  badgeInactive: 'bg-emerald-100 text-emerald-800 border-emerald-300 animate-pulse',
                   icon: Zap,
-                  activeClass: 'bg-[#FFDF00] text-black shadow-soft',
-                  inactiveClass: 'bg-white text-slate-800 shadow-sm border border-black/5',
-                  iconActive: 'text-black',
-                  iconInactive: 'text-brand-orange'
+                  iconActive: 'bg-emerald-500 text-white',
+                  iconInactive: 'bg-emerald-50 text-emerald-600',
+                  activeClass: 'bg-slate-950 text-white shadow-md ring-2 ring-emerald-500/30'
                 },
                 services: { 
-                  title: 'Services', 
+                  title: 'Glacons', 
+                  badge: '🛠️ AC & CARE',
+                  badgeActive: 'bg-amber-500/25 text-amber-200 border-amber-400/40',
+                  badgeInactive: 'bg-amber-50 text-amber-900 border-amber-300',
                   icon: Wrench,
-                  activeClass: 'bg-[#C5A880] text-zinc-950 shadow-elevated',
-                  inactiveClass: 'bg-white text-slate-800 shadow-sm border border-black/5',
-                  iconActive: 'text-zinc-950',
-                  iconInactive: 'text-teal-655'
+                  iconActive: 'bg-amber-500 text-slate-950',
+                  iconInactive: 'bg-amber-50 text-amber-700',
+                  activeClass: 'bg-slate-950 text-white shadow-md ring-2 ring-amber-500/30'
                 }
               };
               const item = config[v];
@@ -155,35 +161,29 @@ export const MobileApp: React.FC = () => {
               return (
                 <button
                   key={v}
-                  onClick={() => setCurrentVertical(v)}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-[14px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
-                    isActive ? item.activeClass : item.inactiveClass
+                  onClick={() => {
+                    setCurrentVertical(v);
+                    navigateTo('home');
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-xl text-center relative transition-all duration-200 active:scale-95 focus:outline-none ${
+                    isActive ? item.activeClass : 'bg-white text-slate-800 border border-slate-200 shadow-2xs'
                   }`}
                 >
-                  {v === 'shop' ? (
-                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-                      <img 
-                        src="/logo.png" 
-                        alt="ShopIndia" 
-                        className={`w-[85%] scale-[1.15] h-auto object-contain select-none pointer-events-none transition-all ${isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'}`}
-                      />
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                      isActive ? item.iconActive : item.iconInactive
+                    }`}>
+                      <Icon size={11} strokeWidth={2.6} />
                     </div>
-                  ) : v === 'services' ? (
-                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[14px]">
-                      <img 
-                        src={servicesImg} 
-                        alt="Services" 
-                        className="w-full h-full object-cover select-none pointer-events-none rounded-[14px]"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <Icon size={14} className={`transition-all ${isActive ? item.iconActive : item.iconInactive}`} strokeWidth={2.5} />
-                      <span className={`text-xs tracking-wide leading-none ${isActive ? 'font-black' : 'font-bold'}`}>
-                        {item.title}
-                      </span>
-                    </>
-                  )}
+                    <span className={`text-[11px] tracking-tight leading-none ${isActive ? 'font-black text-white' : 'font-bold text-slate-900'}`}>
+                      {item.title}
+                    </span>
+                  </div>
+                  <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded-full border tracking-wide whitespace-nowrap mt-0.5 ${
+                    isActive ? item.badgeActive : item.badgeInactive
+                  }`}>
+                    {item.badge}
+                  </span>
                 </button>
               );
             })}

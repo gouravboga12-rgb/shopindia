@@ -105,51 +105,51 @@ export const DesktopHeader: React.FC = () => {
 
   return (
     <header className="w-full flex flex-col sticky top-0 z-50 shadow-soft select-none theme-transition transition-all duration-300 bg-white text-brand-graphite border-b border-brand-border/60">
-      {/* Top Vertical Selector Bar (Redesigned with Premium Segmented control matching reference, no status dots) */}
-      <div className="w-full border-b flex justify-between items-center px-12 py-2.5 transition-colors duration-300 select-none bg-transparent border-brand-border/20 text-brand-slate">
+      {/* Top Vertical Selector Bar — Responsive for Desktop & Tablets */}
+      <div className="w-full border-b flex justify-between items-center px-4 sm:px-6 lg:px-12 py-2 bg-gradient-to-r from-slate-50 via-white to-slate-50 border-slate-200/70 select-none overflow-x-auto scrollbar-none">
         {/* Multi-Vertical Department Selector */}
-        <div className="flex items-center gap-2">
-          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200/80 text-slate-700 shadow-xs">
-            <Sparkles size={13} className="text-brand-orange animate-pulse" />
-            <span className="text-[11px] font-black uppercase tracking-wider">Select Department:</span>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200/90 text-slate-700 shadow-2xs">
+            <Sparkles size={13} className="text-amber-500 animate-pulse" />
+            <span className="text-[11px] font-black uppercase tracking-wider">Stores:</span>
           </div>
 
-          <div className="flex items-center gap-2 p-1 rounded-2xl bg-slate-100/70 border border-slate-200/80 shadow-inner">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 p-1 rounded-2xl bg-slate-200/50 border border-slate-200 shadow-inner">
             {(['shop', 'quick', 'services'] as const).map(v => {
               const isActive = currentVertical === v;
               const config = {
                 shop: { 
                   title: 'E-Commerce', 
                   badge: 'MEGASTORE',
-                  badgeActive: 'bg-blue-500/20 text-blue-200 border-blue-400/40',
-                  badgeInactive: 'bg-blue-50 text-blue-700 border-blue-200/80',
+                  badgeActive: 'bg-blue-500/20 text-blue-200 border-blue-400/40 shadow-xs',
+                  badgeInactive: 'bg-blue-50 text-blue-700 border-blue-200 font-extrabold',
                   subtitle: 'Fashion, Tech & Essentials', 
                   icon: ShoppingBag,
-                  iconActive: 'bg-blue-500 text-white',
-                  iconInactive: 'bg-blue-100 text-blue-600',
-                  activeGlow: 'ring-2 ring-blue-500/30'
+                  iconActive: 'bg-blue-500 text-white shadow-sm',
+                  iconInactive: 'bg-blue-50 text-blue-600',
+                  activeBg: 'bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-md ring-2 ring-blue-500/30'
                 },
                 quick: { 
                   title: 'Quick Commerce', 
                   badge: '⚡ 10-20 MINS',
-                  badgeActive: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40 animate-pulse',
-                  badgeInactive: 'bg-emerald-100/90 text-emerald-800 border-emerald-300 font-extrabold animate-pulse',
-                  subtitle: 'Grocery & Instant Needs', 
+                  badgeActive: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40 shadow-xs animate-pulse',
+                  badgeInactive: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black animate-pulse',
+                  subtitle: 'Groceries & Instant Needs', 
                   icon: Zap,
-                  iconActive: 'bg-emerald-500 text-white',
-                  iconInactive: 'bg-emerald-100 text-emerald-700',
-                  activeGlow: 'ring-2 ring-emerald-500/30'
+                  iconActive: 'bg-emerald-500 text-white shadow-sm',
+                  iconInactive: 'bg-emerald-50 text-emerald-600',
+                  activeBg: 'bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white shadow-md ring-2 ring-emerald-500/30'
                 },
                 services: { 
                   title: 'Glacons Services', 
                   badge: '🛠️ AC & HOME CARE',
-                  badgeActive: 'bg-amber-500/20 text-amber-200 border-amber-400/40',
-                  badgeInactive: 'bg-amber-50 text-amber-800 border-amber-300/80',
+                  badgeActive: 'bg-amber-500/20 text-amber-200 border-amber-400/40 shadow-xs',
+                  badgeInactive: 'bg-amber-50 text-amber-900 border-amber-300/80 font-extrabold',
                   subtitle: 'Expert Technicians at Home', 
                   icon: Wrench,
-                  iconActive: 'bg-amber-500 text-slate-900',
-                  iconInactive: 'bg-amber-100 text-amber-800',
-                  activeGlow: 'ring-2 ring-amber-500/30'
+                  iconActive: 'bg-amber-500 text-slate-950 shadow-sm',
+                  iconInactive: 'bg-amber-50 text-amber-700',
+                  activeBg: 'bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white shadow-md ring-2 ring-amber-500/30'
                 }
               };
               const item = config[v];
@@ -162,14 +162,14 @@ export const DesktopHeader: React.FC = () => {
                     setCurrentVertical(v);
                     navigateTo('home');
                   }}
-                  className={`group relative flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all duration-200 focus:outline-none cursor-pointer text-left ${
+                  className={`group relative flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-1.5 rounded-xl transition-all duration-200 focus:outline-none cursor-pointer text-left shrink-0 ${
                     isActive 
-                      ? 'bg-slate-900 text-white shadow-md ' + item.activeGlow
-                      : 'bg-white hover:bg-white text-slate-800 border border-slate-200/90 hover:border-slate-300 hover:shadow-sm'
+                      ? item.activeBg + ' scale-[1.02]'
+                      : 'bg-white hover:bg-slate-50/90 text-slate-800 border border-slate-200/90 hover:border-slate-300 shadow-2xs hover:shadow-sm hover:-translate-y-0.5'
                   }`}
                 >
                   {/* Icon Container */}
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${
                     isActive ? item.iconActive : item.iconInactive
                   }`}>
                     <Icon size={15} strokeWidth={2.4} />
@@ -178,18 +178,18 @@ export const DesktopHeader: React.FC = () => {
                   {/* Text Content */}
                   <div className="flex flex-col min-w-0 pr-1">
                     <div className="flex items-center gap-1.5">
-                      <span className={`text-[12px] font-black tracking-tight leading-tight ${
+                      <span className={`text-[12px] sm:text-[13px] font-black tracking-tight leading-tight ${
                         isActive ? 'text-white' : 'text-slate-900 group-hover:text-blue-650'
                       }`}>
                         {item.title}
                       </span>
-                      <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full border tracking-wide whitespace-nowrap ${
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border tracking-wider whitespace-nowrap ${
                         isActive ? item.badgeActive : item.badgeInactive
                       }`}>
                         {item.badge}
                       </span>
                     </div>
-                    <span className={`text-[10px] leading-tight mt-0.5 truncate ${
+                    <span className={`hidden md:block text-[10px] leading-tight mt-0.5 truncate ${
                       isActive ? 'text-slate-300' : 'text-slate-500'
                     }`}>
                       {item.subtitle}
@@ -198,20 +198,23 @@ export const DesktopHeader: React.FC = () => {
 
                   {/* Active indicator dot */}
                   {isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 absolute top-2 right-2 ring-2 ring-slate-900 animate-ping" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 absolute top-1.5 right-1.5 ring-2 ring-slate-900 animate-ping" />
                   )}
                 </button>
               );
             })}
           </div>
         </div>
+
+        {/* Location selector */}
         <button 
           onClick={() => setShowLocationModal(true)}
-          className="flex items-center gap-1.5 text-xs font-bold py-1 px-2.5 rounded-lg hover:bg-slate-100/90 border border-transparent hover:border-brand-border/60 transition-all cursor-pointer select-none group"
+          className="flex items-center gap-1.5 text-xs font-bold py-1 px-2.5 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 transition-all cursor-pointer select-none group shrink-0 ml-4 shadow-2xs"
         >
           <MapPin size={13} className="text-brand-blue shrink-0 group-hover:animate-bounce" />
-          <span className="text-brand-slate">Delivering to: <strong className="text-brand-graphite">{location}</strong></span>
-          <ChevronDown size={11} className="text-brand-slate shrink-0 ml-0.5 group-hover:text-brand-blue" />
+          <span className="text-slate-500 hidden sm:inline">Delivering to: <strong className="text-slate-900">{location}</strong></span>
+          <span className="text-slate-900 font-bold sm:hidden">{location}</span>
+          <ChevronDown size={11} className="text-slate-400 shrink-0 ml-0.5 group-hover:text-brand-blue" />
         </button>
       </div>
 
