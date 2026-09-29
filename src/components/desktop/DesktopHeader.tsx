@@ -233,15 +233,22 @@ export const DesktopHeader: React.FC = () => {
             )}
           </div>
 
-          {/* Design System Search bar */}
+          {/* Highlighted Prominent Search Bar */}
           <div ref={suggestionRef} className="relative w-full max-w-xl">
-            <div className={`flex w-full rounded-input overflow-hidden items-center border transition-all duration-300 bg-white/80 border-brand-border/40 text-brand-graphite backdrop-blur-md ${theme.inputFocus}`}>
-              <button
-                onClick={() => handleSearchSubmit(searchQuery)}
-                className="p-3.5 flex items-center justify-center text-brand-slate hover:text-brand-blue transition-colors"
-              >
-                <Search size={15} strokeWidth={2.5} />
-              </button>
+            <div className={`flex w-full rounded-2xl items-center border-2 transition-all duration-200 bg-[#F1F3F6] hover:bg-white focus-within:bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] focus-within:shadow-[0_4px_20px_rgba(40,116,240,0.15)] overflow-hidden pl-3.5 pr-1.5 py-1 ${
+              currentVertical === 'quick'
+                ? 'border-orange-300 hover:border-orange-500 focus-within:border-brand-orange focus-within:ring-4 focus-within:ring-orange-500/15'
+                : currentVertical === 'services'
+                ? 'border-amber-300 hover:border-amber-500 focus-within:border-amber-600 focus-within:ring-4 focus-within:ring-amber-500/15'
+                : 'border-slate-300 hover:border-brand-blue focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/15'
+            }`}>
+              <Search
+                size={17}
+                strokeWidth={2.5}
+                className={`shrink-0 mr-2.5 transition-colors ${
+                  currentVertical === 'quick' ? 'text-brand-orange' : currentVertical === 'services' ? 'text-amber-600' : 'text-brand-blue'
+                }`}
+              />
               <input
                 type="text"
                 placeholder={
@@ -260,8 +267,20 @@ export const DesktopHeader: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSearchSubmit(searchQuery);
                 }}
-                className="w-full py-2.5 text-xs bg-transparent focus:outline-none placeholder-brand-slate font-medium text-brand-graphite pr-3"
+                className="w-full py-2 text-xs bg-transparent focus:outline-none placeholder:text-slate-500 font-semibold text-slate-800 pr-2"
               />
+              <button
+                onClick={() => handleSearchSubmit(searchQuery)}
+                className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                  currentVertical === 'quick'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white'
+                    : currentVertical === 'services'
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-brand-blue hover:bg-blue-600 text-white'
+                }`}
+              >
+                <span>Search</span>
+              </button>
             </div>
 
             {/* Auto-suggestions Dropdown */}
