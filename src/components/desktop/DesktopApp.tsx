@@ -13,6 +13,7 @@ import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
 import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
+import { CartSuccessToast } from '../common/CartSuccessToast';
 
 export const DesktopApp: React.FC = () => {
   const { currentVertical, currentPath } = useApp();
@@ -51,6 +52,7 @@ export const DesktopApp: React.FC = () => {
         {renderContent()}
       </main>
       <DesktopFooter />
+      <CartSuccessToast />
     </div>
   );
 };

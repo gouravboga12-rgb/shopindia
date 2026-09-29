@@ -4,11 +4,12 @@ import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
   Star, Clock, Calendar, ShieldCheck,
-  Heart, LayoutGrid, X,
+  Heart, LayoutGrid,
   Home, Wrench, Shield, PhoneCall
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
+import { TimeSlotWheelPickerModal } from '../common/TimeSlotWheelPickerModal';
 import type { Product } from '../../data/types';
 
 type ServiceSubVertical = 'home' | 'vehicle';
@@ -61,29 +62,6 @@ export const VerticalServices: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
 
-  // Dynamically generate the next 4 calendar days (Today, Tomorrow, and upcoming weekday names)
-  const dates = useMemo(() => {
-    const result: string[] = [];
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const now = new Date();
-    for (let i = 0; i < 4; i++) {
-      const d = new Date(now);
-      d.setDate(now.getDate() + i);
-      if (i === 0) result.push('Today');
-      else if (i === 1) result.push('Tomorrow');
-      else result.push(dayNames[d.getDay()]);
-    }
-    return result;
-  }, []);
-
-  // Dynamically resolve time slots configured by admin/vendor for the selected service
-  const times = useMemo(() => {
-    if (selectedServiceForBooking?.serviceSlots && selectedServiceForBooking.serviceSlots.length > 0) {
-      return selectedServiceForBooking.serviceSlots;
-    }
-    return ['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM'];
-  }, [selectedServiceForBooking]);
-
   // Filter service items
   const services = products.filter((p) => {
     if (p.vertical !== 'services') return false;
@@ -128,17 +106,18 @@ export const VerticalServices: React.FC = () => {
     setSelectedTime(slots[0] || '10:00 AM');
   };
 
-  const confirmBooking = () => {
+  const confirmBooking = (slotData?: { date: string; time: string }) => {
     if (!selectedServiceForBooking) return;
+    const date = slotData?.date || selectedDate;
+    const time = slotData?.time || selectedTime;
     const bookingDetails: Product = {
       ...selectedServiceForBooking,
-      deliveryTime: `${selectedDate} at ${selectedTime}`,
+      deliveryTime: `${date} at ${time}`,
       specs: {
         ...selectedServiceForBooking.specs,
-        'Scheduled Slot': `${selectedDate}, ${selectedTime}`,
-        'Service Vertical': activeSubVertical === 'home' ? 'Home Services ( Company Style)' : `Vehicle Services (${selectedVehicle?.brand} ${selectedVehicle?.model})`,
+        'Scheduled Slot': `${date}, ${time}`,
+        'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : `Vehicle Services (${selectedVehicle?.brand} ${selectedVehicle?.model})`,
         'Technician': 'Certified Professional Assigned',
-        'Warranty': '30-Day Money Back Guarantee',
       },
     };
     addToCart(bookingDetails);
@@ -335,8 +314,14 @@ export const VerticalServices: React.FC = () => {
                       {/* Image */}
                       <div className="w-full h-40 bg-slate-100 rounded-2xl overflow-hidden mb-3 relative">
                         <img
-                          src={service.image || 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=500&auto=format&fit=crop&q=60'}
+                          src={service.image || (activeSubVertical === 'vehicle' ? 'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=500&auto=format&fit=crop&q=60' : 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=60')}
                           alt={service.title}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = activeSubVertical === 'vehicle'
+                              ? 'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=500&auto=format&fit=crop&q=60'
+                              : 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=60';
+                          }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
@@ -392,83 +377,14 @@ export const VerticalServices: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Slot Booking Dialog */}
-      {selectedServiceForBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-5"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-bold text-base text-slate-900">Select Date & Time Slot</h3>
-                <p className="text-xs text-slate-500">{selectedServiceForBooking.title}</p>
-              </div>
-              <button
-                onClick={() => setSelectedServiceForBooking(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Date Picker */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Select Date</label>
-              <div className="grid grid-cols-4 gap-2">
-                {dates.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setSelectedDate(d)}
-                    className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all ${selectedDate === d
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Time Picker */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Select Time Window</label>
-              <div className="grid grid-cols-3 gap-2">
-                {times.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setSelectedTime(t)}
-                    className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all ${selectedTime === t
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Total & Confirm */}
-            <div className="p-3 bg-slate-50 rounded-2xl flex items-center justify-between text-xs font-bold">
-              <span className="text-slate-600">Total Payable:</span>
-              <span className="text-base font-black text-slate-900">₹{selectedServiceForBooking.price}</span>
-            </div>
-
-            <button
-              onClick={confirmBooking}
-              className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-amber-600/25 transition-all"
-            >
-              Confirm Slot & Add to Cart
-            </button>
-          </motion.div>
-        </div>
-      )}
+      {/* 4. Slot Booking Dialog (Wheel/Roller Picker matching reference) */}
+      <TimeSlotWheelPickerModal
+        isOpen={!!selectedServiceForBooking}
+        onClose={() => setSelectedServiceForBooking(null)}
+        serviceTitle={selectedServiceForBooking?.title || ''}
+        price={selectedServiceForBooking?.price || 0}
+        onConfirm={confirmBooking}
+      />
 
       {/* Vehicle Selector Modal */}
       <VehicleSelectorModal

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Ticket } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShieldCheck, Ticket } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CheckoutDrawer } from '../components/common/CheckoutDrawer';
 
@@ -215,8 +215,18 @@ export const CartPage: React.FC = () => {
     return (
       <div className="w-full flex flex-col bg-slate-50/50 min-h-screen text-left pb-36 select-none text-brand-graphite font-sans">
         {/* Glassmorphism Header */}
-        <div className="px-5 py-4 sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]">
-          <span className="font-black text-[13px] uppercase tracking-widest font-heading text-zinc-800">Shopping Cart <span className="text-brand-slate font-bold">({cart.length})</span></span>
+        <div className="px-5 py-4 sticky top-0 z-30 bg-white/90 backdrop-blur-xl border-b border-slate-200/60 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigateTo('home')} className="p-1.5 -ml-1 rounded-full text-slate-600 hover:text-slate-900 active:scale-90 transition-all">
+              <ArrowLeft size={18} />
+            </button>
+            <span className="font-black text-[13px] uppercase tracking-widest font-heading text-zinc-800">
+              Shopping Cart <span className="text-brand-slate font-bold">({cart.length})</span>
+            </span>
+          </div>
+          <button onClick={() => navigateTo('home')} className="text-xs font-bold text-brand-blue">
+            Add More
+          </button>
         </div>
 
         {cart.length === 0 ? (
@@ -325,7 +335,7 @@ export const CartPage: React.FC = () => {
 
         {/* Mobile checkout floating bar */}
         {cart.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/60 px-5 py-4 pb-safe flex items-center justify-between z-40 select-none shadow-[0_-8px_20px_-8px_rgba(0,0,0,0.1)]">
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/80 px-5 py-4 pb-safe flex items-center justify-between z-50 select-none shadow-[0_-8px_25px_-4px_rgba(0,0,0,0.12)]">
             <div className="flex flex-col leading-none font-numbers">
               <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 font-sans">Total Payable</span>
               <span className="text-[22px] font-black text-zinc-900 tracking-tighter">₹{finalTotal.toLocaleString('en-IN')}</span>
@@ -333,9 +343,9 @@ export const CartPage: React.FC = () => {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleCheckout}
-              className="px-8 py-3.5 bg-[#17B169] hover:bg-emerald-600 text-white rounded-full text-[13px] font-black uppercase tracking-wider shadow-[0_4px_14px_rgba(23,177,105,0.3)] flex items-center gap-2 font-heading transition-colors"
+              className="px-7 py-3.5 bg-[#17B169] hover:bg-emerald-600 active:scale-95 text-white rounded-full text-[13px] font-black uppercase tracking-wider shadow-[0_4px_14px_rgba(23,177,105,0.35)] flex items-center gap-2 font-heading transition-all"
             >
-              <span>Place Order</span>
+              <span>Proceed to Checkout</span>
               <ArrowRight size={16} strokeWidth={2.5} />
             </motion.button>
           </div>

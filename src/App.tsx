@@ -9,24 +9,37 @@ import { VendorPortal } from './vendor/VendorPortal';
 
 const MainLayout: React.FC = () => {
   const isMobile = useIsMobile();
-
   return isMobile ? <MobileApp /> : <DesktopApp />;
 };
 
+function getCleanPath(): string {
+  // If legacy hash routing is present, automatically redirect to clean path
+  if (window.location.hash.startsWith('#/')) {
+    const clean = window.location.hash.slice(1);
+    window.history.replaceState(null, '', clean);
+    return clean;
+  }
+  return window.location.pathname;
+}
+
 function App() {
-  const [hash, setHash] = useState(window.location.hash);
+  const [pathname, setPathname] = useState(getCleanPath);
 
   useEffect(() => {
-    const handleHashChange = () => setHash(window.location.hash);
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    const handleLocationChange = () => setPathname(getCleanPath());
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('shopindia:navigate', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('shopindia:navigate', handleLocationChange);
+    };
   }, []);
 
-  if (hash.startsWith('#/admin')) {
+  if (pathname.startsWith('/admin')) {
     return <AdminPortal />;
   }
 
-  if (hash.startsWith('#/vendor')) {
+  if (pathname.startsWith('/vendor')) {
     return <VendorPortal />;
   }
 
@@ -40,5 +53,3 @@ function App() {
 }
 
 export default App;
-
-

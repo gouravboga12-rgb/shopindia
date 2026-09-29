@@ -5,6 +5,7 @@ import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, C
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackEvent } from '../../lib/customerApi';
 import type { OrderItem, VerticalType } from '../../context/AppContext';
+import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
 
 const QUICK_STEPS: Record<string, string[]> = {
   pending: ['Order Placed', 'Awaiting Store Acceptance'],
@@ -221,7 +222,7 @@ export const OrdersPage: React.FC = () => {
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
-                            <PrimaryButton onClick={() => alert('Invoice downloaded (demo).')} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                            <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
                             {cancelable && (
                               <button 
                                 disabled={isProcessing}

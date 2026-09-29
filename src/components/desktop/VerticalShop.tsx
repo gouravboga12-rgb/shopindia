@@ -8,18 +8,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
 
 const BRAND_LOGOS: Record<string, string> = {
-  'Apple': 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg',
-  'Samsung': 'https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg',
-  'boAt': 'https://upload.wikimedia.org/wikipedia/commons/9/94/Boat_Logo.png',
-  'OnePlus': 'https://upload.wikimedia.org/wikipedia/commons/e/e0/OnePlus_Logo.svg',
-  'Levi’s': 'https://upload.wikimedia.org/wikipedia/commons/8/84/Levi%27s_logo.svg',
-  "Levi's": 'https://upload.wikimedia.org/wikipedia/commons/8/84/Levi%27s_logo.svg',
-  'Nike': 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg',
-  'Sony': 'https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg',
-  'Puma': 'https://upload.wikimedia.org/wikipedia/commons/8/88/Puma_complete_logo.svg',
-  'Wildcraft': 'https://upload.wikimedia.org/wikipedia/en/thumb/5/52/Wildcraft_logo.svg/512px-Wildcraft_logo.svg.png',
-  'LEGO': 'https://upload.wikimedia.org/wikipedia/commons/2/24/LEGO_logo.svg',
-  'Voltas': 'https://upload.wikimedia.org/wikipedia/commons/8/86/Voltas_logo.svg',
+  'Apple': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/apple.svg',
+  'Samsung': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/samsung.svg',
+  'boAt': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40"><text x="50" y="27" fill="%23E11D48" font-family="Arial,sans-serif" font-weight="900" font-style="italic" font-size="22" text-anchor="middle">bo<tspan fill="%23111827">A</tspan>t</text></svg>',
+  'OnePlus': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/oneplus.svg',
+  'Levi’s': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40"><path fill="%23C41230" d="M0 0h100v28c-12 8-28 12-50 12s-38-4-50-12V0z"/><text x="50" y="24" fill="white" font-family="Arial,sans-serif" font-weight="900" font-size="16" text-anchor="middle" letter-spacing="1">LEVI%27S</text></svg>',
+  "Levi's": 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40"><path fill="%23C41230" d="M0 0h100v28c-12 8-28 12-50 12s-38-4-50-12V0z"/><text x="50" y="24" fill="white" font-family="Arial,sans-serif" font-weight="900" font-size="16" text-anchor="middle" letter-spacing="1">LEVI%27S</text></svg>',
+  'Nike': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/nike.svg',
+  'Sony': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/sony.svg',
+  'Puma': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/puma.svg',
+  'Wildcraft': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><text x="60" y="26" fill="%23D97706" font-family="Arial,sans-serif" font-weight="900" font-size="15" text-anchor="middle" letter-spacing="1.5">WILDCRAFT</text></svg>',
+  'LEGO': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/lego.svg',
+  'Voltas': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40"><text x="50" y="26" fill="%230284C7" font-family="Arial,sans-serif" font-weight="900" font-size="17" text-anchor="middle" letter-spacing="2">VOLTAS</text></svg>',
 };
 
 export const VerticalShop: React.FC = () => {
@@ -342,10 +342,19 @@ export const VerticalShop: React.FC = () => {
                   >
                     <div className="h-7 w-full flex items-center justify-center px-2">
                       {logoUrl ? (
-                        <img src={logoUrl} alt={brand} className="max-h-full max-w-[75px] object-contain transition-transform group-hover:scale-105" />
-                      ) : (
-                        <span className="font-extrabold text-xs text-brand-graphite">{brand}</span>
-                      )}
+                        <img
+                          src={logoUrl}
+                          alt={brand}
+                          onError={(e) => {
+                            // If external image fails, hide image and show text badge
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.parentElement?.querySelector('.brand-fallback');
+                            if (fallback) (fallback as HTMLElement).style.display = 'block';
+                          }}
+                          className="max-h-full max-w-[75px] object-contain transition-transform group-hover:scale-105"
+                        />
+                      ) : null}
+                      <span className={`brand-fallback font-extrabold text-xs text-brand-graphite ${logoUrl ? 'hidden' : 'block'}`}>{brand}</span>
                     </div>
                     <span className="font-bold text-[10.5px] text-slate-500 group-hover:text-brand-blue transition-colors line-clamp-1">
                       {brand}

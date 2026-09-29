@@ -385,17 +385,34 @@ export const VerticalQuickCommerce: React.FC = () => {
                           Customize +
                         </button>
                       ) : qty === 0 ? (
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          onClick={(e) => handleAddToCartWithCustomization(product, e)}
-                          className={`px-4 py-1.5 text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-wider ${
-                            activeSubVertical === 'pharmacy'
-                              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                          }`}
-                        >
-                          Add
-                        </motion.button>
+                        <div className="flex items-center gap-1.5">
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(product);
+                              navigateTo('cart');
+                            }}
+                            className={`px-3 py-1.5 text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-wider text-white ${
+                              activeSubVertical === 'pharmacy'
+                                ? 'bg-blue-600 hover:bg-blue-700'
+                                : 'bg-emerald-600 hover:bg-emerald-700'
+                            }`}
+                          >
+                            Buy
+                          </motion.button>
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => handleAddToCartWithCustomization(product, e)}
+                            className={`px-3 py-1.5 text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-wider ${
+                              activeSubVertical === 'pharmacy'
+                                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                            }`}
+                          >
+                            Add
+                          </motion.button>
+                        </div>
                       ) : (
                         <div className="flex items-center bg-emerald-600 text-white rounded-xl overflow-hidden text-xs font-bold shadow-sm">
                           <button

@@ -7,7 +7,7 @@ import { LocationModal } from '../common/LocationModal';
 import servicesImg from '../../assets/services.png';
 import { 
   Search, Zap, Bell, ShoppingCart, User, 
-  Mic, Camera, Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
+  Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
 } from 'lucide-react';
 
 export const DesktopHeader: React.FC = () => {
@@ -260,16 +260,8 @@ export const DesktopHeader: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSearchSubmit(searchQuery);
                 }}
-                className="w-full py-2.5 text-xs bg-transparent focus:outline-none placeholder-brand-slate font-medium text-brand-graphite"
+                className="w-full py-2.5 text-xs bg-transparent focus:outline-none placeholder-brand-slate font-medium text-brand-graphite pr-3"
               />
-              <div className="flex items-center gap-3 px-4 border-l border-brand-border/20 text-brand-slate shrink-0">
-                <button className="hover:text-brand-blue hover:scale-110 active:scale-95 transition-all p-0.5" title="Voice Search">
-                  <Mic size={14} />
-                </button>
-                <button className="hover:text-brand-blue hover:scale-110 active:scale-95 transition-all p-0.5" title="Search by Image">
-                  <Camera size={14} />
-                </button>
-              </div>
             </div>
 
             {/* Auto-suggestions Dropdown */}

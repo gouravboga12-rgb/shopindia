@@ -54,8 +54,7 @@ export const ProfilePage: React.FC = () => {
       setCustomerSession(data.token, data.user);
       setAuthUser(data.user);
       setAName(''); setAEmail(''); setAPass('');
-      window.location.hash = '#/dashboard';
-      window.location.reload();
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setAError(err.message || 'Authentication failed');
     } finally {
@@ -109,8 +108,7 @@ export const ProfilePage: React.FC = () => {
       setCustomerSession(data.token, data.user);
       setAuthUser(data.user);
       setAName(''); setAEmail(''); setAPass(''); setAOtp('');
-      window.location.hash = '#/dashboard';
-      window.location.reload();
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setAError(err.message || 'OTP verification failed. Please try again.');
     } finally {

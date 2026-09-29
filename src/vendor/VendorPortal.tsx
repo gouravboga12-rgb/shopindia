@@ -14,7 +14,7 @@ const VendorContent: React.FC = () => {
   const [tab, setTab] = useState('dashboard');
 
   if (!isAuthenticated) {
-    const registerRequested = window.location.hash.includes('/register');
+    const registerRequested = window.location.pathname.includes('/register') || window.location.hash.includes('/register');
     return <VendorLogin initialRegister={registerRequested} />;
   }
 

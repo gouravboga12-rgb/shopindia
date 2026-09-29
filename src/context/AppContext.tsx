@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Product } from '../data/types';
 
 const RAW_API = import.meta.env.VITE_API_URL || '';
@@ -68,27 +68,40 @@ interface AppContextType {
   addNotification: (n: Omit<Notification, 'id' | 'read' | 'timestamp'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
+  lastAddedProduct: { product: Product; timestamp: number } | null;
+  clearLastAddedProduct: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Resolve route and vertical from clean path (and auto-clean legacy hashes)
+  const initialRoute = React.useMemo(() => {
+    if (window.location.hash.startsWith('#/')) {
+      const clean = window.location.hash.slice(1);
+      window.history.replaceState(null, '', clean);
+    }
+    const p = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+    if (p === '/dashboard' || p === '/account') return { path: 'dashboard' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/profile') return { path: 'profile' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/orders') return { path: 'orders' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/cart') return { path: 'cart' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/search') return { path: 'search' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/category' || p === '/categories') return { path: 'category' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/notifications') return { path: 'notifications' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/quick') return { path: 'home' as PathType, vertical: 'quick' as VerticalType };
+    if (p === '/services' || p === '/glacons') return { path: 'home' as PathType, vertical: 'services' as VerticalType };
+    return { path: 'home' as PathType, vertical: 'shop' as VerticalType };
+  }, []);
+
   // Navigation states
-  const [currentPath, setCurrentPath] = useState<PathType>(() => {
-    const h = window.location.hash;
-    if (h.startsWith('#/dashboard') || h.startsWith('#/account')) return 'dashboard';
-    if (h.startsWith('#/profile')) return 'profile';
-    if (h.startsWith('#/orders')) return 'orders';
-    if (h.startsWith('#/cart')) return 'cart';
-    if (h.startsWith('#/search')) return 'search';
-    return 'home';
-  });
-  const [history, setHistory] = useState<PathType[]>([currentPath]);
+  const [currentPath, setCurrentPath] = useState<PathType>(initialRoute.path);
+  const [history, setHistory] = useState<PathType[]>([initialRoute.path]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Business vertical
-  const [currentVertical, setCurrentVerticalState] = useState<VerticalType>('shop');
+  const [currentVertical, setCurrentVerticalState] = useState<VerticalType>(initialRoute.vertical);
 
   // Location
   const [location, setLocationState] = useState<string>(() => {
@@ -102,6 +115,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Cart
   const [cart, setCart] = useState<OrderItem[]>([]);
+  const [lastAddedProduct, setLastAddedProduct] = useState<{ product: Product; timestamp: number } | null>(null);
+
+  const clearLastAddedProduct = useCallback(() => {
+    setLastAddedProduct(null);
+  }, []);
 
   // Orders
   const [orders, setOrders] = useState<Order[]>([]);
@@ -203,20 +221,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     fetchAppData();
     
-    const handleHash = () => {
-      const h = window.location.hash;
-      if (h.startsWith('#/dashboard') || h.startsWith('#/account')) setCurrentPath('dashboard');
-      else if (h.startsWith('#/profile')) setCurrentPath('profile');
-      else if (h.startsWith('#/orders')) setCurrentPath('orders');
-      else if (h.startsWith('#/cart')) setCurrentPath('cart');
-      else if (h.startsWith('#/search')) setCurrentPath('search');
-      else if (h === '' || h === '#/') setCurrentPath('home');
+    const handleLocationChange = () => {
+      if (window.location.hash.startsWith('#/')) {
+        const clean = window.location.hash.slice(1);
+        window.history.replaceState(null, '', clean);
+      }
+      const p = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+      if (p === '/dashboard' || p === '/account') setCurrentPath('dashboard');
+      else if (p === '/profile') setCurrentPath('profile');
+      else if (p === '/orders') setCurrentPath('orders');
+      else if (p === '/cart') setCurrentPath('cart');
+      else if (p === '/search') setCurrentPath('search');
+      else if (p === '/category' || p === '/categories') setCurrentPath('category');
+      else if (p === '/notifications') setCurrentPath('notifications');
+      else if (p === '/quick') {
+        setCurrentPath('home');
+        setCurrentVerticalState('quick');
+      } else if (p === '/services' || p === '/glacons') {
+        setCurrentPath('home');
+        setCurrentVerticalState('services');
+      } else if (p === '/shop' || p === '/') {
+        setCurrentPath('home');
+        setCurrentVerticalState('shop');
+      }
     };
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('shopindia:navigate', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('shopindia:navigate', handleLocationChange);
+    };
   }, []);
-
-
 
   // Custom Navigation function
   const navigateTo = (path: PathType, productId?: string) => {
@@ -225,10 +261,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setHistory(prev => [...prev, path]);
     setCurrentPath(path);
-    if (path !== 'detail' && path !== 'home') {
-      window.location.hash = `#/${path}`;
-    } else if (path === 'home') {
-      window.location.hash = '';
+
+    if (path !== 'detail') {
+      const targetUrl = path === 'home'
+        ? (currentVertical === 'shop' ? '/' : `/${currentVertical}`)
+        : `/${path}`;
+      if (window.location.pathname !== targetUrl) {
+        window.history.pushState(null, '', targetUrl);
+        window.dispatchEvent(new Event('shopindia:navigate'));
+      }
     }
   };
 
@@ -239,8 +280,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const prevPath = newHistory[newHistory.length - 1];
       setHistory(newHistory);
       setCurrentPath(prevPath);
+      const targetUrl = prevPath === 'home' ? '/' : `/${prevPath}`;
+      window.history.pushState(null, '', targetUrl);
+      window.dispatchEvent(new Event('shopindia:navigate'));
     } else {
       setCurrentPath('home');
+      window.history.pushState(null, '', '/');
+      window.dispatchEvent(new Event('shopindia:navigate'));
     }
   };
 
@@ -248,6 +294,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentVerticalState(vertical);
     // When changing verticals on mobile/desktop, go back to home to display the correct feed
     setCurrentPath('home');
+    const targetUrl = vertical === 'shop' ? '/' : `/${vertical}`;
+    window.history.pushState(null, '', targetUrl);
+    window.dispatchEvent(new Event('shopindia:navigate'));
   };
 
   // Cart operations
@@ -256,6 +305,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       alert('This product is out of stock.');
       return;
     }
+    setLastAddedProduct({ product, timestamp: Date.now() });
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.product.id === product.id);
       if (existingItem) {
@@ -392,7 +442,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notifications,
         addNotification,
         markAsRead,
-        markAllAsRead
+        markAllAsRead,
+        lastAddedProduct,
+        clearLastAddedProduct
       }}
     >
       {children}

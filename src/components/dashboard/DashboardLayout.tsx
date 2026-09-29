@@ -98,8 +98,7 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
             <button
               onClick={() => {
                 clearCustomerSession();
-                window.location.hash = '#/';
-                window.location.reload();
+                window.location.href = '/';
               }}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold text-brand-red hover:bg-red-50 transition-all"
             >
@@ -120,7 +119,7 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
             <span className="font-black text-sm font-heading">My Account</span>
           </div>
         </div>
-        <button onClick={() => (window.location.hash = '#/')} aria-label="Back to store" className="p-1.5 bg-white/10 rounded-full">
+        <button onClick={() => (window.location.href = '/')} aria-label="Back to store" className="p-1.5 bg-white/10 rounded-full">
           <X size={18} />
         </button>
       </div>
@@ -161,8 +160,7 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
               <div className="p-4 border-t border-white/10">
                 <button onClick={() => {
                   clearCustomerSession();
-                  window.location.hash = '#/';
-                  window.location.reload();
+                  window.location.href = '/';
                 }} className="w-full flex items-center justify-center gap-2 py-2 bg-red-500/20 text-red-100 rounded-xl text-xs font-bold">
                   <LogOut className="w-3.5 h-3.5" /> Logout
                 </button>

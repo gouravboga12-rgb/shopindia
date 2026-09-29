@@ -14,6 +14,7 @@ import { Home, User, MapPin, X, Search, ChevronDown, Zap, LayoutGrid, Bell, Shop
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
 import { LocationModal } from '../common/LocationModal';
+import { CartSuccessToast } from '../common/CartSuccessToast';
 import servicesImg from '../../assets/services.png';
 
 export const MobileApp: React.FC = () => {
@@ -242,21 +243,11 @@ export const MobileApp: React.FC = () => {
             onClick={() => { setSearchQuery(''); navigateTo('search'); }}
             className="w-full bg-white border-[2px] border-[#2874F0] rounded-full py-2.5 px-4 flex items-center justify-between shadow-sm text-brand-slate text-xs font-medium cursor-pointer transition-all active:scale-[0.99] leading-none shrink-0"
           >
-            <div className="flex items-center gap-2.5">
-              <Search size={16} className="text-zinc-500" />
-              <span className="text-zinc-500 font-sans text-[12px] font-medium truncate max-w-[170px] sm:max-w-xs">
+            <div className="flex items-center gap-2.5 w-full">
+              <Search size={16} className="text-[#2874F0] shrink-0" />
+              <span className="text-zinc-500 font-sans text-[12px] font-medium truncate flex-1">
                 Search products, brands and catalog...
               </span>
-            </div>
-            <div className="flex items-center gap-3 text-zinc-400 select-none shrink-0">
-              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 19v4M8 23h8" />
-              </svg>
-              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
             </div>
           </div>
         </div>
@@ -280,7 +271,7 @@ export const MobileApp: React.FC = () => {
       </div>
 
       {/* Native-style Mobile Bottom Navigation Tab Bar (Rounded 24px) */}
-      {currentPath !== 'detail' && (
+      {currentPath !== 'detail' && currentPath !== 'cart' && (
         <nav className={`fixed bottom-0 left-0 right-0 h-16 border-t border-brand-border/60 z-45 flex justify-around items-center select-none shadow-[0_-4px_20px_rgba(0,0,0,0.04)] bg-white transition-colors duration-300 px-2`}>
           {[
           { id: 'home', label: 'Home', icon: Home, action: () => navigateTo('home') },
@@ -448,6 +439,9 @@ export const MobileApp: React.FC = () => {
 
       {/* Address Picker / Real-Time Live Location Modal */}
       <LocationModal isOpen={showLocationModal} onClose={() => setShowLocationModal(false)} />
+
+      {/* Visual Add-to-Cart Toast */}
+      <CartSuccessToast />
     </div>
   );
 };
