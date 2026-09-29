@@ -85,7 +85,7 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
                   <Icon size={16} strokeWidth={active ? 2.5 : 2} />
                   <span className="flex-1 text-left">{item.label}</span>
                   {badge ? (
-                    <span className="min-w-full max-w-[18px] h-[18px] px-1 rounded-full bg-brand-red text-white text-xs font-black flex items-center justify-center">
+                    <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-brand-red text-white text-[11px] font-black flex items-center justify-center shrink-0">
                       {badge}
                     </span>
                   ) : null}
@@ -152,7 +152,7 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
                       }`}>
                       <Icon className="w-4 h-4" />
                       <span className="flex-1 text-left">{item.label}</span>
-                      {badge ? <span className="min-w-full max-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-xs font-black flex items-center justify-center">{badge}</span> : null}
+                      {badge ? <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-[11px] font-black flex items-center justify-center shrink-0">{badge}</span> : null}
                     </button>
                   );
                 })}
