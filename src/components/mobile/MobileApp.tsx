@@ -14,7 +14,7 @@ import { Home, User, MapPin, X, Search, ChevronDown, Zap, LayoutGrid, Bell, Shop
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
 import { LocationModal } from '../common/LocationModal';
-import servicesImg from '../../assets/services.jpeg';
+import servicesImg from '../../assets/services.png';
 
 export const MobileApp: React.FC = () => {
   const {
@@ -191,7 +191,7 @@ export const MobileApp: React.FC = () => {
                   <img
                     src={servicesImg}
                     alt="Glacons"
-                    className="w-full h-full object-contain select-none pointer-events-none rounded-[8px]"
+                    className="h-[30px] w-auto max-w-[92%] object-contain select-none pointer-events-none"
                   />
                 </button>
               );

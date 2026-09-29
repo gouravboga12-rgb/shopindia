@@ -4,7 +4,7 @@ import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { CartDrawer } from '../common/CartDrawer';
 import { LocationModal } from '../common/LocationModal';
-import servicesImg from '../../assets/services.jpeg';
+import servicesImg from '../../assets/services.png';
 import { 
   Search, Zap, Bell, ShoppingCart, User, 
   Mic, Camera, Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
@@ -179,7 +179,7 @@ export const DesktopHeader: React.FC = () => {
                 <button
                   key="services"
                   onClick={() => setCurrentVertical('services')}
-                  className={`group relative flex items-center justify-center px-2 py-1 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
+                  className={`group relative flex items-center justify-center px-3 py-1 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
                     isActive
                       ? 'bg-white shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500 border border-emerald-300 scale-[1.02]'
                       : 'bg-white hover:bg-teal-50/40 border border-slate-200/90 hover:border-teal-300 shadow-xs hover:scale-[1.01]'
@@ -189,7 +189,7 @@ export const DesktopHeader: React.FC = () => {
                   <img 
                     src={servicesImg} 
                     alt="Glacons" 
-                    className="w-full h-full object-contain select-none pointer-events-none rounded-[10px]"
+                    className="h-[34px] w-auto max-w-[92%] object-contain select-none pointer-events-none transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
               );
