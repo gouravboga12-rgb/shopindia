@@ -27,5 +27,6 @@ server/.env
 *.sln
 *.sw?
 
-
-shop-india-\ec2-key.pem
+*.pem
+ec2-key.pem
+*.dump

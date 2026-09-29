@@ -75,6 +75,8 @@ app.use('/api/vendor/orders', require('./routes/vendor/orders'));
 app.use('/api/vendor/analytics', require('./routes/vendor/analytics'));
 app.use('/api/vendor/wallet', require('./routes/vendor/wallet'));
 app.use('/api/vendor/reviews', require('./routes/vendor/reviews'));
+app.use('/api/vendor/technicians', require('./routes/vendor/technicians'));
+app.use('/api/vendor/service-jobs', require('./routes/vendor/service-jobs'));
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
