@@ -117,11 +117,11 @@ export const MobileApp: React.FC = () => {
         } bg-white border-b border-brand-border/60 text-brand-graphite`}
       >
         
-        {/* Row 1: Switcher Cards (Static height, transition opacity only) */}
-        <div className={`w-full transition-all duration-220 h-[62px] flex-shrink-0 ${
+        {/* Row 1: Switcher Cards (Highlighted Multi-Vertical Deck) */}
+        <div className={`w-full transition-all duration-220 flex-shrink-0 ${
           showHeader ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <div className="grid grid-cols-3 gap-2 w-full select-none">
+          <div className="grid grid-cols-3 gap-2 w-full select-none p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/90 shadow-sm">
             {/* 1. ShopIndia Mobile */}
             {(() => {
               const isActive = currentVertical === 'shop';
@@ -129,19 +129,22 @@ export const MobileApp: React.FC = () => {
                 <button
                   key="shop"
                   onClick={() => setCurrentVertical('shop')}
-                  className={`flex items-center justify-center p-1 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none overflow-hidden ${
+                  className={`flex flex-col items-center justify-center p-1 rounded-xl text-center relative h-[48px] transition-all duration-300 active:scale-95 focus:outline-none overflow-hidden ${
                     isActive
-                      ? 'bg-[#1C1C1E] shadow-md ring-2 ring-blue-500/50'
-                      : 'bg-white shadow-xs border border-slate-200/90'
+                      ? 'bg-[#0F2C59] shadow-md shadow-blue-950/30 ring-2 ring-blue-500 border border-blue-400/50 scale-[1.02]'
+                      : 'bg-white hover:bg-slate-50 shadow-xs border border-slate-200/80'
                   }`}
                 >
                   <img
                     src="/logo.png"
                     alt="ShopIndia"
                     className={`w-[85%] scale-[1.1] h-auto object-contain select-none pointer-events-none transition-all ${
-                      isActive ? 'mix-blend-screen' : 'invert mix-blend-multiply opacity-90'
+                      isActive ? 'mix-blend-screen brightness-125' : 'invert mix-blend-multiply opacity-85'
                     }`}
                   />
+                  {isActive && (
+                    <span className="absolute bottom-1 w-7 h-1 rounded-full bg-blue-400 shadow-xs animate-pulse" />
+                  )}
                 </button>
               );
             })()}
@@ -153,25 +156,28 @@ export const MobileApp: React.FC = () => {
                 <button
                   key="quick"
                   onClick={() => setCurrentVertical('quick')}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-center relative h-[48px] transition-all duration-300 active:scale-95 focus:outline-none ${
                     isActive
-                      ? 'bg-gradient-to-r from-[#FF0055] via-[#FF5500] to-[#FFAA00] text-white shadow-lg shadow-orange-500/30 ring-2 ring-amber-300'
-                      : 'bg-gradient-to-r from-orange-50 to-amber-50 text-orange-950 border border-orange-200'
+                      ? 'bg-gradient-to-r from-[#FF0055] via-[#FF5500] to-[#FFAA00] text-white shadow-md shadow-orange-500/35 ring-2 ring-amber-300 border border-amber-200/60 scale-[1.02]'
+                      : 'bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100/70 hover:to-amber-100/70 text-orange-950 border border-orange-200/90 shadow-xs'
                   }`}
                 >
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                    isActive ? 'bg-white text-orange-600' : 'bg-orange-500 text-white'
+                    isActive ? 'bg-white text-orange-600 shadow-xs' : 'bg-orange-500 text-white'
                   }`}>
-                    <Zap size={10} className="fill-current" />
+                    <Zap size={11} className="fill-current" />
                   </div>
                   <div className="flex flex-col text-left leading-none">
                     <span className={`text-[11px] font-black tracking-wide ${isActive ? 'text-white' : 'text-slate-900'}`}>
                       Quick
                     </span>
-                    <span className={`text-[8px] font-bold uppercase mt-0.5 ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
+                    <span className={`text-[8.5px] font-extrabold uppercase mt-0.5 ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
                       10 Min
                     </span>
                   </div>
+                  {isActive && (
+                    <span className="absolute bottom-1 w-7 h-1 rounded-full bg-white shadow-xs animate-pulse" />
+                  )}
                 </button>
               );
             })()}
@@ -183,17 +189,22 @@ export const MobileApp: React.FC = () => {
                 <button
                   key="services"
                   onClick={() => setCurrentVertical('services')}
-                  className={`flex items-center justify-center p-1 rounded-[12px] text-center relative h-[44px] transition-all duration-300 active:scale-95 focus:outline-none overflow-hidden ${
+                  className={`flex flex-col items-center justify-center p-1 rounded-xl text-center relative h-[48px] transition-all duration-300 active:scale-95 focus:outline-none overflow-hidden ${
                     isActive
-                      ? 'bg-white shadow-md ring-2 ring-emerald-500 border border-emerald-300'
-                      : 'bg-white border border-slate-200/90'
+                      ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/90 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-500 border border-emerald-400 scale-[1.02]'
+                      : 'bg-white hover:bg-teal-50/40 border border-slate-200/80 shadow-xs'
                   }`}
                 >
                   <img
                     src={servicesImg}
                     alt="Glacons"
-                    className="h-[30px] w-auto max-w-[92%] object-contain select-none pointer-events-none"
+                    className={`h-[28px] w-auto max-w-[92%] object-contain select-none pointer-events-none transition-all ${
+                      isActive ? 'scale-105' : 'opacity-85'
+                    }`}
                   />
+                  {isActive && (
+                    <span className="absolute bottom-1 w-7 h-1 rounded-full bg-emerald-500 shadow-xs animate-pulse" />
+                  )}
                 </button>
               );
             })()}
