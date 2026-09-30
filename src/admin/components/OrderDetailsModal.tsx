@@ -15,6 +15,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   if (!order) return null;
 
   const customer = order.customer || order.customerId;
+  const vendor = order.vendor || order.items?.[0]?.product?.vendor;
   const address = order.deliveryAddress;
   const addressStr = typeof address === 'string'
     ? address
@@ -24,7 +25,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 select-none">
-      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col">
+      <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl border border-gray-100 flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
           <div>
@@ -52,19 +53,36 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
-          {/* Customer & Address Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Customer, Vendor & Address Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Customer Details</span>
               <p className="font-bold text-gray-900">{customer?.name || 'Customer'}</p>
               <div className="flex items-center gap-2 text-xs text-gray-600">
                 <Mail size={13} className="text-gray-400" />
-                <span>{customer?.email || 'N/A'}</span>
+                <span className="truncate">{customer?.email || 'N/A'}</span>
               </div>
               {customer?.phone && (
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <Phone size={13} className="text-gray-400" />
                   <span>{customer.phone}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vendor Details</span>
+              <p className="font-bold text-gray-900">{vendor?.businessName || 'ShopIndia In-House'}</p>
+              {vendor?.phone && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Phone size={13} className="text-gray-400" />
+                  <span>{vendor.phone}</span>
+                </div>
+              )}
+              {vendor?.email && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Mail size={13} className="text-gray-400" />
+                  <span className="truncate">{vendor.email}</span>
                 </div>
               )}
             </div>

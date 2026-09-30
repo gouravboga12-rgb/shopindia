@@ -22,8 +22,24 @@ router.get('/', async (req, res) => {
       prisma.order.findMany({
         where,
         include: {
-          customer: { select: { name: true, email: true, phone: true } },
-          items: true,
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true, gstNumber: true } },
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  brand: true,
+                  basePrice: true,
+                  mrp: true,
+                  stock: true,
+                  category: { select: { name: true } },
+                  images: { select: { url: true }, take: 1 },
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (pageNum - 1) * limitNum,
@@ -135,6 +151,42 @@ router.patch('/:id/status', async (req, res) => {
 
     res.json(order);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/** DELETE /api/vendor/orders/:id — Delete order permanently from entire platform */
+router.delete('/:id', async (req, res) => {
+  try {
+    const existing = await prisma.order.findFirst({
+      where: { id: req.params.id, vendorId: req.user.vendorId },
+    });
+    if (!existing) return res.status(404).json({ error: 'Order not found.' });
+
+    await prisma.$transaction(async (tx) => {
+      // Revert vendor wallet balance if order was delivered & credited
+      if (existing.status === 'delivered' && existing.paymentStatus === 'paid' && existing.total) {
+        const vendor = await tx.vendor.findUnique({ where: { id: req.user.vendorId } });
+        const commRateRaw = Number(vendor?.commissionRate) || 10;
+        const commRate = commRateRaw > 1 ? commRateRaw / 100 : commRateRaw;
+        const commission = existing.total * commRate;
+        const netEarnings = existing.total - commission;
+        await tx.vendor.update({
+          where: { id: req.user.vendorId },
+          data: { walletBalance: { decrement: netEarnings } },
+        });
+      }
+
+      await tx.ticket.updateMany({ where: { orderId: req.params.id }, data: { orderId: null } });
+      await tx.serviceJob.deleteMany({ where: { orderId: req.params.id } }).catch(() => {});
+      await tx.transaction.deleteMany({ where: { orderId: req.params.id } }).catch(() => {});
+      await tx.orderItem.deleteMany({ where: { orderId: req.params.id } });
+      await tx.order.delete({ where: { id: req.params.id } });
+    });
+
+    res.json({ success: true, message: 'Order deleted successfully.' });
+  } catch (err) {
+    console.error('Vendor order delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

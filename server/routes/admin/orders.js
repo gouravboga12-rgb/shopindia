@@ -28,9 +28,19 @@ router.get('/', async (req, res) => {
         where,
         include: {
           customer: { select: { name: true, email: true, phone: true } },
-          vendor: { select: { businessName: true } },
+          vendor: { select: { id: true, businessName: true, phone: true, email: true } },
           branch: { select: { name: true } },
-          items: true,
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  vendor: { select: { id: true, businessName: true, phone: true, email: true } }
+                }
+              }
+            }
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (pageNum - 1) * limitNum,
@@ -132,6 +142,41 @@ router.post('/:id/refund', async (req, res) => {
     });
     res.json(order);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/** DELETE /api/admin/orders/:id — Super Admin delete order */
+router.delete('/:id', async (req, res) => {
+  try {
+    const existing = await prisma.order.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ error: 'Order not found.' });
+
+    await prisma.$transaction(async (tx) => {
+      if (existing.status === 'delivered' && existing.paymentStatus === 'paid' && existing.vendorId) {
+        const vendor = await tx.vendor.findUnique({ where: { id: existing.vendorId } });
+        const commRateRaw = Number(vendor?.commissionRate) || 10;
+        const commRate = commRateRaw > 1 ? commRateRaw / 100 : commRateRaw;
+        const commission = existing.total * commRate;
+        const netEarnings = existing.total - commission;
+        await tx.vendor.update({
+          where: { id: existing.vendorId },
+          data: { walletBalance: { decrement: netEarnings } },
+        });
+      }
+
+      await tx.ticket.updateMany({ where: { orderId: req.params.id }, data: { orderId: null } });
+      await tx.serviceJob.deleteMany({ where: { orderId: req.params.id } }).catch(() => {});
+      await tx.transaction.deleteMany({ where: { orderId: req.params.id } }).catch(() => {});
+      await tx.orderItem.deleteMany({ where: { orderId: req.params.id } });
+      await tx.order.delete({ where: { id: req.params.id } });
+    });
+
+    res.json({ success: true, message: 'Order deleted successfully.' });
+  } catch (err) {
+    console.error('Admin order delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

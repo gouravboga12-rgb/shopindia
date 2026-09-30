@@ -58,6 +58,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
     try {
       await requestPasswordReset(email.trim().toLowerCase());
+      setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
       setStep('reset');
       setResendCooldown(60);
     } catch (err: any) {
@@ -176,7 +180,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
             {/* STEP 1: REQUEST OTP */}
             {step === 'request' && (
-              <form onSubmit={handleRequestOtp} className="space-y-4">
+              <form onSubmit={handleRequestOtp} autoComplete="off" className="space-y-4">
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
                   Enter your registered email address below. We'll send you a 6-digit verification code to reset your password.
                 </p>
@@ -189,6 +193,9 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="email"
+                      name="reset_request_email"
+                      id="reset_request_email"
+                      autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com"
@@ -231,7 +238,25 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
             {/* STEP 2: ENTER OTP & NEW PASSWORD */}
             {step === 'reset' && (
-              <form onSubmit={handleResetPassword} className="space-y-4">
+              <form onSubmit={handleResetPassword} autoComplete="off" className="space-y-4">
+                {/* Hidden decoy fields to intercept browser/Chromium aggressive credential autofill heuristics */}
+                <input
+                  type="text"
+                  name="prevent_autofill_username"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  style={{ position: 'absolute', opacity: 0, height: 0, width: 0, zIndex: -1, pointerEvents: 'none' }}
+                />
+                <input
+                  type="password"
+                  name="prevent_autofill_password"
+                  tabIndex={-1}
+                  autoComplete="new-password"
+                  aria-hidden="true"
+                  style={{ position: 'absolute', opacity: 0, height: 0, width: 0, zIndex: -1, pointerEvents: 'none' }}
+                />
+
                 <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex items-start justify-between gap-2 text-xs text-blue-900">
                   <div>
                     <span>OTP sent to: </span>
@@ -242,6 +267,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                     onClick={() => {
                       setStep('request');
                       setError('');
+                      setOtp('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                      setShowPassword(false);
                     }}
                     className="text-brand-blue font-bold hover:underline shrink-0"
                   >
@@ -266,6 +295,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                   </div>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    name="reset_otp_code"
+                    id="reset_otp_code"
                     maxLength={6}
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
@@ -282,6 +315,9 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
+                      name="new_password"
+                      id="new_password"
+                      autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="At least 6 characters"
@@ -305,6 +341,9 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                   </label>
                   <input
                     type="password"
+                    name="confirm_password"
+                    id="confirm_password"
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter your new password"

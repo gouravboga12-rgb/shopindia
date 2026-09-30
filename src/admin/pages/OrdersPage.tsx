@@ -57,7 +57,8 @@ export const OrdersPage: React.FC = () => {
       o.id?.toLowerCase().includes(q.toLowerCase()) ||
       o.customer?.name?.toLowerCase().includes(q.toLowerCase()) ||
       o.customerId?.name?.toLowerCase().includes(q.toLowerCase()) ||
-      o.items?.some((item: any) => item.name?.toLowerCase().includes(q.toLowerCase()));
+      o.vendor?.businessName?.toLowerCase().includes(q.toLowerCase()) ||
+      o.items?.some((item: any) => item.name?.toLowerCase().includes(q.toLowerCase()) || item.product?.vendor?.businessName?.toLowerCase().includes(q.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
     return matchesQuery && matchesStatus;
@@ -126,6 +127,7 @@ export const OrdersPage: React.FC = () => {
             <tr>
               <th className="px-5 py-3.5 font-bold">Order ID</th>
               <th className="px-5 py-3.5 font-bold">Customer</th>
+              <th className="px-5 py-3.5 font-bold">Vendor</th>
               <th className="px-5 py-3.5 font-bold">Type</th>
               <th className="px-5 py-3.5 font-bold">Total</th>
               <th className="px-5 py-3.5 font-bold">Status</th>
@@ -136,13 +138,14 @@ export const OrdersPage: React.FC = () => {
           <tbody className="divide-y divide-gray-50">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}><td colSpan={7} className="px-5 py-5"><div className="h-4 skeleton-shimmer rounded" /></td></tr>
+                <tr key={i}><td colSpan={8} className="px-5 py-5"><div className="h-4 skeleton-shimmer rounded" /></td></tr>
               ))
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-14 text-gray-400 font-medium">No orders found matching filters.</td></tr>
+              <tr><td colSpan={8} className="text-center py-14 text-gray-400 font-medium">No orders found matching filters.</td></tr>
             ) : (
               filtered.map(o => {
                 const customer = o.customer || o.customerId;
+                const vendor = o.vendor || o.items?.[0]?.product?.vendor;
                 const orderId = o.id || o._id;
                 const itemsCount = o.items?.length || 1;
                 const firstItemName = o.items?.[0]?.name || o.items?.[0]?.title;
@@ -165,6 +168,26 @@ export const OrdersPage: React.FC = () => {
                     <td className="px-5 py-4">
                       <p className="font-bold text-gray-900">{customer?.name || 'Customer'}</p>
                       <p className="text-[11px] text-gray-400">{customer?.email}</p>
+                      {customer?.phone && <p className="text-[10px] text-gray-400 font-mono">{customer?.phone}</p>}
+                    </td>
+
+                    {/* Vendor */}
+                    <td className="px-5 py-4">
+                      {vendor?.businessName ? (
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900 text-xs">{vendor.businessName}</span>
+                          {vendor.phone && (
+                            <span className="text-[11px] text-gray-500 font-mono">{vendor.phone}</span>
+                          )}
+                          {vendor.email && (
+                            <span className="text-[10px] text-gray-400 truncate max-w-[140px]">{vendor.email}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic text-[11px] px-2 py-0.5 rounded bg-gray-50 border border-gray-100">
+                          ShopIndia Direct
+                        </span>
+                      )}
                     </td>
 
                     {/* Type */}

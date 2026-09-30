@@ -165,11 +165,13 @@ export const SecurityPage: React.FC = () => {
 
       {/* Change password */}
       <SectionCard title="Change Password" subtitle="Use a strong password you don't use elsewhere">
-        <form onSubmit={changePassword} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form onSubmit={changePassword} autoComplete="off" className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-black uppercase text-brand-slate">Current Password</label>
             <input
               type="password"
+              name="current-password"
+              autoComplete="current-password"
               className={fieldCls}
               value={cur}
               onChange={(e) => setCur(e.target.value)}
@@ -181,6 +183,8 @@ export const SecurityPage: React.FC = () => {
             <label className="text-xs font-black uppercase text-brand-slate">New Password</label>
             <input
               type="password"
+              name="new-password"
+              autoComplete="new-password"
               className={fieldCls}
               value={pw}
               onChange={(e) => setPw(e.target.value)}
@@ -193,6 +197,8 @@ export const SecurityPage: React.FC = () => {
             <label className="text-xs font-black uppercase text-brand-slate">Confirm New</label>
             <input
               type="password"
+              name="confirm-password"
+              autoComplete="new-password"
               className={fieldCls}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}

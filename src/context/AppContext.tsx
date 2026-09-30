@@ -81,7 +81,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const clean = window.location.hash.slice(1);
       window.history.replaceState(null, '', clean);
     }
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlProductId = searchParams.get('productId') || searchParams.get('id');
     const p = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+    if (p.startsWith('/detail') || urlProductId) return { path: 'detail' as PathType, vertical: 'shop' as VerticalType, productId: urlProductId };
     if (p === '/dashboard' || p === '/account') return { path: 'dashboard' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/profile') return { path: 'profile' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/orders') return { path: 'orders' as PathType, vertical: 'shop' as VerticalType };
@@ -97,7 +100,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Navigation states
   const [currentPath, setCurrentPath] = useState<PathType>(initialRoute.path);
   const [history, setHistory] = useState<PathType[]>([initialRoute.path]);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(initialRoute.productId || null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Business vertical
@@ -226,8 +229,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const clean = window.location.hash.slice(1);
         window.history.replaceState(null, '', clean);
       }
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlProductId = searchParams.get('productId') || searchParams.get('id');
       const p = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
-      if (p === '/dashboard' || p === '/account') setCurrentPath('dashboard');
+      if (p.startsWith('/detail') || urlProductId) {
+        if (urlProductId) setSelectedProductId(urlProductId);
+        setCurrentPath('detail');
+      } else if (p === '/dashboard' || p === '/account') setCurrentPath('dashboard');
       else if (p === '/profile') setCurrentPath('profile');
       else if (p === '/orders') setCurrentPath('orders');
       else if (p === '/cart') setCurrentPath('cart');
