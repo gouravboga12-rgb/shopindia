@@ -54,25 +54,18 @@ router.get('/', customerAuth, async (req, res) => {
     const orders = await prisma.order.findMany({
       where: { customerId: req.user.userId },
       include: {
+        customer: { select: { id: true, name: true, email: true, phone: true } },
         vendor: {
           select: {
             id: true,
             businessName: true,
-            contactName: true,
             phone: true,
             email: true,
             street: true,
             city: true,
             state: true,
             pincode: true,
-          }
-        },
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
+            gstNumber: true,
           }
         },
         items: {
@@ -85,13 +78,13 @@ router.get('/', customerAuth, async (req, res) => {
                   select: {
                     id: true,
                     businessName: true,
-                    contactName: true,
                     phone: true,
                     email: true,
                     street: true,
                     city: true,
                     state: true,
                     pincode: true,
+                    gstNumber: true,
                   }
                 }
               }
@@ -116,10 +109,7 @@ router.get('/', customerAuth, async (req, res) => {
         }
       }
 
-      const resolvedVendor = o.vendor || o.items?.[0]?.product?.vendor || null;
-      const deliveryAddress = [o.deliveryLine1, o.deliveryLine2, o.deliveryCity, o.deliveryState, o.deliveryPincode]
-        .filter(Boolean)
-        .join(', ');
+      const vendorData = o.vendor || o.items?.[0]?.product?.vendor || null;
 
       return {
         id: o.id,
@@ -130,53 +120,38 @@ router.get('/', customerAuth, async (req, res) => {
         vertical: vert,
         createdAt: o.createdAt,
         date: new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-        deliveryAddress: deliveryAddress || null,
-        deliveryCity: o.deliveryCity,
-        deliveryState: o.deliveryState,
-        deliveryPincode: o.deliveryPincode,
         customer: o.customer ? {
           name: o.customer.name,
           email: o.customer.email,
           phone: o.customer.phone,
-        } : {
-          name: req.user.name,
-          email: req.user.email,
-          phone: req.user.phone,
+        } : undefined,
+        vendor: vendorData ? {
+          id: vendorData.id,
+          businessName: vendorData.businessName,
+          phone: vendorData.phone,
+          email: vendorData.email,
+          street: vendorData.street,
+          city: vendorData.city,
+          state: vendorData.state,
+          pincode: vendorData.pincode,
+        } : undefined,
+        deliveryAddress: {
+          street: [o.deliveryLine1, o.deliveryLine2].filter(Boolean).join(', ') || 'Customer Address',
+          city: o.deliveryCity || 'Bengaluru',
+          state: o.deliveryState || 'Karnataka',
+          postalCode: o.deliveryPincode || '560102',
         },
-        vendor: resolvedVendor ? {
-          id: resolvedVendor.id,
-          businessName: resolvedVendor.businessName,
-          contactName: resolvedVendor.contactName,
-          phone: resolvedVendor.phone,
-          email: resolvedVendor.email,
-          street: resolvedVendor.street,
-          city: resolvedVendor.city,
-          state: resolvedVendor.state,
-          pincode: resolvedVendor.pincode,
-        } : null,
         items: o.items.map((it) => ({
-          id: it.id,
-          name: it.name,
-          price: it.price,
-          quantity: it.quantity,
           product: {
             id: it.productId,
             title: it.name,
             price: it.price,
             image: it.product && it.product.images && it.product.images.length ? it.product.images[0].url : '',
             category: it.product?.category?.name,
-            vendor: it.product?.vendor ? {
-              id: it.product.vendor.id,
-              businessName: it.product.vendor.businessName,
-              contactName: it.product.vendor.contactName,
-              phone: it.product.vendor.phone,
-              email: it.product.vendor.email,
-              street: it.product.vendor.street,
-              city: it.product.vendor.city,
-              state: it.product.vendor.state,
-              pincode: it.product.vendor.pincode,
-            } : undefined,
           },
+          title: it.name,
+          price: it.price,
+          quantity: it.quantity,
         })),
       };
     });

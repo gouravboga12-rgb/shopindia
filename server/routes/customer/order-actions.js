@@ -10,14 +10,14 @@ async function findOwnOrder(userId, orderNumber) {
   return prisma.order.findFirst({
     where: { customerId: userId, orderNumber },
     include: {
-      customer: { select: { name: true, email: true, phone: true } },
+      customer: { select: { id: true, name: true, email: true, phone: true } },
       vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } },
       items: {
         include: {
           product: {
             include: {
               images: true,
-              vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } }
+              vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } },
             }
           }
         }

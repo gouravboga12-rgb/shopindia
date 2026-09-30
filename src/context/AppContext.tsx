@@ -25,10 +25,6 @@ export interface Order {
   status: 'placed' | 'confirmed' | 'packing' | 'shipping' | 'delivered' | 'cancelled' | string;
   deliveryTimeEstimate?: string;
   location?: string;
-  deliveryAddress?: string;
-  deliveryCity?: string;
-  deliveryState?: string;
-  deliveryPincode?: string;
   customer?: {
     name?: string;
     email?: string;
@@ -37,15 +33,19 @@ export interface Order {
   vendor?: {
     id?: string;
     businessName?: string;
-    contactName?: string;
     phone?: string;
     email?: string;
     street?: string;
     city?: string;
     state?: string;
     pincode?: string;
-    country?: string;
   };
+  deliveryAddress?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+  } | string;
 }
 
 export type NotificationType = 'order' | 'quick' | 'service' | 'promo';
