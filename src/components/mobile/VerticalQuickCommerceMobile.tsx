@@ -109,6 +109,23 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
 
   return (
     <div className="w-full flex flex-col gap-3 py-3 px-3 bg-[#FAF9F6] min-h-screen text-slate-800 font-sans pb-32">
+      {/* Design Demo Preview Callout */}
+      <a
+        href="/demo-design"
+        className="w-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black px-3.5 py-2.5 rounded-2xl flex items-center justify-between text-xs shadow-sm transition active:scale-98"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-base">🎨</span>
+          <div>
+            <div className="leading-tight font-extrabold text-[12px]">Preview New Zinkit Quick Design</div>
+            <div className="text-[10px] text-amber-950 font-semibold">Interactive demo • Live site untouched</div>
+          </div>
+        </div>
+        <span className="bg-slate-950 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-xs">
+          Open Demo →
+        </span>
+      </a>
+
       {/* 1. Mobile Sub-Vertical Pill Switcher */}
       <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         {MOBILE_SUB_TABS.map((tab) => {
