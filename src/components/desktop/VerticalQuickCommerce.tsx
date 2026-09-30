@@ -143,30 +143,6 @@ export const VerticalQuickCommerce: React.FC = () => {
     <div className="w-full flex flex-col min-h-screen bg-brand-bg text-brand-graphite relative select-none font-sans">
       {/* 1. Sub-Vertical Segmented Switcher */}
       <div className="max-w-[1440px] mx-auto w-full px-8 pt-6">
-        {/* Design Demo Preview Callout */}
-        <div className="mb-4 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[1px] rounded-2xl shadow-sm">
-          <div className="bg-amber-50/90 rounded-2xl px-5 py-3 flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🎨</span>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
-                  Design Preview Available: New Zinkit Quick-Commerce Interface
-                </h4>
-                <p className="text-xs text-slate-600 font-medium">
-                  Review the warm lemon-yellow aesthetic, curated visual cards, and brand tiles in a safe demo sandbox.
-                </p>
-              </div>
-            </div>
-            <a
-              href="/demo-design"
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition"
-            >
-              <span>Explore Demo Design</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-
         <div className="bg-white/80 backdrop-blur-md p-2 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
             {SUB_VERTICAL_TABS.map((tab) => {

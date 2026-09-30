@@ -6,7 +6,6 @@ import { DesktopApp } from './components/desktop/DesktopApp';
 import { MobileApp } from './components/mobile/MobileApp';
 import { AdminPortal } from './admin/AdminPortal';
 import { VendorPortal } from './vendor/VendorPortal';
-import { QuickCommerceDemoPage } from './pages/QuickCommerceDemoPage';
 
 const MainLayout: React.FC = () => {
   const isMobile = useIsMobile();
@@ -42,16 +41,6 @@ function App() {
 
   if (pathname.startsWith('/vendor')) {
     return <VendorPortal />;
-  }
-
-  if (pathname.startsWith('/demo-design') || pathname.startsWith('/quick-demo')) {
-    return (
-      <CustomerProvider>
-        <AppProvider>
-          <QuickCommerceDemoPage />
-        </AppProvider>
-      </CustomerProvider>
-    );
   }
 
   return (
