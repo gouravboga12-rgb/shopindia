@@ -47,23 +47,23 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-3 sm:p-6">
       <div className="w-full max-w-lg">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500 text-white shadow-lg mb-4">
-            <Store className="w-8 h-8" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-500 text-white shadow-lg mb-3 sm:mb-4">
+            <Store className="w-7 h-7 sm:w-8 sm:h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 font-heading">ShopIndia Vendor Portal</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage your store, products, and orders</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 font-heading">ShopIndia Vendor Portal</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-1">Manage your store, products, and orders</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 border border-gray-100">
           <div className="flex border-b border-gray-200 mb-6">
             <button
               onClick={() => { setIsRegister(false); setError(''); setSuccess(''); }}
-              className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex-1 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
                 !isRegister ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
@@ -71,7 +71,7 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
             </button>
             <button
               onClick={() => { setIsRegister(true); setError(''); setSuccess(''); }}
-              className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex-1 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
                 isRegister ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
@@ -79,32 +79,32 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
             </button>
           </div>
 
-          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>}
-          {success && <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">{success}</div>}
+          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs sm:text-sm">{error}</div>}
+          {success && <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs sm:text-sm">{success}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Your Name *</label>
-                    <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm" />
+                    <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2.5 border rounded-xl text-base sm:text-sm" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Phone *</label>
-                    <input required value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm" />
+                    <input required value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2.5 border rounded-xl text-base sm:text-sm" />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Business / Store Name *</label>
-                  <input required value={businessName} onChange={e => setBusinessName(e.target.value)} className="w-full px-4 py-2.5 border rounded-xl text-sm" />
+                  <input required value={businessName} onChange={e => setBusinessName(e.target.value)} className="w-full px-4 py-2.5 border rounded-xl text-base sm:text-sm" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">GST Number</label>
-                    <input value={gstNumber} onChange={e => setGstNumber(e.target.value)} placeholder="Optional" className="w-full px-3 py-2 border rounded-xl text-xs uppercase" />
+                    <input value={gstNumber} onChange={e => setGstNumber(e.target.value)} placeholder="Optional" className="w-full px-3 py-2.5 border rounded-xl text-base sm:text-sm uppercase" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">PAN Number</label>
@@ -116,7 +116,7 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Email Address *</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2.5 border rounded-xl text-sm" />
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2.5 border rounded-xl text-base sm:text-sm" />
             </div>
 
             <div>
@@ -138,7 +138,7 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 pr-10 border rounded-xl text-sm"
+                  className="w-full px-4 py-2.5 pr-10 border rounded-xl text-base sm:text-sm"
                 />
                 <button
                   type="button"

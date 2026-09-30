@@ -27,39 +27,39 @@ export const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0F2C59] via-[#1a3d73] to-[#0a1f42] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#0F2C59] via-[#1a3d73] to-[#0a1f42] flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 mb-4">
-            <ShieldCheck className="w-8 h-8 text-white" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 mb-3 sm:mb-4">
+            <ShieldCheck className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white font-heading">ShopIndia Admin</h1>
-          <p className="text-white/60 text-sm mt-1">Super Admin Management Portal</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white font-heading">ShopIndia Admin</h1>
+          <p className="text-white/60 text-xs sm:text-sm mt-1">Super Admin Management Portal</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Sign in to your account</h2>
+        <div className="bg-white rounded-2xl shadow-2xl p-5 sm:p-8">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-5 sm:mb-6">Sign in to your account</h2>
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs sm:text-sm">{error}</div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/30 focus:border-[#0F2C59] transition-all"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/30 focus:border-[#0F2C59] transition-all"
                 placeholder="admin@shopindia.in"
               />
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">Password</label>
                 <button
                   type="button"
                   onClick={() => setShowForgot(true)}
-                  className="text-xs font-semibold text-[#0F2C59] hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-[#0F2C59] hover:underline cursor-pointer py-1"
                 >
                   Forgot Password?
                 </button>
@@ -67,10 +67,10 @@ export const AdminLogin: React.FC = () => {
               <div className="relative">
                 <input
                   type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
-                  className="w-full px-4 py-3 pr-11 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/30 focus:border-[#0F2C59] transition-all"
+                  className="w-full px-4 py-3 pr-11 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/30 focus:border-[#0F2C59] transition-all"
                 />
                 <button type="button" onClick={() => setShow(!show)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
                   {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>

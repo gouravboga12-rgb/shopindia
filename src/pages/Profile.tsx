@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { User, ShieldCheck, Mail, Sparkles, LogIn, LogOut, Loader2, KeyRound, RefreshCw, CheckCircle2, Lock, X } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import {
+  User, ShieldCheck, Mail, Sparkles, LogIn, LogOut, Loader2,
+  KeyRound, RefreshCw, CheckCircle2, Lock, X, Eye, EyeOff, ArrowLeft
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CustomerUser } from '../lib/customerAuth';
 import { DashboardInner } from './dashboard/DashboardPortal';
@@ -18,6 +22,7 @@ import {
 
 export const ProfilePage: React.FC = () => {
   const isMobile = useIsMobile();
+  const { navigateTo } = useApp();
 
   const [authUser, setAuthUser] = useState<CustomerUser | null>(() => {
     const u = getCustomerUser();
@@ -32,6 +37,7 @@ export const ProfilePage: React.FC = () => {
   const [aOtp, setAOtp] = useState('');
   const [aError, setAError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(() => {
@@ -155,209 +161,359 @@ export const ProfilePage: React.FC = () => {
     }
 
     return (
-      <div className={`max-w-7xl mx-auto ${pad} pt-8 pb-4 text-left`}>
-        <div className="bg-white border border-brand-border rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col md:flex-row min-h-[360px]">
-          {/* Left Side: Gradient Banner */}
-          <div className="md:w-2/5 lg:w-1/3 bg-gradient-to-br from-brand-blue to-blue-800 p-8 md:p-10 text-white flex flex-col justify-center relative overflow-hidden">
-             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-             <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-400/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/4 pointer-events-none" />
-             
-             <div className="relative z-10 flex flex-col h-full justify-center">
-                <div className="w-14 h-14 bg-white/10 rounded-2xl backdrop-blur-md border border-white/20 flex items-center justify-center mb-6 shadow-inner">
-                   {authMode === 'login'
-                     ? <LogIn size={28} className="text-white" />
-                     : authMode === 'verify-otp'
-                     ? <KeyRound size={28} className="text-white" />
-                     : <Sparkles size={28} className="text-white" />}
-                </div>
-                <h2 className="text-3xl font-black font-heading mb-3 leading-tight tracking-tight">
+      <div className={`max-w-4xl mx-auto w-full ${isMobile ? 'px-3 pt-3 pb-28' : 'px-6 pt-8 pb-12'} text-left`}>
+        {/* Mobile top navigation helper */}
+        {isMobile && (
+          <div className="flex items-center justify-between mb-3 px-1">
+            <button
+              onClick={() => navigateTo('home')}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-brand-blue py-1.5 px-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs active:scale-95 transition"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Store</span>
+            </button>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Customer Account
+            </span>
+          </div>
+        )}
+
+        <div className="bg-white border border-brand-border rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.06)] overflow-hidden flex flex-col md:flex-row">
+          {/* Header Banner - Responsive: compact on mobile, elegant sidebar on desktop */}
+          <div className="md:w-2/5 lg:w-1/3 bg-gradient-to-br from-[#0F2C59] via-[#1a3d73] to-[#0284c7] p-5 md:p-10 text-white flex flex-col justify-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-400/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/4 pointer-events-none" />
+            
+            <div className="relative z-10 flex md:flex-col items-center md:items-start gap-3.5 md:gap-0">
+              <div className="w-12 h-12 md:w-14 md:h-14 bg-white/15 rounded-2xl backdrop-blur-md border border-white/20 flex items-center justify-center md:mb-6 shadow-inner shrink-0">
+                {authMode === 'login'
+                  ? <LogIn className="w-6 h-6 text-white" />
+                  : authMode === 'verify-otp'
+                  ? <KeyRound className="w-6 h-6 text-white" />
+                  : <Sparkles className="w-6 h-6 text-white" />}
+              </div>
+              <div>
+                <h2 className="text-xl md:text-3xl font-black font-heading md:mb-3 leading-tight tracking-tight text-white">
                   {authMode === 'login' ? 'Welcome Back!' : authMode === 'verify-otp' ? 'Verify Email' : 'Join Shop India'}
                 </h2>
-                <p className="text-blue-50 text-sm font-semibold leading-relaxed max-w-[260px]">
+                <p className="text-blue-100/90 text-xs md:text-sm font-medium leading-relaxed max-w-[280px]">
                   {authMode === 'login'
-                    ? 'Sign in to access your saved addresses, track orders, and experience fast checkout.'
+                    ? 'Sign in to access your orders, saved addresses & fast checkout.'
                     : authMode === 'verify-otp'
-                    ? `A 6-digit OTP has been sent to ${aEmail}. Enter it below to activate your account.`
-                    : 'Create an account for personalized recommendations, faster checkout, and exclusive offers.'}
+                    ? `6-digit OTP code sent to ${aEmail}.`
+                    : 'Create an account for exclusive deals & instant order tracking.'}
                 </p>
-             </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right Side: Form */}
-          <div className="md:w-3/5 lg:w-2/3 p-8 md:p-10 lg:p-12 flex flex-col justify-center bg-white relative">
+          {/* Right Side: Form & Quick Tabs */}
+          <div className="md:w-3/5 lg:w-2/3 p-5 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-center bg-white relative">
+            {/* Required Auth Banner */}
+            {authPromptMessage && (
+              <div className="mb-5 p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 shadow-sm animate-in fade-in">
+                <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5">
+                  <Lock size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-amber-900">Login Required</h4>
+                  <p className="text-xs text-amber-800 font-semibold mt-0.5 leading-relaxed">
+                    {authPromptMessage}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sessionStorage.removeItem('shopindia_auth_prompt_message');
+                    setAuthPromptMessage(null);
+                  }}
+                  className="text-amber-500 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                  title="Dismiss"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
-             {/* Required Auth Banner */}
-             {authPromptMessage && (
-               <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 shadow-sm animate-in fade-in">
-                 <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5">
-                   <Lock size={16} />
-                 </div>
-                 <div className="flex-1 min-w-0">
-                   <h4 className="font-extrabold text-xs uppercase tracking-wider text-amber-900">Login Required</h4>
-                   <p className="text-xs text-amber-800 font-semibold mt-0.5 leading-relaxed">
-                     {authPromptMessage}
-                   </p>
-                 </div>
-                 <button
-                   type="button"
-                   onClick={() => {
-                     sessionStorage.removeItem('shopindia_auth_prompt_message');
-                     setAuthPromptMessage(null);
-                   }}
-                   className="text-amber-500 hover:text-amber-700 p-1 cursor-pointer"
-                   title="Dismiss"
-                 >
-                   <X size={14} />
-                 </button>
-               </div>
-             )}
+            {/* Top Tab Switcher */}
+            {authMode !== 'verify-otp' && (
+              <div className="grid grid-cols-2 p-1 bg-slate-100/90 rounded-2xl mb-6 border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('login'); setAError(''); }}
+                  className={`py-2 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                    authMode === 'login'
+                      ? 'bg-white text-brand-blue shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('register'); setAError(''); }}
+                  className={`py-2 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                    authMode === 'register'
+                      ? 'bg-white text-brand-blue shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
 
-             {/* Error Banner */}
-             <AnimatePresence>
-               {aError && (
-                 <motion.div
-                   initial={{ opacity: 0, y: -6 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   exit={{ opacity: 0, y: -6 }}
-                   className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2"
-                 >
-                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                   <span>{aError}</span>
-                 </motion.div>
-               )}
-             </AnimatePresence>
+            {/* Error Banner */}
+            <AnimatePresence>
+              {aError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                  <span>{aError}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-             {/* ── LOGIN FORM ──────────────────────────────────────────────── */}
-             {authMode === 'login' && (
-               <form onSubmit={handleLogin} className="flex flex-col gap-5 w-full max-w-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-brand-graphite font-heading">Secure Login</h3>
-                    <div className="h-px flex-1 bg-slate-100 ml-4"></div>
+            {/* ── LOGIN FORM ──────────────────────────────────────────────── */}
+            {authMode === 'login' && (
+              <form onSubmit={handleLogin} className="flex flex-col gap-4 w-full">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
+                    <Mail size={12}/> Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={aEmail}
+                      onChange={(e) => setAEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      autoComplete="email"
+                      className="w-full pl-10 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all focus:bg-white placeholder:text-slate-400"
+                    />
                   </div>
+                </div>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><Mail size={12}/> Email Address</label>
-                    <input type="email" value={aEmail} onChange={(e) => setAEmail(e.target.value)} placeholder="you@example.com" required className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><ShieldCheck size={12}/> Password</label>
-                      <button type="button" onClick={() => setShowForgotPassword(true)} className="text-xs font-bold text-brand-blue hover:underline cursor-pointer">
-                        Forgot Password?
-                      </button>
-                    </div>
-                    <input type="password" value={aPass} onChange={(e) => setAPass(e.target.value)} placeholder="••••••••" required className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
-                  </div>
-                  
-                  <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-5">
-                    <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={authLoading}
-                      className="w-full sm:w-auto px-8 py-3.5 bg-brand-blue hover:bg-blue-650 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer">
-                      {authLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-                      Log In Now
-                    </motion.button>
-                    
-                    <button type="button" onClick={() => { setAuthMode('register'); setAError(''); }}
-                      className="text-xs text-brand-slate hover:text-brand-blue font-bold underline transition-colors w-full sm:w-auto text-center cursor-pointer">
-                      New here? Create account
-                    </button>
-                  </div>
-               </form>
-             )}
-
-             {/* ── REGISTER FORM (Step 1) ──────────────────────────────────── */}
-             {authMode === 'register' && (
-               <form onSubmit={handleSendSignupOtp} className="flex flex-col gap-5 w-full max-w-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-brand-graphite font-heading">Create Account</h3>
-                    <div className="h-px flex-1 bg-slate-100 ml-4"></div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><User size={12}/> Full Name</label>
-                    <input value={aName} onChange={(e) => setAName(e.target.value)} placeholder="E.g. Jane Doe" required className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><Mail size={12}/> Email Address</label>
-                    <input type="email" value={aEmail} onChange={(e) => setAEmail(e.target.value)} placeholder="you@example.com" required className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5"><ShieldCheck size={12}/> Password</label>
-                    <input type="password" value={aPass} onChange={(e) => setAPass(e.target.value)} placeholder="Min. 6 characters" required minLength={6} className="px-4 py-3.5 border border-slate-200 rounded-xl text-sm font-bold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all bg-slate-50 focus:bg-white placeholder:text-slate-400" />
-                  </div>
-                  
-                  <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-5">
-                    <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={authLoading}
-                      className="w-full sm:w-auto px-8 py-3.5 bg-brand-blue hover:bg-blue-650 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer">
-                      {authLoading ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />}
-                      {authLoading ? 'Sending OTP…' : 'Send Verification OTP'}
-                    </motion.button>
-                    
-                    <button type="button" onClick={() => { setAuthMode('login'); setAError(''); }}
-                      className="text-xs text-brand-slate hover:text-brand-blue font-bold underline transition-colors w-full sm:w-auto text-center cursor-pointer">
-                      Already registered? Log in
-                    </button>
-                  </div>
-               </form>
-             )}
-
-             {/* ── OTP VERIFY FORM (Step 2) ────────────────────────────────── */}
-             {authMode === 'verify-otp' && (
-               <form onSubmit={handleVerifySignupOtp} className="flex flex-col gap-5 w-full max-w-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-brand-graphite font-heading">Verify Your Email</h3>
-                    <div className="h-px flex-1 bg-slate-100 ml-4"></div>
-                  </div>
-
-                  {/* Email display + change link */}
-                  <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex items-start justify-between gap-2 text-xs text-blue-900">
-                    <div>
-                      <span>OTP sent to: </span>
-                      <strong className="font-bold">{aEmail}</strong>
-                    </div>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck size={12}/> Password
+                    </label>
                     <button
                       type="button"
-                      onClick={() => { setAuthMode('register'); setAError(''); setAOtp(''); }}
-                      className="text-brand-blue font-bold hover:underline shrink-0"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-xs font-bold text-brand-blue hover:underline cursor-pointer py-1"
                     >
-                      Change
+                      Forgot Password?
                     </button>
                   </div>
-
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
-                        <KeyRound size={12}/> 6-Digit OTP Code
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleResendSignupOtp}
-                        disabled={resendCooldown > 0 || authLoading}
-                        className="text-xs font-bold text-brand-blue hover:underline disabled:text-slate-400 disabled:no-underline flex items-center gap-1"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${authLoading ? 'animate-spin' : ''}`} />
-                        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
-                      </button>
-                    </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
-                      type="text"
-                      maxLength={6}
-                      value={aOtp}
-                      onChange={(e) => setAOtp(e.target.value.replace(/\D/g, ''))}
-                      placeholder="123456"
+                      type={showPassword ? 'text' : 'password'}
+                      value={aPass}
+                      onChange={(e) => setAPass(e.target.value)}
+                      placeholder="••••••••"
                       required
-                      className="w-full text-center tracking-[8px] font-mono text-xl py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:tracking-normal placeholder:font-sans placeholder:text-sm placeholder:font-normal placeholder:text-slate-400"
+                      autoComplete="current-password"
+                      className="w-full pl-10 pr-11 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all focus:bg-white placeholder:text-slate-400"
                     />
-                    <p className="text-xs text-slate-500 font-semibold text-center">⏱️ OTP valid for 10 minutes</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                      tabIndex={-1}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
-                  
-                  <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={authLoading}
-                    className="w-full py-3.5 bg-gradient-to-r from-brand-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer">
-                    {authLoading
-                      ? <><Loader2 size={18} className="animate-spin" /><span>Verifying…</span></>
-                      : <><CheckCircle2 size={18} /><span>Verify &amp; Create Account</span></>}
+                </div>
+                
+                <div className="mt-3 flex flex-col gap-3">
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3.5 bg-brand-blue hover:bg-blue-600 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer min-h-[48px]"
+                  >
+                    {authLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+                    <span>Log In Now</span>
                   </motion.button>
-               </form>
-             )}
+                  
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode('register'); setAError(''); }}
+                      className="text-xs text-brand-slate hover:text-brand-blue font-bold underline transition-colors cursor-pointer py-1"
+                    >
+                      New to Shop India? Create an account
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* ── REGISTER FORM (Step 1) ──────────────────────────────────── */}
+            {authMode === 'register' && (
+              <form onSubmit={handleSendSignupOtp} className="flex flex-col gap-4 w-full">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
+                    <User size={12}/> Full Name
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      value={aName}
+                      onChange={(e) => setAName(e.target.value)}
+                      placeholder="E.g. Jane Doe"
+                      required
+                      autoComplete="name"
+                      className="w-full pl-10 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all focus:bg-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
+                    <Mail size={12}/> Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={aEmail}
+                      onChange={(e) => setAEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      autoComplete="email"
+                      className="w-full pl-10 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all focus:bg-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck size={12}/> Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={aPass}
+                      onChange={(e) => setAPass(e.target.value)}
+                      placeholder="Min. 6 characters"
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                      className="w-full pl-10 pr-11 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-brand-graphite focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all focus:bg-white placeholder:text-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                      tabIndex={-1}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="mt-3 flex flex-col gap-3">
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3.5 bg-brand-blue hover:bg-blue-600 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer min-h-[48px]"
+                  >
+                    {authLoading ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />}
+                    <span>{authLoading ? 'Sending OTP…' : 'Send Verification OTP'}</span>
+                  </motion.button>
+                  
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode('login'); setAError(''); }}
+                      className="text-xs text-brand-slate hover:text-brand-blue font-bold underline transition-colors cursor-pointer py-1"
+                    >
+                      Already registered? Sign in instead
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* ── OTP VERIFY FORM (Step 2) ────────────────────────────────── */}
+            {authMode === 'verify-otp' && (
+              <form onSubmit={handleVerifySignupOtp} className="flex flex-col gap-4 w-full">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-lg font-bold text-brand-graphite font-heading">Verify Your Email</h3>
+                  <div className="h-px flex-1 bg-slate-100 ml-2"></div>
+                </div>
+
+                {/* Email display + change link */}
+                <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex items-start justify-between gap-2 text-xs text-blue-900">
+                  <div className="overflow-hidden">
+                    <span className="text-slate-600 block">OTP code sent to:</span>
+                    <strong className="font-bold truncate block">{aEmail}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('register'); setAError(''); setAOtp(''); }}
+                    className="text-brand-blue font-bold hover:underline shrink-0 py-1"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-brand-slate uppercase tracking-wider flex items-center gap-1.5">
+                      <KeyRound size={12}/> 6-Digit Code
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleResendSignupOtp}
+                      disabled={resendCooldown > 0 || authLoading}
+                      className="text-xs font-bold text-brand-blue hover:underline disabled:text-slate-400 disabled:no-underline flex items-center gap-1 py-1"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${authLoading ? 'animate-spin' : ''}`} />
+                      <span>{resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={aOtp}
+                    onChange={(e) => setAOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    required
+                    autoFocus
+                    className="w-full text-center tracking-[8px] font-mono text-xl py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:tracking-normal placeholder:font-sans placeholder:text-sm placeholder:font-normal placeholder:text-slate-400"
+                  />
+                  <p className="text-xs text-slate-500 font-semibold text-center">⏱️ Code expires in 10 minutes</p>
+                </div>
+                
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full py-3.5 bg-gradient-to-r from-brand-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-black uppercase tracking-wider rounded-xl shadow-[0_8px_20px_rgb(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer min-h-[48px] mt-2"
+                >
+                  {authLoading
+                    ? <><Loader2 size={18} className="animate-spin" /><span>Verifying…</span></>
+                    : <><CheckCircle2 size={18} /><span>Verify &amp; Create Account</span></>}
+                </motion.button>
+              </form>
+            )}
           </div>
         </div>
 

@@ -119,7 +119,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -134,13 +134,13 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 z-10"
+          className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 z-10 max-h-[92vh] flex flex-col"
         >
           {/* Header Bar */}
-          <div className="bg-gradient-to-r from-[#0F2C59] to-[#0284c7] px-6 py-5 text-white flex items-center justify-between relative overflow-hidden">
+          <div className="bg-gradient-to-r from-[#0F2C59] to-[#0284c7] px-5 sm:px-6 py-4 sm:py-5 text-white flex items-center justify-between relative overflow-hidden shrink-0">
             <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none -translate-y-1/2 translate-x-1/3" />
             <div className="flex items-center gap-3 relative z-10">
-              <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner">
+              <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner shrink-0">
                 {step === 'success' ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-300" />
                 ) : step === 'reset' ? (
@@ -166,7 +166,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
             </button>
           </div>
 
-          <div className="p-6 md:p-8">
+          <div className="p-5 sm:p-8 overflow-y-auto flex-1">
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
@@ -200,7 +200,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com"
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:text-slate-400"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:text-slate-400"
                     />
                   </div>
                 </div>
@@ -323,7 +323,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                       placeholder="At least 6 characters"
                       required
                       minLength={6}
-                      className="w-full px-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:text-slate-400"
+                      className="w-full px-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:text-slate-400"
                     />
                     <button
                       type="button"
@@ -348,7 +348,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter your new password"
                     required
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:text-slate-400"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 transition-all placeholder:text-slate-400"
                   />
                 </div>
 
