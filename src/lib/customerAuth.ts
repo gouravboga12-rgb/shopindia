@@ -13,6 +13,26 @@ export const API_BASE = RAW_API.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 export const getCustomerToken = (): string | null => localStorage.getItem(TOKEN_KEY);
 
+export const isCustomerAuthenticated = (): boolean => !!getCustomerToken();
+
+export const requireCustomerAuth = (actionDescription = 'add products to cart, buy items, or book services'): boolean => {
+  const token = getCustomerToken();
+  if (!token) {
+    const msg = `Please login to your account first to ${actionDescription}.`;
+    sessionStorage.setItem('shopindia_auth_redirect', window.location.pathname);
+    sessionStorage.setItem('shopindia_auth_prompt_message', msg);
+    alert(msg);
+    // Immediately redirect to login / profile authentication view
+    const targetUrl = '/profile';
+    if (window.location.pathname !== targetUrl) {
+      window.history.pushState(null, '', targetUrl);
+      window.dispatchEvent(new Event('shopindia:navigate'));
+    }
+    return false;
+  }
+  return true;
+};
+
 export const getCustomerUser = (): CustomerUser | null => {
   const raw = localStorage.getItem(USER_KEY);
   return raw ? JSON.parse(raw) : null;

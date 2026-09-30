@@ -10,6 +10,7 @@ import {
 import type { Product } from '../../data/types';
 import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
 import { PrescriptionUploadModal } from '../common/PrescriptionUploadModal';
+import { requireCustomerAuth } from '../../lib/customerAuth';
 
 type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
 
@@ -74,6 +75,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
 
   const handleAddToCartWithCustomization = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireCustomerAuth('add quick commerce items to your cart')) return;
     if (activeSubVertical === 'food') {
       setCustomizingProduct(product);
     } else if (activeSubVertical === 'pharmacy' && product.requiresPrescription) {

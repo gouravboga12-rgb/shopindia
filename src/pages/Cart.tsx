@@ -4,6 +4,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShieldCheck, Ticket } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CheckoutDrawer } from '../components/common/CheckoutDrawer';
+import { requireCustomerAuth } from '../lib/customerAuth';
 
 export const CartPage: React.FC = () => {
   const { cart, updateQuantity, removeFromCart, getCartTotal, navigateTo } = useApp();
@@ -29,6 +30,7 @@ export const CartPage: React.FC = () => {
   };
 
   const handleCheckout = () => {
+    if (!requireCustomerAuth('proceed to checkout and place an order')) return;
     setIsCheckoutOpen(true);
   };
 

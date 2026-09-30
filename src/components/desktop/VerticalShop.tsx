@@ -7,6 +7,7 @@ import { useCategories } from '../../hooks/useCategories';
 import { Star, Award, Heart, ChevronLeft, ChevronRight, Clock, ShoppingCart, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
+import { requireCustomerAuth } from '../../lib/customerAuth';
 
 const BRAND_LOGOS: Record<string, string> = {
   'Apple': 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/apple.svg',
@@ -462,6 +463,7 @@ export const VerticalShop: React.FC = () => {
                           whileTap={{ scale: 0.94 }}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!requireCustomerAuth('buy this product')) return;
                             addToCart(product);
                             navigateTo('cart');
                           }}
@@ -730,6 +732,7 @@ export const VerticalShop: React.FC = () => {
                                     whileTap={{ scale: 0.94 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!requireCustomerAuth('buy this product')) return;
                                       addToCart(product);
                                       navigateTo('cart');
                                     }}

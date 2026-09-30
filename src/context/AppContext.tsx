@@ -4,7 +4,7 @@ import type { Product } from '../data/types';
 const RAW_API = import.meta.env.VITE_API_URL || '';
 const API_BASE = RAW_API.replace(/\/api\/?$/, '').replace(/\/$/, '');
 import { api } from '../lib/api';
-import { getCustomerToken } from '../lib/customerAuth';
+import { getCustomerToken, requireCustomerAuth } from '../lib/customerAuth';
 
 export type VerticalType = 'shop' | 'quick' | 'services';
 export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category';
@@ -92,6 +92,7 @@ interface AppContextType {
   markAllAsRead: () => void;
   lastAddedProduct: { product: Product; timestamp: number } | null;
   clearLastAddedProduct: () => void;
+  requireAuth: (actionDescription?: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -108,7 +109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const p = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
     if (p.startsWith('/detail') || urlProductId) return { path: 'detail' as PathType, vertical: 'shop' as VerticalType, productId: urlProductId };
     if (p === '/dashboard' || p === '/account') return { path: 'dashboard' as PathType, vertical: 'shop' as VerticalType };
-    if (p === '/profile') return { path: 'profile' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/profile' || p === '/login' || p === '/signin') return { path: 'profile' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/orders') return { path: 'orders' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/cart') return { path: 'cart' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/search') return { path: 'search' as PathType, vertical: 'shop' as VerticalType };
@@ -258,7 +259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (urlProductId) setSelectedProductId(urlProductId);
         setCurrentPath('detail');
       } else if (p === '/dashboard' || p === '/account') setCurrentPath('dashboard');
-      else if (p === '/profile') setCurrentPath('profile');
+      else if (p === '/profile' || p === '/login' || p === '/signin') setCurrentPath('profile');
       else if (p === '/orders') setCurrentPath('orders');
       else if (p === '/cart') setCurrentPath('cart');
       else if (p === '/search') setCurrentPath('search');
@@ -343,6 +344,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Cart operations
   const addToCart = (product: Product) => {
+    if (!requireCustomerAuth('add products to your cart, buy items, or book services')) {
+      return;
+    }
     if (product.isOutOfStock || (product.stock !== undefined && product.stock <= 0)) {
       alert('This product is out of stock.');
       return;
@@ -486,7 +490,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markAsRead,
         markAllAsRead,
         lastAddedProduct,
-        clearLastAddedProduct
+        clearLastAddedProduct,
+        requireAuth: requireCustomerAuth
       }}
     >
       {children}

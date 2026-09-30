@@ -5,6 +5,7 @@ import { useProducts } from '../hooks/useProducts';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { Search, Star, Filter, ArrowUpDown, Heart, ShoppingCart, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { requireCustomerAuth } from '../lib/customerAuth';
 
 export const SearchPage: React.FC = () => {
   const { currentVertical, searchQuery, setSearchQuery, navigateTo, addToCart } = useApp();
@@ -403,6 +404,7 @@ export const SearchPage: React.FC = () => {
                       whileTap={{ scale: 0.94 }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (!requireCustomerAuth('buy this product')) return;
                         addToCart(product);
                         navigateTo('cart');
                       }}

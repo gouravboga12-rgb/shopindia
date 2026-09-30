@@ -4,6 +4,7 @@ import { useProducts } from '../hooks/useProducts';
 import { useCustomer } from '../context/CustomerContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, BadgePercent, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2 } from 'lucide-react';
+import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
@@ -43,10 +44,12 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   const handleAddToCart = () => {
+    if (!requireCustomerAuth('add this item to your cart')) return;
     if (product) addToCart(product);
   };
 
   const handleBuyNow = () => {
+    if (!requireCustomerAuth('buy this product')) return;
     if (product) {
       addToCart(product);
       navigateTo('cart');
@@ -54,6 +57,7 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   const handleBookNow = () => {
+    if (!requireCustomerAuth('book this service')) return;
     if (product) {
       const bookingDetails = {
         ...product,
@@ -392,6 +396,7 @@ export const ProductDetailPage: React.FC = () => {
                           whileTap={{ scale: 0.94 }}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!requireCustomerAuth('buy this product')) return;
                             addToCart(p);
                             navigateTo('cart');
                           }}
@@ -721,6 +726,7 @@ export const ProductDetailPage: React.FC = () => {
                           whileTap={{ scale: 0.94 }}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!requireCustomerAuth('buy this product')) return;
                             addToCart(p);
                             navigateTo('cart');
                           }}

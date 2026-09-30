@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { User, ShieldCheck, Mail, Sparkles, LogIn, LogOut, Loader2, KeyRound, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { User, ShieldCheck, Mail, Sparkles, LogIn, LogOut, Loader2, KeyRound, RefreshCw, CheckCircle2, Lock, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CustomerUser } from '../lib/customerAuth';
 import { DashboardInner } from './dashboard/DashboardPortal';
@@ -34,6 +34,9 @@ export const ProfilePage: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(() => {
+    return sessionStorage.getItem('shopindia_auth_prompt_message');
+  });
 
   // Resend cooldown timer
   useEffect(() => {
@@ -54,7 +57,10 @@ export const ProfilePage: React.FC = () => {
       setCustomerSession(data.token, data.user);
       setAuthUser(data.user);
       setAName(''); setAEmail(''); setAPass('');
-      window.location.href = '/dashboard';
+      const redirectUrl = sessionStorage.getItem('shopindia_auth_redirect');
+      sessionStorage.removeItem('shopindia_auth_redirect');
+      sessionStorage.removeItem('shopindia_auth_prompt_message');
+      window.location.href = redirectUrl && redirectUrl !== '/profile' ? redirectUrl : '/dashboard';
     } catch (err: any) {
       setAError(err.message || 'Authentication failed');
     } finally {
@@ -108,7 +114,10 @@ export const ProfilePage: React.FC = () => {
       setCustomerSession(data.token, data.user);
       setAuthUser(data.user);
       setAName(''); setAEmail(''); setAPass(''); setAOtp('');
-      window.location.href = '/dashboard';
+      const redirectUrl = sessionStorage.getItem('shopindia_auth_redirect');
+      sessionStorage.removeItem('shopindia_auth_redirect');
+      sessionStorage.removeItem('shopindia_auth_prompt_message');
+      window.location.href = redirectUrl && redirectUrl !== '/profile' ? redirectUrl : '/dashboard';
     } catch (err: any) {
       setAError(err.message || 'OTP verification failed. Please try again.');
     } finally {
@@ -176,6 +185,32 @@ export const ProfilePage: React.FC = () => {
 
           {/* Right Side: Form */}
           <div className="md:w-3/5 lg:w-2/3 p-8 md:p-10 lg:p-12 flex flex-col justify-center bg-white relative">
+
+             {/* Required Auth Banner */}
+             {authPromptMessage && (
+               <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 shadow-sm animate-in fade-in">
+                 <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5">
+                   <Lock size={16} />
+                 </div>
+                 <div className="flex-1 min-w-0">
+                   <h4 className="font-extrabold text-xs uppercase tracking-wider text-amber-900">Login Required</h4>
+                   <p className="text-xs text-amber-800 font-semibold mt-0.5 leading-relaxed">
+                     {authPromptMessage}
+                   </p>
+                 </div>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     sessionStorage.removeItem('shopindia_auth_prompt_message');
+                     setAuthPromptMessage(null);
+                   }}
+                   className="text-amber-500 hover:text-amber-700 p-1 cursor-pointer"
+                   title="Dismiss"
+                 >
+                   <X size={14} />
+                 </button>
+               </div>
+             )}
 
              {/* Error Banner */}
              <AnimatePresence>

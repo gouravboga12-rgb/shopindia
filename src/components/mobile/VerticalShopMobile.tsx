@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
+import { requireCustomerAuth } from '../../lib/customerAuth';
 
 const REFERENCE_CATEGORIES = [
   {
@@ -399,6 +400,7 @@ export const VerticalShopMobile: React.FC = () => {
                     whileTap={{ scale: 0.94 }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!requireCustomerAuth('buy this product')) return;
                       addToCart(product);
                       navigateTo('cart');
                     }}

@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
 import { TimeSlotWheelPickerModal } from '../common/TimeSlotWheelPickerModal';
+import { requireCustomerAuth } from '../../lib/customerAuth';
 import type { Product } from '../../data/types';
 
 type ServiceSubVertical = 'home' | 'vehicle';
@@ -99,6 +100,7 @@ export const VerticalServices: React.FC = () => {
 
   const handleBookNow = (service: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireCustomerAuth('book a service appointment')) return;
     setSelectedServiceForBooking(service);
     setSelectedDate('Tomorrow');
     const slots = service.serviceSlots && service.serviceSlots.length > 0
@@ -108,6 +110,7 @@ export const VerticalServices: React.FC = () => {
   };
 
   const confirmBooking = (slotData?: { date: string; time: string }) => {
+    if (!requireCustomerAuth('book a service appointment')) return;
     if (!selectedServiceForBooking) return;
     const date = slotData?.date || selectedDate;
     const time = slotData?.time || selectedTime;

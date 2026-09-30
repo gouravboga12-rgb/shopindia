@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
 import { TimeSlotWheelPickerModal } from '../common/TimeSlotWheelPickerModal';
+import { requireCustomerAuth } from '../../lib/customerAuth';
 import type { Product } from '../../data/types';
 
 type ServiceSubVertical = 'home' | 'vehicle';
@@ -91,6 +92,7 @@ export const VerticalServicesMobile: React.FC = () => {
 
   const handleBookClick = (service: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireCustomerAuth('book a service appointment')) return;
     setBookingService(service);
     setSelectedDate('Tomorrow');
     const slots = service.serviceSlots && service.serviceSlots.length > 0
@@ -101,6 +103,7 @@ export const VerticalServicesMobile: React.FC = () => {
 
 
   const confirmBooking = (slotData?: { date: string; time: string }) => {
+    if (!requireCustomerAuth('book a service appointment')) return;
     if (!bookingService) return;
     const date = slotData?.date || selectedDate;
     const time = slotData?.time || selectedTime;
