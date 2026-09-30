@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
         where,
         include: {
           customer: { select: { name: true, email: true, phone: true } },
-          vendor: { select: { id: true, businessName: true, phone: true, email: true } },
+          vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } },
           branch: { select: { name: true } },
           items: {
             include: {
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
                 select: {
                   id: true,
                   name: true,
-                  vendor: { select: { id: true, businessName: true, phone: true, email: true } }
+                  vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } }
                 }
               }
             }
@@ -59,7 +59,7 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         customer: { select: { name: true, email: true, phone: true } },
-        vendor: { select: { businessName: true, phone: true } },
+        vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } },
         items: { include: { product: true } },
       },
     });

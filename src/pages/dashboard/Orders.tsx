@@ -194,7 +194,28 @@ export const OrdersPage: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {/* Items */}
                         <div>
-                          <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Items</h4>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate">Items</h4>
+                          </div>
+
+                          {/* Sold by / Shipped from Vendor info */}
+                          {openOrder.vendor && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-start gap-2.5 text-xs mb-3">
+                              <span className="text-base leading-none">🏪</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-brand-graphite">Sold by: {openOrder.vendor.businessName}</span>
+                                  <span className="text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
+                                    Verified Seller
+                                  </span>
+                                </div>
+                                <p className="text-brand-slate text-[11px] mt-0.5">
+                                  Shipped from: {[openOrder.vendor.street, openOrder.vendor.city, openOrder.vendor.state, openOrder.vendor.pincode].filter(Boolean).join(', ') || 'ShopIndia Logistics Hub'}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex flex-col gap-3">
                             {openOrder.items.map((it: OrderItem, i: number) => (
                               <div key={i} className="flex items-center gap-3 bg-white border border-brand-border rounded-xl p-2.5">
@@ -212,9 +233,9 @@ export const OrdersPage: React.FC = () => {
                         <div>
                           <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Order Summary</h4>
                           <div className="bg-white border border-brand-border rounded-lg p-4 space-y-2 text-xs text-brand-slate">
-                            <div className="flex justify-between"><span>Subtotal</span><span className="font-bold text-brand-graphite font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span></div>
+                            <div className="flex justify-between"><span>Subtotal (Excl. Tax)</span><span className="font-bold text-brand-graphite font-numbers">₹{Math.round(openOrder.total / 1.18).toLocaleString('en-IN')}</span></div>
                             <div className="flex justify-between"><span>Shipping</span><span className="font-bold text-emerald-600">FREE</span></div>
-                            <div className="flex justify-between"><span>Tax (incl.)</span><span className="font-bold text-brand-graphite font-numbers">₹{Math.round(openOrder.total * 0.12).toLocaleString('en-IN')}</span></div>
+                            <div className="flex justify-between"><span>GST (18% incl.)</span><span className="font-bold text-brand-graphite font-numbers">₹{Math.round(openOrder.total - (openOrder.total / 1.18)).toLocaleString('en-IN')}</span></div>
                             <div className="border-t border-brand-border pt-2 flex justify-between items-center">
                               <span className="font-bold text-brand-graphite">Grand Total</span>
                               <span className="font-extrabold text-brand-blue font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span>

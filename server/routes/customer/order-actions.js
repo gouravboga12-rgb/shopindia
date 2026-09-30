@@ -9,7 +9,20 @@ router.use(customerAuth);
 async function findOwnOrder(userId, orderNumber) {
   return prisma.order.findFirst({
     where: { customerId: userId, orderNumber },
-    include: { items: { include: { product: { include: { images: true } } } } },
+    include: {
+      customer: { select: { name: true, email: true, phone: true } },
+      vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } },
+      items: {
+        include: {
+          product: {
+            include: {
+              images: true,
+              vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true } }
+            }
+          }
+        }
+      }
+    },
   });
 }
 

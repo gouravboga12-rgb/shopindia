@@ -2,32 +2,68 @@ export interface InvoiceOrderData {
   id?: string;
   orderNumber?: string;
   createdAt?: string;
+  date?: string;
   status?: string;
   type?: string;
   vertical?: string;
   total: number;
+  subtotal?: number;
+  tax?: number;
   items?: Array<{
     name?: string;
     product?: {
+      id?: string;
       title?: string;
       price?: number;
       category?: string;
+      hsn?: string;
+      vendor?: {
+        id?: string;
+        businessName?: string;
+        contactName?: string;
+        phone?: string;
+        email?: string;
+        street?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
+        country?: string;
+      };
     };
     title?: string;
     price?: number;
     quantity?: number;
+    hsn?: string;
   }>;
   customer?: {
     name?: string;
     email?: string;
     phone?: string;
   };
+  vendor?: {
+    id?: string;
+    businessName?: string;
+    contactName?: string;
+    phone?: string;
+    email?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  };
+  sellerName?: string;
   deliveryAddress?: {
     street?: string;
     city?: string;
     state?: string;
     postalCode?: string;
   } | string;
+  deliveryLine1?: string;
+  deliveryLine2?: string;
+  deliveryCity?: string;
+  deliveryState?: string;
+  deliveryPincode?: string;
 }
 
 export function generateAndPrintInvoice(order: InvoiceOrderData) {
@@ -37,40 +73,104 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
-  }) : new Date().toLocaleDateString('en-IN', {
+  }) : order.date || new Date().toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   });
 
+  // 1. Resolve Sold By / Shipped From Vendor Details
+  const vendorObj = order.vendor || (order.items && order.items[0]?.product?.vendor) || null;
+  const vendorBusinessName = vendorObj?.businessName || order.sellerName || (order as any).vendorBusinessName || 'ShopIndia Official Fulfillment Center';
+  
+  const vendorStreet = vendorObj?.street || 'Central Logistics & Dispatch Hub';
+  const vendorCity = vendorObj?.city || 'Bengaluru';
+  const vendorState = vendorObj?.state || 'Karnataka';
+  const vendorPincode = vendorObj?.pincode ? ` - ${vendorObj.pincode}` : '';
+  const vendorCityState = `${vendorCity}, ${vendorState}${vendorPincode}`;
+  const vendorPhone = vendorObj?.phone ? `Phone: ${vendorObj.phone}` : '';
+  const vendorEmail = vendorObj?.email ? `Email: ${vendorObj.email}` : '';
+
+  // 2. Resolve Customer Billing & Shipping Address
+  let addressText = '';
+  if (typeof order.deliveryAddress === 'string' && order.deliveryAddress.trim()) {
+    addressText = order.deliveryAddress;
+  } else if (order.deliveryAddress && typeof order.deliveryAddress === 'object') {
+    const d = order.deliveryAddress;
+    addressText = [d.street, d.city, d.state ? (d.postalCode ? `${d.state} - ${d.postalCode}` : d.state) : d.postalCode].filter(Boolean).join(', ');
+  } else if (order.deliveryLine1 || order.deliveryCity) {
+    addressText = [order.deliveryLine1, order.deliveryLine2, order.deliveryCity, order.deliveryState ? (order.deliveryPincode ? `${order.deliveryState} - ${order.deliveryPincode}` : order.deliveryState) : order.deliveryPincode].filter(Boolean).join(', ');
+  }
+  if (!addressText) {
+    addressText = 'HSR Layout Sector 4, Outer Ring Road, Bengaluru, Karnataka - 560102';
+  }
+
+  const customerName = order.customer?.name || 'Valued Customer';
+  const customerEmail = order.customer?.email || 'customer@shopindia.in';
+  const customerPhone = order.customer?.phone || '';
+
+  const custState = (typeof order.deliveryAddress === 'object' && order.deliveryAddress?.state) 
+    || order.deliveryState 
+    || (addressText.match(/(Karnataka|Maharashtra|Delhi|Tamil Nadu|Telangana|Gujarat|Uttar Pradesh|Kerala|West Bengal|Rajasthan|Punjab|Haryana|Bihar|Madhya Pradesh|Andhra Pradesh|Odisha|Goa)/i)?.[0]) 
+    || 'Karnataka';
+  const placeOfSupply = `${custState}`;
+
+  // 3. Mathematical & Legal Indian GST Calculations (Tax-Inclusive Pricing)
+  // Taxable Value = Item Total / (1 + GST_Rate)
+  // Total GST = Item Total - Taxable Value
   const rawItems = order.items && order.items.length > 0
     ? order.items
     : [{ name: 'Order Items (Consolidated)', price: order.total, quantity: 1 }];
 
+  const isInterState = vendorState.trim().toLowerCase() !== custState.trim().toLowerCase() && custState.trim().toLowerCase() !== 'karnataka';
+
   const items = rawItems.map((item, idx) => {
     const title = item.name || item.product?.title || item.title || `Item #${idx + 1}`;
     const qty = item.quantity || 1;
-    const price = item.price || item.product?.price || Math.round(order.total / (rawItems.length || 1));
-    const hsn = 8471 + (idx % 10);
-    const taxable = Math.round(price * 0.82);
-    const tax = price - taxable;
-    return { title, qty, price, total: price * qty, hsn, taxable: taxable * qty, tax: tax * qty };
+    const price = item.price || item.product?.price || (order.total / (rawItems.length || 1));
+    const itemTotal = price * qty;
+    
+    // Standard GST rate 18% (9% CGST + 9% SGST)
+    const gstRate = 0.18;
+    const hsn = item.product?.hsn || item.hsn || (8471 + (idx % 10)).toString();
+
+    const taxableTotal = Number((itemTotal / (1 + gstRate)).toFixed(2));
+    const taxTotal = Number((itemTotal - taxableTotal).toFixed(2));
+    const taxablePerUnit = Number((price / (1 + gstRate)).toFixed(2));
+
+    return {
+      title,
+      qty,
+      price,
+      itemTotal,
+      hsn,
+      taxablePerUnit,
+      taxableTotal,
+      taxTotal,
+      gstRate,
+    };
   });
 
-  const subtotal = items.reduce((s, it) => s + it.taxable, 0);
-  const totalTax = items.reduce((s, it) => s + it.tax, 0);
-  const cgst = Math.round(totalTax / 2);
-  const sgst = totalTax - cgst;
-  const grandTotal = order.total || (subtotal + totalTax);
+  const grandTotal = Number((order.total || 0).toFixed(2));
+  let subtotal = Number(items.reduce((s, it) => s + it.taxableTotal, 0).toFixed(2));
+  let totalTax = Number((grandTotal - subtotal).toFixed(2));
 
-  const addressText = typeof order.deliveryAddress === 'string'
-    ? order.deliveryAddress
-    : order.deliveryAddress
-    ? `${order.deliveryAddress.street || 'HSR Layout'}, ${order.deliveryAddress.city || 'Bengaluru'}, ${order.deliveryAddress.state || 'Karnataka'} - ${order.deliveryAddress.postalCode || '560102'}`
-    : 'HSR Layout Sector 4, Outer Ring Road, Bengaluru, Karnataka - 560102';
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
 
-  const customerName = order.customer?.name || 'Valued Customer';
-  const customerEmail = order.customer?.email || 'customer@shopindia.in';
+  if (isInterState) {
+    igst = totalTax;
+  } else {
+    cgst = Number((totalTax / 2).toFixed(2));
+    sgst = Number((totalTax - cgst).toFixed(2));
+  }
+
+  // Exact precision adjustment so subtotal + taxes strictly equal grandTotal
+  const sumDiff = Number((grandTotal - (subtotal + (isInterState ? igst : (cgst + sgst)))).toFixed(2));
+  if (sumDiff !== 0) {
+    subtotal = Number((subtotal + sumDiff).toFixed(2));
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -106,7 +206,7 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
     tbody tr:nth-child(even) { background: #f8fafc; }
 
     .summary-grid { display: flex; justify-content: flex-end; margin-top: 24px; }
-    .summary-table { width: 320px; font-size: 12px; }
+    .summary-table { width: 340px; font-size: 12px; }
     .summary-row { display: flex; justify-content: space-between; padding: 6px 0; color: #475569; }
     .summary-row.total { border-top: 2px solid #0F2C59; margin-top: 6px; padding-top: 10px; font-size: 15px; font-weight: 800; color: #0F2C59; }
 
@@ -140,7 +240,6 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
         <div class="tax-badge">Tax Invoice / Bill of Supply</div>
         <div class="company-info">
           <strong>ShopIndia Internet Private Limited</strong><br>
-          CIN: U51109KA2012PTC066107 | GSTIN: 29AABCS1429B1ZX<br>
           Buildings Alyssa, Begonia & Clove Embassy Tech Village,<br>
           Outer Ring Road, Bengaluru, Karnataka, India - 560103
         </div>
@@ -150,24 +249,26 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
         <div class="meta-row"><strong>Order ID:</strong> ${orderNum}</div>
         <div class="meta-row"><strong>Date:</strong> ${dateStr}</div>
         <div class="meta-row"><strong>Status:</strong> ${order.status?.toUpperCase() || 'CONFIRMED'}</div>
-        <div class="meta-row"><strong>Place of Supply:</strong> Karnataka (29)</div>
+        <div class="meta-row"><strong>Place of Supply:</strong> ${placeOfSupply}</div>
       </div>
     </div>
 
     <div class="addresses">
       <div class="addr-box">
-        <h4>Sold By</h4>
-        <div class="name">ShopIndia Official Fulfilment Center</div>
-        <div>DarkStore Node #BLR-NORTH</div>
-        <div>GSTIN: 29AABCS1429B1ZX</div>
-        <div>State: Karnataka (29)</div>
+        <h4>Sold By (Shipped From)</h4>
+        <div class="name">${vendorBusinessName}</div>
+        <div>${vendorStreet}</div>
+        <div>${vendorCityState}</div>
+        ${vendorPhone ? `<div>${vendorPhone}</div>` : ''}
+        ${vendorEmail ? `<div>${vendorEmail}</div>` : ''}
       </div>
       <div class="addr-box">
         <h4>Billing & Shipping Address</h4>
         <div class="name">${customerName}</div>
         <div>${addressText}</div>
+        ${customerPhone ? `<div>Phone: ${customerPhone}</div>` : ''}
         <div>Email: ${customerEmail}</div>
-        <div>State: Karnataka (29)</div>
+        <div>State: ${custState}</div>
       </div>
     </div>
 
@@ -190,9 +291,9 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
             <td><strong>${it.title}</strong></td>
             <td class="text-center font-mono">${it.hsn}</td>
             <td class="text-center">${it.qty}</td>
-            <td class="text-right font-mono">₹${it.price.toLocaleString('en-IN')}</td>
-            <td class="text-right font-mono">₹${it.taxable.toLocaleString('en-IN')}</td>
-            <td class="text-right font-mono">₹${it.total.toLocaleString('en-IN')}</td>
+            <td class="text-right font-mono">₹${it.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-right font-mono">₹${it.taxableTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-right font-mono">₹${it.itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -200,11 +301,15 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
 
     <div class="summary-grid">
       <div class="summary-table">
-        <div class="summary-row"><span>Taxable Amount</span><span>₹${subtotal.toLocaleString('en-IN')}</span></div>
-        <div class="summary-row"><span>CGST (9.0%)</span><span>₹${cgst.toLocaleString('en-IN')}</span></div>
-        <div class="summary-row"><span>SGST (9.0%)</span><span>₹${sgst.toLocaleString('en-IN')}</span></div>
+        <div class="summary-row"><span>Taxable Amount</span><span class="font-mono">₹${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+        ${isInterState ? `
+          <div class="summary-row"><span>IGST (18.0%)</span><span class="font-mono">₹${igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+        ` : `
+          <div class="summary-row"><span>CGST (9.0%)</span><span class="font-mono">₹${cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+          <div class="summary-row"><span>SGST (9.0%)</span><span class="font-mono">₹${sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+        `}
         <div class="summary-row"><span>Delivery / Shipping Fee</span><span style="color:#16a34a;font-weight:700;">FREE</span></div>
-        <div class="summary-row total"><span>Grand Total</span><span>₹${grandTotal.toLocaleString('en-IN')}</span></div>
+        <div class="summary-row total"><span>Grand Total</span><span class="font-mono">₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
       </div>
     </div>
 
@@ -225,7 +330,6 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
 
   <script>
     window.onload = function() {
-      // Small delay to ensure all assets are laid out cleanly
       setTimeout(() => {
         window.print();
       }, 500);
