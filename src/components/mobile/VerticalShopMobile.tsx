@@ -346,16 +346,15 @@ export const VerticalShopMobile: React.FC = () => {
                   <Heart size={11} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
                 </motion.button>
 
-                {product.isAssured && (
-                  <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-0.5 bg-blue-50/95 text-xs font-black italic px-1.5 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-sm">
-                    <span className="text-brand-blue">ShopIndia</span>
-                    <span className="text-brand-orange">Assured</span>
-                  </div>
-                )}
-                
                 {/* Image panel */}
-                <div className="w-full aspect-[5/4] flex items-center justify-center mb-2 bg-white rounded-[16px] overflow-hidden shadow-sm border border-brand-border/60">
+                <div className="w-full aspect-[5/4] flex items-center justify-center mb-2 bg-white rounded-[16px] overflow-hidden shadow-sm border border-brand-border/60 relative">
                   <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain" />
+                  {product.isAssured && (
+                    <div className="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-0.5 bg-blue-50/95 text-[9.5px] font-black italic px-1.5 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-sm">
+                      <span className="text-brand-blue">ShopIndia</span>
+                      <span className="text-brand-orange">Assured</span>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Content */}

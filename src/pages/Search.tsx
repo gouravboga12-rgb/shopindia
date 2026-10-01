@@ -253,14 +253,14 @@ export const SearchPage: React.FC = () => {
                       <Heart size={12} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
                     </motion.button>
 
-                    {product.isAssured && (
-                      <div className="absolute bottom-3.5 left-3.5 z-10 flex items-center gap-0.5 bg-blue-50/95 text-xs font-black italic px-1.5 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-soft">
-                        <span className="text-brand-blue">ShopIndia</span>
-                        <span className="text-brand-orange">Assured</span>
-                      </div>
-                    )}
-                    <div className="w-full aspect-square flex items-center justify-center mb-5 bg-brand-elevated rounded-card border border-brand-border/40 p-2 overflow-hidden shadow-soft">
+                    <div className="w-full aspect-square flex items-center justify-center mb-5 bg-brand-elevated rounded-card border border-brand-border/40 p-2 overflow-hidden shadow-soft relative">
                       <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                      {product.isAssured && (
+                        <div className="absolute bottom-2 left-2 z-10 flex items-center gap-0.5 bg-blue-50/95 text-xs font-black italic px-1.5 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-soft">
+                          <span className="text-brand-blue">ShopIndia</span>
+                          <span className="text-brand-orange">Assured</span>
+                        </div>
+                      )}
                     </div>
                     <h3 className="text-xs font-bold text-brand-graphite line-clamp-2 leading-relaxed mb-2.5 min-h-[36px] group-hover:text-brand-blue transition-colors dark:group-hover:text-services-gold dark:text-white font-heading">
                       {product.title}
@@ -362,14 +362,14 @@ export const SearchPage: React.FC = () => {
                     <Heart size={10} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
                   </motion.button>
 
-                  {product.isAssured && (
-                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-0.5 bg-blue-50/95 text-xs font-black italic px-1 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-sm">
+                  <div className="w-full aspect-square flex items-center justify-center mb-2.5 bg-brand-elevated rounded-[20px] p-1.5 overflow-hidden shadow-soft border border-brand-border/40 relative">
+                    <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain" />
+                    {product.isAssured && (
+                      <div className="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-0.5 bg-blue-50/95 text-[9.5px] font-black italic px-1.5 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-sm">
                         <span className="text-brand-blue">ShopIndia</span>
                         <span className="text-brand-orange">Assured</span>
                       </div>
-                  )}
-                  <div className="w-full aspect-square flex items-center justify-center mb-2.5 bg-brand-elevated rounded-[20px] p-1.5 overflow-hidden shadow-soft border border-brand-border/40">
-                    <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain" />
+                    )}
                   </div>
                   <h3 className="text-xs font-bold text-brand-graphite line-clamp-2 leading-snug mb-1 min-h-[30px] font-heading">
                     {product.title}
