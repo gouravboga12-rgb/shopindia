@@ -180,4 +180,38 @@ npm run dev
 
 ---
 
-*Document generated and saved to `shopindia/PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`.*
+## 7. Partner Fleet Specialization, Multi-Select Services & Independent Password Reset
+
+### A. Independent OTP-Based Password Reset
+- **Rider Partner Portal (`/rider-login`):**
+  - Added dedicated endpoints `POST /api/rider/auth/forgot-password` and `POST /api/rider/auth/reset-password`.
+  - Sends a secure 6-digit verification code to the partner's registered email with a 15-minute expiration.
+  - Verification modal styled in Partner Amber/Orange with explicit badge `'Delivery Partner'`.
+- **Regional Admin Hub (`/regional-admin`):**
+  - Added dedicated endpoints `POST /api/regional-admin/auth/forgot-password` and `POST /api/regional-admin/auth/reset-password`.
+  - Independent token lifecycle and validation strictly enforcing `regional_admin` or `branch_manager` roles.
+  - Modal styled in Hub Indigo with explicit badge `'Regional Hub Administrator'`.
+
+### B. Partner Specialization & Multi-Select Doorstep Services
+- **3 Partner Roles:**
+  1. `delivery`: 🚚 **Delivery Partner** (Quick Commerce Grocery & Parcels)
+  2. `service`: 🛠️ **Service Professional** (Doorstep Home & Vehicle Maintenance)
+  3. `both`: ⚡ **All-Rounder Partner** (Both Quick Deliveries & Doorstep Services)
+- **Multi-Select Service Catalog (`src/data/partnerSkills.ts`):**
+  - Supports choosing **multiple services simultaneously** (1, 2, or all 13 services).
+  - **Home & Appliance Services:** Electrician & Home Wiring, Plumber & Sanitary Care, AC Repair & Servicing, Deep House Cleaning & Pest Control, Appliance Maintenance & Repair, Carpentry & Furniture Assembly, Painting & Waterproofing, Salon & Grooming at Home.
+  - **Vehicle Care & Roadside Assistance:** Doorstep Vehicle Periodic Service, Doorstep Foam Wash & Detailing, Emergency Roadside Towing (24x7), Battery Jumpstart & Replacement, Brakes, Tyres & Wheel Balancing.
+- **Onboarding & Settings UI:**
+  - Integrated into `src/rider/pages/RiderLogin.tsx` (registration) and `src/rider/pages/RiderProfile.tsx` (live settings).
+  - Allows technicians without vehicles to register with optional vehicle details.
+- **Regional Hub & Vendor Oversight:**
+  - `src/regional-admin/pages/RegionalRiders.tsx`: Filter tabs (`All Partners`, `Delivery`, `Service Pros`, `All-Rounder`, `Pending KYC`), skill tags, and experience badges.
+  - `server/routes/vendor/technicians.js`: Added `GET /api/vendor/technicians/partners` to query verified service professionals filterable by skill.
+- **Database & Cloud Deployment:**
+  - PostgreSQL schema synced with Prisma (`partnerType String @default("delivery")`, `skills String[] @default([])`, `experienceYears Int? @default(1)`).
+  - Deployed on AWS EC2 (`18.61.145.65`) and PM2 restarted online.
+
+---
+
+*Document updated and saved to `shopindia/PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`.*
+
