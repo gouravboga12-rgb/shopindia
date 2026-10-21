@@ -322,4 +322,114 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/rider/auth/forgot-password
+ * Generates and sends a 6-digit OTP specifically for Delivery Partner account password reset.
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { riderProfile: true },
+    });
+
+    if (!user || (!user.riderProfile && user.role !== 'rider')) {
+      return res.status(404).json({ error: 'No delivery partner account found with this email address.' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetOtp: otp,
+        resetOtpExpires: expiresAt,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || '"ShopIndia Delivery Fleet" <shopindia36@gmail.com>',
+        to: normalizedEmail,
+        subject: `ShopIndia Delivery Partner Password Reset OTP: ${otp}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 500px; padding: 24px; border: 1px solid #fed7aa; border-radius: 12px; background: #ffffff;">
+            <h2 style="color: #ea580c; margin-bottom: 8px;">Delivery Partner Account Security</h2>
+            <p style="color: #475569; font-size: 14px;">You requested to reset your password for your ShopIndia Delivery Partner account.</p>
+            <p style="color: #475569; font-size: 14px;">Your 6-digit verification code is:</p>
+            <div style="text-align: center; margin: 24px 0;">
+              <span style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #ea580c; background: #fff7ed; padding: 12px 28px; border-radius: 8px; border: 1px dashed #ea580c; display: inline-block;">
+                ${otp}
+              </span>
+            </div>
+            <p style="color: #94a3b8; font-size: 12px;">This OTP will expire in 10 minutes. If you did not request this code, your account remains secure.</p>
+          </div>
+        `,
+      });
+    } catch (mailErr) {
+      console.warn('SMTP send failed (continuing with dev OTP):', mailErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset OTP sent to your email address.',
+      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+    });
+  } catch (err) {
+    console.error('Rider forgot password error:', err);
+    res.status(500).json({ error: err.message || 'Failed to send OTP.' });
+  }
+});
+
+/**
+ * POST /api/rider/auth/reset-password
+ * Verifies OTP and updates Delivery Partner password securely
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, OTP, and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findFirst({
+      where: {
+        email: normalizedEmail,
+        resetOtp: otp.toString().trim(),
+        resetOtpExpires: { gte: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired OTP code. Please request a new one.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetOtp: null,
+        resetOtpExpires: null,
+      },
+    });
+
+    res.json({ success: true, message: 'Password updated successfully! You can now log in.' });
+  } catch (err) {
+    console.error('Rider reset password error:', err);
+    res.status(500).json({ error: err.message || 'Failed to reset password.' });
+  }
+});
+
 module.exports = router;
+

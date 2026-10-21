@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Globe2, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 interface RegionalAdminLoginProps {
   onSwitchToRegister?: () => void;
@@ -13,6 +14,7 @@ export const RegionalAdminLogin: React.FC<RegionalAdminLoginProps> = ({ onSwitch
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,12 +80,21 @@ export const RegionalAdminLogin: React.FC<RegionalAdminLoginProps> = ({ onSwitch
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold text-slate-300">Password</label>
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline cursor-pointer font-medium"
+              >
+                Forgot Password?
+              </button>
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                autoComplete="new-password"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -129,6 +140,18 @@ export const RegionalAdminLogin: React.FC<RegionalAdminLoginProps> = ({ onSwitch
         </div>
 
       </div>
+
+      {/* Regional Admin OTP Password Reset Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        initialEmail={email}
+        portalType="regional_admin"
+        themeColor="indigo"
+        title="Regional Admin Password Reset"
+        roleBadge="Regional Admin"
+      />
     </div>
   );
 };
+

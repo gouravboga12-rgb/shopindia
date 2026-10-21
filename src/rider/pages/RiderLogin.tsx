@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Bike, ShieldCheck, MapPin, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
+import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 interface RiderLoginProps {
   initialRegister?: boolean;
@@ -16,6 +17,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [detectedDetails, setDetectedDetails] = useState<GeocodedAddress | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -178,13 +180,24 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold text-slate-300">Password</label>
+              {!isRegister && (
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-[11px] text-orange-400 hover:text-orange-300 hover:underline cursor-pointer font-medium"
+                >
+                  Forgot Password?
+                </button>
+              )}
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 required
-                autoComplete="new-password"
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
@@ -405,6 +418,18 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
         </div>
 
       </div>
+
+      {/* Rider OTP Password Reset Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        initialEmail={formData.email}
+        portalType="rider"
+        themeColor="orange"
+        title="Delivery Partner Password Reset"
+        roleBadge="Delivery Partner"
+      />
     </div>
   );
 };
+
