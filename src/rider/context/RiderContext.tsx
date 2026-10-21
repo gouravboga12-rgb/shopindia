@@ -4,6 +4,9 @@ import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
 
 export interface RiderProfileData {
   id: string;
+  partnerType?: 'delivery' | 'service' | 'both' | string;
+  skills?: string[];
+  experienceYears?: number;
   vehicleType: string;
   vehicleNumber?: string;
   licenseNumber?: string;
@@ -70,6 +73,7 @@ interface RiderContextType {
   isOnline: boolean;
   toggleOnline: () => Promise<void>;
   updateRadius: (radiusKm: number) => Promise<void>;
+  updatePartnerProfile: (data: Partial<RiderProfileData>) => Promise<boolean>;
   activeDelivery: ActiveDeliveryData | null;
   incomingBroadcast: BroadcastDelivery | null;
   acceptOrder: (deliveryId: string) => Promise<{ success: boolean; error?: string }>;
@@ -199,6 +203,26 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('Failed to update radius:', err);
+    }
+  };
+
+  const updatePartnerProfile = async (updateData: Partial<RiderProfileData>): Promise<boolean> => {
+    if (!token) return false;
+    try {
+      const res = await fetch('/api/rider/profile', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify(updateData),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setProfile((prev) => prev ? { ...prev, ...(json.profile || updateData) } : null);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to update partner profile:', err);
+      return false;
     }
   };
 
@@ -345,6 +369,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isOnline,
         toggleOnline,
         updateRadius,
+        updatePartnerProfile,
         activeDelivery,
         incomingBroadcast,
         acceptOrder,

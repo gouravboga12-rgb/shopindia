@@ -43,6 +43,9 @@ router.post('/register', async (req, res) => {
       currentLng,
       serviceRadiusKm = 25,
       branchId,
+      partnerType = 'delivery',
+      skills = [],
+      experienceYears = 1,
     } = req.body;
 
     if (!name || !email || !password || !phone) {
@@ -60,6 +63,8 @@ router.post('/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const parsedSkills = Array.isArray(skills) ? skills : (typeof skills === 'string' && skills.trim() ? [skills.trim()] : []);
+    const parsedExp = parseInt(experienceYears, 10) || 1;
 
     let user;
     if (existing) {
@@ -75,7 +80,10 @@ router.post('/register', async (req, res) => {
           branchId: branchId || existing.branchId || undefined,
           riderProfile: {
             create: {
-              vehicleType,
+              partnerType: partnerType || 'delivery',
+              skills: parsedSkills,
+              experienceYears: parsedExp,
+              vehicleType: vehicleType || 'bike',
               vehicleNumber,
               licenseNumber,
               licenseUrl,
@@ -111,7 +119,10 @@ router.post('/register', async (req, res) => {
           branchId: branchId || undefined,
           riderProfile: {
             create: {
-              vehicleType,
+              partnerType: partnerType || 'delivery',
+              skills: parsedSkills,
+              experienceYears: parsedExp,
+              vehicleType: vehicleType || 'bike',
               vehicleNumber,
               licenseNumber,
               licenseUrl,

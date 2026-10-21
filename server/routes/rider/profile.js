@@ -64,6 +64,9 @@ router.patch('/', async (req, res) => {
       address,
       currentLat,
       currentLng,
+      partnerType,
+      skills,
+      experienceYears,
     } = req.body;
 
     const data = {};
@@ -81,6 +84,11 @@ router.patch('/', async (req, res) => {
     if (address !== undefined) data.address = address;
     if (currentLat !== undefined) data.currentLat = parseFloat(currentLat);
     if (currentLng !== undefined) data.currentLng = parseFloat(currentLng);
+    if (partnerType !== undefined) data.partnerType = partnerType;
+    if (skills !== undefined) {
+      data.skills = Array.isArray(skills) ? skills : (typeof skills === 'string' && skills.trim() ? [skills.trim()] : []);
+    }
+    if (experienceYears !== undefined) data.experienceYears = parseInt(experienceYears, 10) || 1;
 
     const updated = await prisma.riderProfile.update({
       where: { userId: req.user.userId },

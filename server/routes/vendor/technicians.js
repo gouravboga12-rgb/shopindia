@@ -24,6 +24,54 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/vendor/technicians/partners
+// List platform verified service professionals & technicians available for doorstep bookings
+router.get('/partners', async (req, res) => {
+  try {
+    const { skill } = req.query;
+    const where = {
+      partnerType: { in: ['service', 'both'] },
+      isApproved: true,
+      isActive: true,
+    };
+    if (skill) {
+      where.skills = { has: skill };
+    }
+
+    const partners = await prisma.riderProfile.findMany({
+      where,
+      select: {
+        id: true,
+        partnerType: true,
+        skills: true,
+        experienceYears: true,
+        rating: true,
+        totalDeliveries: true,
+        isOnline: true,
+        address: true,
+        currentLat: true,
+        currentLng: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { rating: 'desc' },
+      take: 50,
+    });
+
+    res.json({ partners });
+  } catch (error) {
+    console.error('Error fetching platform service partners:', error);
+    res.status(500).json({ error: 'Failed to fetch platform service partners' });
+  }
+});
+
 // Create new technician
 router.post('/', async (req, res) => {
   try {

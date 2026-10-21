@@ -510,6 +510,11 @@ model RiderProfile {
   userId          String         @unique
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Partner Capability & Skills
+  partnerType     String         @default("delivery") // delivery, service, both
+  skills          String[]       @default([])         // electrician, plumbing, ac_service, etc.
+  experienceYears Int?           @default(1)
+
   // Vehicle & Documents
   vehicleType     String         @default("bike") // bike, scooter, van, cycle
   vehicleNumber   String?
