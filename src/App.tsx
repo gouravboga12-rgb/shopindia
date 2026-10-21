@@ -5,7 +5,9 @@ import { useIsMobile } from './hooks/useMediaQuery';
 import { DesktopApp } from './components/desktop/DesktopApp';
 import { MobileApp } from './components/mobile/MobileApp';
 import { AdminPortal } from './admin/AdminPortal';
+import { RegionalAdminPortal } from './regional-admin/RegionalAdminPortal';
 import { VendorPortal } from './vendor/VendorPortal';
+import { RiderPortal } from './rider/RiderPortal';
 
 const MainLayout: React.FC = () => {
   const isMobile = useIsMobile();
@@ -39,8 +41,16 @@ function App() {
     return <AdminPortal />;
   }
 
+  if (pathname.startsWith('/regional-admin')) {
+    return <RegionalAdminPortal />;
+  }
+
   if (pathname.startsWith('/vendor')) {
     return <VendorPortal />;
+  }
+
+  if (pathname.startsWith('/rider') || pathname.startsWith('/rider-login')) {
+    return <RiderPortal />;
   }
 
   return (

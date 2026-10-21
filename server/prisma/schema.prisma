@@ -13,6 +13,7 @@ datasource db {
 
 enum UserRole {
   super_admin
+  regional_admin
   branch_manager
   support_exec
   vendor
@@ -49,6 +50,7 @@ enum ProductStatus {
 enum OrderStatus {
   placed
   pending
+  pending_rider
   processing
   confirmed
   packing
@@ -61,6 +63,23 @@ enum OrderStatus {
   return_requested
   exchange_requested
   refunded
+}
+
+enum DeliveryStatus {
+  broadcasted
+  assigned
+  arrived_pickup
+  picked_up
+  arrived_customer
+  delivered
+  cancelled
+}
+
+enum RegionalAdminStatus {
+  pending_approval
+  approved
+  suspended
+  rejected
 }
 
 enum PaymentStatus {
@@ -122,6 +141,7 @@ model User {
   vendor   Vendor? @relation("UserVendor", fields: [vendorId], references: [id])
 
   riderProfile RiderProfile?
+  regionalAdminProfile RegionalAdminProfile?
 
   // Reverse relations
   vendorsCreated  Vendor[]           @relation("VendorUser")
@@ -189,6 +209,7 @@ model Vendor {
   orders      Order[]
   linkedUsers User[]           @relation("UserVendor")
   technicians Technician[]
+  shiprocketShipments ShiprocketShipment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -305,6 +326,8 @@ model Order {
   items        OrderItem[]
   tickets      Ticket[]
   serviceJobs  ServiceJob[]
+  delivery     Delivery?
+  shiprocketShipment ShiprocketShipment?
   transactions Transaction[] @relation("OrderTransactions")
 
   createdAt DateTime @default(now())
@@ -347,6 +370,8 @@ model Branch {
   staff        User[]        @relation("BranchStaffUsers")
   staffLinks   BranchStaff[]
   serviceAreas ServiceArea[]
+  regionalAdmins RegionalAdminProfile[]
+  riders       RiderProfile[]
   orders       Order[]
 
   createdAt DateTime @default(now())
@@ -455,38 +480,148 @@ model ServiceAreaPincode {
   @@map("service_area_pincodes")
 }
 
-// ─── Rider Management ────────────────────────────────────────────────────────
+// ─── Regional Admin Management ────────────────────────────────────────────────
+model RegionalAdminProfile {
+  id               String              @id @default(uuid())
+  userId           String              @unique
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  branchId         String?
+  branch           Branch?             @relation(fields: [branchId], references: [id])
+
+  regionName       String              // e.g., "Hyderabad Central", "Bengaluru South"
+  district         String?
+  state            String?
+  assignedPincodes String[]            @default([])
+
+  idProofUrl       String?
+  status           RegionalAdminStatus @default(pending_approval)
+  approvedAt       DateTime?
+
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@map("regional_admin_profiles")
+}
+
+// ─── Rider & Delivery Partner Management ──────────────────────────────────────
 model RiderProfile {
-  id            String     @id @default(uuid())
-  userId        String     @unique
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicleType   String?
-  licenseNumber String?
-  isActive      Boolean    @default(true)
-  walletBalance Float      @default(0)
-  deliveries    Delivery[]
+  id              String         @id @default(uuid())
+  userId          String         @unique
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Vehicle & Documents
+  vehicleType     String         @default("bike") // bike, scooter, van, cycle
+  vehicleNumber   String?
+  licenseNumber   String?
+  licenseUrl      String?
+  aadhaarNumber   String?
+  aadhaarUrl      String?
+  panNumber       String?
+  panUrl          String?
+  rcUrl           String?
+  photoUrl        String?
+
+  // Location & Operational Preferences
+  address         String?
+  currentLat      Float?
+  currentLng      Float?
+  serviceRadiusKm Int            @default(25)     // 10km to 100km slider
+  isOnline        Boolean        @default(false)
+  isApproved      Boolean        @default(false)
+  isActive        Boolean        @default(true)
+
+  // Wallet & Metrics
+  walletBalance   Float          @default(0)
+  totalDeliveries Int            @default(0)
+  rating          Float          @default(5.0)
+
+  branchId        String?
+  branch          Branch?        @relation(fields: [branchId], references: [id])
+
+  deliveries      Delivery[]
+  payouts         RiderPayout[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@map("rider_profiles")
 }
 
+// ─── Quick Commerce & Instant Deliveries ──────────────────────────────────────
 model Delivery {
-  id              String       @id @default(uuid())
-  orderNumber     String       @unique
-  riderProfileId  String
-  riderProfile    RiderProfile @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
-  status          String       @default("assigned") // assigned, picked_up, in_transit, delivered, failed
-  payoutAmount    Float        @default(0)
-  customerName    String
-  deliveryAddress String
+  id              String         @id @default(uuid())
+  orderId         String         @unique
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  riderProfileId  String?
+  riderProfile    RiderProfile?  @relation(fields: [riderProfileId], references: [id])
 
-  assignedAt  DateTime  @default(now())
-  completedAt DateTime?
+  status          DeliveryStatus @default(broadcasted)
+  deliveryFee     Float          @default(50)
+  distanceKm      Float          @default(3.5)
+  deliveryOtp     String?        // 4-digit verification code
+
+  pickupName      String
+  pickupAddress   String
+  pickupLat       Float?
+  pickupLng       Float?
+  pickupPhone     String?
+
+  dropoffName     String
+  dropoffAddress  String
+  dropoffLat      Float?
+  dropoffLng      Float?
+  dropoffPhone    String?
+
+  assignedAt      DateTime?
+  pickedUpAt      DateTime?
+  deliveredAt     DateTime?
+  proofPhotoUrl   String?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@map("deliveries")
+}
+
+// ─── 3PL Normal Shipping (Shiprocket Integration) ────────────────────────────
+model ShiprocketShipment {
+  id                  String         @id @default(uuid())
+  orderId             String         @unique
+  order               Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId            String?
+  vendor              Vendor?        @relation(fields: [vendorId], references: [id])
+
+  shipmentId          String?        // Shiprocket Internal Shipment ID
+  shiprocketOrderId   String?        // Shiprocket Order ID
+  awbCode             String?        // Air Waybill Tracking Number
+  courierName         String?        // e.g. Delhivery, Bluedart, Shadowfax
+  labelUrl            String?        // Printable PDF Shipping Label
+  manifestUrl         String?
+  trackingUrl         String?
+  currentStatus       String         @default("ORDER_GENERATED")
+
+  pickupScheduledDate DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@map("shiprocket_shipments")
+}
+
+// ─── Rider Wallet & Payouts ──────────────────────────────────────────────────
+model RiderPayout {
+  id                String         @id @default(uuid())
+  riderProfileId    String
+  riderProfile      RiderProfile   @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
+  amount            Float
+  status            String         @default("pending") // pending, processed, failed
+  bankAccountNumber String?
+  ifscCode          String?
+  referenceNumber   String?
+  processedAt       DateTime?
+  createdAt         DateTime       @default(now())
+
+  @@map("rider_payouts")
 }
 
 // ─── Notification System ─────────────────────────────────────────────────────

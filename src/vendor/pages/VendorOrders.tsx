@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Search, RefreshCw, Phone, MessageSquare, Mail, ExternalLink, Trash2, FileText, AlertTriangle, X, Loader2, CheckCircle2, Copy, Check } from 'lucide-react';
+import { Search, RefreshCw, Phone, MessageSquare, Mail, ExternalLink, Trash2, FileText, AlertTriangle, X, Loader2, CheckCircle2, Copy, Check, Bike, Truck, Zap, Box } from 'lucide-react';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
 
 export const VendorOrders: React.FC = () => {
@@ -42,6 +42,32 @@ export const VendorOrders: React.FC = () => {
       setSuccessToast(`Order #${orders.find(o => o.id === id)?.orderNumber || id} updated to ${status}`);
     } catch (err: any) {
       alert(err.message || 'Failed to update order status');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleBroadcastToRiders = async (orderId: string) => {
+    setActionLoadingId(orderId);
+    try {
+      await api.post(`/api/vendor/orders/${orderId}/broadcast`, {});
+      setSuccessToast(`Order broadcasted to active nearby riders! 🛵`);
+      load();
+    } catch (err: any) {
+      alert(err.message || 'Failed to broadcast order to riders');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleShipViaShiprocket = async (orderId: string) => {
+    setActionLoadingId(orderId);
+    try {
+      const res: any = await api.post('/api/shiprocket/create-shipment', { orderId });
+      setSuccessToast(`Shipment booked via Shiprocket! Courier: ${res.shipment?.courierName || 'Assigned'}, AWB: ${res.shipment?.awbCode || 'Ready'}`);
+      load();
+    } catch (err: any) {
+      alert(err.message || 'Failed to book Shiprocket shipment');
     } finally {
       setActionLoadingId(null);
     }
@@ -347,6 +373,45 @@ export const VendorOrders: React.FC = () => {
                             Start Packing
                           </button>
                         )}
+                        {/* Multi-channel Quick-Commerce / 3PL Dispatch Controls */}
+                        {o.type === 'quick_commerce' && (o.status === 'confirmed' || o.status === 'packing' || o.status === 'ready_to_ship' || o.status === 'placed') && (
+                          <button
+                            disabled={actionLoadingId === o.id}
+                            onClick={() => handleBroadcastToRiders(o.id)}
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-extrabold rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shadow-sm flex items-center gap-1 active:scale-95"
+                            title="Broadcast to online riders within operational radius"
+                          >
+                            <Bike size={13} className="stroke-[2.5]" />
+                            <span>🚀 Broadcast to Riders</span>
+                          </button>
+                        )}
+
+                        {o.delivery && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
+                            <Zap size={10} className="fill-orange-500 text-orange-500" />
+                            <span>Rider: {o.delivery.status}</span>
+                          </span>
+                        )}
+
+                        {o.type === 'traditional' && (o.status === 'confirmed' || o.status === 'packing' || o.status === 'ready_to_ship' || o.status === 'placed') && (
+                          <button
+                            disabled={actionLoadingId === o.id}
+                            onClick={() => handleShipViaShiprocket(o.id)}
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-extrabold rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shadow-sm flex items-center gap-1 active:scale-95"
+                            title="Generate Shiprocket AWB tracking number & shipping label"
+                          >
+                            <Truck size={13} />
+                            <span>📦 Ship via Shiprocket</span>
+                          </button>
+                        )}
+
+                        {o.shiprocketShipment?.awbCode && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                            <Box size={10} />
+                            <span>AWB: {o.shiprocketShipment.awbCode}</span>
+                          </span>
+                        )}
+
                         {o.status === 'packing' && (
                           <button
                             disabled={actionLoadingId === o.id}

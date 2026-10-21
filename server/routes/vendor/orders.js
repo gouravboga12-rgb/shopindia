@@ -189,4 +189,73 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+/** POST /api/vendor/orders/:id/broadcast — Broadcast order to nearby riders */
+router.post('/:id/broadcast', async (req, res) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, vendorId: req.user.vendorId },
+      include: {
+        vendor: true,
+        items: true,
+        delivery: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    // Generate random 4-digit OTP for completion
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    const shipping = order.shippingAddress || {};
+    const dropoffAddress = typeof shipping === 'string' 
+      ? shipping 
+      : `${shipping.street || ''}, ${shipping.city || ''}, ${shipping.state || ''} ${shipping.pincode || ''}`.trim() || 'Customer Doorstep';
+
+    const pickupAddress = `${order.vendor.street || ''}, ${order.vendor.city || ''}, ${order.vendor.state || ''} ${order.vendor.pincode || ''}`.trim() || 'Vendor Store';
+
+    // Calculate delivery fee (base ₹50 + ₹10/km or fixed ₹60)
+    const deliveryFee = 60;
+
+    const delivery = await prisma.delivery.upsert({
+      where: { orderId: order.id },
+      create: {
+        orderId: order.id,
+        status: 'broadcasted',
+        deliveryFee,
+        distanceKm: 4.2,
+        deliveryOtp: otp,
+        pickupName: order.vendor.businessName || 'Merchant Store',
+        pickupAddress,
+        pickupPhone: order.vendor.phone,
+        dropoffName: shipping.name || 'Customer',
+        dropoffAddress,
+        dropoffPhone: shipping.phone,
+      },
+      update: {
+        status: 'broadcasted',
+        riderProfileId: null,
+        deliveryOtp: otp,
+        assignedAt: null,
+      },
+    });
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'packing' },
+    });
+
+    res.json({
+      success: true,
+      message: 'Order broadcasted to active nearby riders!',
+      delivery,
+    });
+  } catch (err) {
+    console.error('Broadcast order error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+

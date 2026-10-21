@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-export type UserRole = 'super_admin' | 'branch_manager' | 'support_exec' | 'vendor' | 'rider' | 'customer';
+export type UserRole = 'super_admin' | 'branch_manager' | 'regional_admin' | 'support_exec' | 'vendor' | 'rider' | 'customer';
 
 export interface AuthUser {
   id: string;
@@ -10,6 +10,7 @@ export interface AuthUser {
   permissions: string[];
   vendorId?: string;
   avatar?: string;
+  branchId?: string;
 }
 
 interface AuthContextType {
@@ -24,9 +25,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode; storagePrefix?: 'admin' | 'vendor' }> = ({ children, storagePrefix = 'admin' }) => {
-  const tokenKey = storagePrefix === 'vendor' ? 'shopindia_vendor_token' : 'shopindia_admin_token';
-  const userKey  = storagePrefix === 'vendor' ? 'shopindia_vendor_user' : 'shopindia_admin_user';
+export const AuthProvider: React.FC<{ children: React.ReactNode; storagePrefix?: 'admin' | 'vendor' | 'rider' | 'regional_admin' }> = ({ children, storagePrefix = 'admin' }) => {
+  const tokenKey = `shopindia_${storagePrefix}_token`;
+  const userKey  = `shopindia_${storagePrefix}_user`;
 
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(tokenKey));
   const [user,  setUser]  = useState<AuthUser | null>(() => {

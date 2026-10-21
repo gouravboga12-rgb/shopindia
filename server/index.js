@@ -61,12 +61,26 @@ app.use('/api/admin/service-areas', require('./routes/admin/serviceAreas'));
 app.use('/api/admin/support', require('./routes/admin/support'));
 app.use('/api/admin/commissions', require('./routes/admin/commissions'));
 app.use('/api/admin/riders', require('./routes/admin/riders'));
+app.use('/api/admin/regional-admins', require('./routes/admin/regionalAdmins'));
 app.use('/api/admin/reports', require('./routes/admin/reports'));
 app.use('/api/admin/offers', require('./routes/admin/offers'));
 app.use('/api/admin/notifications', require('./routes/admin/notifications'));
 app.use('/api/admin/categories', require('./routes/admin/categories'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
 app.use('/api/admin/reviews', require('./routes/admin/reviews'));
+
+// Regional Admin routes
+app.use('/api/regional-admin/auth', require('./routes/regional-admin/auth'));
+app.use('/api/regional-admin', require('./routes/regional-admin/operations'));
+
+// Rider & Delivery Partner routes
+app.use('/api/rider/auth', require('./routes/rider/auth'));
+app.use('/api/rider/profile', require('./routes/rider/profile'));
+app.use('/api/rider/orders', require('./routes/rider/orders'));
+app.use('/api/rider/wallet', require('./routes/rider/wallet'));
+
+// Shiprocket 3PL Logistics routes
+app.use('/api/shiprocket', require('./routes/shiprocket/shipments'));
 
 // Vendor routes (guarded by verifyToken + requireRole('vendor') in each file)
 app.use('/api/vendor/auth', require('./routes/vendor/auth'));
@@ -77,6 +91,7 @@ app.use('/api/vendor/wallet', require('./routes/vendor/wallet'));
 app.use('/api/vendor/reviews', require('./routes/vendor/reviews'));
 app.use('/api/vendor/technicians', require('./routes/vendor/technicians'));
 app.use('/api/vendor/service-jobs', require('./routes/vendor/service-jobs'));
+
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {

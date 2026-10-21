@@ -13,6 +13,7 @@ import { ServiceAreasPage } from './pages/ServiceAreasPage';
 import { SupportPage } from './pages/SupportPage';
 import { CommissionsPage } from './pages/CommissionsPage';
 import { RidersPage } from './pages/RidersPage';
+import { RegionalAdminsPage } from './pages/RegionalAdminsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { OffersPage } from './pages/OffersPage';
@@ -44,6 +45,7 @@ const AdminContent: React.FC = () => {
   const renderTab = () => {
     switch (tab) {
       case 'dashboard': return <Dashboard />;
+      case 'regional-admins': return <RegionalAdminsPage />;
       case 'vendors': return <VendorsPage onManage={setManagedVendor} />;
       case 'users': return <UsersPage />;
       case 'products': return <ProductsPage />;

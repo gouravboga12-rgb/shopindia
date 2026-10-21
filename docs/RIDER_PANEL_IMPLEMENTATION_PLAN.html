@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShopIndia — Multi-Panel Operations & Dispatch Architecture (Rider, Regional Admin, Shiprocket)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1e293b;
+      background: #f8fafc;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 20px auto;
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+
+    /* Header & Branding */
+    .header-box {
+      border-bottom: 2px solid #0f2c59;
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f2c59;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 14px;
+      font-weight: 600;
+      color: #059669;
+      margin-top: 4px;
+    }
+
+    .meta-badge {
+      text-align: right;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .badge-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #ecfdf5;
+      color: #047857;
+      font-weight: 700;
+      border-radius: 999px;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 1px solid #a7f3d0;
+      margin-top: 4px;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4 {
+      color: #0f2c59;
+      font-weight: 700;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1.5px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 13.5px;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #1e293b;
+    }
+
+    p {
+      margin-bottom: 10px;
+      color: #334155;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    li {
+      margin-bottom: 5px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+    }
+
+    /* Callout & Highlights */
+    .callout {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin: 14px 0;
+      font-size: 12.5px;
+      color: #1e3a8a;
+    }
+
+    .callout-success {
+      background: #f0fdf4;
+      border-left: 4px solid #10b981;
+      color: #065f46;
+    }
+
+    .callout-warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+
+    /* Comparison & Cards Grid */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      background: #f8fafc;
+    }
+
+    .card h4 {
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .card-normal { border-top: 3px solid #6366f1; }
+    .card-quick { border-top: 3px solid #10b981; }
+    .card-service { border-top: 3px solid #f59e0b; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 12px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #0f2c59;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 14px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      overflow-x: auto;
+      margin: 12px 0;
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    /* Stage Tracker */
+    .stage-container {
+      display: flex;
+      justify-content: space-between;
+      margin: 18px 0;
+      position: relative;
+    }
+
+    .stage-item {
+      flex: 1;
+      text-align: center;
+      padding: 10px 8px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      margin: 0 4px;
+    }
+
+    .stage-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #0f2c59;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stage-title {
+      font-weight: 700;
+      font-size: 11.5px;
+      color: #0f2c59;
+    }
+
+    .stage-action {
+      font-size: 10.5px;
+      color: #059669;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header Box -->
+  <div class="header-box">
+    <div>
+      <div class="brand-title">ShopIndia — Multi-Panel Operations & Dispatch Architecture</div>
+      <div class="brand-subtitle">Rider Panel • Regional Admin Panel • Shiprocket 3PL • Local Quick-Commerce</div>
+    </div>
+    <div class="meta-badge">
+      <div><strong>Version:</strong> 2.0.0</div>
+      <div><strong>Target Scope:</strong> Full Multi-Channel Fulfillment</div>
+      <div class="badge-pill">Approved for Implementation</div>
+    </div>
+  </div>
+
+  <!-- 1. Executive Summary & Fulfillment Taxonomy -->
+  <h2>1. Order Fulfillment Taxonomy & Shiprocket Clarity</h2>
+  <p>ShopIndia categorizes all marketplace orders into three discrete fulfillment pathways, giving both local merchants and operations managers clarity on dispatch mechanics:</p>
+
+  <div class="grid-3">
+    <div class="card card-normal">
+      <h4>📦 Stream A: Normal Delivery</h4>
+      <p><strong>Channel:</strong> Shiprocket (3PL Logistics)</p>
+      <p><strong>Timeline:</strong> 2–5 Business Days</p>
+      <p><strong>Carriers:</strong> Bluedart, Delhivery, DTDC, Shadowfax</p>
+      <p><strong>Execution:</strong> Inter-city / interstate parcels shipped with auto-generated AWB and labels.</p>
+    </div>
+
+    <div class="card card-quick">
+      <h4>🚀 Stream B: Quick Commerce</h4>
+      <p><strong>Channel:</strong> ShopIndia Rider Fleet</p>
+      <p><strong>Timeline:</strong> 10–30 Minutes</p>
+      <p><strong>Radius:</strong> 10 km to 100 km (rider slider)</p>
+      <p><strong>Execution:</strong> Rider drives to Vendor store, verifies package checklist, and delivers to customer doorstep with 4-digit OTP.</p>
+    </div>
+
+    <div class="card card-service">
+      <h4>🔧 Stream C: Services & HVAC</h4>
+      <p><strong>Channel:</strong> Technician / Service Partner</p>
+      <p><strong>Timeline:</strong> Scheduled / Immediate</p>
+      <p><strong>Scope:</strong> AC Repair, Installation, Diagnostics</p>
+      <p><strong>Execution:</strong> Certified technicians dispatched to customer site with work verification OTP.</p>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Key Architectural Decision — Shiprocket API Credentials:</strong><br>
+    <strong>Super Admin holds the Master Shiprocket Account keys</strong> centrally. Each vendor's store address is registered via API as a <em>Shiprocket Pickup Location</em>. When a vendor has a Normal Delivery, they do NOT need their own Shiprocket account—they simply click <code>[ 📦 Ship via Shiprocket ]</code>, and the platform automatically fetches the best courier rate, generates the AWB, and creates the printable shipping label. Both Regional Admins and Super Admin have oversight to track manifests and delays.
+  </div>
+
+  <!-- 2. System Architecture & Routing -->
+  <h2>2. Platform Portals & Unified Routing</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Portal Name</th>
+        <th>URL Route</th>
+        <th>Primary Users</th>
+        <th>Key Responsibilities</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Customer Storefront</strong></td>
+        <td><code>/</code></td>
+        <td>Shoppers & Service Clients</td>
+        <td>Product search, quick commerce ordering, service booking, real-time tracking, delivery OTP.</td>
+      </tr>
+      <tr>
+        <td><strong>Super Admin Portal</strong></td>
+        <td><code>/admin</code></td>
+        <td>Executive & Ops Admins</td>
+        <td>Master governance, Regional Admin approvals, platform-wide rider KYC, categories, finance, Shiprocket keys.</td>
+      </tr>
+      <tr>
+        <td><strong>Regional Admin Portal</strong></td>
+        <td><code>/regional-admin</code><br><code>/regional-admin/register</code></td>
+        <td>City & District Regional Admins</td>
+        <td>Regional vendor oversight, regional rider approval, live delivery radar map, dispatch delay escalations.</td>
+      </tr>
+      <tr>
+        <td><strong>Vendor Merchant Portal</strong></td>
+        <td><code>/vendor</code></td>
+        <td>Store Owners & Merchants</td>
+        <td>Catalog, order packing, one-click <code>[ 🚀 Broadcast to Riders ]</code> or <code>[ 📦 Ship via Shiprocket ]</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Rider / Delivery Portal</strong></td>
+        <td><code>/rider</code><br><code>/rider-login</code></td>
+        <td>Local Delivery Partners</td>
+        <td>Online/Offline toggle, 30s broadcast radar chime, atomic accept, 4-stage turn-by-turn route, instant wallet payout.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 3. Regional Admin Module -->
+  <h2>3. Regional Admin Module: Architecture & Governance</h2>
+  <p>To support high-velocity regional scale across Indian cities and districts, the Regional Admin acts as the local operations lead:</p>
+  <ul>
+    <li><strong>Self-Service Onboarding:</strong> Prospective regional managers apply at <code>/regional-admin/register</code>, providing Aadhaar/PAN ID proofs, contact details, and their target District/Zone.</li>
+    <li><strong>Super Admin Approval:</strong> Visible under <code>/admin</code> in the <strong>"Regional Admins"</strong> management tab. Super Admin reviews credentials, sets status to <code>approved</code>, and assigns branch/district boundaries.</li>
+    <li><strong>Regional Scoped Dashboard:</strong> Once authenticated, Regional Admins see only merchants, delivery riders, and orders active within their assigned territory.</li>
+    <li><strong>Live Operations Radar:</strong> Interactive Mapbox view tracking in-flight riders traveling from vendor stores to customer dropoffs, with emergency reassignment capability if a rider stalls.</li>
+  </ul>
+
+  <!-- 4. Quick Delivery: 4-Stage Lifecycle -->
+  <h2>4. Quick Commerce Delivery: 4-Stage Pipeline</h2>
+  <div class="stage-container">
+    <div class="stage-item">
+      <div class="stage-num">1</div>
+      <div class="stage-title">Heading to Vendor</div>
+      <div class="stage-action">Open Directions ➔ Slide: "Arrived at Store"</div>
+    </div>
+    <div class="stage-item">
+      <div class="stage-num">2</div>
+      <div class="stage-title">Store Handover</div>
+      <div class="stage-action">Verify Item Checklist ➔ Slide: "Picked Up"</div>
+    </div>
+    <div class="stage-item">
+      <div class="stage-num">3</div>
+      <div class="stage-title">In Transit to Customer</div>
+      <div class="stage-action">Mapbox Live Polyline ➔ Slide: "Arrived at Dropoff"</div>
+    </div>
+    <div class="stage-item">
+      <div class="stage-num">4</div>
+      <div class="stage-title">Customer Handover</div>
+      <div class="stage-action">Enter 4-Digit OTP ➔ Delivery Done & Wallet Credited</div>
+    </div>
+  </div>
+
+  <!-- 5. Concurrency & Broadcast Radar -->
+  <h2>5. Broadcast Radar & Atomic Concurrency Engine</h2>
+  <p>When an order is broadcasted by a vendor, an alert chime plays on all online riders' devices within the vendor's GPS radius (10–100 km). Multiple riders may tap "Accept" simultaneously. Concurrency is resolved via atomic database locking:</p>
+  <pre><code>-- Atomic First-Come-First-Served Order Claim in PostgreSQL
+UPDATE deliveries
+SET rider_profile_id = $1, status = 'assigned', assigned_at = NOW(), updated_at = NOW()
+WHERE id = $2 AND status = 'broadcasted'
+RETURNING *;</code></pre>
+  <ul>
+    <li><strong>Winner (Row Count = 1):</strong> Status becomes <code>assigned</code>. Modal dismisses and immediately opens the Turn-by-Turn active delivery interface.</li>
+    <li><strong>Follower (Row Count = 0):</strong> The server responds with <code>{ "success": false, "code": "ALREADY_ASSIGNED" }</code>. The UI shows a friendly toast alert and smoothly animates the card away.</li>
+  </ul>
+
+  <!-- 6. Database Schema Design -->
+  <h2>6. Database Schema Enhancements (Prisma / PostgreSQL)</h2>
+  <pre><code>// server/prisma/schema.prisma (Core Models)
+
+enum DeliveryStatus {
+  broadcasted       // Available in pool for local riders
+  assigned          // Claimed by rider, traveling to vendor
+  arrived_pickup    // Reached merchant store
+  picked_up         // Package collected, traveling to customer
+  arrived_customer  // At customer location
+  delivered         // Verified via 4-digit OTP or photo
+  cancelled
+}
+
+model RegionalAdminProfile {
+  id               String              @id @default(uuid())
+  userId           String              @unique
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId         String?
+  regionName       String              // e.g. "Hyderabad Central"
+  district         String?
+  state            String?
+  assignedPincodes String[]            @default([])
+  status           RegionalAdminStatus @default(pending_approval)
+  createdAt        DateTime            @default(now())
+  @@map("regional_admin_profiles")
+}
+
+model RiderProfile {
+  id              String        @id @default(uuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType     String        @default("bike")
+  vehicleNumber   String?
+  licenseNumber   String?
+  licenseUrl      String?
+  aadhaarNumber   String?
+  aadhaarUrl      String?
+  panNumber       String?
+  panUrl          String?
+  serviceRadiusKm Int           @default(25) // 10km to 100km slider
+  isOnline        Boolean       @default(false)
+  walletBalance   Float         @default(0)
+  deliveries      Delivery[]
+  payouts         RiderPayout[]
+  @@map("rider_profiles")
+}
+
+model Delivery {
+  id             String         @id @default(uuid())
+  orderId        String         @unique
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  riderProfileId String?
+  riderProfile   RiderProfile?  @relation(fields: [riderProfileId], references: [id])
+  status         DeliveryStatus @default(broadcasted)
+  deliveryFee    Float          @default(50)
+  distanceKm     Float          @default(3.5)
+  deliveryOtp    String?        // 4-digit verification code
+  pickupName     String
+  pickupAddress  String
+  dropoffName    String
+  dropoffAddress String
+  @@map("deliveries")
+}</code></pre>
+
+  <!-- 7. Implementation Roadmap -->
+  <h2>7. Implementation Roadmap</h2>
+  <ul>
+    <li><strong>Phase 1: Database Schema & Migration</strong> — Update <code>schema.prisma</code> with <code>RegionalAdminProfile</code>, <code>RiderProfile</code>, <code>Delivery</code>, and <code>ShiprocketShipment</code>. Push to PostgreSQL RDS.</li>
+    <li><strong>Phase 2: Backend REST APIs</strong> — Implement Rider auth, atomic acceptance queue, stage progression, Regional Admin onboarding, and Shiprocket dispatch helper.</li>
+    <li><strong>Phase 3: Rider Portal Frontend</strong> — Build mobile-first <code>/rider</code> with Mapbox registration, 30s countdown radar chime, swipeable <code>SlideToConfirm</code>, and 4-digit OTP completion.</li>
+    <li><strong>Phase 4: Regional Admin Portal</strong> — Build <code>/regional-admin</code> with zone application, vendor monitoring, rider KYC approvals, and live delivery map.</li>
+    <li><strong>Phase 5: Vendor & Super Admin Integrations</strong> — Add <code>[ 🚀 Broadcast to Riders ]</code> and <code>[ 📦 Ship via Shiprocket ]</code> in <code>VendorOrders.tsx</code>. Add <code>RegionalAdminsPage.tsx</code> in <code>/admin</code>.</li>
+  </ul>
+
+</div>
+
+</body>
+</html>
