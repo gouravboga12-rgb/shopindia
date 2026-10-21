@@ -57,7 +57,9 @@ This document records all changes made across the **ShopIndia** codebase coverin
 | `src/rider/components/IncomingRadarModal.tsx` | **Created** | 30-second radial countdown alert modal with audio chime, pickup/dropoff summary, guaranteed fee, and atomic acceptance button. |
 | `src/rider/components/SlideToConfirm.tsx` | **Created** | Ergonomic swipe-to-confirm thumb slider designed for delivery partner glove safety. |
 | `src/rider/components/RiderMapRoute.tsx` | **Created** | Interactive routing visualizer with store/customer nodes, animated polyline, and direct Google Maps navigation button. |
-| `src/rider/pages/RiderLogin.tsx` | **Created** | Login and onboarding registration with GPS location auto-detect, vehicle selection, and KYC input fields. |
+| `server/routes/tracking.js` | **Created / Enhanced** | Real-time order tracking endpoint (`GET /api/tracking/order/:orderId`) and GPS reverse-geocoding service (`GET /api/tracking/reverse-geocode`) resolving Road No, Colony/Village, Mandal, District/City, State, Pincode, and Country without exposing API tokens in frontend client code. |
+| `src/lib/mapbox.ts` | **Created / Enhanced** | Mapbox & reverse-geocoding client utility connecting to backend reverse-geocode service with multi-provider fallback. |
+| `src/rider/pages/RiderLogin.tsx` | **Created / Enhanced** | Login and onboarding registration with GPS location auto-detect, vehicle selection, KYC fields, and clean user-facing 'Detected Address Details' card. |
 | `src/rider/pages/ActiveDeliveryView.tsx` | **Created** | 4-stage active trip execution: Stage 1 (To Store) ➔ Stage 2 (Store Item Verification Checklist) ➔ Stage 3 (In Transit to Customer) ➔ Stage 4 (4-digit Customer OTP Verification & Instant Wallet Credit). |
 | `src/rider/pages/RiderDashboard.tsx` | **Created** | Live radar pulse animation, shift metrics (wallet balance, completed trips, radius, rating), and standby mode. |
 | `src/rider/pages/RiderOrders.tsx` | **Created** | Tabbed deliveries list showing in-progress trip and completed delivery history. |
