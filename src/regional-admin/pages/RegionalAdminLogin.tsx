@@ -63,12 +63,13 @@ export const RegionalAdminLogin: React.FC<RegionalAdminLoginProps> = ({ onSwitch
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Regional Admin Email</label>
             <input
               type="email"
               required
+              autoComplete="off"
               placeholder="region.admin@shopindia.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -82,6 +83,7 @@ export const RegionalAdminLogin: React.FC<RegionalAdminLoginProps> = ({ onSwitch
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

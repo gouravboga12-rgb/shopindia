@@ -128,7 +128,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           {isRegister && (
             <>
               <div>
@@ -137,6 +137,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   type="text"
                   name="name"
                   required
+                  autoComplete="off"
                   placeholder="e.g. Ramesh Kumar"
                   value={formData.name}
                   onChange={handleChange}
@@ -150,6 +151,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   type="tel"
                   name="phone"
                   required
+                  autoComplete="off"
                   placeholder="+91 98765 43210"
                   value={formData.phone}
                   onChange={handleChange}
@@ -165,6 +167,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
               type="email"
               name="email"
               required
+              autoComplete="off"
               placeholder="rider@example.com"
               value={formData.email}
               onChange={handleChange}
@@ -179,6 +182,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 required
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
