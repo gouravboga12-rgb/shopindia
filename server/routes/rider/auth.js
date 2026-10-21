@@ -50,49 +50,93 @@ router.post('/register', async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (existing) {
-      return res.status(409).json({ error: 'An account with this email already exists.' });
+    const existing = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { riderProfile: true },
+    });
+
+    if (existing && existing.riderProfile) {
+      return res.status(409).json({ error: 'A delivery partner account with this email already exists. Please sign in.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with role rider
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email: normalizedEmail,
-        phone,
-        password: hashedPassword,
-        role: 'rider',
-        avatar: photoUrl,
-        branchId: branchId || undefined,
-        riderProfile: {
-          create: {
-            vehicleType,
-            vehicleNumber,
-            licenseNumber,
-            licenseUrl,
-            aadhaarNumber,
-            aadhaarUrl,
-            panNumber,
-            panUrl,
-            rcUrl,
-            photoUrl,
-            address,
-            currentLat: currentLat ? parseFloat(currentLat) : null,
-            currentLng: currentLng ? parseFloat(currentLng) : null,
-            serviceRadiusKm: parseInt(serviceRadiusKm, 10) || 25,
-            isOnline: true,
-            isApproved: false, // requires admin/regional admin review
-            branchId: branchId || undefined,
+    let user;
+    if (existing) {
+      // User exists from customer/main shop; upgrade to rider role and attach rider profile
+      user = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: name || existing.name,
+          phone: phone || existing.phone,
+          password: hashedPassword,
+          role: 'rider',
+          avatar: photoUrl || existing.avatar,
+          branchId: branchId || existing.branchId || undefined,
+          riderProfile: {
+            create: {
+              vehicleType,
+              vehicleNumber,
+              licenseNumber,
+              licenseUrl,
+              aadhaarNumber,
+              aadhaarUrl,
+              panNumber,
+              panUrl,
+              rcUrl,
+              photoUrl,
+              address,
+              currentLat: currentLat ? parseFloat(currentLat) : null,
+              currentLng: currentLng ? parseFloat(currentLng) : null,
+              serviceRadiusKm: parseInt(serviceRadiusKm, 10) || 25,
+              isOnline: true,
+              isApproved: false, // requires admin/regional admin review
+              branchId: branchId || undefined,
+            },
           },
         },
-      },
-      include: {
-        riderProfile: true,
-      },
-    });
+        include: {
+          riderProfile: true,
+        },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          name,
+          email: normalizedEmail,
+          phone,
+          password: hashedPassword,
+          role: 'rider',
+          avatar: photoUrl,
+          branchId: branchId || undefined,
+          riderProfile: {
+            create: {
+              vehicleType,
+              vehicleNumber,
+              licenseNumber,
+              licenseUrl,
+              aadhaarNumber,
+              aadhaarUrl,
+              panNumber,
+              panUrl,
+              rcUrl,
+              photoUrl,
+              address,
+              currentLat: currentLat ? parseFloat(currentLat) : null,
+              currentLng: currentLng ? parseFloat(currentLng) : null,
+              serviceRadiusKm: parseInt(serviceRadiusKm, 10) || 25,
+              isOnline: true,
+              isApproved: false, // requires admin/regional admin review
+              branchId: branchId || undefined,
+            },
+          },
+        },
+        include: {
+          riderProfile: true,
+        },
+      });
+    }
+
 
     const token = jwt.sign(
       {
