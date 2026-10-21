@@ -2,23 +2,40 @@
 ## Project Changelog, Architectural Summary & Next-Steps Resume Guide
 
 **File Location:** `PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`  
-**Date of Record:** October 21, 2026  
-**Status:** All Web Modules Completed, Fully Built & Verified (0 TypeScript Errors, Production Bundle Verified)
+**Date of Record:** October 22, 2026 (Updated: 01:05 AM IST)  
+**Status:** All Web Modules Completed, Fully Built & Deployed to Git & AWS EC2 (0 TypeScript Errors, Production Bundle Verified)
 
 ---
 
 ## 1. Executive Summary
 
-This document records all changes made across the **ShopIndia** codebase covering:
-1. **Rider & Delivery Partner Portal (`/rider` & `/rider-login`):** Mobile-first responsive web portal featuring real-time radar polling, Web Audio alert chime, 30-second radial countdown order acceptance, atomic concurrency locking, a 4-stage turn-by-turn workflow (store pickup checklist ➔ navigation ➔ 4-digit customer OTP completion), instant wallet crediting, and a 10–100 km operational radius slider.
-2. **Regional Admin Portal (`/regional-admin` & `/regional-admin/register`):** Scoped territory command center for zone/hub managers with self-service registration (district/pincode selection), territory metrics (GMV, active deliveries, online fleet), local merchant oversight, one-click rider KYC verification, live radar map, and emergency order re-broadcasting.
-3. **Shiprocket 3PL Logistics Integration:** Master platform credentials architecture with auto-registered vendor pickup locations. Generates AWB tracking numbers, printable shipping labels, and real-time courier tracking timelines without requiring individual vendor Shiprocket accounts.
-4. **Vendor Portal Multi-Channel Dispatch (`/vendor`):** Intelligent action buttons:
-   - `[ 🚀 Broadcast to Nearby Riders ]` for Quick-Commerce orders (10–30 min delivery).
-   - `[ 📦 Ship via Shiprocket ]` for Traditional/Normal Delivery (multi-day courier).
-5. **Super Admin Regional Governance (`/admin`):** Management tab to review, approve, suspend, or reject regional administrator applications and assign operating branches.
+This document provides a comprehensive, centralized record of the multi-panel dispatch, logistics, and service marketplace architecture built across **ShopIndia**:
 
-> **Note on Platform Scope:** Everything has been developed entirely within the **Web Application** (`shopindia`). No native mobile apps have been modified yet.
+1. **Rider & Delivery Partner Portal (`/rider` & `/rider-login`):**
+   - Mobile-first responsive web portal featuring real-time radar polling, Web Audio alert chime, 30-second radial countdown order acceptance, atomic concurrency locking (`ALREADY_ASSIGNED` guard), 4-stage turn-by-turn workflow (store pickup checklist ➔ navigation ➔ 4-digit customer OTP completion), instant wallet crediting, and a 10–100 km operational radius slider.
+   - **GPS Reverse Geocoding with Clean UI:** Auto-detects Road, Colony/Village, Mandal, District/City, State, Pincode, and Country without exposing raw third-party brand labels or API tokens in the client.
+   - **Partner Fleet Specialization & Multi-Select Skills:** Partners choose between `delivery` (Quick Commerce), `service` (Doorstep Service Professional), or `both` (All-Rounder). Technicians can select **any combination or all 13 services** from the website catalog (Electrician, Plumber, AC Repair, Cleaning, Appliance Care, Carpentry, Painting, Salon, Vehicle Care, Foam Wash, Roadside Towing, Battery, Tyres/Brakes).
+   - **Independent OTP-Based Password Reset:** Self-contained 6-digit OTP verification via email with separate token handling.
+   - **Automatic Account Role Upgrade:** Existing customer accounts registering as partners automatically upgrade to `rider` role and attach their `riderProfile` without data loss.
+
+2. **Regional Admin Portal (`/regional-admin` & `/regional-admin/register`):**
+   - Scoped territory command center for zone/hub managers with self-service registration (district/pincode selection), territory metrics (GMV, active deliveries, online fleet), local merchant oversight, one-click rider KYC verification, live radar map, and emergency order re-broadcasting.
+   - **Independent Hub Password Reset:** OTP-based reset strictly enforcing `regional_admin` and `branch_manager` roles.
+   - **Territory Fleet & Service Network Management:** Filter tabs (`All Partners`, `🚚 Delivery`, `🛠️ Service Pros`, `⚡ All-Rounder`, `⚠️ Pending KYC`), skill badge chips, and experience tags.
+
+3. **Vendor Portal Multi-Channel Dispatch & Service Hiring (`/vendor`):**
+   - Intelligent dispatch buttons:
+     - `[ 🚀 Broadcast to Nearby Riders ]` for Quick-Commerce orders (10–30 min delivery).
+     - `[ 📦 Ship via Shiprocket ]` for Traditional/Normal Delivery (multi-day courier).
+   - **Service Professional Discovery:** Endpoint `GET /api/vendor/technicians/partners?skill=:skill` to discover verified platform service professionals for job assignment.
+
+4. **Shiprocket 3PL Logistics Integration:**
+   - Master platform credentials architecture with auto-registered vendor pickup locations. Generates AWB tracking numbers, printable shipping labels, and real-time courier tracking timelines without requiring individual vendor Shiprocket accounts.
+
+5. **Super Admin Regional Governance (`/admin`):**
+   - Management tab to review, approve, suspend, or reject regional administrator applications and assign operating branches.
+
+> **Note on Platform Scope:** Everything has been developed entirely within the **Web Application** (`shopindia`). No native mobile apps have been modified.
 
 ---
 
@@ -28,17 +45,19 @@ This document records all changes made across the **ShopIndia** codebase coverin
 
 | File Path | Type | Description |
 |---|---|---|
-| `server/prisma/schema.prisma` | Modified | Added `DeliveryStatus`, `RegionalAdminStatus`, `RegionalAdminProfile`, `RiderProfile`, `Delivery`, `ShiprocketShipment`, and `RiderPayout` models. Added `regional_admin` to `UserRole`. |
-| `server/lib/shiprocket.js` | **Created** | Master Shiprocket client with token caching, vendor pickup location registration, ad-hoc shipment creation, label generation, and AWB tracking. |
-| `server/routes/rider/auth.js` | **Created** | Rider registration with vehicle and KYC details (DL, RC, Aadhaar, PAN), JWT authentication, and SMTP verification. |
-| `server/routes/rider/profile.js` | **Created** | Live GPS location updates, online/offline status toggle, vehicle preferences, and 10–100 km service radius preference. |
-| `server/routes/rider/orders.js` | **Created** | Broadcast queue feed within rider radius, atomic concurrency claim lock (`ALREADY_ASSIGNED` check), 4-stage turn-by-turn workflow updates, and 4-digit customer OTP validation with instant wallet payout credit. |
-| `server/routes/rider/wallet.js` | **Created** | Wallet balance check, payout transaction history, and bank account withdrawal requests. |
-| `server/routes/regional-admin/auth.js` | **Created** | Self-service registration for territory managers (sets `pending_approval`) and login with status checks. |
-| `server/routes/regional-admin/operations.js` | **Created** | Regional dashboard KPIs, local vendor latency monitoring, regional rider fleet KYC verification, live radar delivery map, and emergency order re-broadcast. |
-| `server/routes/shiprocket/shipments.js` | **Created** | Vendor/Admin shipment generation (`/create-shipment`), live courier tracking (`/track/:awb`), and webhook listener (`/webhook`). |
-| `server/routes/admin/regionalAdmins.js` | **Created** | Super Admin API to list, approve, suspend, or reject regional admin applications and assign branch territories. |
-| `server/routes/vendor/orders.js` | Modified | Added `POST /api/vendor/orders/:id/broadcast` to create `Delivery` records, generate 4-digit OTPs, and broadcast to active nearby riders. |
+| `server/prisma/schema.prisma` | Modified | Added `partnerType String @default("delivery")`, `skills String[] @default([])`, and `experienceYears Int? @default(1)` to `RiderProfile`. Includes all models: `User`, `RiderProfile`, `Delivery`, `ShiprocketShipment`, `RegionalAdminProfile`, `Technician`, `ServiceJob`, `Order`, `Vendor`. |
+| `server/routes/rider/auth.js` | Modified | Independent OTP forgot/reset password endpoints; extracts and saves `partnerType`, `skills`, and `experienceYears`; auto-upgrades existing customer accounts to `rider` role. |
+| `server/routes/rider/profile.js` | Modified | Live GPS updates, online status toggle, vehicle preferences, 10–100 km radius slider, and `PATCH /` updating `partnerType`, `skills`, `experienceYears`. |
+| `server/routes/rider/orders.js` | Created | Radius broadcast queue feed, atomic concurrency claim lock, 4-stage turn-by-turn workflow, and 4-digit customer OTP completion with instant wallet payout credit. |
+| `server/routes/rider/wallet.js` | Created | Wallet balance, payout history, and bank withdrawal requests. |
+| `server/routes/regional-admin/auth.js` | Modified | Self-service registration for territory managers; independent OTP forgot/reset password endpoints. |
+| `server/routes/regional-admin/operations.js` | Created | Regional dashboard KPIs, merchant latency monitoring, regional rider fleet KYC verification, live radar delivery map, emergency order re-broadcast. |
+| `server/routes/vendor/technicians.js` | Modified | Added `GET /api/vendor/technicians/partners` to query verified service professionals by skill. |
+| `server/routes/vendor/orders.js` | Modified | `POST /api/vendor/orders/:id/broadcast` to create `Delivery` records, generate 4-digit OTPs, and broadcast to active nearby riders. |
+| `server/routes/tracking.js` | Created | Real-time order tracking (`GET /api/tracking/order/:orderId`) and backend reverse-geocode service (`GET /api/tracking/reverse-geocode`). |
+| `server/lib/shiprocket.js` | Created | Master Shiprocket client with token caching, pickup registration, label generation, and AWB tracking. |
+| `server/routes/shiprocket/shipments.js` | Created | Shipment generation, courier tracking, and webhook listener. |
+| `server/routes/admin/regionalAdmins.js` | Created | Super Admin API to list, approve, suspend, or reject regional admin applications. |
 | `server/index.js` | Modified | Centrally mounted all Rider, Regional Admin, Shiprocket, and Admin Regional routes. |
 
 ---
@@ -47,35 +66,32 @@ This document records all changes made across the **ShopIndia** codebase coverin
 
 | File Path | Type | Description |
 |---|---|---|
-| `src/context/AuthContext.tsx` | Modified | Added `'regional_admin'` to `UserRole`. Added support for `rider` and `regional_admin` local storage token prefixes. |
-| `src/App.tsx` | Modified | Configured clean URL routing for `/rider`, `/rider-login`, and `/regional-admin`. |
-| `src/rider/RiderPortal.tsx` | **Created** | Main shell with dual responsive layouts: mobile bottom bar navigation + desktop hub sidebar. |
-| `src/rider/context/RiderContext.tsx` | **Created** | Global rider state provider: Web Audio API dispatch chime, 6-second broadcast polling, atomic claims, active trip state, and radius settings. |
-| `src/rider/components/RiderHeader.tsx` | **Created** | Sticky header with glowing Online/Offline switch, KYC badge, vehicle info, and live wallet balance preview. |
-| `src/rider/components/RiderBottomNav.tsx` | **Created** | Mobile-first bottom navigation bar with live status indicators. |
-| `src/rider/components/RiderSidebar.tsx` | **Created** | Desktop hub navigation sidebar with quick stats and profile information. |
-| `src/rider/components/IncomingRadarModal.tsx` | **Created** | 30-second radial countdown alert modal with audio chime, pickup/dropoff summary, guaranteed fee, and atomic acceptance button. |
-| `src/rider/components/SlideToConfirm.tsx` | **Created** | Ergonomic swipe-to-confirm thumb slider designed for delivery partner glove safety. |
-| `src/rider/components/RiderMapRoute.tsx` | **Created** | Interactive routing visualizer with store/customer nodes, animated polyline, and direct Google Maps navigation button. |
-| `server/routes/tracking.js` | **Created / Enhanced** | Real-time order tracking endpoint (`GET /api/tracking/order/:orderId`) and GPS reverse-geocoding service (`GET /api/tracking/reverse-geocode`) resolving Road No, Colony/Village, Mandal, District/City, State, Pincode, and Country without exposing API tokens in frontend client code. |
-| `src/lib/mapbox.ts` | **Created / Enhanced** | Mapbox & reverse-geocoding client utility connecting to backend reverse-geocode service with multi-provider fallback. |
-| `src/rider/pages/RiderLogin.tsx` | **Created / Enhanced** | Login and onboarding registration with GPS location auto-detect, vehicle selection, KYC fields, and clean user-facing 'Detected Address Details' card. |
-| `src/rider/pages/ActiveDeliveryView.tsx` | **Created** | 4-stage active trip execution: Stage 1 (To Store) ➔ Stage 2 (Store Item Verification Checklist) ➔ Stage 3 (In Transit to Customer) ➔ Stage 4 (4-digit Customer OTP Verification & Instant Wallet Credit). |
-| `src/rider/pages/RiderDashboard.tsx` | **Created** | Live radar pulse animation, shift metrics (wallet balance, completed trips, radius, rating), and standby mode. |
-| `src/rider/pages/RiderOrders.tsx` | **Created** | Tabbed deliveries list showing in-progress trip and completed delivery history. |
-| `src/rider/pages/RiderWallet.tsx` | **Created** | Available balance card, instant bank withdrawal form (Account No, IFSC, Amount), and withdrawal logs. |
-| `src/rider/pages/RiderProfile.tsx` | **Created** | Vehicle info, KYC document badges, and interactive 10–100 km operational radius slider. |
-| `src/regional-admin/RegionalAdminPortal.tsx` | **Created** | Regional Admin shell with sidebar navigation and tab switching. |
-| `src/regional-admin/RegionalAdminSidebar.tsx` | **Created** | Navigation sidebar for regional operations. |
-| `src/regional-admin/pages/RegionalAdminLogin.tsx` | **Created** | Authentication for approved regional administrators. |
-| `src/regional-admin/pages/RegionalAdminRegister.tsx` | **Created** | Self-service onboarding application for territory managers (district & pincode assignment). |
-| `src/regional-admin/pages/RegionalDashboard.tsx` | **Created** | Live territory pulse: active quick-commerce deliveries, online riders count, regional GMV, and recent deliveries table. |
-| `src/regional-admin/pages/RegionalVendors.tsx` | **Created** | Local merchant oversight, pending dispatch queues, and store manager phone call shortcuts. |
-| `src/regional-admin/pages/RegionalRiders.tsx` | **Created** | Fleet supervision and pending KYC queue with one-click Approve / Reject buttons. |
-| `src/regional-admin/pages/RegionalLiveMap.tsx` | **Created** | Real-time map canvas of active pick-and-drop trips, online riders, and emergency order re-broadcast. |
-| `src/admin/pages/RegionalAdminsPage.tsx` | **Created** | Super Admin panel to review regional manager applications (Approve / Suspend / Reject). |
-| `src/admin/AdminSidebar.tsx` | Modified | Added `Regional Admins` navigation link with globe icon. |
-| `src/admin/AdminPortal.tsx` | Modified | Wired `regional-admins` tab to render `RegionalAdminsPage`. |
+| `src/data/partnerSkills.ts` | **Created** | Shared catalog of 3 partner specialization types and 13 multi-select doorstep service skills with icons, descriptions, and category groupings (Home & Vehicle Care). |
+| `src/rider/pages/RiderLogin.tsx` | Modified | Partner onboarding & login with partner specialization selector (Delivery / Service / Both), multi-select skill chips, experience selector, adaptive vehicle requirement, GPS location auto-detect, and "Forgot Password?" trigger modal. |
+| `src/rider/pages/RiderProfile.tsx` | Modified | Vehicle info, KYC document badges, 10–100 km operational radius slider, and dedicated **"Partner Specialization & Service Skills"** card with live saving. |
+| `src/rider/context/RiderContext.tsx` | Modified | Global rider state provider: dispatch chime, broadcast polling, atomic claims, active trip state, operational radius, and `updatePartnerProfile` handler. |
+| `src/regional-admin/pages/RegionalRiders.tsx` | Modified | Fleet supervision with filter tabs (`All Partners`, `🚚 Delivery`, `🛠️ Service Pros`, `⚡ All-Rounder`, `⚠️ Pending KYC`), skill chips, experience badges, and one-click KYC approval. |
+| `src/regional-admin/pages/RegionalAdminLogin.tsx` | Modified | Regional admin login with dedicated "Forgot Password?" link triggering the Hub Admin OTP reset modal. |
+| `src/components/auth/ForgotPasswordModal.tsx` | Modified | Reusable OTP password reset modal supporting dynamic theming (`orange` for Rider, `indigo` for Regional Admin) and independent API endpoint routing. |
+| `src/lib/mapbox.ts` | Modified | Mapbox & reverse-geocoding client utility connecting to backend reverse-geocode service with multi-provider fallback. Clean address parser for Road, Colony/Village, Mandal, District/City, State, Pincode. |
+| `src/rider/RiderPortal.tsx` | Created | Dual responsive layout: mobile bottom bar + desktop hub sidebar. |
+| `src/rider/components/RiderHeader.tsx` | Created | Sticky header with glowing Online/Offline switch, KYC badge, vehicle info, and wallet balance preview. |
+| `src/rider/components/RiderBottomNav.tsx` | Created | Mobile-first bottom navigation bar with live status indicators. |
+| `src/rider/components/RiderSidebar.tsx` | Created | Desktop hub navigation sidebar with quick stats and profile information. |
+| `src/rider/components/IncomingRadarModal.tsx` | Created | 30-second radial countdown alert modal with audio chime, pickup/dropoff summary, guaranteed fee, and atomic acceptance. |
+| `src/rider/components/SlideToConfirm.tsx` | Created | Ergonomic swipe-to-confirm thumb slider designed for delivery partner glove safety. |
+| `src/rider/components/RiderMapRoute.tsx` | Created | Interactive routing visualizer with store/customer nodes, animated polyline, and Google Maps button. |
+| `src/rider/pages/ActiveDeliveryView.tsx` | Created | 4-stage active trip execution: To Store ➔ Item Checklist ➔ In Transit ➔ 4-digit OTP Verification. |
+| `src/rider/pages/RiderDashboard.tsx` | Created | Live radar pulse animation, shift metrics (wallet balance, completed trips, radius, rating), and standby mode. |
+| `src/rider/pages/RiderOrders.tsx` | Created | Tabbed deliveries list showing in-progress trip and completed delivery history. |
+| `src/rider/pages/RiderWallet.tsx` | Created | Available balance card, instant bank withdrawal form, and withdrawal logs. |
+| `src/regional-admin/RegionalAdminPortal.tsx` | Created | Regional Admin shell with sidebar navigation and tab switching. |
+| `src/regional-admin/RegionalAdminSidebar.tsx` | Created | Navigation sidebar for regional operations. |
+| `src/regional-admin/pages/RegionalAdminRegister.tsx` | Created | Self-service onboarding application for territory managers (district & pincode assignment). |
+| `src/regional-admin/pages/RegionalDashboard.tsx` | Created | Live territory pulse: active quick-commerce deliveries, online riders count, regional GMV, recent deliveries. |
+| `src/regional-admin/pages/RegionalVendors.tsx` | Created | Local merchant oversight, pending dispatch queues, and store manager phone call shortcuts. |
+| `src/regional-admin/pages/RegionalLiveMap.tsx` | Created | Real-time map canvas of active pick-and-drop trips, online riders, emergency order re-broadcast. |
+| `src/admin/pages/RegionalAdminsPage.tsx` | Created | Super Admin panel to review regional manager applications (Approve / Suspend / Reject). |
 | `src/vendor/pages/VendorOrders.tsx` | Modified | Integrated `[ 🚀 Broadcast to Nearby Riders ]` (Quick-Commerce) and `[ 📦 Ship via Shiprocket ]` (Normal Delivery with AWB display). |
 
 ---
@@ -85,22 +101,24 @@ This document records all changes made across the **ShopIndia** codebase coverin
 | Route | Target Audience | Primary Function |
 |---|---|---|
 | `/` | Customers | Public Storefront (Desktop / Mobile web view) |
-| `/rider` | Delivery Partners | Radar standby, active deliveries, wallet earnings, radius settings |
-| `/rider-login` | Delivery Partners | Sign in or register with vehicle info and KYC documents |
-| `/regional-admin` | Regional Zone Managers | Territory dashboard, merchant oversight, rider verification, live radar |
+| `/rider` | Delivery & Service Partners | Radar standby, active bookings, wallet earnings, radius & skills settings |
+| `/rider-login` | Delivery & Service Partners | Sign in, register (choose Delivery / Service / Both + Skills), OTP reset |
+| `/regional-admin` | Regional Zone Managers | Territory dashboard, merchant oversight, rider verification, live radar, OTP reset |
 | `/regional-admin/register` | Regional Applicants | Submit territory application (District, State, Pincodes) |
-| `/vendor` | Merchants | Store catalog, order packing, rider broadcast, Shiprocket shipping |
+| `/vendor` | Merchants | Store catalog, order packing, rider broadcast, Shiprocket shipping, technician hiring |
 | `/admin` | Super Admin | Platform governance, Regional Admin approvals, platform-wide riders |
 
 ---
 
 ## 4. Backend REST API Endpoints Reference
 
-### Rider APIs (`/api/rider/*`)
-- `POST /api/rider/auth/register` — Register rider, vehicle, KYC docs, and service radius.
+### A. Rider & Service Partner APIs (`/api/rider/*`)
+- `POST /api/rider/auth/register` — Register partner with role (`delivery`, `service`, `both`), multi-select skills, vehicle info, KYC, and service radius.
 - `POST /api/rider/auth/login` — Partner credential authentication & JWT token issuance.
-- `GET /api/rider/profile` — Fetch authenticated rider profile & KYC verification status.
-- `PATCH /api/rider/profile` — Update vehicle, address, and radius slider (10–100 km).
+- `POST /api/rider/auth/forgot-password` — Generate & email 6-digit OTP for partner password reset (15-min expiry).
+- `POST /api/rider/auth/reset-password` — Validate OTP and update partner password.
+- `GET /api/rider/profile` — Fetch authenticated partner profile, specialization, skills, and KYC verification status.
+- `PATCH /api/rider/profile` — Update specialization (`partnerType`), `skills`, `experienceYears`, vehicle, address, and radius (10–100 km).
 - `PATCH /api/rider/profile/status` — Toggle Online/Offline and update GPS coordinates.
 - `GET /api/rider/orders/broadcast-feed` — Fetch unclaimed orders within rider's radius.
 - `POST /api/rider/orders/:id/accept` — **Atomic Claim:** Locks order to rider or returns `ALREADY_ASSIGNED`.
@@ -111,48 +129,70 @@ This document records all changes made across the **ShopIndia** codebase coverin
 - `GET /api/rider/wallet` — Balance inquiry and payout logs.
 - `POST /api/rider/wallet/payout-request` — Request bank withdrawal (Account Number & IFSC).
 
-### Regional Admin APIs (`/api/regional-admin/*`)
+### B. Regional Admin APIs (`/api/regional-admin/*`)
 - `POST /api/regional-admin/auth/register` — Self-service application for territory management.
 - `POST /api/regional-admin/auth/login` — Regional manager login (checks `status === 'approved'`).
+- `POST /api/regional-admin/auth/forgot-password` — Generate & email 6-digit OTP for regional admin password reset.
+- `POST /api/regional-admin/auth/reset-password` — Validate OTP and update regional admin password.
 - `GET /api/regional-admin/dashboard` — Scoped metrics: active deliveries, online fleet, regional GMV.
 - `GET /api/regional-admin/vendors` — Local vendors list and unfulfilled order counts.
-- `GET /api/regional-admin/riders` — Regional rider fleet and pending KYC queue.
+- `GET /api/regional-admin/riders` — Regional fleet supervision with partner types and skill tags.
 - `PATCH /api/regional-admin/riders/:id/verify` — Approve or reject rider KYC.
 - `GET /api/regional-admin/deliveries/live` — Real-time map feed of active deliveries and online riders.
 - `POST /api/regional-admin/deliveries/:id/reassign` — Emergency re-broadcasting of delayed orders.
 
-### Shiprocket & Dispatch APIs
+### C. Vendor Dispatch & Service Partner APIs
+- `GET /api/vendor/technicians/partners?skill=:skill` — Query verified service professionals filterable by skill.
+- `POST /api/vendor/orders/:id/broadcast` — Initiates Quick-Commerce broadcast to nearby riders with 4-digit OTP.
 - `POST /api/shiprocket/create-shipment` — Books shipment via Shiprocket, generates AWB, and creates printable shipping label.
 - `GET /api/shiprocket/track/:awb` — Courier tracking timeline.
-- `POST /api/shiprocket/webhook` — Receives courier status updates (In Transit, Out for Delivery, Delivered).
-- `POST /api/vendor/orders/:id/broadcast` — Initiates Quick-Commerce broadcast to nearby riders with 4-digit OTP.
+- `POST /api/shiprocket/webhook` — Receives courier status updates.
 
-### Super Admin Regional Management
-- `GET /api/admin/regional-admins` — List all regional administrators and territory applications.
-- `PATCH /api/admin/regional-admins/:id/status` — Approve, suspend, or reject regional admin.
-
----
-
-## 5. Verification & Build Health
-
-1. **TypeScript Check:**  
-   Ran `npx tsc --noEmit` across the entire project. **0 errors found.**
-2. **Vite Production Bundle:**  
-   Ran `npx vite build`. **2,284 modules compiled and transformed successfully into `/dist`.**
-3. **Database Schema:**  
-   Prisma client generated with all 7 new operational models.
+### D. Reverse Geocoding & Tracking APIs
+- `GET /api/tracking/reverse-geocode?lat=:lat&lng=:lng` — Reverse-geocodes GPS coordinates into clean Road, Colony/Village, Mandal, District/City, State, Pincode.
+- `GET /api/tracking/order/:orderId` — Real-time live tracking feed for customers.
 
 ---
 
-## 6. How to Run & Resume the Project Tomorrow
+## 5. Catalog of Doorstep Service Skills & Specializations
 
-### Step 1: Start the Backend Server
-In a terminal inside `shopindia/server`:
+Defined in `src/data/partnerSkills.ts`:
+
+### A. Specialization Roles:
+1. `delivery` — 🚚 **Delivery Partner** (Quick Commerce Grocery & Hyperlocal Orders)
+2. `service` — 🛠️ **Service Professional** (Doorstep Repairs & Maintenance)
+3. `both` — ⚡ **All-Rounder Partner** (Both Quick Deliveries & Doorstep Services)
+
+### B. Multi-Select Services (13 Total — Any Combination Allowed):
+
+#### Home & Appliance Services:
+1. `electrician` — ⚡ Electrician & Home Wiring
+2. `plumbing` — 🔧 Plumber & Sanitary Care
+3. `ac_service` — ❄️ AC Repair & Servicing
+4. `cleaning` — ✨ Deep House Cleaning & Pest Control
+5. `appliance_repair` — 🧺 Appliance Maintenance & Repair (Fridge, Washing Machine, RO, Microwave)
+6. `carpentry` — 🪚 Carpentry & Furniture Assembly
+7. `painting` — 🎨 Painting & Waterproofing
+8. `salon_grooming` — ✂️ Salon & Grooming at Home
+
+#### Vehicle Care & Roadside Assistance:
+9. `vehicle_care` — 🛵 Doorstep Vehicle Periodic Service (Car/Bike)
+10. `vehicle_wash` — 🚗 Doorstep Foam Wash & Detailing
+11. `vehicle_breakdown` — 🚨 Emergency Roadside Towing (24x7)
+12. `vehicle_battery` — 🔋 Battery Jumpstart & Replacement
+13. `vehicle_tyres` — 🛞 Brakes, Tyres & Wheel Balancing
+
+---
+
+## 6. How to Run & Resume the Project in the Morning
+
+### Step 1: Start the Backend Server (Local Development)
+In terminal inside `shopindia/server`:
 ```powershell
 cd "d:\Company Projects\SHOP INDIA\shopindia\server"
 node index.js
 ```
-*(The server listens on `http://localhost:5001` and connects to PostgreSQL/RDS via Prisma).*
+*(Server listens on `http://localhost:5001` and connects to PostgreSQL).*
 
 ### Step 2: Start the Frontend Vite Dev Server
 In a second terminal inside `shopindia`:
@@ -160,58 +200,54 @@ In a second terminal inside `shopindia`:
 cd "d:\Company Projects\SHOP INDIA\shopindia"
 npm run dev
 ```
-*(Opens the application on `http://localhost:5173`).*
-
-### Step 3: Test the Workflows
-1. **Rider Workflow:**
-   - Navigate to `http://localhost:5173/rider-login`.
-   - Register a new delivery partner (enter vehicle and KYC info).
-   - Once logged in, tap **"GO ONLINE"** to enter standby radar mode.
-   - Adjust operational radius via the 10–100 km slider in Profile.
-2. **Vendor Dispatch:**
-   - Log in at `http://localhost:5173/vendor`.
-   - On an order in Orders, click **`[ 🚀 Broadcast to Riders ]`** (for Quick Commerce) or **`[ 📦 Ship via Shiprocket ]`** (for Normal Delivery).
-   - The online rider hears the audio chime and receives the 30s countdown card.
-   - Rider accepts ➔ executes the 4-stage delivery ➔ enters 4-digit OTP ➔ wallet is credited!
-3. **Regional Admin Hub:**
-   - Navigate to `http://localhost:5173/regional-admin/register` to submit a territory manager application.
-   - In `http://localhost:5173/admin` (Super Admin), go to **Regional Admins** tab and click **Approve**.
-   - Log in at `http://localhost:5173/regional-admin` to access the live radar map, merchant monitoring, and fleet KYC approvals.
+*(Application opens on `http://localhost:5173`).*
 
 ---
 
-## 7. Partner Fleet Specialization, Multi-Select Services & Independent Password Reset
+### Step 3: Verified Test Accounts & Credentials
 
-### A. Independent OTP-Based Password Reset
-- **Rider Partner Portal (`/rider-login`):**
-  - Added dedicated endpoints `POST /api/rider/auth/forgot-password` and `POST /api/rider/auth/reset-password`.
-  - Sends a secure 6-digit verification code to the partner's registered email with a 15-minute expiration.
-  - Verification modal styled in Partner Amber/Orange with explicit badge `'Delivery Partner'`.
-- **Regional Admin Hub (`/regional-admin`):**
-  - Added dedicated endpoints `POST /api/regional-admin/auth/forgot-password` and `POST /api/regional-admin/auth/reset-password`.
-  - Independent token lifecycle and validation strictly enforcing `regional_admin` or `branch_manager` roles.
-  - Modal styled in Hub Indigo with explicit badge `'Regional Hub Administrator'`.
+| Role | Email | Password | Details |
+|---|---|---|---|
+| **Partner (All-Rounder)** | `bogagourav10@gmail.com` | `Password123!` | Vehicle: `AP29L0679`, Role: `both`, Skills: `electrician`, `ac_service`, `cleaning`, `plumbing`, Radius: `80 km` |
+| **Regional Hub Admin** | `admin.hyderabad@shopindia.com` | `Password123!` | Assigned Territory: Hyderabad / Medchal / Rangareddy |
+| **Merchant / Vendor** | `vendor@shopindia.com` | `Password123!` | Multi-channel dispatch & technician hiring |
 
-### B. Partner Specialization & Multi-Select Doorstep Services
-- **3 Partner Roles:**
-  1. `delivery`: 🚚 **Delivery Partner** (Quick Commerce Grocery & Parcels)
-  2. `service`: 🛠️ **Service Professional** (Doorstep Home & Vehicle Maintenance)
-  3. `both`: ⚡ **All-Rounder Partner** (Both Quick Deliveries & Doorstep Services)
-- **Multi-Select Service Catalog (`src/data/partnerSkills.ts`):**
-  - Supports choosing **multiple services simultaneously** (1, 2, or all 13 services).
-  - **Home & Appliance Services:** Electrician & Home Wiring, Plumber & Sanitary Care, AC Repair & Servicing, Deep House Cleaning & Pest Control, Appliance Maintenance & Repair, Carpentry & Furniture Assembly, Painting & Waterproofing, Salon & Grooming at Home.
-  - **Vehicle Care & Roadside Assistance:** Doorstep Vehicle Periodic Service, Doorstep Foam Wash & Detailing, Emergency Roadside Towing (24x7), Battery Jumpstart & Replacement, Brakes, Tyres & Wheel Balancing.
-- **Onboarding & Settings UI:**
-  - Integrated into `src/rider/pages/RiderLogin.tsx` (registration) and `src/rider/pages/RiderProfile.tsx` (live settings).
-  - Allows technicians without vehicles to register with optional vehicle details.
-- **Regional Hub & Vendor Oversight:**
-  - `src/regional-admin/pages/RegionalRiders.tsx`: Filter tabs (`All Partners`, `Delivery`, `Service Pros`, `All-Rounder`, `Pending KYC`), skill tags, and experience badges.
-  - `server/routes/vendor/technicians.js`: Added `GET /api/vendor/technicians/partners` to query verified service professionals filterable by skill.
-- **Database & Cloud Deployment:**
-  - PostgreSQL schema synced with Prisma (`partnerType String @default("delivery")`, `skills String[] @default([])`, `experienceYears Int? @default(1)`).
-  - Deployed on AWS EC2 (`18.61.145.65`) and PM2 restarted online.
+---
+
+### Step 4: AWS EC2 Cloud Infrastructure & Deployment
+
+- **EC2 Instance IP:** `18.61.145.65`
+- **SSH Key Location:** `D:\Company Projects\SHOP INDIA\shopindia\ec2-key.pem`
+- **Connect via SSH:**
+  ```powershell
+  ssh -i "D:\Company Projects\SHOP INDIA\shopindia\ec2-key.pem" ubuntu@18.61.145.65
+  ```
+- **PM2 Process:** `shopindia-api` running on port `5001`
+  ```bash
+  pm2 status
+  pm2 logs shopindia-api --lines 50
+  pm2 restart all
+  ```
+- **Live APIs:**
+  - `http://18.61.145.65/api/health`
+  - `https://api.codetechawsurl1.shop/api/health`
+- **Live Production Frontend:**
+  - `https://shopindia-three.vercel.app`
+
+---
+
+## 7. Next Steps & Morning Agenda
+
+When you resume in the morning, here are the ready next steps:
+1. **Doorstep Service Booking Dispatch Flow:**
+   - When a customer books a doorstep service (e.g. AC Repair or Electrician) via `/services`, the order automatically broadcasts to service professionals with matching skills within their service radius.
+2. **Technician Job Scheduling & Calendar:**
+   - In `/rider` (for service partners), display a **"Booked Service Jobs"** tab showing time slots, customer address, and service notes.
+3. **Vendor Direct Assignment:**
+   - In `/vendor`, add a UI dropdown/modal allowing vendors to directly assign incoming doorstep service jobs to verified platform partners queried via `GET /api/vendor/technicians/partners`.
+4. **Partner Document Upload:**
+   - Direct S3 upload for Driving License, Aadhaar, and PAN image proofs.
 
 ---
 
 *Document updated and saved to `shopindia/PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`.*
-
