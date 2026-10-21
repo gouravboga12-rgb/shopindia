@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, CheckCircle2, AlertCircle, Building2, MapPin, RefreshCw, Sparkles } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, AlertCircle, Building2, MapPin, RefreshCw } from 'lucide-react';
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 
 interface RegionalAdminRegisterProps {
@@ -201,8 +201,8 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
             {detectedLocation && (
               <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-2xl text-xs space-y-2 animate-in fade-in">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-400 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Mapbox Geocoded Breakdown
+                  <span className="font-bold text-blue-400 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" /> Detected Location Details
                   </span>
                   <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
                     Auto-Populated Below

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Bike, ShieldCheck, MapPin, Eye, EyeOff, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { Bike, ShieldCheck, MapPin, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 
 interface RiderLoginProps {
@@ -278,7 +278,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                     className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold disabled:opacity-50 cursor-pointer transition-colors"
                   >
                     <MapPin className={`w-3.5 h-3.5 ${isDetectingLocation ? 'animate-bounce' : ''}`} />
-                    <span>{isDetectingLocation ? 'Detecting via GPS...' : 'Auto-Detect GPS (Mapbox)'}</span>
+                    <span>{isDetectingLocation ? 'Detecting Location...' : 'Auto-Detect Location (GPS)'}</span>
                   </button>
                 </div>
                 <input
@@ -294,8 +294,8 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                 {detectedDetails && (
                   <div className="mt-2.5 p-3 bg-orange-950/30 border border-orange-500/30 rounded-xl text-xs space-y-2 animate-in fade-in">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-orange-400 flex items-center gap-1 text-[11px]">
-                        <Sparkles className="w-3.5 h-3.5" /> Reverse Geocoded Breakdown
+                      <span className="font-bold text-orange-400 flex items-center gap-1.5 text-[11px]">
+                        <MapPin className="w-3.5 h-3.5" /> Detected Address Details
                       </span>
                       <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
                         GPS Verified
