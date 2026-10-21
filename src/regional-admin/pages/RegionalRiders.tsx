@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Bike, ShieldCheck, CheckCircle2, XCircle, Phone, Star, AlertCircle, RefreshCw } from 'lucide-react';
+import { Bike, CheckCircle2, Star, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface RiderItem {
   id: string;

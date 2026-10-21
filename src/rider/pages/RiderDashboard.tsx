@@ -4,12 +4,9 @@ import { ActiveDeliveryView } from './ActiveDeliveryView';
 import {
   Radar,
   Power,
-  Zap,
   TrendingUp,
   Package,
   Clock,
-  ShieldCheck,
-  AlertCircle,
   Navigation,
   CheckCircle2,
 } from 'lucide-react';
@@ -18,8 +15,8 @@ interface RiderDashboardProps {
   onNavigateToTab?: (tab: string) => void;
 }
 
-export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
-  const { profile, isOnline, toggleOnline, activeDelivery, incomingBroadcast, acceptOrder } = useRider();
+export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
+  const { profile, isOnline, toggleOnline, activeDelivery } = useRider();
 
   // If there is an active assigned delivery, prioritize rendering the active turn-by-turn view
   if (activeDelivery) {

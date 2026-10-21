@@ -3,12 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   Globe2,
   Bike,
-  Package,
   TrendingUp,
-  Clock,
-  Store,
-  MapPin,
-  CheckCircle2,
   RefreshCw,
   AlertCircle,
   Truck,

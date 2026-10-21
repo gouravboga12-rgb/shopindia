@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
-import { Package, Clock, CheckCircle2, ChevronRight, Store, MapPin, IndianRupee } from 'lucide-react';
+import { Package, CheckCircle2, Store, MapPin } from 'lucide-react';
 
 interface HistoryOrder {
   id: string;
@@ -17,7 +17,6 @@ interface HistoryOrder {
 export const RiderOrders: React.FC = () => {
   const { token } = useAuth();
   const { activeDelivery } = useRider();
-  const [filter, setFilter] = useState<'all' | 'delivered'>('all');
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [loading, setLoading] = useState(true);
 

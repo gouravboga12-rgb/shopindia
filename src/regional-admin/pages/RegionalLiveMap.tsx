@@ -7,16 +7,13 @@ import {
   Navigation,
   RefreshCw,
   Store,
-  ExternalLink,
   RotateCcw,
-  Clock,
 } from 'lucide-react';
 
 export const RegionalLiveMap: React.FC = () => {
   const { token } = useAuth();
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [onlineRiders, setOnlineRiders] = useState<any[]>([]);
-  const [shiprocketShipments, setShiprocketShipments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [reassigningId, setReassigningId] = useState<string | null>(null);
 
@@ -31,7 +28,6 @@ export const RegionalLiveMap: React.FC = () => {
         const data = await res.json();
         setDeliveries(data.deliveries || []);
         setOnlineRiders(data.onlineRiders || []);
-        setShiprocketShipments(data.shiprocketShipments || []);
       }
     } catch (e) {
       console.error('Failed to fetch live regional map data', e);

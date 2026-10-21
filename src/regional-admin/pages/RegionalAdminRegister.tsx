@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe2, ShieldCheck, CheckCircle2, AlertCircle, Building2, MapPin } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
 
 interface RegionalAdminRegisterProps {
   onSwitchToLogin: () => void;

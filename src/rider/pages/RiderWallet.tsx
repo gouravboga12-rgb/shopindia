@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
-import { Wallet, IndianRupee, ArrowDownToLine, CheckCircle2, AlertCircle, Clock, Building } from 'lucide-react';
+import { Wallet, IndianRupee, ArrowDownToLine, CheckCircle2, AlertCircle, Building } from 'lucide-react';
 
 interface PayoutItem {
   id: string;

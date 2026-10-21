@@ -9,9 +9,7 @@ import {
   CheckSquare,
   Square,
   KeyRound,
-  ShieldCheck,
   CheckCircle2,
-  Navigation,
   Sparkles,
   AlertCircle,
 } from 'lucide-react';

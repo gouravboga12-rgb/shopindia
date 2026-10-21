@@ -3,13 +3,10 @@ import { api } from '../../lib/api';
 import {
   Globe2,
   CheckCircle2,
-  XCircle,
-  AlertCircle,
   RefreshCw,
   Building,
   Mail,
   Phone,
-  ShieldCheck,
   PauseCircle,
 } from 'lucide-react';
 

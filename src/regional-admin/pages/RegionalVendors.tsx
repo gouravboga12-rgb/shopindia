@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Store, Phone, Clock, Package, MapPin, CheckCircle2 } from 'lucide-react';
+import { Store, Phone, Package, MapPin } from 'lucide-react';
 
 interface VendorItem {
   id: string;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
-import { User, ShieldCheck, AlertCircle, Bike, Navigation, MapPin, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Bike, Navigation, CheckCircle2 } from 'lucide-react';
 
 export const RiderProfile: React.FC = () => {
   const { user } = useAuth();
