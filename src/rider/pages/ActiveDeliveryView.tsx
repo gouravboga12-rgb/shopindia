@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRider } from '../context/RiderContext';
 import { RiderMapRoute } from '../components/RiderMapRoute';
 import { SlideToConfirm } from '../components/SlideToConfirm';
+import { getSocket } from '../../lib/socket';
 import {
   Store,
   MapPin,
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   Sparkles,
   AlertCircle,
+  Radio,
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
@@ -21,6 +23,63 @@ export const ActiveDeliveryView: React.FC = () => {
   const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [completedSuccess, setCompletedSuccess] = useState(false);
+  const [isBroadcastingGps, setIsBroadcastingGps] = useState(false);
+
+  // High-frequency live GPS streaming to Customer & Vendor via WebSockets
+  useEffect(() => {
+    if (!activeDelivery?.id) return;
+
+    const socket = getSocket();
+    socket.emit('join_delivery', { deliveryId: activeDelivery.id });
+
+    let lastPing = 0;
+    let prevCoords: { lat: number; lng: number } | null = null;
+    let watchId: number | null = null;
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      setIsBroadcastingGps(true);
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const now = Date.now();
+          if (now - lastPing < 3000) return; // Throttle to 3s interval (battery protection)
+          lastPing = now;
+
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const speed = pos.coords.speed || 0;
+
+          let bearing = 0;
+          if (prevCoords) {
+            const y = Math.sin(lng - prevCoords.lng) * Math.cos(lat);
+            const x = Math.cos(prevCoords.lat) * Math.sin(lat) - Math.sin(prevCoords.lat) * Math.cos(lat) * Math.cos(lng - prevCoords.lng);
+            bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+          }
+          prevCoords = { lat, lng };
+
+          socket.emit('rider:location_ping', {
+            deliveryId: activeDelivery.id,
+            lat,
+            lng,
+            bearing,
+            speed,
+            stage: activeDelivery.status,
+          });
+        },
+        (err) => {
+          console.warn('Geolocation live stream notice:', err.message);
+        },
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null && typeof navigator !== 'undefined') {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      setIsBroadcastingGps(false);
+      socket.emit('leave_delivery', { deliveryId: activeDelivery.id });
+    };
+  }, [activeDelivery?.id, activeDelivery?.status]);
 
   if (!activeDelivery) return null;
 
@@ -54,11 +113,17 @@ export const ActiveDeliveryView: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
                 Active Quick-Commerce Delivery
               </span>
+              {isBroadcastingGps && (
+                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30 flex items-center gap-1">
+                  <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
+                  Live GPS Broadcasting
+                </span>
+              )}
             </div>
             <h2 className="text-xl font-bold text-white mt-1">
               Order #{activeDelivery.order?.orderNumber || activeDelivery.orderId.slice(0, 8)}

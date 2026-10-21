@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Search, RefreshCw, Phone, MessageSquare, Mail, ExternalLink, Trash2, FileText, AlertTriangle, X, Loader2, CheckCircle2, Copy, Check, Bike, Truck, Zap, Box } from 'lucide-react';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
+import { LiveOrderTrackingModal } from '../../components/common/LiveOrderTrackingModal';
 
 export const VendorOrders: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -16,6 +17,7 @@ export const VendorOrders: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -387,10 +389,21 @@ export const VendorOrders: React.FC = () => {
                         )}
 
                         {o.delivery && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-                            <Zap size={10} className="fill-orange-500 text-orange-500" />
-                            <span>Rider: {o.delivery.status}</span>
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => setTrackingOrderId(o.id)}
+                              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                              title="Track rider live GPS position"
+                            >
+                              <Bike size={11} className="text-orange-600" />
+                              <span>Track Rider</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            </button>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
+                              <Zap size={10} className="fill-orange-500 text-orange-500" />
+                              <span>{o.delivery.status}</span>
+                            </span>
+                          </div>
                         )}
 
                         {o.type === 'traditional' && (o.status === 'confirmed' || o.status === 'packing' || o.status === 'ready_to_ship' || o.status === 'placed') && (
@@ -579,6 +592,14 @@ export const VendorOrders: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {trackingOrderId && (
+        <LiveOrderTrackingModal
+          orderId={trackingOrderId}
+          onClose={() => setTrackingOrderId(null)}
+          viewerRole="vendor"
+        />
       )}
     </div>
   );

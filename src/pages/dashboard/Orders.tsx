@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageHeader, Badge, statusTone, EmptyState, PrimaryButton, GhostButton } from '../../components/dashboard/DashboardUI';
-import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, ChevronRight, Zap, Wrench } from 'lucide-react';
+import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, ChevronRight, Zap, Wrench, Bike } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackEvent } from '../../lib/customerApi';
 import type { OrderItem, VerticalType } from '../../context/AppContext';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
+import { LiveOrderTrackingModal } from '../../components/common/LiveOrderTrackingModal';
 
 const QUICK_STEPS: Record<string, string[]> = {
   pending: ['Order Placed', 'Awaiting Store Acceptance'],
@@ -47,6 +48,7 @@ export const OrdersPage: React.FC = () => {
   const [openId, setOpenId] = useState<string | null>(null);
   const [filterVertical, setFilterVertical] = useState<'all' | VerticalType>('all');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
 
   const getOrderVertical = (o: any): VerticalType => {
     if (o.vertical === 'quick' || o.vertical === 'services' || o.vertical === 'shop') return o.vertical;
@@ -232,6 +234,17 @@ export const OrdersPage: React.FC = () => {
                           )}
 
                           <div className="mt-4 flex flex-wrap gap-2">
+                            {/* Live Rider Tracking Button for Quick Commerce Orders */}
+                            {(orderVert === 'quick' || ['shipped', 'on_the_way', 'packing', 'processing'].includes(openOrder.status)) && (
+                              <button
+                                onClick={() => setTrackingOrderId(openOrder.id)}
+                                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-black text-xs rounded-button shadow-md transition-all active:scale-95 cursor-pointer"
+                              >
+                                <Bike className="w-3.5 h-3.5" />
+                                <span>Track Rider Live</span>
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+                              </button>
+                            )}
                             <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
                             {cancelable && (
                               <button 
@@ -309,6 +322,14 @@ export const OrdersPage: React.FC = () => {
           );
         })}
       </div>
+
+      {trackingOrderId && (
+        <LiveOrderTrackingModal
+          orderId={trackingOrderId}
+          onClose={() => setTrackingOrderId(null)}
+          viewerRole="customer"
+        />
+      )}
     </div>
   );
 };

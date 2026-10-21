@@ -1,10 +1,15 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const prisma = require('./lib/prisma');
+const { initSocket } = require('./lib/socket');
 
 const app = express();
+const server = http.createServer(app);
+initSocket(server);
+
 app.set('trust proxy', 1); // trust Nginx reverse proxy so req.ip is the real client IP
 const PORT = process.env.PORT || 5001;
 
@@ -82,6 +87,9 @@ app.use('/api/rider/wallet', require('./routes/rider/wallet'));
 // Shiprocket 3PL Logistics routes
 app.use('/api/shiprocket', require('./routes/shiprocket/shipments'));
 
+// Real-time Live Order & Rider Tracking routes
+app.use('/api/tracking', require('./routes/tracking'));
+
 // Vendor routes (guarded by verifyToken + requireRole('vendor') in each file)
 app.use('/api/vendor/auth', require('./routes/vendor/auth'));
 app.use('/api/vendor/products', require('./routes/vendor/products'));
@@ -103,7 +111,7 @@ app.use((err, _req, res, _next) => {
 prisma.$connect()
   .then(() => {
     console.log(`✅ PostgreSQL / Amazon RDS connected via Prisma ORM`);
-    app.listen(PORT, () => console.log(`🚀 Server listening on http://localhost:${PORT}`));
+    server.listen(PORT, () => console.log(`🚀 Server with WebSockets listening on http://localhost:${PORT}`));
   })
   .catch((err) => {
     console.error('❌ RDS connection failed:', err.message);

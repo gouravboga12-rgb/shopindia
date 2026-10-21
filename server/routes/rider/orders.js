@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
+const { emitDeliveryStageChange, cleanDeliveryTracking } = require('../../lib/socket');
 
 const router = express.Router();
 router.use(verifyToken, requireRole('rider'));
@@ -237,6 +238,8 @@ router.patch('/orders/:id/stage', async (req, res) => {
       },
     });
 
+    emitDeliveryStageChange(req.params.id, { stage: updated.status });
+
     res.json({ success: true, stage: updated.status, delivery: updated });
   } catch (err) {
     console.error('Update delivery stage error:', err);
@@ -298,6 +301,9 @@ router.post('/orders/:id/complete', async (req, res) => {
         },
       }),
     ]);
+
+    emitDeliveryStageChange(req.params.id, { stage: 'delivered' });
+    cleanDeliveryTracking(req.params.id);
 
     res.json({
       success: true,
