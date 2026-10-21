@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ShieldCheck, CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, AlertCircle, Building2, MapPin, RefreshCw, Sparkles } from 'lucide-react';
+import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 
 interface RegionalAdminRegisterProps {
   onSwitchToLogin: () => void;
@@ -7,8 +8,10 @@ interface RegionalAdminRegisterProps {
 
 export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ onSwitchToLogin }) => {
   const [loading, setLoading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [detectedLocation, setDetectedLocation] = useState<GeocodedAddress | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -23,6 +26,32 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // Mapbox Reverse Geocoding to auto-fill Road, Area, Mandal, City, District, State, Country, and Pincode
+  const handleDetectTerritory = async () => {
+    setDetecting(true);
+    setError(null);
+    try {
+      const geocoded = await detectCurrentLocationWithMapbox();
+      setDetectedLocation(geocoded);
+
+      const areaOrMandal = geocoded.mandal || geocoded.neighborhood || geocoded.road;
+      const cityOrDistrict = geocoded.city || geocoded.district || 'Hub';
+      const autoRegionName = areaOrMandal ? `${areaOrMandal} Hub (${cityOrDistrict})` : `${cityOrDistrict} Regional Hub`;
+
+      setFormData((prev) => ({
+        ...prev,
+        regionName: autoRegionName,
+        district: geocoded.district || geocoded.city || prev.district,
+        state: geocoded.state || prev.state,
+        assignedPincodes: geocoded.pincode || prev.assignedPincodes,
+      }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to detect territory via Mapbox GPS.');
+    } finally {
+      setDetecting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -145,6 +174,74 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
           </div>
 
           <div className="pt-2 border-t border-slate-800 space-y-3">
+            {/* Mapbox Auto-Detect Button Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-800/60 border border-slate-700/80 p-3 rounded-2xl">
+              <div>
+                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-blue-400" />
+                  <span>Territory & Postal Code Detection</span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Auto-fill Road, Mandal, City, District & Pincode via Mapbox
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDetectTerritory}
+                disabled={detecting}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${detecting ? 'animate-spin' : ''}`} />
+                <span>{detecting ? 'Locating...' : 'Auto-Detect via GPS'}</span>
+              </button>
+            </div>
+
+            {/* Structured Breakdown Card if location detected */}
+            {detectedLocation && (
+              <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-2xl text-xs space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-400 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" /> Mapbox Geocoded Breakdown
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    Auto-Populated Below
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1 border-t border-blue-900/50">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Road / Street:</span>
+                    <strong className="text-white">{detectedLocation.road || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Area / Nearby:</span>
+                    <strong className="text-white">{detectedLocation.neighborhood || detectedLocation.mandal || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Mandal / Locality:</span>
+                    <strong className="text-white">{detectedLocation.mandal || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">City:</span>
+                    <strong className="text-white">{detectedLocation.city || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">District:</span>
+                    <strong className="text-white">{detectedLocation.district || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">State & Country:</span>
+                    <strong className="text-white">{detectedLocation.state || 'Telangana'}, {detectedLocation.country || 'India'}</strong>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500 block text-[10px]">Postal Code (Pincode):</span>
+                    <span className="font-mono font-bold text-blue-300">{detectedLocation.pincode || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Territory / Region Name</label>
               <input

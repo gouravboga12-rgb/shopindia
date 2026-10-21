@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Bike, ShieldCheck, MapPin, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
 
 interface RiderLoginProps {
   initialRegister?: boolean;
@@ -11,6 +12,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
   const [isRegister, setIsRegister] = useState(initialRegister);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -26,6 +28,8 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
     aadhaarNumber: '',
     panNumber: '',
     address: '',
+    currentLat: undefined as number | undefined,
+    currentLng: undefined as number | undefined,
     serviceRadiusKm: 25,
   });
 
@@ -33,27 +37,23 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // Mock / Geocode current GPS location into address
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
-      return;
+  // Mapbox Reverse Geocode GPS coordinates into clean address
+  const handleDetectLocation = async () => {
+    setIsDetectingLocation(true);
+    setError(null);
+    try {
+      const geocoded = await detectCurrentLocationWithMapbox();
+      setFormData((prev) => ({
+        ...prev,
+        address: geocoded.fullAddress,
+        currentLat: geocoded.latitude,
+        currentLng: geocoded.longitude,
+      }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not detect location. Please type manually.');
+    } finally {
+      setIsDetectingLocation(false);
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setFormData((prev) => ({
-          ...prev,
-          address: `GPS Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)} (Madhapur Hub, Hyderabad)`,
-        }));
-      },
-      () => {
-        setFormData((prev) => ({
-          ...prev,
-          address: 'Hitech City, Madhapur, Hyderabad, Telangana 500081',
-        }));
-      }
-    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -268,9 +268,11 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   <button
                     type="button"
                     onClick={handleDetectLocation}
-                    className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-medium"
+                    disabled={isDetectingLocation}
+                    className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-medium disabled:opacity-50"
                   >
-                    <MapPin className="w-3 h-3" /> Auto-Detect GPS
+                    <MapPin className="w-3 h-3" />
+                    <span>{isDetectingLocation ? 'Detecting via Mapbox...' : 'Auto-Detect GPS (Mapbox)'}</span>
                   </button>
                 </div>
                 <input

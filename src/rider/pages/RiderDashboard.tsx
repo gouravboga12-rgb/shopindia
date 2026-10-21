@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRider } from '../context/RiderContext';
 import { ActiveDeliveryView } from './ActiveDeliveryView';
 import {
@@ -9,6 +9,9 @@ import {
   Clock,
   Navigation,
   CheckCircle2,
+  MapPin,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 
 interface RiderDashboardProps {
@@ -16,7 +19,22 @@ interface RiderDashboardProps {
 }
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
-  const { profile, isOnline, toggleOnline, activeDelivery } = useRider();
+  const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation } = useRider();
+  const [locating, setLocating] = useState(false);
+  const [locFeedback, setLocFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleUpdateLocation = async () => {
+    setLocating(true);
+    setLocFeedback(null);
+    const result = await updateGpsLocation();
+    setLocating(false);
+    if (result.success) {
+      setLocFeedback({ type: 'success', text: 'GPS & base station synchronized via Mapbox' });
+      setTimeout(() => setLocFeedback(null), 4000);
+    } else {
+      setLocFeedback({ type: 'error', text: result.error || 'Failed to detect location' });
+    }
+  };
 
   // If there is an active assigned delivery, prioritize rendering the active turn-by-turn view
   if (activeDelivery) {
@@ -60,6 +78,48 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
             <span>{isOnline ? 'GO OFFLINE' : 'GO ONLINE & RECEIVE ORDERS'}</span>
           </button>
         </div>
+      </div>
+
+      {/* Manual GPS Location Bar (Mapbox Geocoding — Zero Background Polling) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-300">Rider Base Station (Mapbox GPS)</span>
+              <span className="text-[10px] font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                Manual on-demand
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-white mt-0.5 line-clamp-1">
+              {profile?.address || 'No GPS coordinates recorded yet — click update below'}
+            </p>
+            {profile?.currentLat && profile?.currentLng && (
+              <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                Coords: {profile.currentLat.toFixed(4)}°N, {profile.currentLng.toFixed(4)}°E
+              </p>
+            )}
+            {locFeedback && (
+              <p className={`text-xs mt-1 font-medium flex items-center gap-1.5 ${
+                locFeedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'
+              }`}>
+                {locFeedback.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                {locFeedback.text}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <button
+          onClick={handleUpdateLocation}
+          disabled={locating}
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
+          <span>{locating ? 'Fetching GPS...' : 'Update GPS Location'}</span>
+        </button>
       </div>
 
       {/* Metric Cards Grid */}

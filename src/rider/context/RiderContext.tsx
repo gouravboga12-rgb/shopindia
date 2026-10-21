@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
 
 export interface RiderProfileData {
   id: string;
@@ -76,6 +77,7 @@ interface RiderContextType {
   advanceStage: (nextStage: 'arrived_pickup' | 'picked_up' | 'arrived_customer') => Promise<void>;
   completeDelivery: (otp: string, photoProofUrl?: string) => Promise<{ success: boolean; error?: string }>;
   refreshData: () => Promise<void>;
+  updateGpsLocation: () => Promise<{ success: boolean; address?: string; error?: string }>;
   playChime: () => void;
 }
 
@@ -200,6 +202,40 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Manual GPS update using Mapbox Reverse Geocoding (no auto-polling)
+  const updateGpsLocation = async (): Promise<{ success: boolean; address?: string; error?: string }> => {
+    if (!token) return { success: false, error: 'Unauthorized' };
+    try {
+      const geocoded = await detectCurrentLocationWithMapbox();
+      const res = await fetch('/api/rider/profile', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          currentLat: geocoded.latitude,
+          currentLng: geocoded.longitude,
+          address: geocoded.fullAddress,
+        }),
+      });
+      if (res.ok) {
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentLat: geocoded.latitude,
+                currentLng: geocoded.longitude,
+                address: geocoded.fullAddress,
+              }
+            : null
+        );
+        return { success: true, address: geocoded.fullAddress };
+      }
+      return { success: false, error: 'Failed to update location on server' };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Location detection failed';
+      return { success: false, error: msg };
+    }
+  };
+
   // Radar polling for incoming broadcast deliveries
   useEffect(() => {
     if (!isOnline || activeDelivery || !token) return;
@@ -316,6 +352,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         advanceStage,
         completeDelivery,
         refreshData,
+        updateGpsLocation,
         playChime: playDispatchChime,
       }}
     >
