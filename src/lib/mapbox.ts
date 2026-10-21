@@ -1,14 +1,16 @@
 /**
- * Mapbox Geocoding & Location Utility
- * Utilizes VITE_MAPBOX_TOKEN to perform reverse geocoding from GPS coordinates.
+ * Mapbox & Reverse Geocoding Utility
+ * Connects with backend reverse-geocode service (/api/tracking/reverse-geocode)
+ * with multi-provider fallback to accurately resolve:
+ * Road Number / Street, Colony / Village, Mandal, District / City, State, Pincode, and Country.
  */
-
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 export interface GeocodedAddress {
   fullAddress: string;
   road?: string;
   neighborhood?: string;
+  colony?: string;
+  village?: string;
   mandal?: string;
   city?: string;
   district?: string;
@@ -17,6 +19,7 @@ export interface GeocodedAddress {
   pincode?: string;
   latitude: number;
   longitude: number;
+  formattedAddress?: string;
 }
 
 /**
@@ -39,9 +42,9 @@ export function getBrowserCoordinates(): Promise<{ latitude: number; longitude: 
       (error) => {
         let msg = 'Failed to retrieve location.';
         if (error.code === error.PERMISSION_DENIED) {
-          msg = 'Location permission denied. Please allow location access in your browser.';
+          msg = 'Location permission denied. Please allow location access in your browser settings.';
         } else if (error.code === error.POSITION_UNAVAILABLE) {
-          msg = 'Location information is unavailable.';
+          msg = 'Location information is unavailable on your device.';
         } else if (error.code === error.TIMEOUT) {
           msg = 'Location request timed out.';
         }
@@ -57,65 +60,119 @@ export function getBrowserCoordinates(): Promise<{ latitude: number; longitude: 
 }
 
 /**
- * Reverse geocode longitude and latitude into structured address components using Mapbox API
+ * Reverse geocode longitude and latitude into structured address components.
+ * Prioritizes the backend reverse-geocode service (which holds Mapbox token + Nominatim).
+ * Falls back to direct reverse geocoding if the backend is unreachable.
  */
 export async function reverseGeocodeMapbox(
   longitude: number,
   latitude: number
 ): Promise<GeocodedAddress> {
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${MAPBOX_TOKEN}&country=in`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Mapbox geocoding error: ${response.statusText}`);
+  // 1. Try Backend Proxy with Mapbox Access Token + Nominatim
+  try {
+    const res = await fetch(`/api/tracking/reverse-geocode?lat=${latitude}&lng=${longitude}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        return {
+          fullAddress: data.formattedAddress || data.fullAddress,
+          formattedAddress: data.formattedAddress || data.fullAddress,
+          road: data.road || undefined,
+          neighborhood: data.colony || data.village || undefined,
+          colony: data.colony || undefined,
+          village: data.village || undefined,
+          mandal: data.mandal || undefined,
+          city: data.city || undefined,
+          district: data.district || undefined,
+          state: data.state || undefined,
+          country: data.country || 'India',
+          pincode: data.pincode || undefined,
+          latitude,
+          longitude,
+        };
+      }
+    }
+  } catch (backendErr) {
+    console.warn('Backend reverse-geocode failed, attempting direct fallback...', backendErr);
   }
 
-  const data = await response.json();
-  const feature = data.features?.[0];
+  // 2. Client-side Nominatim Fallback (Direct OpenStreetMap API)
+  try {
+    const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`;
+    const nomRes = await fetch(nomUrl);
+    if (nomRes.ok) {
+      const nomData = await nomRes.json();
+      const addr = nomData?.address || {};
 
-  if (!feature) {
-    return {
-      fullAddress: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
-      latitude,
-      longitude,
-    };
+      const pincode = addr.postcode || '';
+      const rawRoad = [addr.house_number, addr.road].filter(Boolean).join(' ');
+      const road = rawRoad === pincode ? '' : rawRoad;
+
+      const colony = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.residential || '';
+      const village = addr.village || addr.hamlet || '';
+      const mandal = addr.county || addr.subdistrict || addr.tehsil || addr.municipality || '';
+      const city = addr.city || addr.town || addr.municipality || '';
+      const district = addr.state_district || addr.district || city || '';
+      const state = addr.state || '';
+      const country = addr.country || 'India';
+
+      const parts: string[] = [];
+      if (road) parts.push(road);
+      if (colony && !parts.includes(colony)) parts.push(colony);
+      if (mandal && !parts.includes(mandal) && mandal !== colony) parts.push(mandal);
+      if (district && !parts.includes(district) && district !== city) {
+        if (city && !parts.includes(city)) {
+          parts.push(`${district}, ${city}`);
+        } else {
+          parts.push(district);
+        }
+      } else if (city && !parts.includes(city)) {
+        parts.push(city);
+      }
+      if (state) {
+        parts.push(pincode ? `${state} - ${pincode}` : state);
+      } else if (pincode) {
+        parts.push(pincode);
+      }
+      if (country && !parts.includes(country)) parts.push(country);
+
+      const formatted = parts.length > 0 ? parts.join(', ') : nomData?.display_name || `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`;
+
+      return {
+        fullAddress: formatted,
+        formattedAddress: formatted,
+        road: road || undefined,
+        neighborhood: colony || undefined,
+        colony: colony || undefined,
+        village: village || undefined,
+        mandal: mandal || undefined,
+        city: city || undefined,
+        district: district || undefined,
+        state: state || undefined,
+        country,
+        pincode: pincode || undefined,
+        latitude,
+        longitude,
+      };
+    }
+  } catch (fallbackErr) {
+    console.error('All reverse-geocoding sources exhausted:', fallbackErr);
   }
 
-  const context: Array<{ id: string; text: string }> = feature.context || [];
-
-  const getContextText = (prefix: string) => {
-    const item = context.find((c) => c.id.startsWith(prefix));
-    return item ? item.text : undefined;
-  };
-
-  const road = feature.text || undefined;
-  const neighborhood = getContextText('neighborhood');
-  const mandal = getContextText('locality') || neighborhood;
-  const city = getContextText('place');
-  const district = getContextText('district') || city;
-  const state = getContextText('region');
-  const country = getContextText('country');
-  const pincode = getContextText('postcode');
-
+  // 3. Fallback to basic coordinates representation
   return {
-    fullAddress: feature.place_name || '',
-    road,
-    neighborhood,
-    mandal,
-    city,
-    district,
-    state,
-    country,
-    pincode,
+    fullAddress: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+    formattedAddress: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
     latitude,
     longitude,
   };
 }
 
 /**
- * Combined helper: Get current GPS coordinates + Reverse Geocode via Mapbox
+ * Combined helper: Get current GPS coordinates + Reverse Geocode
  */
 export async function detectCurrentLocationWithMapbox(): Promise<GeocodedAddress> {
   const coords = await getBrowserCoordinates();
   return await reverseGeocodeMapbox(coords.longitude, coords.latitude);
 }
+

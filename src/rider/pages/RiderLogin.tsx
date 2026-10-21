@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Bike, ShieldCheck, MapPin, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
-import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
+import { Bike, ShieldCheck, MapPin, Eye, EyeOff, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 
 interface RiderLoginProps {
   initialRegister?: boolean;
@@ -15,6 +15,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [detectedDetails, setDetectedDetails] = useState<GeocodedAddress | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -37,12 +38,13 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // Mapbox Reverse Geocode GPS coordinates into clean address
+  // Mapbox & Reverse Geocoding into clean, structured address (Road, Colony, Mandal, City, State, Pincode, Country)
   const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
     setError(null);
     try {
       const geocoded = await detectCurrentLocationWithMapbox();
+      setDetectedDetails(geocoded);
       setFormData((prev) => ({
         ...prev,
         address: geocoded.fullAddress,
@@ -273,20 +275,65 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                     type="button"
                     onClick={handleDetectLocation}
                     disabled={isDetectingLocation}
-                    className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-medium disabled:opacity-50"
+                    className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold disabled:opacity-50 cursor-pointer transition-colors"
                   >
-                    <MapPin className="w-3 h-3" />
-                    <span>{isDetectingLocation ? 'Detecting via Mapbox...' : 'Auto-Detect GPS (Mapbox)'}</span>
+                    <MapPin className={`w-3.5 h-3.5 ${isDetectingLocation ? 'animate-bounce' : ''}`} />
+                    <span>{isDetectingLocation ? 'Detecting via GPS...' : 'Auto-Detect GPS (Mapbox)'}</span>
                   </button>
                 </div>
                 <input
                   type="text"
                   name="address"
-                  placeholder="Area, Landmark, City, Pincode"
+                  placeholder="Road No, Colony/Village, Mandal, District/City, State, Pincode"
                   value={formData.address}
                   onChange={handleChange}
                   className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
                 />
+
+                {/* Structured Breakdown Card if location detected */}
+                {detectedDetails && (
+                  <div className="mt-2.5 p-3 bg-orange-950/30 border border-orange-500/30 rounded-xl text-xs space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-orange-400 flex items-center gap-1 text-[11px]">
+                        <Sparkles className="w-3.5 h-3.5" /> Reverse Geocoded Breakdown
+                      </span>
+                      <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        GPS Verified
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-300 pt-1 border-t border-orange-900/40">
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-semibold">Road / Street</span>
+                        <strong className="text-white text-[11px]">{detectedDetails.road || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-semibold">Colony / Village</span>
+                        <strong className="text-white text-[11px]">{detectedDetails.colony || detectedDetails.village || detectedDetails.neighborhood || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-semibold">Mandal</span>
+                        <strong className="text-white text-[11px]">{detectedDetails.mandal || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-semibold">District / City</span>
+                        <strong className="text-white text-[11px]">
+                          {detectedDetails.district || detectedDetails.city || 'N/A'}
+                          {detectedDetails.city && detectedDetails.district && detectedDetails.city !== detectedDetails.district ? ` (${detectedDetails.city})` : ''}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-semibold">State</span>
+                        <strong className="text-white text-[11px]">{detectedDetails.state || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-semibold">PIN Code & Country</span>
+                        <strong className="text-orange-300 font-mono text-[11px]">{detectedDetails.pincode || 'N/A'}</strong>
+                        <span className="text-slate-400 ml-1">({detectedDetails.country || 'India'})</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Service Radius Slider */}

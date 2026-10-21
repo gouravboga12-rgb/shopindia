@@ -36,7 +36,7 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
       const geocoded = await detectCurrentLocationWithMapbox();
       setDetectedLocation(geocoded);
 
-      const areaOrMandal = geocoded.mandal || geocoded.neighborhood || geocoded.road;
+      const areaOrMandal = geocoded.mandal || geocoded.colony || geocoded.village || geocoded.neighborhood || geocoded.road;
       const cityOrDistrict = geocoded.city || geocoded.district || 'Hub';
       const autoRegionName = areaOrMandal ? `${areaOrMandal} Hub (${cityOrDistrict})` : `${cityOrDistrict} Regional Hub`;
 
@@ -215,8 +215,8 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
                     <strong className="text-white">{detectedLocation.road || 'N/A'}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[10px]">Area / Nearby:</span>
-                    <strong className="text-white">{detectedLocation.neighborhood || detectedLocation.mandal || 'N/A'}</strong>
+                    <span className="text-slate-500 block text-[10px]">Colony / Village / Area:</span>
+                    <strong className="text-white">{detectedLocation.colony || detectedLocation.village || detectedLocation.neighborhood || detectedLocation.mandal || 'N/A'}</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Mandal / Locality:</span>
