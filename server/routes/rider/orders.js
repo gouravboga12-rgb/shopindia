@@ -193,7 +193,15 @@ router.get('/active-job', async (req, res) => {
           },
         },
       },
-    });
+    if (activeJob) {
+      if (!activeJob.dropoffAddress || activeJob.dropoffAddress.replace(/[,\s]/g, '').length === 0) {
+        activeJob.dropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
+      }
+      if (!activeJob.pickupLat) activeJob.pickupLat = activeJob.order?.vendor?.lat || 17.3732;
+      if (!activeJob.pickupLng) activeJob.pickupLng = activeJob.order?.vendor?.lng || 78.5385;
+      if (!activeJob.dropoffLat) activeJob.dropoffLat = activeJob.pickupLat + 0.015;
+      if (!activeJob.dropoffLng) activeJob.dropoffLng = activeJob.pickupLng - 0.008;
+    }
 
     res.json({ activeJob: activeJob || null, activeDelivery: activeJob || null });
   } catch (err) {

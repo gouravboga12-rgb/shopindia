@@ -224,7 +224,7 @@ export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
                 }}
                 dropoff={{
                   name: data.dropoff.name,
-                  address: data.dropoff.address,
+                  address: data.dropoff.address && data.dropoff.address.replace(/[,\s]/g, '').length > 0 ? data.dropoff.address : 'Customer Doorstep',
                   lat: data.dropoff.lat,
                   lng: data.dropoff.lng,
                 }}
@@ -239,6 +239,7 @@ export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
                 currentStage={liveStage}
                 height="260px"
                 darkMode={true}
+                viewerRole="customer"
               />
 
               {/* Customer 4-Digit Verification OTP (Displayed for Customer) */}

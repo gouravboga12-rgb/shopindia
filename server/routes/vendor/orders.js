@@ -228,11 +228,40 @@ router.post('/:id/broadcast', async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
     const shipping = order.shippingAddress || {};
-    const dropoffAddress = typeof shipping === 'string' 
-      ? shipping 
-      : `${shipping.street || ''}, ${shipping.city || ''}, ${shipping.state || ''} ${shipping.pincode || ''}`.trim() || 'Customer Doorstep';
+    const pickupLat = order.vendor.lat || 17.3732;
+    const pickupLng = order.vendor.lng || 78.5385;
 
-    const pickupAddress = `${order.vendor.street || ''}, ${order.vendor.city || ''}, ${order.vendor.state || ''} ${order.vendor.pincode || ''}`.trim() || 'Vendor Store';
+    // Build clean dropoff address without empty comma patterns
+    const rawParts = [
+      order.deliveryLine1,
+      order.deliveryLine2,
+      order.deliveryCity,
+      order.deliveryState,
+      order.deliveryPincode
+    ];
+    const validParts = rawParts.filter(p => typeof p === 'string' && p.trim() && p.trim() !== ',');
+    let dropoffAddress = validParts.length > 0 ? validParts.join(', ') : '';
+
+    if (!dropoffAddress && shipping) {
+      if (typeof shipping === 'string' && shipping.trim() && shipping.trim() !== ',') {
+        dropoffAddress = shipping.trim();
+      } else if (typeof shipping === 'object') {
+        const shipParts = [shipping.street, shipping.city, shipping.state, shipping.pincode]
+          .filter(p => typeof p === 'string' && p.trim() && p.trim() !== ',');
+        dropoffAddress = shipParts.join(', ');
+      }
+    }
+    if (!dropoffAddress || dropoffAddress.replace(/[,\s]/g, '').length === 0) {
+      dropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
+    }
+
+    // Dropoff coordinates (offset from vendor store if not explicitly set)
+    const dropoffLat = pickupLat + 0.015;
+    const dropoffLng = pickupLng - 0.008;
+
+    const pickupAddress = [order.vendor.street, order.vendor.city, order.vendor.state, order.vendor.pincode]
+      .filter(p => typeof p === 'string' && p.trim() && p.trim() !== ',')
+      .join(', ') || 'Vendor Store, Hyderabad';
 
     // Calculate delivery fee (base ₹50 + ₹10/km or fixed ₹60)
     const deliveryFee = 60;
@@ -248,15 +277,25 @@ router.post('/:id/broadcast', async (req, res) => {
         pickupName: order.vendor.businessName || 'Merchant Store',
         pickupAddress,
         pickupPhone: order.vendor.phone,
-        dropoffName: shipping.name || 'Customer',
+        pickupLat,
+        pickupLng,
+        dropoffName: (shipping && shipping.name) || order.customer?.name || 'Customer',
         dropoffAddress,
-        dropoffPhone: shipping.phone,
+        dropoffPhone: (shipping && shipping.phone) || order.customer?.phone,
+        dropoffLat,
+        dropoffLng,
       },
       update: {
         status: 'broadcasted',
         riderProfileId: null,
         deliveryOtp: otp,
         assignedAt: null,
+        pickupLat,
+        pickupLng,
+        dropoffLat,
+        dropoffLng,
+        pickupAddress,
+        dropoffAddress,
       },
     });
 

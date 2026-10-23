@@ -122,7 +122,11 @@ export const IncomingRadarModal: React.FC = () => {
               </div>
               <p className="text-[11px] text-emerald-700 font-extrabold uppercase tracking-wider">Dropoff Destination</p>
               <h4 className="text-sm font-bold text-slate-900">{incomingBroadcast.dropoffName}</h4>
-              <p className="text-xs text-slate-500 truncate">{incomingBroadcast.dropoffAddress}</p>
+              <p className="text-xs text-slate-500 truncate">
+                {incomingBroadcast.dropoffAddress && incomingBroadcast.dropoffAddress.replace(/[,\s]/g, '').length > 0
+                  ? incomingBroadcast.dropoffAddress
+                  : 'Customer Doorstep, Hyderabad'}
+              </p>
             </div>
           </div>
 

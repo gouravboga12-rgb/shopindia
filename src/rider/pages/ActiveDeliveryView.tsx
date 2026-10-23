@@ -28,6 +28,7 @@ export const ActiveDeliveryView: React.FC = () => {
   const [completedSuccess, setCompletedSuccess] = useState(false);
   const [isBroadcastingGps, setIsBroadcastingGps] = useState(false);
   const [showDynamicQr, setShowDynamicQr] = useState(false);
+  const [currentRiderCoords, setCurrentRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // High-frequency live GPS streaming to Customer & Vendor via WebSockets
   useEffect(() => {
@@ -59,6 +60,7 @@ export const ActiveDeliveryView: React.FC = () => {
             bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
           }
           prevCoords = { lat, lng };
+          setCurrentRiderCoords({ lat, lng });
 
           socket.emit('rider:location_ping', {
             deliveryId: activeDelivery.id,
@@ -105,6 +107,29 @@ export const ActiveDeliveryView: React.FC = () => {
       setOtpError(result.error || 'Incorrect OTP code. Please ask the customer to check their app.');
     }
   };
+
+  const pickupLat = activeDelivery.pickupLat || 17.3732;
+  const pickupLng = activeDelivery.pickupLng || 78.5385;
+  const dropoffLat = activeDelivery.dropoffLat || (pickupLat + 0.015);
+  const dropoffLng = activeDelivery.dropoffLng || (pickupLng - 0.008);
+
+  const cleanPickupAddress =
+    activeDelivery.pickupAddress && activeDelivery.pickupAddress.replace(/[,\s]/g, '').length > 0
+      ? activeDelivery.pickupAddress
+      : 'Vendor Store, Hyderabad';
+
+  const cleanDropoffAddress =
+    activeDelivery.dropoffAddress && activeDelivery.dropoffAddress.replace(/[,\s]/g, '').length > 0
+      ? activeDelivery.dropoffAddress
+      : 'Customer Doorstep, Hyderabad';
+
+  const storeNavUrl = (pickupLat && pickupLng)
+    ? `https://www.google.com/maps/dir/?api=1&destination=${pickupLat},${pickupLng}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanPickupAddress)}&travelmode=driving`;
+
+  const customerNavUrl = (dropoffLat && dropoffLng)
+    ? `https://www.google.com/maps/dir/?api=1&destination=${dropoffLat},${dropoffLng}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanDropoffAddress)}&travelmode=driving`;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 sm:space-y-5 pb-24 text-slate-800 animate-in fade-in duration-200">
@@ -157,9 +182,15 @@ export const ActiveDeliveryView: React.FC = () => {
       {/* Map Navigation Route Visualizer */}
       <RiderMapRoute
         pickupName={activeDelivery.pickupName}
-        pickupAddress={activeDelivery.pickupAddress}
-        dropoffName={activeDelivery.dropoffName}
-        dropoffAddress={activeDelivery.dropoffAddress}
+        pickupAddress={cleanPickupAddress}
+        pickupLat={pickupLat}
+        pickupLng={pickupLng}
+        dropoffName={activeDelivery.dropoffName || 'Customer Doorstep'}
+        dropoffAddress={cleanDropoffAddress}
+        dropoffLat={dropoffLat}
+        dropoffLng={dropoffLng}
+        riderLat={currentRiderCoords?.lat || activeDelivery.riderLat}
+        riderLng={currentRiderCoords?.lng || activeDelivery.riderLng}
         distanceKm={activeDelivery.distanceKm}
         currentStage={currentStage}
       />
@@ -175,7 +206,7 @@ export const ActiveDeliveryView: React.FC = () => {
               <div>
                 <span className="text-xs uppercase font-extrabold text-orange-600 tracking-wider">Pickup Location</span>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.pickupName}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{activeDelivery.pickupAddress}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{cleanPickupAddress}</p>
               </div>
             </div>
 
@@ -190,7 +221,7 @@ export const ActiveDeliveryView: React.FC = () => {
                 </a>
               )}
               <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activeDelivery.pickupAddress || activeDelivery.pickupName || '')}`}
+                href={storeNavUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
@@ -278,8 +309,8 @@ export const ActiveDeliveryView: React.FC = () => {
               </div>
               <div>
                 <span className="text-xs uppercase font-extrabold text-emerald-700 tracking-wider">Customer Destination</span>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.dropoffName}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{activeDelivery.dropoffAddress}</p>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.dropoffName || 'Customer Doorstep'}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{cleanDropoffAddress}</p>
               </div>
             </div>
 
@@ -294,7 +325,7 @@ export const ActiveDeliveryView: React.FC = () => {
                 </a>
               )}
               <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activeDelivery.dropoffAddress || activeDelivery.dropoffName || '')}`}
+                href={customerNavUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"

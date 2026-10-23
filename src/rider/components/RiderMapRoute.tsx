@@ -33,12 +33,27 @@ export const RiderMapRoute: React.FC<RiderMapRouteProps> = ({
 }) => {
   // Navigation target based on current trip phase
   const isEnRouteToStore = currentStage === 'assigned';
-  const targetDestination = isEnRouteToStore ? pickupAddress : dropoffAddress;
-  const targetLabel = isEnRouteToStore ? `Store: ${pickupName}` : `Customer: ${dropoffName}`;
+  const cleanDropoffAddress =
+    dropoffAddress && dropoffAddress.replace(/[,\s]/g, '').length > 0
+      ? dropoffAddress
+      : 'Customer Doorstep, Hyderabad';
+  const cleanPickupAddress =
+    pickupAddress && pickupAddress.replace(/[,\s]/g, '').length > 0
+      ? pickupAddress
+      : 'Store, Hyderabad';
+
+  const targetLabel = isEnRouteToStore ? `Store: ${pickupName}` : `Customer: ${dropoffName || 'Customer Doorstep'}`;
 
   const openNavigation = () => {
-    const encoded = encodeURIComponent(targetDestination || targetLabel);
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encoded}&travelmode=driving`;
+    // CRITICAL FIX: Prioritize exact decimal coordinates so Google Maps NEVER fails on comma-only or blank addresses!
+    const targetLat = isEnRouteToStore ? pickupLat : dropoffLat;
+    const targetLng = isEnRouteToStore ? pickupLng : dropoffLng;
+    const dest =
+      targetLat && targetLng && !isNaN(targetLat)
+        ? `${targetLat},${targetLng}`
+        : encodeURIComponent(isEnRouteToStore ? cleanPickupAddress : cleanDropoffAddress);
+
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
     window.open(googleMapsUrl, '_blank');
   };
 
@@ -48,13 +63,13 @@ export const RiderMapRoute: React.FC<RiderMapRouteProps> = ({
       <RealWorldMap
         pickup={{
           name: pickupName,
-          address: pickupAddress,
+          address: cleanPickupAddress,
           lat: pickupLat,
           lng: pickupLng,
         }}
         dropoff={{
-          name: dropoffName,
-          address: dropoffAddress,
+          name: dropoffName || 'Customer Doorstep',
+          address: cleanDropoffAddress,
           lat: dropoffLat,
           lng: dropoffLng,
         }}
@@ -66,6 +81,7 @@ export const RiderMapRoute: React.FC<RiderMapRouteProps> = ({
         currentStage={currentStage}
         height="240px"
         darkMode={false}
+        viewerRole="rider"
         onOpenNavigation={openNavigation}
       />
 

@@ -26,6 +26,7 @@ interface RealWorldMapProps {
   currentStage?: string;
   height?: string;
   darkMode?: boolean;
+  viewerRole?: 'customer' | 'rider';
   onOpenNavigation?: () => void;
 }
 
@@ -33,9 +34,10 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
   pickup,
   dropoff,
   rider,
-  currentStage: _currentStage = 'picked_up',
+  currentStage = 'picked_up',
   height = '240px',
   darkMode = true,
+  viewerRole = 'customer',
   onOpenNavigation,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -47,8 +49,8 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
     routeLine?: L.Polyline;
   }>({});
 
-  const [mapStyle, setMapStyle] = useState<'dark' | 'voyager' | 'streets'>(
-    darkMode ? 'dark' : 'voyager'
+  const [mapStyle, setMapStyle] = useState<'dark' | 'streets'>(
+    darkMode ? 'dark' : 'streets'
   );
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
@@ -116,7 +118,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
     }, 150);
 
     return () => {
-      // Keep map instance alive across re-renders to prevent flickering
+      // Keep map instance alive across re-renders
     };
   }, [mapStyle]);
 
@@ -150,7 +152,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
           <span style="background: rgba(15,23,42,0.92); color:#6ee7b7; font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; margin-top:3px; white-space:nowrap; border: 1px solid rgba(16,185,129,0.4); box-shadow:0 2px 8px rgba(0,0,0,0.3); max-width:130px; overflow:hidden; text-overflow:ellipsis;">
-            ${dropoff.name || 'Customer'}
+            ${dropoff.name || 'Customer Doorstep'}
           </span>
         </div>
       `,
@@ -201,15 +203,30 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       markersRef.current.rider.setIcon(riderIcon);
     }
 
-    // 4. Fetch Real Driving Polyline from OSRM or Fallback to Direct Path
+    // 4. Fetch Real Driving Polyline from OSRM
+    // CRITICAL:
+    // For Customer view: strictly route from Store (pLng, pLat) to Customer (dLng, dLat).
+    // The rider moves along this delivery route without showing rider's home-to-store leg!
+    // For Rider view:
+    // If assigned (heading to store): Rider -> Store
+    // If picked_up (in transit): Rider -> Customer
     let isCancelled = false;
 
     const fetchRoute = async () => {
+      let routeUrl = '';
+      if (viewerRole === 'customer') {
+        routeUrl = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+      } else {
+        if (currentStage === 'assigned') {
+          routeUrl = `https://router.project-osrm.org/route/v1/driving/${rLng},${rLat};${pLng},${pLat}?overview=full&geometries=geojson`;
+        } else {
+          routeUrl = `https://router.project-osrm.org/route/v1/driving/${rLng},${rLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+        }
+      }
+
       try {
-        // Try real driving directions via OSRM public routing API
-        const url = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${rLng},${rLat};${dLng},${dLat}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('OSRM unavailable');
+        const res = await fetch(routeUrl);
+        if (!res.ok) throw new Error('OSRM route unavailable');
         const json = await res.json();
         const coords = json?.routes?.[0]?.geometry?.coordinates;
 
@@ -234,11 +251,22 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       }
 
       if (!isCancelled) {
-        const fallbackPath: L.LatLngExpression[] = [
-          [pLat, pLng],
-          [rLat, rLng],
-          [dLat, dLng],
-        ];
+        const fallbackPath: L.LatLngExpression[] =
+          viewerRole === 'customer'
+            ? [
+                [pLat, pLng],
+                [dLat, dLng],
+              ]
+            : currentStage === 'assigned'
+            ? [
+                [rLat, rLng],
+                [pLat, pLng],
+              ]
+            : [
+                [rLat, rLng],
+                [dLat, dLng],
+              ];
+
         if (markersRef.current.routeLine) {
           markersRef.current.routeLine.setLatLngs(fallbackPath);
         } else {
@@ -254,15 +282,28 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
 
     fetchRoute();
 
-    // 5. Fit bounds to encapsulate all 3 locations
+    // 5. Fit bounds to encapsulate the relevant points
     try {
-      const bounds = L.latLngBounds([
-        [pLat, pLng],
-        [rLat, rLng],
-        [dLat, dLng],
-      ]);
+      const boundsPoints: [number, number][] =
+        viewerRole === 'customer'
+          ? [
+              [pLat, pLng],
+              [dLat, dLng],
+              [rLat, rLng],
+            ]
+          : currentStage === 'assigned'
+          ? [
+              [rLat, rLng],
+              [pLat, pLng],
+            ]
+          : [
+              [rLat, rLng],
+              [dLat, dLng],
+            ];
+
+      const bounds = L.latLngBounds(boundsPoints);
       map.fitBounds(bounds, {
-        padding: [38, 38],
+        padding: [42, 42],
         maxZoom: 16,
       });
     } catch {
@@ -272,7 +313,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [pLat, pLng, dLat, dLng, rLat, rLng, bearing, pickup.name, dropoff.name, rider?.name]);
+  }, [pLat, pLng, dLat, dLng, rLat, rLng, bearing, pickup.name, dropoff.name, rider?.name, viewerRole, currentStage]);
 
   // Recenter helper
   const handleRecenter = () => {
@@ -291,6 +332,21 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
     mapRef.current.setView([rLat, rLng], 16, { animate: true });
   };
 
+  // Turn-by-Turn GPS navigation link (Prioritize decimal coordinates so Google Maps never fails)
+  const handleDirectNavigation = () => {
+    if (onOpenNavigation) {
+      onOpenNavigation();
+      return;
+    }
+    const targetLat = viewerRole === 'rider' && currentStage === 'assigned' ? pLat : dLat;
+    const targetLng = viewerRole === 'rider' && currentStage === 'assigned' ? pLng : dLng;
+    const dest =
+      targetLat && targetLng && !isNaN(targetLat)
+        ? `${targetLat},${targetLng}`
+        : encodeURIComponent(dropoff.address || dropoff.name || 'Customer');
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`, '_blank');
+  };
+
   return (
     <div
       className="relative w-full rounded-2xl overflow-hidden border border-slate-700/60 shadow-lg group"
@@ -305,10 +361,10 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
         <button
           type="button"
           onClick={() =>
-            setMapStyle((prev) => (prev === 'dark' ? 'voyager' : prev === 'voyager' ? 'streets' : 'dark'))
+            setMapStyle((prev) => (prev === 'dark' ? 'streets' : 'dark'))
           }
           className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-          title={`Current style: ${mapStyle.toUpperCase()} (Click to change)`}
+          title={`Switch Map Theme: ${mapStyle === 'dark' ? 'Daylight Streets' : 'Dark Radar'}`}
         >
           <Layers className="w-3.5 h-3.5 text-orange-400" />
         </button>
@@ -338,13 +394,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       <div className="absolute bottom-2.5 left-2.5 z-[400]">
         <button
           type="button"
-          onClick={
-            onOpenNavigation ||
-            (() => {
-              const dest = encodeURIComponent(dropoff.address || dropoff.name || `${dLat},${dLng}`);
-              window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`, '_blank');
-            })
-          }
+          onClick={handleDirectNavigation}
           className="flex items-center gap-1.5 bg-blue-600/95 hover:bg-blue-600 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl shadow-md backdrop-blur-xs transition-all active:scale-95 cursor-pointer"
         >
           <Navigation className="w-3 h-3" />
@@ -355,7 +405,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       {/* Real-time Telemetry Badge (Bottom Right) */}
       <div className="absolute bottom-2.5 right-12 z-[400] hidden sm:flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-slate-700/60 text-[10px] text-slate-300 font-mono">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span>GPS Stream: {rLat.toFixed(4)}, {rLng.toFixed(4)}</span>
+        <span>GPS: {rLat.toFixed(4)}, {rLng.toFixed(4)}</span>
       </div>
     </div>
   );

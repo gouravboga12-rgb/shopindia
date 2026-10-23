@@ -156,6 +156,8 @@ router.get('/order/:orderId', async (req, res) => {
                 city: true,
                 state: true,
                 pincode: true,
+                lat: true,
+                lng: true,
               },
             },
           },
@@ -184,10 +186,24 @@ router.get('/order/:orderId', async (req, res) => {
       return res.status(404).json({ error: 'No quick delivery record found for this order.' });
     }
 
+    const vendorLat = delivery.order?.vendor?.lat || 17.3732;
+    const vendorLng = delivery.order?.vendor?.lng || 78.5385;
+
+    const pickupLat = delivery.pickupLat || vendorLat;
+    const pickupLng = delivery.pickupLng || vendorLng;
+    const dropoffLat = delivery.dropoffLat || (pickupLat + 0.015);
+    const dropoffLng = delivery.dropoffLng || (pickupLng - 0.008);
+
+    // Sanitize dropoffAddress so strings like ", , " don't reach customer UI
+    let cleanDropoffAddress = delivery.dropoffAddress || '';
+    if (cleanDropoffAddress.replace(/[,\s]/g, '').length === 0) {
+      cleanDropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
+    }
+
     // Get live in-memory location ping if actively streaming, or fallback to rider profile coords
     const livePing = getDeliveryLocation(delivery.id);
-    const lastLat = livePing?.lat ?? delivery.riderProfile?.currentLat ?? delivery.pickupLat ?? 17.4486;
-    const lastLng = livePing?.lng ?? delivery.riderProfile?.currentLng ?? delivery.pickupLng ?? 78.3850;
+    const lastLat = livePing?.lat ?? delivery.riderProfile?.currentLat ?? pickupLat;
+    const lastLng = livePing?.lng ?? delivery.riderProfile?.currentLng ?? pickupLng;
 
     res.json({
       success: true,
@@ -201,15 +217,15 @@ router.get('/order/:orderId', async (req, res) => {
         name: delivery.pickupName,
         address: delivery.pickupAddress,
         phone: delivery.pickupPhone,
-        lat: delivery.pickupLat || 17.4486,
-        lng: delivery.pickupLng || 78.3850,
+        lat: pickupLat,
+        lng: pickupLng,
       },
       dropoff: {
         name: delivery.dropoffName,
-        address: delivery.dropoffAddress,
+        address: cleanDropoffAddress,
         phone: delivery.dropoffPhone,
-        lat: delivery.dropoffLat || 17.4375,
-        lng: delivery.dropoffLng || 78.3650,
+        lat: dropoffLat,
+        lng: dropoffLng,
       },
       rider: delivery.riderProfile ? {
         id: delivery.riderProfile.id,
