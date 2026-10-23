@@ -85,24 +85,28 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       map.removeLayer(tileLayerRef.current);
     }
 
-    let tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    let subdomains = 'abcd';
+    const token = import.meta.env.VITE_MAPBOX_TOKEN;
 
-    if (mapStyle === 'voyager') {
-      tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-    } else if (mapStyle === 'streets') {
-      const token = import.meta.env.VITE_MAPBOX_TOKEN;
-      if (token) {
-        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${token}`;
-        subdomains = 'a';
+    let tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    let subdomains = 'abc';
+    let tileSize = 256;
+    let zoomOffset = 0;
+
+    if (token) {
+      tileSize = 512;
+      zoomOffset = -1;
+      subdomains = 'a';
+      if (mapStyle === 'dark') {
+        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`;
       } else {
-        tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-        subdomains = 'abc';
+        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`;
       }
     }
 
     tileLayerRef.current = L.tileLayer(tileUrl, {
       maxZoom: 19,
+      tileSize,
+      zoomOffset,
       subdomains,
     }).addTo(map);
 
