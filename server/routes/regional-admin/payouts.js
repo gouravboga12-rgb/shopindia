@@ -10,7 +10,7 @@ const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 
-router.use(verifyToken, requireRole('regional_admin'));
+router.use(verifyToken, requireRole('regional_admin', 'super_admin'));
 
 /**
  * GET /api/regional-admin/payouts
