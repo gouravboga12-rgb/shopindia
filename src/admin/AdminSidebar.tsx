@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
   Building2, ShieldCheck, MapPin, Headphones, Percent, LogOut,
   Truck, Tag, BarChart3, Bell, LayoutGrid, Image, Globe2,
-  DollarSign, CreditCard, Bike
+  DollarSign, CreditCard, Bike, Banknote
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,6 +21,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'payouts-vendors', label: 'Merchant Payouts', icon: Store, perm: 'manage_commissions' },
     { id: 'payouts-fleet', label: 'Fleet & Service Payouts', icon: Bike, perm: 'manage_commissions' },
     { id: 'accounts', label: 'Accounts & Statements', icon: CreditCard, perm: 'manage_commissions' },
+    { id: 'cod-settings', label: 'COD & Cash Clearance', icon: Banknote, perm: 'manage_commissions' },
     { id: 'commissions', label: 'Pricing & Commission', icon: Percent, perm: 'manage_commissions' },
     { id: 'regional-admins', label: 'Regional Admins', icon: Globe2, perm: 'manage_users' },
     { id: 'vendors', label: 'Vendors', icon: Store, perm: 'view_vendors' },

@@ -25,6 +25,7 @@ import { VendorPayoutsPage } from './pages/VendorPayoutsPage';
 import { FleetPayoutsPage } from './pages/FleetPayoutsPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { AccountStatementPage } from './pages/AccountStatementPage';
+import { CODSettingsPage } from './pages/CODSettingsPage';
 
 export interface ManagedVendor { id: string; name: string; }
 
@@ -67,6 +68,7 @@ const AdminContent: React.FC = () => {
       case 'payouts-fleet': return <FleetPayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'payouts': return <VendorPayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'accounts': return <AccountsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
+      case 'cod-settings': return <CODSettingsPage />;
       case 'regional-admins': return <RegionalAdminsPage />;
       case 'vendors': return <VendorsPage onManage={setManagedVendor} />;
       case 'users': return <UsersPage />;

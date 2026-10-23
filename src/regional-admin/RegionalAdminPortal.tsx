@@ -11,6 +11,7 @@ import { RegionalVendors } from './pages/RegionalVendors';
 import { RegionalRiders } from './pages/RegionalRiders';
 import { RegionalSupport } from './pages/RegionalSupport';
 import { RegionalPayouts } from './pages/RegionalPayouts';
+import { RegionalCODCollection } from './pages/RegionalCODCollection';
 
 const RegionalAdminContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -36,6 +37,8 @@ const RegionalAdminContent: React.FC = () => {
         return <RegionalVendors />;
       case 'riders':
         return <RegionalRiders />;
+      case 'cod-remittance':
+        return <RegionalCODCollection />;
       case 'payouts':
         return <RegionalPayouts />;
       case 'support':

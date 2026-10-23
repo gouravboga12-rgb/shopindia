@@ -12,13 +12,16 @@ import {
   MapPin,
   RefreshCw,
   AlertCircle,
+  Banknote,
+  ArrowUpRight,
+  ShieldAlert
 } from 'lucide-react';
 
 interface RiderDashboardProps {
   onNavigateToTab?: (tab: string) => void;
 }
 
-export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
+export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
   const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation } = useRider();
   const [locating, setLocating] = useState(false);
   const [locFeedback, setLocFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -79,6 +82,51 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
           </button>
         </div>
       </div>
+
+      {/* Floating Cash in Hand Alert Banner (if holding COD cash) */}
+      {(profile?.codCashFloat ?? 0) > 0 && (
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${
+          (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
+            ? 'bg-red-50 border-red-200 text-red-900'
+            : 'bg-orange-50 border-orange-200 text-orange-950'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl border ${
+              (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
+                ? 'bg-red-500 text-white border-red-600 shadow-xs'
+                : 'bg-orange-500 text-white border-orange-600 shadow-xs'
+            }`}>
+              <Banknote className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  Cash in Hand: ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
+                </span>
+                {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000) && (
+                  <span className="text-[10px] bg-red-200 text-red-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <ShieldAlert className="w-3 h-3" /> Radar Paused
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
+                  ? 'Maximum float limit exceeded. Please remit cash to receive new order dispatches.'
+                  : 'Customer COD cash held. Clear online via Razorpay or submit to your Regional Admin.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNavigateToTab?.('wallet')}
+            className="self-start sm:self-auto px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+          >
+            <span>Clear Cash Float</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Manual GPS Location Bar (Mapbox Geocoding — Zero Background Polling) */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -14,6 +14,9 @@ import {
   Sparkles,
   AlertCircle,
   Radio,
+  Navigation,
+  Banknote,
+  QrCode
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
@@ -24,6 +27,7 @@ export const ActiveDeliveryView: React.FC = () => {
   const [otpError, setOtpError] = useState<string | null>(null);
   const [completedSuccess, setCompletedSuccess] = useState(false);
   const [isBroadcastingGps, setIsBroadcastingGps] = useState(false);
+  const [showDynamicQr, setShowDynamicQr] = useState(false);
 
   // High-frequency live GPS streaming to Customer & Vendor via WebSockets
   useEffect(() => {
@@ -175,14 +179,26 @@ export const ActiveDeliveryView: React.FC = () => {
               </div>
             </div>
 
-            {activeDelivery.pickupPhone && (
+            <div className="flex items-center gap-2">
+              {activeDelivery.pickupPhone && (
+                <a
+                  href={`tel:${activeDelivery.pickupPhone}`}
+                  className="p-3 bg-slate-50 hover:bg-slate-100 text-orange-600 rounded-2xl transition-colors border border-slate-200"
+                  title="Call Store"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
+              )}
               <a
-                href={`tel:${activeDelivery.pickupPhone}`}
-                className="p-3 bg-slate-50 hover:bg-slate-100 text-orange-600 rounded-2xl transition-colors border border-slate-200"
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activeDelivery.pickupAddress || activeDelivery.pickupName || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
+                title="1-Tap Google Maps Navigation"
               >
-                <Phone className="w-5 h-5" />
+                <Navigation className="w-5 h-5" />
               </a>
-            )}
+            </div>
           </div>
 
           <div className="pt-2">
@@ -267,14 +283,26 @@ export const ActiveDeliveryView: React.FC = () => {
               </div>
             </div>
 
-            {activeDelivery.dropoffPhone && (
+            <div className="flex items-center gap-2">
+              {activeDelivery.dropoffPhone && (
+                <a
+                  href={`tel:${activeDelivery.dropoffPhone}`}
+                  className="p-3 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-2xl transition-colors border border-slate-200"
+                  title="Call Customer"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
+              )}
               <a
-                href={`tel:${activeDelivery.dropoffPhone}`}
-                className="p-3 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-2xl transition-colors border border-slate-200"
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activeDelivery.dropoffAddress || activeDelivery.dropoffName || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
+                title="1-Tap Google Maps Navigation"
               >
-                <Phone className="w-5 h-5" />
+                <Navigation className="w-5 h-5" />
               </a>
-            )}
+            </div>
           </div>
 
           <div className="pt-2">
@@ -290,6 +318,49 @@ export const ActiveDeliveryView: React.FC = () => {
       {/* STAGE 4: Customer Handover & 4-Digit OTP Verification */}
       {currentStage === 'arrived_customer' && (
         <div className="bg-white border-2 border-emerald-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+          
+          {/* Doorstep COD Collection Card */}
+          {activeDelivery.order?.total ? (
+            <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-orange-500 text-white rounded-xl shadow-xs">
+                    <Banknote className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-orange-700 tracking-wider">Doorstep Payment</span>
+                    <h4 className="text-base font-black text-slate-900">
+                      Collect ₹{activeDelivery.order.total.toLocaleString('en-IN')} Cash
+                    </h4>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDynamicQr(!showDynamicQr)}
+                  className="px-3 py-1.5 bg-white border border-orange-300 text-orange-700 rounded-xl text-xs font-bold hover:bg-orange-100/60 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>{showDynamicQr ? 'Hide QR' : 'Show UPI QR'}</span>
+                </button>
+              </div>
+
+              {showDynamicQr && (
+                <div className="pt-2 border-t border-orange-200/80 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+                  <p className="text-xs text-slate-600 mb-2">Customer can scan with GPay, PhonePe, or Paytm:</p>
+                  <div className="p-3 bg-white rounded-2xl border-2 border-orange-400 shadow-sm inline-block">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=shopindia@upi&pn=ShopIndia&am=${activeDelivery.order.total}&cu=INR`)}`}
+                      alt="Customer UPI QR"
+                      className="w-36 h-36"
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400 mt-1">Direct instant settlement to ShopIndia</span>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <div className="text-center">
             <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-2 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-2xs">
               <KeyRound className="w-6 h-6 sm:w-7 sm:h-7" />

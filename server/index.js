@@ -76,11 +76,13 @@ app.use('/api/admin/notifications', require('./routes/admin/notifications'));
 app.use('/api/admin/categories', require('./routes/admin/categories'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
 app.use('/api/admin/reviews', require('./routes/admin/reviews'));
+app.use('/api/admin/cod-settings', require('./routes/admin/cod-settings'));
 
 // Regional Admin routes
 app.use('/api/regional-admin/auth', require('./routes/regional-admin/auth'));
 app.use('/api/regional-admin/support', require('./routes/regional-admin/support'));
 app.use('/api/regional-admin/payouts', require('./routes/regional-admin/payouts'));
+app.use('/api/regional-admin/cod', require('./routes/regional-admin/cod'));
 app.use('/api/regional-admin', require('./routes/regional-admin/operations'));
 
 // Rider & Delivery Partner routes
@@ -88,6 +90,7 @@ app.use('/api/rider/auth', require('./routes/rider/auth'));
 app.use('/api/rider/profile', require('./routes/rider/profile'));
 app.use('/api/rider/orders', require('./routes/rider/orders'));
 app.use('/api/rider/wallet', require('./routes/rider/wallet'));
+app.use('/api/rider/cod', require('./routes/rider/cod'));
 
 // Shiprocket 3PL Logistics routes
 app.use('/api/shiprocket', require('./routes/shiprocket/shipments'));

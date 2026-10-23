@@ -21,6 +21,8 @@ export interface RiderProfileData {
   address?: string;
   currentLat?: number;
   currentLng?: number;
+  codCashFloat?: number;
+  codFloatLimit?: number;
 }
 
 export interface DeliveryItem {

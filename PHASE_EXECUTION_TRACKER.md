@@ -14,7 +14,7 @@
 | **Phase 4** | 3-Tier Support Queue (Vendor → Regional Admin → Super Admin) & SLA Timers | ✅ COMPLETED | support routes, slaEscalation.js, VendorSupport, RegionalSupport, SupportPage upgraded |
 | **Phase 5** | Vendor Store Settings (`VendorSettings.tsx`), Mapbox GPS & Hyper-Local Quick-Commerce Filtering | ✅ COMPLETED | VendorSettings, GPS detection, item analytics, Haversine filtering |
 | **Phase 6** | Unified 3-Queue Payout Center (`PayoutRequest`) & Master Finance Dashboard (`/admin/finance`) | ✅ COMPLETED | Unified PayoutRequest, CFO balance sheet, partner passbooks & regional approvals |
-| **Phase 7** | COD Dynamic Clearance (QR vs Cash), Remittance & Rapido-Style Doorstep Service Adjustment | ⚪ NOT STARTED | Pending |
+| **Phase 7** | COD Dynamic Clearance (QR vs Cash), Remittance & Rapido-Style Doorstep Service Adjustment | ✅ COMPLETED | Super Admin COD settings, Rider dual clearance, Regional collection hub, Doorstep QR/Cash |
 
 ---
 
@@ -231,7 +231,18 @@
 - `src/rider/pages/ActiveServiceJobView.tsx` (NEW)
 
 ### 7.3 Execution Status & Verification
-- **Status:** Not Started
+- **Status:** ✅ COMPLETED
+- **Verification Commands:** `npm run build` (Clean production bundle build in 6.02s)
+- **Details:**
+  - `server/routes/admin/cod-settings.js`: Platform COD clearance settings (`GET /`, `POST /`), live monitored riders cash float table (`GET /riders`), and Super Admin manual float clearance (`POST /riders/:id/force-clear`).
+  - `server/routes/rider/cod.js`: Rider COD float status (`GET /status`), Razorpay clearance order creation (`POST /create-razorpay-order`), payment signature verification with immutable ledger debit (`POST /verify-razorpay-remittance`), and physical handover request with 4-digit verification OTP (`POST /request-physical-handover`). If no Regional Admin is available in territory, returns explicit prompt directing to Razorpay.
+  - `server/routes/regional-admin/cod.js`: Regional Admin cash custody hub (`GET /`), physical cash confirmation (`POST /:id/confirm-receipt`), Razorpay super remittance order creation (`POST /create-super-remittance-order`), and remittance signature verification (`POST /verify-super-remittance`).
+  - `src/admin/pages/CODSettingsPage.tsx`: Admin panel for configuring deadline rules (End of Day vs Next 2-3 Orders), ₹3,000 float threshold, physical cash toggle, auto-pause toggle, and real-time monitored fleet cash table with force clear action.
+  - `src/regional-admin/pages/RegionalCODCollection.tsx`: Regional Admin cash collection queue, physical handover confirmation, and multi-batch Razorpay remittance to Super Admin.
+  - `src/rider/pages/RiderWallet.tsx`: Added dual COD cash clearance card (Online Razorpay vs Regional Admin physical handover with 4-digit OTP). Handled territory check showing "No Regional Admin available in your area. Please pay through Razorpay."
+  - `src/rider/pages/RiderDashboard.tsx`: Added floating cash-in-hand alert banner with quick 1-tap navigation to clear float.
+  - `src/rider/pages/ActiveDeliveryView.tsx`: 1-tap Google Maps turn-by-turn navigation link for pickup and dropoff destinations; Doorstep COD collection banner with dynamic UPI QR code generator.
+  - `server/index.js`, `AdminSidebar.tsx`, `AdminPortal.tsx`, `RegionalAdminSidebar.tsx`, `RegionalAdminPortal.tsx`: Fully mounted and wired across all portals.
 
 ---
 

@@ -12,6 +12,12 @@ function getToken(path: string): string | null {
   if (path.startsWith('/api/admin')) {
     return localStorage.getItem('shopindia_admin_token');
   }
+  if (path.startsWith('/api/regional-admin')) {
+    return localStorage.getItem('shopindia_regional_admin_token') || localStorage.getItem('shopindia_admin_token');
+  }
+  if (path.startsWith('/api/rider')) {
+    return localStorage.getItem('shopindia_rider_token');
+  }
   return localStorage.getItem('shopindia_customer_token') || localStorage.getItem('shopindia_admin_token');
 }
 
