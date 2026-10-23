@@ -71,7 +71,7 @@ router.get('/overview', async (req, res) => {
       // 2. Captured payments from Razorpay
       prisma.paymentRecord.aggregate({
         where: { status: 'captured', ...dateFilter },
-        _sum: { amount: true, fee: true, tax: true },
+        _sum: { amount: true, gatewayFee: true, gatewayTax: true },
         _count: { id: true },
       }),
 
@@ -114,7 +114,7 @@ router.get('/overview', async (req, res) => {
       // 8. Gateway settlements summary
       prisma.gatewaySettlement.aggregate({
         where: dateFilter,
-        _sum: { amount: true, fees: true, tax: true },
+        _sum: { amount: true, fee: true, tax: true },
         _count: { id: true },
       }),
 
@@ -131,7 +131,7 @@ router.get('/overview', async (req, res) => {
 
     // Financial Computations
     const grossCustomerPaid = ordersAgg._sum.total || 0;
-    const actualGatewayFees = gatewayFeesAgg._sum.amount || (capturedPaymentsAgg._sum.fee || 0) + (capturedPaymentsAgg._sum.tax || 0);
+    const actualGatewayFees = gatewayFeesAgg._sum.amount || (capturedPaymentsAgg._sum.gatewayFee || 0) + (capturedPaymentsAgg._sum.gatewayTax || 0);
     const netReceived = Math.max(0, grossCustomerPaid - actualGatewayFees);
 
     // Partner balances owed: Vendors + Riders
