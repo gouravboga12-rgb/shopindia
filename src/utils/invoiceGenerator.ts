@@ -5,6 +5,10 @@ export interface InvoiceOrderData {
   status?: string;
   type?: string;
   vertical?: string;
+  subtotal?: number;
+  discount?: number;
+  deliveryFee?: number;
+  platformFee?: number;
   total: number;
   items?: Array<{
     name?: string;
@@ -32,6 +36,7 @@ export interface InvoiceOrderData {
     state?: string;
     pincode?: string;
     country?: string;
+    gstNumber?: string;
   };
   deliveryAddress?: {
     street?: string;
@@ -58,18 +63,24 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
     ? order.items
     : [{ name: 'Order Items (Consolidated)', price: order.total, quantity: 1 }];
 
-  // Standard Indian GST for Retail & E-Commerce: 18% (9.0% CGST + 9.0% SGST)
-  // Store prices are inclusive of GST.
+  const vert = (order.vertical || (order.type === 'quick_commerce' ? 'quick' : (order.type === 'hvac_service' || order.type === 'hvac') ? 'services' : 'shop')).toLowerCase();
+  const isQuick = vert === 'quick' || order.type === 'quick_commerce';
+  const isService = vert === 'services' || order.type === 'hvac_service' || order.type === 'hvac';
+
+  // Standard Indian GST: 18% (9.0% CGST + 9.0% SGST)
+  // Store consumer prices are inclusive of GST.
   // Formula: Taxable Value = Line Total / (1 + GST_RATE)
   const GST_RATE = 0.18;
   const CGST_RATE = 0.09;
+  const SGST_RATE = 0.09;
 
   const items = rawItems.map((item, idx) => {
-    const title = item.name || item.product?.title || item.title || `Item #${idx + 1}`;
+    const title = item.name || item.product?.title || item.title || (isService ? `Service #${idx + 1}` : `Item #${idx + 1}`);
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price || item.product?.price || 0) || Math.round((order.total || 0) / (rawItems.length || 1));
     const lineTotal = price * qty;
-    const hsn = 8471 + (idx % 10);
+    // SAC code 9987 for services, HSN 8471 / retail goods for commerce
+    const hsn = isService ? '9987' : (8471 + (idx % 10)).toString();
     
     // Taxable amount before GST
     const taxableTotal = Math.round((lineTotal / (1 + GST_RATE)) * 100) / 100;
@@ -86,13 +97,32 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
     };
   });
 
-  const grandTotal = Number(order.total) || items.reduce((s, it) => s + it.lineTotal, 0);
-  const totalTaxable = Math.round(items.reduce((s, it) => s + it.taxableTotal, 0) * 100) / 100;
-  const totalTax = Math.round((grandTotal - totalTaxable) * 100) / 100;
+  const itemsTotal = items.reduce((s, it) => s + it.lineTotal, 0);
+  const itemsTaxable = Math.round(items.reduce((s, it) => s + it.taxableTotal, 0) * 100) / 100;
   
-  // Exact 9.0% CGST and 9.0% SGST
-  const cgst = Math.round((totalTaxable * CGST_RATE) * 100) / 100;
-  const sgst = Math.round((totalTax - cgst) * 100) / 100;
+  // Exact 9.0% CGST and 9.0% SGST on items - ALWAYS EQUAL
+  const itemsCgst = Math.round((itemsTaxable * CGST_RATE) * 100) / 100;
+  const itemsSgst = Math.round((itemsTaxable * SGST_RATE) * 100) / 100;
+
+  const grandTotal = Number(order.total) || itemsTotal;
+  const rawDiff = Math.max(0, grandTotal - itemsTotal);
+
+  // Explicit breakdown of Delivery Fee and Platform Fee
+  let deliveryFee = typeof order.deliveryFee === 'number' ? order.deliveryFee : 0;
+  let platformFee = typeof order.platformFee === 'number' ? order.platformFee : 0;
+  const discount = typeof order.discount === 'number' ? order.discount : 0;
+
+  // If fees weren't explicitly passed, deduce them accurately from the difference
+  if (deliveryFee === 0 && platformFee === 0 && rawDiff > 0) {
+    if (isQuick) {
+      platformFee = rawDiff >= 6 ? 6 : Math.min(rawDiff, 5);
+      deliveryFee = Math.max(0, rawDiff - platformFee);
+    } else if (isService) {
+      deliveryFee = rawDiff; // Visiting / inspection fee
+    } else {
+      deliveryFee = rawDiff; // Standard shipping
+    }
+  }
 
   const addressText = typeof order.deliveryAddress === 'string'
     ? order.deliveryAddress
@@ -106,13 +136,14 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
 
   // Vendor Shipped-From Details
   const vendor = order.vendor || {};
-  const vendorName = vendor.businessName || 'ShopIndia Official Fulfilment Partner';
+  const vendorName = vendor.businessName || (isService ? 'Glacons Certified Service Partner' : 'ShopIndia Official Fulfilment Partner');
   const vendorStreet = vendor.street || 'Plot No. 44, Electronic City Phase 1, Hosur Road';
   const vendorCity = vendor.city || 'Bengaluru';
   const vendorState = vendor.state || 'Karnataka';
   const vendorPincode = vendor.pincode ? ` - ${vendor.pincode}` : ' - 560100';
   const vendorLocation = `${vendorCity}, ${vendorState}${vendorPincode}`;
   const vendorContact = vendor.phone ? `Phone: ${vendor.phone}` : (vendor.email ? `Email: ${vendor.email}` : '');
+  const vendorGst = vendor.gstNumber ? `GSTIN: ${vendor.gstNumber}` : 'GSTIN: 29AABCS1429B1Z8';
 
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString('en-IN', {
@@ -120,6 +151,24 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
       maximumFractionDigits: 2,
     });
   };
+
+  const invoiceBadge = isQuick 
+    ? '10-Min Fast Delivery Tax Invoice' 
+    : isService 
+    ? 'Glacons Service & Maintenance Tax Invoice' 
+    : 'E-Commerce Retail Tax Invoice';
+
+  const platformFeeLabel = isService 
+    ? 'Platform Booking & Safety Fee' 
+    : isQuick 
+    ? 'Platform Convenience Fee' 
+    : 'Platform Handling Fee';
+
+  const deliveryFeeLabel = isService 
+    ? 'Technician Visiting & Inspection Fee' 
+    : isQuick 
+    ? 'Express 10-Min Delivery Fee' 
+    : 'Standard Courier Shipping Charges';
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -155,7 +204,7 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
     tbody tr:nth-child(even) { background: #f8fafc; }
 
     .summary-grid { display: flex; justify-content: flex-end; margin-top: 24px; }
-    .summary-table { width: 340px; font-size: 12px; }
+    .summary-table { width: 380px; font-size: 12px; }
     .summary-row { display: flex; justify-content: space-between; padding: 6px 0; color: #475569; }
     .summary-row.total { border-top: 2px solid #0F2C59; margin-top: 6px; padding-top: 10px; font-size: 15px; font-weight: 800; color: #0F2C59; }
 
@@ -186,7 +235,7 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
     <div class="header">
       <div>
         <div class="brand-title">SHOP<span>INDIA</span></div>
-        <div class="tax-badge">Tax Invoice / Bill of Supply</div>
+        <div class="tax-badge">${invoiceBadge}</div>
         <div class="company-info">
           <strong>ShopIndia Internet Private Limited</strong><br>
           Buildings Alyssa, Begonia & Clove Embassy Tech Village,<br>
@@ -209,7 +258,7 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
         <div>${vendorStreet}</div>
         <div>${vendorLocation}</div>
         ${vendorContact ? `<div>${vendorContact}</div>` : ''}
-        <div>State: ${vendorState}</div>
+        <div>${vendorGst}</div>
       </div>
       <div class="addr-box">
         <h4>Billing & Shipping Address</h4>
@@ -225,8 +274,8 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
       <thead>
         <tr>
           <th>#</th>
-          <th>Description</th>
-          <th class="text-center">HSN/SAC</th>
+          <th>${isService ? 'Service Description' : 'Item Description'}</th>
+          <th class="text-center">${isService ? 'SAC' : 'HSN'}</th>
           <th class="text-center">Qty</th>
           <th class="text-right">Unit Price</th>
           <th class="text-right">Taxable Amt</th>
@@ -250,11 +299,38 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
 
     <div class="summary-grid">
       <div class="summary-table">
-        <div class="summary-row"><span>Taxable Amount</span><span>₹${formatCurrency(totalTaxable)}</span></div>
-        <div class="summary-row"><span>CGST (9.0%)</span><span>₹${formatCurrency(cgst)}</span></div>
-        <div class="summary-row"><span>SGST (9.0%)</span><span>₹${formatCurrency(sgst)}</span></div>
-        <div class="summary-row"><span>Delivery / Shipping Fee</span><span style="color:#16a34a;font-weight:700;">FREE</span></div>
-        <div class="summary-row total"><span>Grand Total</span><span>₹${formatCurrency(grandTotal)}</span></div>
+        <div class="summary-row">
+          <span>${isService ? 'Service Value (Taxable)' : 'Items Taxable Amount'}</span>
+          <span class="font-mono">₹${formatCurrency(itemsTaxable)}</span>
+        </div>
+        <div class="summary-row">
+          <span>CGST (9.0%)</span>
+          <span class="font-mono">₹${formatCurrency(itemsCgst)}</span>
+        </div>
+        <div class="summary-row">
+          <span>SGST (9.0%)</span>
+          <span class="font-mono">₹${formatCurrency(itemsSgst)}</span>
+        </div>
+        ${platformFee > 0 ? `
+        <div class="summary-row">
+          <span>${platformFeeLabel}</span>
+          <span class="font-mono">₹${formatCurrency(platformFee)}</span>
+        </div>
+        ` : ''}
+        <div class="summary-row">
+          <span>${deliveryFeeLabel}</span>
+          <span class="font-mono">${deliveryFee > 0 ? '₹' + formatCurrency(deliveryFee) : '<span style="color:#16a34a;font-weight:700;">FREE</span>'}</span>
+        </div>
+        ${discount > 0 ? `
+        <div class="summary-row">
+          <span>Discount / Coupon</span>
+          <span class="font-mono" style="color:#16a34a;font-weight:700;">-₹${formatCurrency(discount)}</span>
+        </div>
+        ` : ''}
+        <div class="summary-row total">
+          <span>Grand Total</span>
+          <span class="font-mono">₹${formatCurrency(grandTotal)}</span>
+        </div>
       </div>
     </div>
 
@@ -262,8 +338,8 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
       <div>
         <strong>Terms & Conditions:</strong><br>
         1. Goods once sold are covered under ShopIndia Buyer Protection.<br>
-        2. This is a computer generated invoice and requires no physical signature.<br>
-        3. For support or returns, visit shopindia.in/support.
+        2. This is an authenticated computer-generated tax invoice and requires no physical signature.<br>
+        3. For support, returns, or warranty inquiries, visit shopindia.in/support.
       </div>
       <div class="authorized">
         <div class="sign-box"></div>

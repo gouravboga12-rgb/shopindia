@@ -179,12 +179,19 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       iconAnchor: [0, 0],
     });
 
-    // 1. Update/Create Store Marker
-    if (!markersRef.current.store) {
-      markersRef.current.store = L.marker([pLat, pLng], { icon: storeIcon }).addTo(map);
+    // 1. Store Pickup Marker (only for rider, hidden for customer)
+    if (viewerRole === 'customer') {
+      if (markersRef.current.store) {
+        map.removeLayer(markersRef.current.store);
+        markersRef.current.store = undefined;
+      }
     } else {
-      markersRef.current.store.setLatLng([pLat, pLng]);
-      markersRef.current.store.setIcon(storeIcon);
+      if (!markersRef.current.store) {
+        markersRef.current.store = L.marker([pLat, pLng], { icon: storeIcon }).addTo(map);
+      } else {
+        markersRef.current.store.setLatLng([pLat, pLng]);
+        markersRef.current.store.setIcon(storeIcon);
+      }
     }
 
     // 2. Update/Create Customer Marker
@@ -204,9 +211,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
     }
 
     // 4. Fetch Real Driving Polyline from OSRM
-    // CRITICAL:
-    // For Customer view: strictly route from Store (pLng, pLat) to Customer (dLng, dLat).
-    // The rider moves along this delivery route without showing rider's home-to-store leg!
+    // For Customer view: strictly route from Rider live location to Customer Doorstep!
     // For Rider view:
     // If assigned (heading to store): Rider -> Store
     // If picked_up (in transit): Rider -> Customer
@@ -215,7 +220,9 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
     const fetchRoute = async () => {
       let routeUrl = '';
       if (viewerRole === 'customer') {
-        routeUrl = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+        const startLng = (rLng && !isNaN(rLng)) ? rLng : pLng;
+        const startLat = (rLat && !isNaN(rLat)) ? rLat : pLat;
+        routeUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${dLng},${dLat}?overview=full&geometries=geojson`;
       } else {
         if (currentStage === 'assigned') {
           routeUrl = `https://router.project-osrm.org/route/v1/driving/${rLng},${rLat};${pLng},${pLat}?overview=full&geometries=geojson`;
@@ -287,9 +294,8 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       const boundsPoints: [number, number][] =
         viewerRole === 'customer'
           ? [
-              [pLat, pLng],
+              [(rLat && !isNaN(rLat)) ? rLat : pLat, (rLng && !isNaN(rLng)) ? rLng : pLng],
               [dLat, dLng],
-              [rLat, rLng],
             ]
           : currentStage === 'assigned'
           ? [

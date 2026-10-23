@@ -113,9 +113,34 @@ router.get('/', customerAuth, async (req, res) => {
 
       const vendorData = o.vendor || o.items?.[0]?.product?.vendor || null;
 
+      const itemsSubtotal = o.items.reduce((s, it) => s + (it.price * it.quantity), 0);
+      const orderSubtotal = o.subtotal ?? itemsSubtotal;
+      const orderDiff = Math.max(0, (o.total || 0) - orderSubtotal);
+      
+      let deliveryFee = o.delivery?.deliveryFee ?? 0;
+      let platformFee = 0;
+      if (vert === 'quick') {
+        if (orderDiff > 0) {
+          platformFee = 6;
+          deliveryFee = Math.max(0, orderDiff - platformFee);
+        }
+      } else if (vert === 'services') {
+        if (orderDiff > 0) {
+          deliveryFee = orderDiff;
+        }
+      } else {
+        if (orderDiff > 0) {
+          deliveryFee = orderDiff;
+        }
+      }
+
       return {
         id: o.id,
         orderNumber: o.orderNumber,
+        subtotal: orderSubtotal,
+        discount: o.discount ?? 0,
+        deliveryFee,
+        platformFee,
         total: o.total,
         status: o.status,
         type: vert === 'quick' ? 'quick_commerce' : vert === 'services' ? 'hvac_service' : 'traditional',

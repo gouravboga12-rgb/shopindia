@@ -389,7 +389,7 @@ export const OrdersPage: React.FC = () => {
                               )}
 
                               <div className="mt-4 flex flex-wrap gap-2">
-                                <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                                <PrimaryButton onClick={() => generateAndPrintInvoice({ ...openOrder, vertical: orderVert })} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
                                 {cancelable && (
                                   <button 
                                     disabled={isProcessing}
@@ -484,7 +484,7 @@ export const OrdersPage: React.FC = () => {
                               )}
 
                               <div className="mt-4 flex flex-wrap gap-2">
-                                <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                                <PrimaryButton onClick={() => generateAndPrintInvoice({ ...openOrder, vertical: orderVert })} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
                                 {cancelable && (
                                   <button 
                                     disabled={isProcessing}

@@ -193,34 +193,56 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
     );
   }
 
-  // Fallback if vendor hasn't broadcasted to riders yet
-  if (!data || error) {
+  // CRITICAL REQUIREMENT: Show live map ONLY after rider took item from the vendor shop!
+  const isPickedUp =
+    ['picked_up', 'on_the_way', 'in_transit', 'arrived_customer', 'delivered', 'completed'].includes(liveStage) ||
+    ['shipped', 'on_the_way', 'in_transit', 'delivered', 'completed'].includes(orderStatus);
+
+  // Show Store Preparation / Dispatch Standby card before rider picks up the order from the store
+  if (!data || error || !isPickedUp) {
+    const isAssigned = data && ['assigned', 'arrived_pickup'].includes(liveStage);
     return (
-      <div className="h-56 bg-gradient-to-br from-amber-50/50 to-orange-50/50 rounded-2xl border border-amber-200/80 p-5 flex flex-col justify-between">
-        <div className="flex items-start gap-3">
-          <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl">
+      <div className="h-56 bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-slate-50 rounded-2xl border border-amber-200/80 p-5 flex flex-col justify-between shadow-sm">
+        <div className="flex items-start gap-3.5">
+          <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-sm">
             {isService ? <Wrench className="w-5 h-5" /> : <Store className="w-5 h-5" />}
           </div>
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
-              {isService ? 'Service Processing' : 'Store Preparing Order'}
-            </span>
-            <h4 className="text-sm font-bold text-slate-900 mt-0.5">
-              {isService ? 'Technician dispatch in progress' : 'Items being packed at store'}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                {isAssigned
+                  ? liveStage === 'arrived_pickup' ? 'Partner at Store' : 'Partner Assigned'
+                  : isService ? 'Technician Scheduled' : 'Store Packing Items'}
+              </span>
+              {data?.rider && (
+                <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                  {isService ? <Wrench className="w-3 h-3 text-purple-600" /> : <Bike className="w-3 h-3 text-orange-600" />}
+                  {data.rider.name}
+                </span>
+              )}
+            </div>
+            <h4 className="text-sm sm:text-base font-bold text-slate-900">
+              {isAssigned
+                ? liveStage === 'arrived_pickup'
+                  ? `Partner ${data?.rider?.name || 'Gourav'} is at the store verifying and packing your items`
+                  : `Partner ${data?.rider?.name || 'Gourav'} is heading to the store to collect your package`
+                : isService
+                ? 'Certified technician dispatch scheduled'
+                : 'Merchant store is preparing your items'}
             </h4>
-            <p className="text-xs text-slate-500 mt-1">
-              Live GPS street tracking activates automatically as soon as the {isService ? 'service partner' : 'delivery partner'} is assigned and dispatched.
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              📍 Live Street GPS map tracking will automatically activate the moment your {isService ? 'technician' : 'delivery partner'} picks up the order from the shop and starts traveling to your doorstep.
             </p>
           </div>
         </div>
         <div className="flex items-center justify-between pt-3 border-t border-amber-200/60 text-[11px] text-slate-500 font-medium">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            Auto-refreshing status
+          <span className="flex items-center gap-2 text-amber-800 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            {isAssigned ? 'Awaiting Store Handover' : 'Preparing Order'}
           </span>
           <button
             onClick={() => fetchTracking()}
-            className="text-amber-800 font-bold hover:underline flex items-center gap-1"
+            className="text-amber-800 font-bold hover:underline flex items-center gap-1 text-[11px]"
           >
             <RefreshCw className="w-3 h-3" /> Refresh
           </button>
