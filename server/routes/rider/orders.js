@@ -81,7 +81,7 @@ router.get('/broadcast-feed', async (req, res) => {
  * ATOMIC CLAIM: Lock order to this rider.
  * If another rider tapped milliseconds earlier, returns ALREADY_ASSIGNED.
  */
-router.post('/orders/:id/accept', async (req, res) => {
+router.post(['/:id/accept', '/orders/:id/accept'], async (req, res) => {
   try {
     const profile = await getRiderProfile(req.user.userId);
     if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
@@ -160,7 +160,7 @@ router.post('/orders/:id/accept', async (req, res) => {
  * POST /api/rider/orders/:id/decline
  * Dismiss delivery alert from this rider's radar
  */
-router.post('/orders/:id/decline', async (_req, res) => {
+router.post(['/:id/decline', '/orders/:id/decline'], async (_req, res) => {
   res.json({ success: true, message: 'Order dismissed from radar.' });
 });
 
@@ -206,7 +206,7 @@ router.get('/active-job', async (req, res) => {
  * PATCH /api/rider/orders/:id/stage
  * Advance delivery stage: arrived_pickup -> picked_up -> arrived_customer
  */
-router.patch('/orders/:id/stage', async (req, res) => {
+router.patch(['/:id/stage', '/orders/:id/stage'], async (req, res) => {
   try {
     const { stage } = req.body;
     const allowedStages = ['arrived_pickup', 'picked_up', 'arrived_customer'];
@@ -253,13 +253,14 @@ router.patch('/orders/:id/stage', async (req, res) => {
  * Stage 4: Customer Handover with 4-digit OTP or Photo Proof.
  * Credits delivery fee to rider wallet and marks order delivered.
  */
-router.post('/orders/:id/complete', async (req, res) => {
+router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
   try {
     const { otp, proofPhotoUrl } = req.body;
     const profile = await getRiderProfile(req.user.userId);
 
     const delivery = await prisma.delivery.findFirst({
       where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
     });
 
     if (!delivery) return res.status(404).json({ error: 'Delivery job not found.' });
@@ -276,6 +277,8 @@ router.post('/orders/:id/complete', async (req, res) => {
     }
 
     const feeToCredit = delivery.deliveryFee || 50;
+    const isCOD = delivery.order?.paymentMethod === 'cod';
+    const orderCash = delivery.order?.total || 0;
 
     // Atomic transaction: mark delivery completed, update order, credit rider wallet, write ledger entry
     let updatedDelivery;
@@ -302,6 +305,7 @@ router.post('/orders/:id/complete', async (req, res) => {
         data: {
           walletBalance: { increment: feeToCredit },
           totalDeliveries: { increment: 1 },
+          ...(isCOD && orderCash > 0 ? { codCashFloat: { increment: orderCash } } : {}),
         },
       });
 
