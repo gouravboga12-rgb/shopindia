@@ -9,6 +9,7 @@ import { VendorAnalytics } from './pages/VendorAnalytics';
 import { VendorWallet } from './pages/VendorWallet';
 import { VendorTechnicians } from './pages/VendorTechnicians';
 import { VendorSupport } from './pages/VendorSupport';
+import { VendorSettings } from './pages/VendorSettings';
 
 const VendorContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -28,6 +29,7 @@ const VendorContent: React.FC = () => {
       case 'wallet':      return <VendorWallet />;
       case 'technicians': return <VendorTechnicians />;
       case 'support':     return <VendorSupport />;
+      case 'settings':    return <VendorSettings />;
       default:            return <VendorDashboard />;
     }
   };

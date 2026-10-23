@@ -108,6 +108,7 @@ app.use('/api/vendor/reviews', require('./routes/vendor/reviews'));
 app.use('/api/vendor/technicians', require('./routes/vendor/technicians'));
 app.use('/api/vendor/service-jobs', require('./routes/vendor/service-jobs'));
 app.use('/api/vendor/support', require('./routes/vendor/support'));
+app.use('/api/vendor/settings', require('./routes/vendor/settings'));
 
 const { startSlaEscalationJob } = require('./jobs/slaEscalation');
 

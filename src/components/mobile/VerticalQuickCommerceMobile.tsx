@@ -5,7 +5,7 @@ import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
   Plus, Minus, Clock, Heart,
-  Zap, UtensilsCrossed, Pill, ShieldCheck
+  Zap, UtensilsCrossed, Pill, ShieldCheck, Store
 } from 'lucide-react';
 import type { Product } from '../../data/types';
 import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
@@ -27,7 +27,7 @@ const QUICK_CATEGORIES_FALLBACK: Record<QuickSubVertical, string[]> = {
 };
 
 export const VerticalQuickCommerceMobile: React.FC = () => {
-  const { cart, addToCart, updateQuantity, navigateTo } = useApp();
+  const { cart, addToCart, updateQuantity, navigateTo, location, setCurrentVertical } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
 
@@ -206,7 +206,37 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
       </div>
 
       {/* 4. Product Cards Grid */}
-      <div className="grid grid-cols-2 gap-2.5">
+      {currentProducts.length === 0 ? (
+        quickProducts.length === 0 ? (
+          <div className="w-full py-10 px-4 text-center bg-white rounded-2xl border border-emerald-100 space-y-3.5 my-2">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+              <Zap className="w-7 h-7 fill-emerald-500 text-emerald-600" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-base text-slate-800">10-Min Delivery Unavailable Here</h4>
+              <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                Hyperlocal quick stores haven't arrived in <span className="font-semibold text-slate-700">{location || 'your area'}</span> yet. Enjoy 10,000+ products via Pan-India delivery!
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setCurrentVertical('shop');
+                navigateTo('home');
+              }}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm"
+            >
+              <Store className="w-4 h-4" />
+              <span>Explore Pan-India Store</span>
+            </button>
+          </div>
+        ) : (
+          <div className="w-full py-12 text-center bg-white rounded-2xl border border-slate-200/80 p-6 my-2">
+            <p className="text-sm font-bold text-slate-700">No items found in this section</p>
+            <p className="text-xs text-slate-400 mt-1">Please try another category or sub-vertical above.</p>
+          </div>
+        )
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5">
         {currentProducts.map((product) => {
           const qty = getCartQty(product.id);
           const discount = product.originalPrice > product.price
@@ -318,6 +348,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
           );
         })}
       </div>
+      )}
 
 
 

@@ -12,7 +12,7 @@
 | **Phase 2b**| Razorpay Backend Integration & Gateway Fee/Tax Ledger Tracking | ✅ COMPLETED | lib/razorpay.js, routes/payments.js, webhooks/razorpay.js created |
 | **Phase 3** | Pricing Engine (`server/lib/pricing.js`) & Admin Dynamic Settings with Live Calculator | ✅ COMPLETED | lib/pricing.js, routes/admin/pricing.js, PricingSettingsPage.tsx created |
 | **Phase 4** | 3-Tier Support Queue (Vendor → Regional Admin → Super Admin) & SLA Timers | ✅ COMPLETED | support routes, slaEscalation.js, VendorSupport, RegionalSupport, SupportPage upgraded |
-| **Phase 5** | Vendor Store Settings (`VendorSettings.tsx`), Mapbox GPS & Hyper-Local Quick-Commerce Filtering | ⚪ NOT STARTED | Pending |
+| **Phase 5** | Vendor Store Settings (`VendorSettings.tsx`), Mapbox GPS & Hyper-Local Quick-Commerce Filtering | ✅ COMPLETED | VendorSettings, GPS detection, item analytics, Haversine filtering |
 | **Phase 6** | Unified 3-Queue Payout Center (`PayoutRequest`) & Master Finance Dashboard (`/admin/finance`) | ⚪ NOT STARTED | Pending |
 | **Phase 7** | COD Dynamic Clearance (QR vs Cash), Remittance & Rapido-Style Doorstep Service Adjustment | ⚪ NOT STARTED | Pending |
 
@@ -165,7 +165,15 @@
 - `src/components/mobile/VerticalQuickCommerceMobile.tsx`
 
 ### 5.3 Execution Status & Verification
-- **Status:** Not Started
+- **Status:** ✅ COMPLETED
+- **Verification Commands:** `npm run build` (passed, 0 errors in 4.57s), Node route require verification (passed, 0 errors).
+- **Details:**
+  - `server/routes/vendor/settings.js`: Created store settings endpoint supporting store info, GPS coordinates, delivery radius slider, and audit-logged Bank & UPI payout details. Mounted in `server/index.js`.
+  - `server/routes/vendor/analytics.js`: Rewritten to group order items strictly by `item.vendorId === vendorId`, calculating item-level gross sales, net payout, and daily metrics without timezone drifts.
+  - `server/routes/products.js`: Implemented Haversine great-circle distance filtering for quick-commerce items (`fulfillmentType: 'quick_commerce'`) against `vendor.deliveryRadiusKm`. Traditional products remain Pan-India.
+  - `src/vendor/pages/VendorSettings.tsx`: Created 3-tab settings page (Store Profile & Hours, Mapbox GPS & Quick Radius with browser auto-detect, Audited Bank & Instant UPI Payout Details).
+  - `src/vendor/VendorSidebar.tsx` & `src/vendor/VendorPortal.tsx`: Mounted Settings tab in vendor navigation.
+  - `src/components/desktop/VerticalQuickCommerce.tsx` & `src/components/mobile/VerticalQuickCommerceMobile.tsx`: Added location-aware empty state recommending the Pan-India Store when no local dark stores deliver to the customer's coordinates/city.
 
 ---
 

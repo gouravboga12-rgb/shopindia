@@ -5,7 +5,7 @@ import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
   Plus, Minus, Clock, ShoppingCart, ArrowRight, Heart, LayoutGrid,
-  Zap, UtensilsCrossed, Pill, Sparkles, UploadCloud, ShieldCheck
+  Zap, UtensilsCrossed, Pill, Sparkles, UploadCloud, ShieldCheck, Store
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Product } from '../../data/types';
@@ -52,7 +52,7 @@ const QUICK_CATEGORIES_FALLBACK: Record<QuickSubVertical, string[]> = {
 };
 
 export const VerticalQuickCommerce: React.FC = () => {
-  const { cart, addToCart, updateQuantity, navigateTo } = useApp();
+  const { cart, addToCart, updateQuantity, navigateTo, location, setCurrentVertical } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
 
@@ -276,15 +276,41 @@ export const VerticalQuickCommerce: React.FC = () => {
           </div>
 
           {activeProducts.length === 0 ? (
-            <div className="w-full py-16 text-center bg-white rounded-3xl border border-slate-200/80 p-8 space-y-3">
-              <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                <LayoutGrid className="w-8 h-8" />
+            quickProducts.length === 0 ? (
+              <div className="w-full py-14 text-center bg-white rounded-3xl border border-emerald-100 p-8 space-y-4 shadow-sm">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+                  <Zap className="w-8 h-8 fill-emerald-500 text-emerald-600" />
+                </div>
+                <div className="space-y-1.5">
+                  <h4 className="font-extrabold text-lg text-slate-800">10-Minute Delivery Isn't in Your Area Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                    We haven't expanded quick-commerce stores to <span className="font-semibold text-slate-700">{location || 'your area'}</span> yet. You can still order over 10,000+ authentic products with nationwide doorstep delivery!
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setCurrentVertical('shop');
+                      navigateTo('home');
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>Explore Pan-India Store</span>
+                  </button>
+                </div>
               </div>
-              <h4 className="font-bold text-slate-700">No products found in this aisle</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Try picking another category from the left aisle or switch between Grocery, Food, and Pharmacy above.
-              </p>
-            </div>
+            ) : (
+              <div className="w-full py-16 text-center bg-white rounded-3xl border border-slate-200/80 p-8 space-y-3">
+                <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <LayoutGrid className="w-8 h-8" />
+                </div>
+                <h4 className="font-bold text-slate-700">No products found in this aisle</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Try picking another category from the left aisle or switch between Grocery, Food, and Pharmacy above.
+                </p>
+              </div>
+            )
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {activeProducts.map((product) => {
