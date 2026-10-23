@@ -56,6 +56,7 @@ router.get('/', customerAuth, async (req, res) => {
       where: { customerId: req.user.userId },
       include: {
         customer: { select: { id: true, name: true, email: true, phone: true } },
+        delivery: { select: { id: true, status: true, deliveryOtp: true, distanceKm: true } },
         vendor: {
           select: {
             id: true,
@@ -121,6 +122,13 @@ router.get('/', customerAuth, async (req, res) => {
         vertical: vert,
         createdAt: o.createdAt,
         date: new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        deliveryOtp: o.delivery?.deliveryOtp || null,
+        delivery: o.delivery ? {
+          id: o.delivery.id,
+          status: o.delivery.status,
+          deliveryOtp: o.delivery.deliveryOtp,
+          distanceKm: o.delivery.distanceKm,
+        } : null,
         customer: o.customer ? {
           name: o.customer.name,
           email: o.customer.email,

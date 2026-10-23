@@ -1,47 +1,89 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageHeader, Badge, statusTone, EmptyState, PrimaryButton, GhostButton } from '../../components/dashboard/DashboardUI';
-import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, ChevronRight, Zap, Wrench, Bike } from 'lucide-react';
+import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, ChevronRight, Zap, Wrench, KeyRound } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackEvent } from '../../lib/customerApi';
 import type { OrderItem, VerticalType } from '../../context/AppContext';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
 import { LiveOrderTrackingModal } from '../../components/common/LiveOrderTrackingModal';
+import { InlineOrderTracking } from '../../components/common/InlineOrderTracking';
 
-const QUICK_STEPS: Record<string, string[]> = {
-  pending: ['Order Placed', 'Awaiting Store Acceptance'],
-  placed: ['Order Placed', 'Packing at Dark Store'],
-  confirmed: ['Order Placed', 'Packing at Dark Store'],
-  packing: ['Order Placed', 'Packing at Dark Store', 'Packed & Ready'],
-  processing: ['Order Placed', 'Packing at Dark Store', 'Packed & Ready'],
-  shipped: ['Order Placed', 'Packed & Ready', 'Rider On The Way ⚡'],
-  on_the_way: ['Order Placed', 'Packed & Ready', 'Rider On The Way ⚡'],
-  delivered: ['Order Placed', 'Packed & Ready', 'Rider On The Way ⚡', 'Delivered to Doorstep 🎉'],
-};
+interface Milestone {
+  label: string;
+}
 
-const SERVICE_STEPS: Record<string, string[]> = {
-  pending: ['Booking Requested', 'Confirming Slot'],
-  placed: ['Service Booked', 'Technician Being Assigned'],
-  confirmed: ['Service Booked', 'Certified Technician Assigned 👨‍🔧'],
-  processing: ['Service Booked', 'Technician Assigned', 'Preparing Equipment'],
-  shipped: ['Service Booked', 'Technician Assigned', 'Technician On The Way 🛠️'],
-  on_the_way: ['Service Booked', 'Technician Assigned', 'Technician On The Way 🛠️'],
-  delivered: ['Service Booked', 'Technician Arrived', 'Job Completed (30-Day Warranty Active) ✅'],
-  completed: ['Service Booked', 'Technician Arrived', 'Job Completed (30-Day Warranty Active) ✅'],
-};
+const QUICK_MILESTONES: Milestone[] = [
+  { label: 'Order Placed' },
+  { label: 'Packing at Store' },
+  { label: 'Rider Dispatched ⚡' },
+  { label: 'Delivered 🎉' },
+];
 
-const ECOMMERCE_STEPS: Record<string, string[]> = {
-  pending: ['Order Placed', 'Awaiting Confirmation'],
-  placed: ['Order Placed', 'Order Confirmed by Seller'],
-  confirmed: ['Order Placed', 'Order Confirmed by Seller'],
-  processing: ['Order Placed', 'Order Confirmed', 'Processing Order'],
-  packing: ['Order Placed', 'Order Confirmed', 'Packed & Boxed'],
-  ready_to_ship: ['Order Placed', 'Order Confirmed', 'Packed & Boxed', 'Courier Manifested'],
-  shipped: ['Order Placed', 'Order Confirmed', 'Packed', 'Shipped via Express Courier 🚚'],
-  in_transit: ['Order Placed', 'Order Confirmed', 'Packed', 'Shipped', 'In Transit to Hub'],
-  out_for_delivery: ['Order Placed', 'Order Confirmed', 'Packed', 'Shipped', 'Out For Delivery Today 📦'],
-  delivered: ['Order Placed', 'Order Confirmed', 'Packed', 'Shipped', 'Out For Delivery', 'Delivered at Doorstep 🎁'],
-};
+const SERVICE_MILESTONES: Milestone[] = [
+  { label: 'Booking Confirmed' },
+  { label: 'Technician Assigned 👨‍🔧' },
+  { label: 'Technician On The Way 🛠️' },
+  { label: 'Service Completed ✅' },
+];
+
+const ECOMMERCE_MILESTONES: Milestone[] = [
+  { label: 'Order Placed' },
+  { label: 'Order Confirmed' },
+  { label: 'Packed & Boxed' },
+  { label: 'Shipped via Courier 🚚' },
+  { label: 'Out For Delivery' },
+  { label: 'Delivered at Doorstep 🎁' },
+];
+
+function getMilestoneProgress(status: string, vertical: VerticalType): { milestones: Milestone[]; currentIndex: number } {
+  const normStatus = (status || '').toLowerCase().trim();
+
+  if (vertical === 'quick') {
+    let currentIndex = 0;
+    if (['placed', 'pending'].includes(normStatus)) {
+      currentIndex = 0;
+    } else if (['confirmed', 'packing', 'processing'].includes(normStatus)) {
+      currentIndex = 1;
+    } else if (['shipped', 'on_the_way', 'in_transit', 'out_for_delivery', 'assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'].includes(normStatus)) {
+      currentIndex = 2; // Rider Dispatched - Step 3 Delivered is NOT checked!
+    } else if (['delivered', 'completed'].includes(normStatus)) {
+      currentIndex = 3; // Delivered
+    }
+    return { milestones: QUICK_MILESTONES, currentIndex };
+  }
+
+  if (vertical === 'services') {
+    let currentIndex = 0;
+    if (['placed', 'pending'].includes(normStatus)) {
+      currentIndex = 0;
+    } else if (['confirmed', 'assigned'].includes(normStatus)) {
+      currentIndex = 1;
+    } else if (['processing', 'packing', 'shipped', 'on_the_way', 'in_transit', 'arrived_pickup', 'picked_up'].includes(normStatus)) {
+      currentIndex = 2;
+    } else if (['delivered', 'completed'].includes(normStatus)) {
+      currentIndex = 3;
+    }
+    return { milestones: SERVICE_MILESTONES, currentIndex };
+  }
+
+  // Traditional ShopIndia E-commerce
+  let currentIndex = 0;
+  if (['placed', 'pending'].includes(normStatus)) {
+    currentIndex = 0;
+  } else if (['confirmed'].includes(normStatus)) {
+    currentIndex = 1;
+  } else if (['processing', 'packing', 'ready_to_ship'].includes(normStatus)) {
+    currentIndex = 2;
+  } else if (['shipped'].includes(normStatus)) {
+    currentIndex = 3;
+  } else if (['in_transit', 'out_for_delivery'].includes(normStatus)) {
+    currentIndex = 4;
+  } else if (['delivered', 'completed'].includes(normStatus)) {
+    currentIndex = 5;
+  }
+  return { milestones: ECOMMERCE_MILESTONES, currentIndex };
+}
 
 export const OrdersPage: React.FC = () => {
   const { orders, cancelOrder, updateOrderStatus } = useApp();
@@ -49,6 +91,7 @@ export const OrdersPage: React.FC = () => {
   const [filterVertical, setFilterVertical] = useState<'all' | VerticalType>('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [orderOtps, setOrderOtps] = useState<Record<string, string>>({});
 
   const getOrderVertical = (o: any): VerticalType => {
     if (o.vertical === 'quick' || o.vertical === 'services' || o.vertical === 'shop') return o.vertical;
@@ -70,7 +113,8 @@ export const OrdersPage: React.FC = () => {
 
   const openOrder = openId !== null ? orders.find((o) => (o.id || '') === openId) : null;
   const orderVert = openOrder ? getOrderVertical(openOrder) : 'shop';
-  const steps = openOrder ? getVerticalSteps(openOrder.status, orderVert) : [];
+  const milestoneInfo = openOrder ? getMilestoneProgress(openOrder.status, orderVert) : { milestones: [], currentIndex: 0 };
+  const activeOtp = openOrder ? (orderOtps[openOrder.id] || (openOrder as any).deliveryOtp || (openOrder as any).delivery?.deliveryOtp || null) : null;
   const cancelable = openOrder ? ['pending', 'placed', 'confirmed', 'processing', 'packing'].includes(openOrder.status) : false;
 
   return (
@@ -174,146 +218,343 @@ export const OrdersPage: React.FC = () => {
               <AnimatePresence initial={false}>
                 {isOpen && openOrder && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="border-t border-brand-border/60 bg-slate-50/40 overflow-hidden">
-                    <div className="p-5 space-y-5">
-                      {/* Tracking timeline */}
-                      <div>
-                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Order Tracking</h4>
-                        <div className="flex flex-col">
-                          {steps.map((s, i) => (
-                            <div key={s} className="flex items-start gap-3">
-                              <div className="flex flex-col items-center">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${i < steps.length ? 'bg-emerald-500 text-white' : 'bg-slate-200'}`}>
-                                  <CheckCircle2 className="w-4 h-4" />
+                    <div className="p-4 sm:p-6 space-y-6">
+                      
+                      {/* CONDITIONAL LAYOUT: Quick Commerce & Glacons Services vs Traditional ShopIndia */}
+                      {orderVert === 'quick' || orderVert === 'services' ? (
+                        <>
+                          {/* TOP SECTION: Stepper on Left, Live Street Tracking Radar on Right (As requested!) */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+                            {/* Left: Milestone Stepper with Accurate Progress */}
+                            <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center justify-between mb-4">
+                                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate">
+                                    {orderVert === 'services' ? 'Service Timeline' : 'Delivery Progress'}
+                                  </h4>
+                                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${orderVert === 'services' ? 'bg-amber-100 text-amber-800' : 'bg-orange-100 text-orange-800'}`}>
+                                    {orderVert === 'services' ? 'Glacons Tech Booking' : '⚡ 10-Min Delivery'}
+                                  </span>
                                 </div>
-                                {i < steps.length - 1 && <div className="w-0.5 h-8 bg-emerald-400" />}
-                              </div>
-                              <p className={`text-xs font-semibold pt-1 ${i < steps.length ? 'text-brand-graphite' : 'text-brand-slate'}`}>{s}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {/* Items */}
-                        <div>
-                          <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Items</h4>
-                          <div className="flex flex-col gap-3">
-                            {openOrder.items.map((it: OrderItem, i: number) => (
-                              <div key={i} className="flex items-center gap-3 bg-white border border-brand-border rounded-xl p-2.5">
-                                <img src={it.product.image} alt={it.product.title} className="w-12 h-12 rounded-lg object-cover bg-slate-100" />
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-bold text-brand-graphite line-clamp-1">{it.product.title}</p>
-                                  <p className="text-xs text-brand-slate">Qty {it.quantity}</p>
+                                <div className="flex flex-col">
+                                  {milestoneInfo.milestones.map((m, i) => {
+                                    const isCompleted = i <= milestoneInfo.currentIndex;
+                                    const isCurrent = i === milestoneInfo.currentIndex;
+                                    return (
+                                      <div key={m.label} className="flex items-start gap-3">
+                                        <div className="flex flex-col items-center">
+                                          <div
+                                            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                                              isCompleted
+                                                ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-100'
+                                                : 'bg-slate-200 text-slate-400'
+                                            }`}
+                                          >
+                                            {isCompleted ? (
+                                              <CheckCircle2 className="w-4 h-4" />
+                                            ) : (
+                                              <span className="w-2 h-2 rounded-full bg-slate-400" />
+                                            )}
+                                          </div>
+                                          {i < milestoneInfo.milestones.length - 1 && (
+                                            <div
+                                              className={`w-0.5 h-8 transition-colors ${
+                                                i < milestoneInfo.currentIndex ? 'bg-emerald-400' : 'bg-slate-200'
+                                              }`}
+                                            />
+                                          )}
+                                        </div>
+                                        <div className="pt-0.5 pb-2">
+                                          <p
+                                            className={`text-xs font-semibold ${
+                                              isCompleted ? 'text-brand-graphite' : 'text-slate-400'
+                                            }`}
+                                          >
+                                            {m.label}
+                                          </p>
+                                          {isCurrent && i < milestoneInfo.milestones.length - 1 && (
+                                            <span className="inline-block text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                              In Progress
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                                <span className="text-xs font-bold text-brand-graphite font-numbers">₹{(it.product.price * it.quantity).toLocaleString('en-IN')}</span>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                        {/* Summary + actions */}
-                        <div>
-                          <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Order Summary</h4>
-                          <div className="bg-white border border-brand-border rounded-lg p-4 space-y-2 text-xs text-brand-slate">
-                            <div className="flex justify-between"><span>Subtotal</span><span className="font-bold text-brand-graphite font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span></div>
-                            <div className="flex justify-between"><span>Shipping</span><span className="font-bold text-emerald-600">FREE</span></div>
-                            <div className="flex justify-between"><span>GST (18% incl.)</span><span className="font-bold text-brand-graphite font-numbers">₹{Math.round(openOrder.total - (openOrder.total / 1.18)).toLocaleString('en-IN')}</span></div>
-                            <div className="border-t border-brand-border pt-2 flex justify-between items-center">
-                              <span className="font-bold text-brand-graphite">Grand Total</span>
-                              <span className="font-extrabold text-brand-blue font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span>
+                            </div>
+
+                            {/* Right: Interactive Street Map (Swiggy / Zomato / Uber Style) */}
+                            <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-sm">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate">
+                                    {orderVert === 'services' ? 'Live Technician Radar' : 'Live Partner Dispatch Radar'}
+                                  </h4>
+                                </div>
+                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                  GPS Live Telemetry
+                                </span>
+                              </div>
+                              <InlineOrderTracking
+                                orderId={openOrder.id}
+                                orderNumber={openOrder.orderNumber}
+                                orderStatus={openOrder.status}
+                                vertical={orderVert}
+                                initialOtp={activeOtp}
+                                onOtpLoaded={(code) => setOrderOtps((prev) => ({ ...prev, [openOrder.id]: code }))}
+                              />
                             </div>
                           </div>
 
-                          {openOrder.vendor && (
-                            <div className="mt-3 bg-white border border-brand-border rounded-lg p-3.5 text-xs text-brand-slate">
-                              <p className="text-[10px] font-extrabold uppercase tracking-wider text-brand-slate mb-1">Sold & Shipped By</p>
-                              <p className="font-bold text-brand-graphite text-xs">{openOrder.vendor.businessName}</p>
-                              <p className="mt-0.5 text-[11px] text-slate-500">
-                                {[openOrder.vendor.street, openOrder.vendor.city, openOrder.vendor.state, openOrder.vendor.pincode].filter(Boolean).join(', ')}
-                              </p>
-                            </div>
-                          )}
+                          {/* BOTTOM SECTION: Items + OTP on Left, Order Summary & Actions on Right */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                            {/* Left: Items list + PROMINENT CUSTOMER DELIVERY OTP */}
+                            <div className="space-y-4">
+                              <div>
+                                <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Items</h4>
+                                <div className="flex flex-col gap-3">
+                                  {openOrder.items.map((it: OrderItem, i: number) => (
+                                    <div key={i} className="flex items-center gap-3 bg-white border border-brand-border rounded-xl p-2.5 shadow-sm">
+                                      <img src={it.product.image} alt={it.product.title} className="w-12 h-12 rounded-lg object-cover bg-slate-100" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-bold text-brand-graphite line-clamp-1">{it.product.title}</p>
+                                        <p className="text-xs text-brand-slate">Qty {it.quantity}</p>
+                                      </div>
+                                      <span className="text-xs font-bold text-brand-graphite font-numbers">₹{(it.product.price * it.quantity).toLocaleString('en-IN')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
 
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {/* Live Rider Tracking Button for Quick Commerce Orders */}
-                            {(orderVert === 'quick' || ['shipped', 'on_the_way', 'packing', 'processing'].includes(openOrder.status)) && (
-                              <button
-                                onClick={() => setTrackingOrderId(openOrder.id)}
-                                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-black text-xs rounded-button shadow-md transition-all active:scale-95 cursor-pointer"
-                              >
-                                <Bike className="w-3.5 h-3.5" />
-                                <span>Track Rider Live</span>
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
-                              </button>
-                            )}
-                            <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
-                            {cancelable && (
-                              <button 
-                                disabled={isProcessing}
-                                onClick={async () => { 
-                                  if (confirm('Are you sure you want to cancel this order?')) {
-                                    setIsProcessing(true);
-                                    try {
-                                      await cancelOrder(openOrder.id);
-                                      trackEvent('ORDER_CANCELLED', { entityId: openOrder.id, entityType: 'order' }); 
-                                      alert('Order successfully cancelled.');
-                                    } catch (err) {
-                                      alert('Failed to cancel order.');
-                                    } finally {
-                                      setIsProcessing(false);
-                                    }
-                                  }
-                                }} 
-                                className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-xs font-bold disabled:opacity-50"
-                              >
-                                <X className="w-3.5 h-3.5" /> Cancel
-                              </button>
-                            )}
-                            {openOrder.status === 'delivered' && (
-                              <>
-                                <GhostButton 
-                                  disabled={isProcessing}
-                                  className="inline-flex items-center gap-1.5 disabled:opacity-50" 
-                                  onClick={async () => { 
-                                    setIsProcessing(true);
-                                    try {
-                                      await updateOrderStatus(openOrder.id, 'returned');
-                                      trackEvent('RETURN_REQUESTED', { entityId: openOrder.id, entityType: 'order' }); 
-                                      alert('Return request submitted.');
-                                    } catch (err) {
-                                      alert('Failed to submit return request.');
-                                    } finally {
-                                      setIsProcessing(false);
-                                    }
-                                  }}
-                                >
-                                  <Undo2 className="w-3.5 h-3.5" /> Return
+                              {/* PROMINENT 4-DIGIT CUSTOMER DELIVERY OTP (Directly under items / beside tracking) */}
+                              {activeOtp ? (
+                                <div className="p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 rounded-2xl shadow-sm flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-orange-500/20">
+                                      <KeyRound className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-900">
+                                          Customer Delivery OTP
+                                        </span>
+                                        <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">
+                                          Required for Handover
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-slate-600 mt-0.5">
+                                        Share this 4-digit code with the {orderVert === 'services' ? 'technician' : 'delivery partner'} upon arrival
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right pl-3">
+                                    <div className="font-mono text-2xl sm:text-3xl font-black tracking-widest text-slate-900 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300 shadow-sm inline-block">
+                                      {activeOtp}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : openOrder.status === 'delivered' ? (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                  Order handed over and verified via secure OTP.
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* Right: Order Summary + Actions */}
+                            <div>
+                              <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Order Summary</h4>
+                              <div className="bg-white border border-brand-border rounded-lg p-4 space-y-2 text-xs text-brand-slate shadow-sm">
+                                <div className="flex justify-between"><span>Subtotal</span><span className="font-bold text-brand-graphite font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span></div>
+                                <div className="flex justify-between"><span>Shipping</span><span className="font-bold text-emerald-600">FREE</span></div>
+                                <div className="flex justify-between"><span>GST (18% incl.)</span><span className="font-bold text-brand-graphite font-numbers">₹{Math.round(openOrder.total - (openOrder.total / 1.18)).toLocaleString('en-IN')}</span></div>
+                                <div className="border-t border-brand-border pt-2 flex justify-between items-center">
+                                  <span className="font-bold text-brand-graphite">Grand Total</span>
+                                  <span className="font-extrabold text-brand-blue font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span>
+                                </div>
+                              </div>
+
+                              {openOrder.vendor && (
+                                <div className="mt-3 bg-white border border-brand-border rounded-lg p-3.5 text-xs text-brand-slate shadow-sm">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-brand-slate mb-1">Sold & Shipped By</p>
+                                  <p className="font-bold text-brand-graphite text-xs">{openOrder.vendor.businessName}</p>
+                                  <p className="mt-0.5 text-[11px] text-slate-500">
+                                    {[openOrder.vendor.street, openOrder.vendor.city, openOrder.vendor.state, openOrder.vendor.pincode].filter(Boolean).join(', ')}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                                {cancelable && (
+                                  <button 
+                                    disabled={isProcessing}
+                                    onClick={async () => { 
+                                      if (confirm('Are you sure you want to cancel this order?')) {
+                                        setIsProcessing(true);
+                                        try {
+                                          await cancelOrder(openOrder.id);
+                                          trackEvent('ORDER_CANCELLED', { entityId: openOrder.id, entityType: 'order' }); 
+                                          alert('Order successfully cancelled.');
+                                        } catch (err) {
+                                          alert('Failed to cancel order.');
+                                        } finally {
+                                          setIsProcessing(false);
+                                        }
+                                      }
+                                    }} 
+                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-xs font-bold disabled:opacity-50"
+                                  >
+                                    <X className="w-3.5 h-3.5" /> Cancel
+                                  </button>
+                                )}
+                                <GhostButton className="inline-flex items-center gap-1.5" onClick={() => { trackEvent('REORDER', { entityId: openOrder.id, entityType: 'order' }); alert('Items added to cart (demo).'); }}>
+                                  <RotateCcw className="w-3.5 h-3.5" /> Reorder
                                 </GhostButton>
-                                <GhostButton 
-                                  disabled={isProcessing}
-                                  className="inline-flex items-center gap-1.5 disabled:opacity-50" 
-                                  onClick={async () => { 
-                                    setIsProcessing(true);
-                                    try {
-                                      await updateOrderStatus(openOrder.id, 'returned');
-                                      trackEvent('EXCHANGE_REQUESTED', { entityId: openOrder.id, entityType: 'order' }); 
-                                      alert('Exchange request submitted.'); 
-                                    } catch (err) {
-                                      alert('Failed to submit exchange request.');
-                                    } finally {
-                                      setIsProcessing(false);
-                                    }
-                                  }}
-                                >
-                                  <ArrowLeftRight className="w-3.5 h-3.5" /> Exchange
-                                </GhostButton>
-                              </>
-                            )}
-                            <GhostButton className="inline-flex items-center gap-1.5" onClick={() => { trackEvent('REORDER', { entityId: openOrder.id, entityType: 'order' }); alert('Items added to cart (demo).'); }}>
-                              <RotateCcw className="w-3.5 h-3.5" /> Reorder
-                            </GhostButton>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        </>
+                      ) : (
+                        /* TRADITIONAL SHOPINDIA (ECOMMERCE) LAYOUT - UNTOUCHED, RESERVED FOR SHIPROCKET */
+                        <>
+                          {/* Tracking timeline */}
+                          <div>
+                            <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Order Tracking</h4>
+                            <div className="flex flex-col">
+                              {milestoneInfo.milestones.map((m, i) => {
+                                const isCompleted = i <= milestoneInfo.currentIndex;
+                                return (
+                                  <div key={m.label} className="flex items-start gap-3">
+                                    <div className="flex flex-col items-center">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-200'}`}>
+                                        {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <span className="w-2 h-2 rounded-full bg-slate-400" />}
+                                      </div>
+                                      {i < milestoneInfo.milestones.length - 1 && <div className={`w-0.5 h-8 ${i < milestoneInfo.currentIndex ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+                                    </div>
+                                    <p className={`text-xs font-semibold pt-1 ${isCompleted ? 'text-brand-graphite' : 'text-brand-slate'}`}>{m.label}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {/* Items */}
+                            <div>
+                              <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Items</h4>
+                              <div className="flex flex-col gap-3">
+                                {openOrder.items.map((it: OrderItem, i: number) => (
+                                  <div key={i} className="flex items-center gap-3 bg-white border border-brand-border rounded-xl p-2.5">
+                                    <img src={it.product.image} alt={it.product.title} className="w-12 h-12 rounded-lg object-cover bg-slate-100" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-bold text-brand-graphite line-clamp-1">{it.product.title}</p>
+                                      <p className="text-xs text-brand-slate">Qty {it.quantity}</p>
+                                    </div>
+                                    <span className="text-xs font-bold text-brand-graphite font-numbers">₹{(it.product.price * it.quantity).toLocaleString('en-IN')}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Summary + actions */}
+                            <div>
+                              <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate mb-3">Order Summary</h4>
+                              <div className="bg-white border border-brand-border rounded-lg p-4 space-y-2 text-xs text-brand-slate">
+                                <div className="flex justify-between"><span>Subtotal</span><span className="font-bold text-brand-graphite font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span></div>
+                                <div className="flex justify-between"><span>Shipping</span><span className="font-bold text-emerald-600">FREE</span></div>
+                                <div className="flex justify-between"><span>GST (18% incl.)</span><span className="font-bold text-brand-graphite font-numbers">₹{Math.round(openOrder.total - (openOrder.total / 1.18)).toLocaleString('en-IN')}</span></div>
+                                <div className="border-t border-brand-border pt-2 flex justify-between items-center">
+                                  <span className="font-bold text-brand-graphite">Grand Total</span>
+                                  <span className="font-extrabold text-brand-blue font-numbers">₹{openOrder.total.toLocaleString('en-IN')}</span>
+                                </div>
+                              </div>
+
+                              {openOrder.vendor && (
+                                <div className="mt-3 bg-white border border-brand-border rounded-lg p-3.5 text-xs text-brand-slate">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-brand-slate mb-1">Sold & Shipped By</p>
+                                  <p className="font-bold text-brand-graphite text-xs">{openOrder.vendor.businessName}</p>
+                                  <p className="mt-0.5 text-[11px] text-slate-500">
+                                    {[openOrder.vendor.street, openOrder.vendor.city, openOrder.vendor.state, openOrder.vendor.pincode].filter(Boolean).join(', ')}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <PrimaryButton onClick={() => generateAndPrintInvoice(openOrder)} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                                {cancelable && (
+                                  <button 
+                                    disabled={isProcessing}
+                                    onClick={async () => { 
+                                      if (confirm('Are you sure you want to cancel this order?')) {
+                                        setIsProcessing(true);
+                                        try {
+                                          await cancelOrder(openOrder.id);
+                                          trackEvent('ORDER_CANCELLED', { entityId: openOrder.id, entityType: 'order' }); 
+                                          alert('Order successfully cancelled.');
+                                        } catch (err) {
+                                          alert('Failed to cancel order.');
+                                        } finally {
+                                          setIsProcessing(false);
+                                        }
+                                      }
+                                    }} 
+                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-xs font-bold disabled:opacity-50"
+                                  >
+                                    <X className="w-3.5 h-3.5" /> Cancel
+                                  </button>
+                                )}
+                                {openOrder.status === 'delivered' && (
+                                  <>
+                                    <GhostButton 
+                                      disabled={isProcessing}
+                                      className="inline-flex items-center gap-1.5 disabled:opacity-50" 
+                                      onClick={async () => { 
+                                        setIsProcessing(true);
+                                        try {
+                                          await updateOrderStatus(openOrder.id, 'returned');
+                                          trackEvent('RETURN_REQUESTED', { entityId: openOrder.id, entityType: 'order' }); 
+                                          alert('Return request submitted.');
+                                        } catch (err) {
+                                          alert('Failed to submit return request.');
+                                        } finally {
+                                          setIsProcessing(false);
+                                        }
+                                      }}
+                                    >
+                                      <Undo2 className="w-3.5 h-3.5" /> Return
+                                    </GhostButton>
+                                    <GhostButton 
+                                      disabled={isProcessing}
+                                      className="inline-flex items-center gap-1.5 disabled:opacity-50" 
+                                      onClick={async () => { 
+                                        setIsProcessing(true);
+                                        try {
+                                          await updateOrderStatus(openOrder.id, 'returned');
+                                          trackEvent('EXCHANGE_REQUESTED', { entityId: openOrder.id, entityType: 'order' }); 
+                                          alert('Exchange request submitted.'); 
+                                        } catch (err) {
+                                          alert('Failed to submit exchange request.');
+                                        } finally {
+                                          setIsProcessing(false);
+                                        }
+                                      }}
+                                    >
+                                      <ArrowLeftRight className="w-3.5 h-3.5" /> Exchange
+                                    </GhostButton>
+                                  </>
+                                )}
+                                <GhostButton className="inline-flex items-center gap-1.5" onClick={() => { trackEvent('REORDER', { entityId: openOrder.id, entityType: 'order' }); alert('Items added to cart (demo).'); }}>
+                                  <RotateCcw className="w-3.5 h-3.5" /> Reorder
+                                </GhostButton>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -333,13 +574,3 @@ export const OrdersPage: React.FC = () => {
     </div>
   );
 };
-
-function getVerticalSteps(status: string, vertical: VerticalType): string[] {
-  if (vertical === 'quick') {
-    return QUICK_STEPS[status] || ['Order Placed', 'Packing at Store', 'Rider Dispatched', 'Delivered'];
-  }
-  if (vertical === 'services') {
-    return SERVICE_STEPS[status] || ['Service Booked', 'Technician Assigned', 'Technician On The Way', 'Job Completed'];
-  }
-  return ECOMMERCE_STEPS[status] || ['Order Placed', 'Order Confirmed', 'Packed', 'Shipped', 'Delivered'];
-}
