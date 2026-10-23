@@ -193,6 +193,8 @@ router.get('/active-job', async (req, res) => {
           },
         },
       },
+    });
+
     if (activeJob) {
       if (!activeJob.dropoffAddress || activeJob.dropoffAddress.replace(/[,\s]/g, '').length === 0) {
         activeJob.dropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
