@@ -20,6 +20,10 @@ import { OffersPage } from './pages/OffersPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { AdminVendorView } from './pages/AdminVendorView';
+import { FinancePage } from './pages/FinancePage';
+import { PayoutsPage } from './pages/PayoutsPage';
+import { AccountsPage } from './pages/AccountsPage';
+import { AccountStatementPage } from './pages/AccountStatementPage';
 
 export interface ManagedVendor { id: string; name: string; }
 
@@ -27,6 +31,7 @@ const AdminContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('dashboard');
   const [managedVendor, setManagedVendor] = useState<ManagedVendor | null>(null);
+  const [statementTarget, setStatementTarget] = useState<{ partyType: string; partyId: string; name?: string } | null>(null);
 
   if (!isAuthenticated) return <AdminLogin />;
 
@@ -34,7 +39,7 @@ const AdminContent: React.FC = () => {
   if (managedVendor) {
     return (
       <div className="flex min-h-screen bg-[#FAF9F6]">
-        <AdminSidebar currentTab={tab} onTabChange={(t) => { setTab(t); setManagedVendor(null); }} />
+        <AdminSidebar currentTab={tab} onTabChange={(t) => { setTab(t); setManagedVendor(null); setStatementTarget(null); }} />
         <main className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto">
           <AdminVendorView vendor={managedVendor} onBack={() => setManagedVendor(null)} />
         </main>
@@ -43,8 +48,22 @@ const AdminContent: React.FC = () => {
   }
 
   const renderTab = () => {
+    if (statementTarget) {
+      return (
+        <AccountStatementPage
+          partyType={statementTarget.partyType}
+          partyId={statementTarget.partyId}
+          initialAccountName={statementTarget.name}
+          onBack={() => setStatementTarget(null)}
+        />
+      );
+    }
+
     switch (tab) {
       case 'dashboard': return <Dashboard />;
+      case 'finance': return <FinancePage />;
+      case 'payouts': return <PayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
+      case 'accounts': return <AccountsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'regional-admins': return <RegionalAdminsPage />;
       case 'vendors': return <VendorsPage onManage={setManagedVendor} />;
       case 'users': return <UsersPage />;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe2, LayoutDashboard, Radar, Store, Bike, LogOut, ChevronRight, Headphones } from 'lucide-react';
+import { Globe2, LayoutDashboard, Radar, Store, Bike, LogOut, ChevronRight, Headphones, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface RegionalAdminSidebarProps {
@@ -15,6 +15,7 @@ export const RegionalAdminSidebar: React.FC<RegionalAdminSidebarProps> = ({ curr
     { id: 'live-map', label: 'Live Dispatch Radar', icon: Radar },
     { id: 'vendors', label: 'Territory Merchants', icon: Store },
     { id: 'riders', label: 'Delivery Fleet & KYC', icon: Bike },
+    { id: 'payouts', label: 'Payout Approvals', icon: Wallet },
     { id: 'support', label: 'Territory Support', icon: Headphones },
   ];
 

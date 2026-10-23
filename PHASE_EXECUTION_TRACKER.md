@@ -13,7 +13,7 @@
 | **Phase 3** | Pricing Engine (`server/lib/pricing.js`) & Admin Dynamic Settings with Live Calculator | ✅ COMPLETED | lib/pricing.js, routes/admin/pricing.js, PricingSettingsPage.tsx created |
 | **Phase 4** | 3-Tier Support Queue (Vendor → Regional Admin → Super Admin) & SLA Timers | ✅ COMPLETED | support routes, slaEscalation.js, VendorSupport, RegionalSupport, SupportPage upgraded |
 | **Phase 5** | Vendor Store Settings (`VendorSettings.tsx`), Mapbox GPS & Hyper-Local Quick-Commerce Filtering | ✅ COMPLETED | VendorSettings, GPS detection, item analytics, Haversine filtering |
-| **Phase 6** | Unified 3-Queue Payout Center (`PayoutRequest`) & Master Finance Dashboard (`/admin/finance`) | ⚪ NOT STARTED | Pending |
+| **Phase 6** | Unified 3-Queue Payout Center (`PayoutRequest`) & Master Finance Dashboard (`/admin/finance`) | ✅ COMPLETED | Unified PayoutRequest, CFO balance sheet, partner passbooks & regional approvals |
 | **Phase 7** | COD Dynamic Clearance (QR vs Cash), Remittance & Rapido-Style Doorstep Service Adjustment | ⚪ NOT STARTED | Pending |
 
 ---
@@ -197,7 +197,20 @@
 - `src/regional-admin/pages/RegionalPayouts.tsx` (NEW)
 
 ### 6.3 Execution Status & Verification
-- **Status:** Not Started
+- **Status:** ✅ COMPLETED
+- **Verification Commands:** `npm run build` (Clean production bundle build in 9.98s)
+- **Details:**
+  - `server/routes/admin/finance.js`: CFO financial balance sheet endpoint (`/api/admin/finance/overview`) calculating Gross Customer Paid, Gateway Fees, Net Received, To Be Cleared (Vendor & Rider liability; never platform profit), Net Platform Profit, Gross Commission, and COD Cash Float. Also includes Razorpay settlement logs (`/settlements`).
+  - `server/routes/admin/payouts.js`: Unified 3-queue payout review (`/api/admin/payouts`), approval (`/:id/approve`), disbursement recording UTR and immutable ledger `DEBIT` (`/:id/complete`), rejection (`/:id/reject`), accounts directory (`/accounts`), chronological passbook statement with running balances (`/statement/:partyType/:partyId`), and audited manual adjustment (`/manual-adjustment`).
+  - `server/routes/regional-admin/payouts.js`: Territory payout inspection and forward-to-HQ endpoint (`/:id/verify`).
+  - `server/routes/vendor/wallet.js` & `server/routes/rider/wallet.js`: Updated withdrawal requests to insert into unified `PayoutRequest` model with bank/UPI snapshots.
+  - `src/admin/pages/FinancePage.tsx`: CFO financial overview dashboard with real-time balance sheet cards, COD float alerts, refund at-fault breakdown, and Razorpay settlement tracking.
+  - `src/admin/pages/PayoutsPage.tsx`: 3-queue payout review (Vendors, Technicians, Delivery Riders) with UTR disbursement modal and rejection modal.
+  - `src/admin/pages/AccountsPage.tsx`: Partner directory with KYC badges, wallet balances, passbook statement link, and audited manual adjustment modal.
+  - `src/admin/pages/AccountStatementPage.tsx`: Chronological ledger passbook with running balance, credit/debit indicators, and CSV export.
+  - `src/regional-admin/pages/RegionalPayouts.tsx`: Territory payout review & forwarding interface.
+  - `src/admin/AdminSidebar.tsx` & `src/admin/AdminPortal.tsx`: Mounted Finance, Payouts, and Accounts tabs.
+  - `src/regional-admin/RegionalAdminSidebar.tsx` & `src/regional-admin/RegionalAdminPortal.tsx`: Mounted Regional Payout Approvals tab.
 
 ---
 

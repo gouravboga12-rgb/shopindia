@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
   Building2, ShieldCheck, MapPin, Headphones, Percent, LogOut,
-  Truck, Tag, BarChart3, Bell, LayoutGrid, Image, Globe2
+  Truck, Tag, BarChart3, Bell, LayoutGrid, Image, Globe2,
+  DollarSign, Wallet, CreditCard
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,6 +17,10 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'view_dashboard' },
+    { id: 'finance', label: 'Finance Center', icon: DollarSign, perm: 'manage_commissions' },
+    { id: 'payouts', label: 'Partner Payouts', icon: Wallet, perm: 'manage_commissions' },
+    { id: 'accounts', label: 'Accounts & Statements', icon: CreditCard, perm: 'manage_commissions' },
+    { id: 'commissions', label: 'Pricing & Commission', icon: Percent, perm: 'manage_commissions' },
     { id: 'regional-admins', label: 'Regional Admins', icon: Globe2, perm: 'manage_users' },
     { id: 'vendors', label: 'Vendors', icon: Store, perm: 'view_vendors' },
     { id: 'riders', label: 'Riders Operations', icon: Truck, perm: 'view_users' },
@@ -26,7 +31,6 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'rbac', label: 'RBAC Controls', icon: ShieldCheck, perm: 'manage_users' },
     { id: 'service-areas', label: 'Service Areas', icon: MapPin, perm: 'manage_service_areas' },
     { id: 'support', label: 'Support Queue', icon: Headphones, perm: 'view_support' },
-    { id: 'commissions', label: 'Pricing & Commissions', icon: Percent, perm: 'manage_commissions' },
     { id: 'promotions', label: 'Promotions', icon: Image, perm: 'manage_commissions' },
     { id: 'offers', label: 'Offers & Coupons', icon: Tag, perm: 'manage_commissions' },
     { id: 'categories', label: 'Categories', icon: LayoutGrid, perm: 'view_products' },

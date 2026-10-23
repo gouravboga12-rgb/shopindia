@@ -123,17 +123,39 @@ router.post('/withdraw', async (req, res) => {
       return res.status(400).json({ error: 'Invalid withdrawal amount or insufficient available balance.' });
     }
 
-    const tx = await prisma.transaction.create({
-      data: {
-        userId: vendor.userId,
-        type: 'withdrawal',
-        amount: amount,
-        status: 'pending',
-        gatewayRef: 'withdrawal_request'
-      }
-    });
+    const [tx, payoutReq] = await prisma.$transaction([
+      prisma.transaction.create({
+        data: {
+          userId: vendor.userId,
+          type: 'withdrawal',
+          amount: parseFloat(amount),
+          status: 'pending',
+          gatewayRef: 'withdrawal_request'
+        }
+      }),
+      prisma.payoutRequest.create({
+        data: {
+          partyType: 'VENDOR',
+          partyId: vendor.id,
+          vendorId: vendor.id,
+          amount: parseFloat(amount),
+          status: 'pending',
+          bankSnapshot: {
+            accountHolder: vendor.accountHolder,
+            accountNumber: vendor.accountNumber,
+            ifsc: vendor.ifsc,
+            bankName: vendor.bankName,
+            upiId: vendor.upiId,
+          },
+        }
+      })
+    ]);
 
-    res.json({ message: 'Withdrawal request submitted for approval.', walletBalance: vendor.walletBalance });
+    res.json({
+      message: 'Withdrawal request submitted for approval.',
+      walletBalance: vendor.walletBalance,
+      payoutRequestId: payoutReq.id
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

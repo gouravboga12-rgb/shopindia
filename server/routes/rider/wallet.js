@@ -72,7 +72,7 @@ router.post('/payout-request', async (req, res) => {
       });
     }
 
-    const [payout] = await prisma.$transaction([
+    const [payout, payoutReq] = await prisma.$transaction([
       prisma.riderPayout.create({
         data: {
           riderProfileId: profile.id,
@@ -80,6 +80,22 @@ router.post('/payout-request', async (req, res) => {
           bankAccountNumber,
           ifscCode,
           status: 'pending',
+        },
+      }),
+      prisma.payoutRequest.create({
+        data: {
+          partyType: 'RIDER',
+          partyId: profile.id,
+          riderProfileId: profile.id,
+          amount: withdrawAmount,
+          status: 'pending',
+          bankSnapshot: {
+            accountHolder: profile.accountHolder,
+            accountNumber: bankAccountNumber || profile.accountNumber,
+            ifsc: ifscCode || profile.ifsc,
+            bankName: profile.bankName,
+            upiId: profile.upiId,
+          },
         },
       }),
       prisma.riderProfile.update({

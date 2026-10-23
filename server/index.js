@@ -66,6 +66,8 @@ app.use('/api/admin/service-areas', require('./routes/admin/serviceAreas'));
 app.use('/api/admin/support', require('./routes/admin/support'));
 app.use('/api/admin/commissions', require('./routes/admin/commissions'));
 app.use('/api/admin/pricing', require('./routes/admin/pricing'));
+app.use('/api/admin/finance', require('./routes/admin/finance'));
+app.use('/api/admin/payouts', require('./routes/admin/payouts'));
 app.use('/api/admin/riders', require('./routes/admin/riders'));
 app.use('/api/admin/regional-admins', require('./routes/admin/regionalAdmins'));
 app.use('/api/admin/reports', require('./routes/admin/reports'));
@@ -78,6 +80,7 @@ app.use('/api/admin/reviews', require('./routes/admin/reviews'));
 // Regional Admin routes
 app.use('/api/regional-admin/auth', require('./routes/regional-admin/auth'));
 app.use('/api/regional-admin/support', require('./routes/regional-admin/support'));
+app.use('/api/regional-admin/payouts', require('./routes/regional-admin/payouts'));
 app.use('/api/regional-admin', require('./routes/regional-admin/operations'));
 
 // Rider & Delivery Partner routes
