@@ -8,10 +8,8 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  Wrench,
   Sparkles,
   Check,
-  Zap,
 } from 'lucide-react';
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
@@ -91,13 +89,13 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
     });
   };
 
-  // Mapbox & Reverse Geocoding into clean, structured address (Road, Colony, Mandal, City, State, Pincode, Country)
   const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
     setError(null);
     try {
       const geocoded = await detectCurrentLocationWithMapbox();
       setDetectedDetails(geocoded);
+
       setFormData((prev) => ({
         ...prev,
         address: geocoded.fullAddress,
@@ -105,7 +103,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
         currentLng: geocoded.longitude,
       }));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not detect location. Please type manually.');
+      setError(err instanceof Error ? err.message : 'Could not detect your GPS location.');
     } finally {
       setIsDetectingLocation(false);
     }
@@ -115,19 +113,18 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
-
-    // Validation for service partners
-    if (isRegister && (formData.partnerType === 'service' || formData.partnerType === 'both')) {
-      if (formData.skills.length === 0) {
-        setError('Please select at least one service skill so customers and vendors can book your services.');
-        return;
-      }
-    }
-
     setLoading(true);
 
     try {
       if (isRegister) {
+        // Validate service skills if partner is service or both
+        if (
+          (formData.partnerType === 'service' || formData.partnerType === 'both') &&
+          formData.skills.length === 0
+        ) {
+          throw new Error('Please select at least one service skill to register as a service partner.');
+        }
+
         const res = await fetch('/api/rider/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -136,13 +133,20 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Registration failed');
 
-        setSuccessMsg('Partner registration submitted! You can now log in.');
-        setTimeout(() => setIsRegister(false), 1500);
+        setSuccessMsg('Registration submitted! You can now log into your dashboard to start receiving dispatches.');
+        setTimeout(() => {
+          setIsRegister(false);
+          setSuccessMsg(null);
+        }, 2000);
       } else {
+        // Login
         const res = await fetch('/api/rider/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, password: formData.password }),
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Login failed');
@@ -160,46 +164,36 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
   const vehicleSkills = PARTNER_SKILLS.filter((s) => s.category === 'vehicle');
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-8 text-slate-100">
-      <div
-        className={`w-full transition-all duration-300 ${
-          isRegister ? 'max-w-xl' : 'max-w-md'
-        } bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden`}
-      >
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-8 text-slate-800">
+      <div className="w-full max-w-xl bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+        
         {/* Glow Accent */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-orange-500 to-amber-400 rounded-full blur-sm" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full blur-sm" />
 
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto mb-3 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg shadow-orange-500/20">
-            {formData.partnerType === 'service' ? (
-              <Wrench className="w-8 h-8" />
-            ) : formData.partnerType === 'both' ? (
-              <Zap className="w-8 h-8" />
-            ) : (
-              <Bike className="w-8 h-8" />
-            )}
+          <div className="w-14 h-14 mx-auto mb-3 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-orange-500/20">
+            <Bike className="w-7 h-7" />
           </div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-white">
-            {isRegister ? 'Partner Fleet Registration' : 'Partner Portal Sign In'}
+          <h2 className="text-2xl font-black tracking-tight text-slate-900">
+            {isRegister ? 'Partner Onboarding (Delivery & Services)' : 'Partner Dispatch Portal'}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             {isRegister
-              ? 'Deliver quick-commerce orders & earn with on-demand doorstep services'
-              : 'Sign in to access your dispatch radar & active bookings'}
+              ? 'Join ShopIndia as a Quick-Commerce Delivery or Doorstep Service Partner'
+              : 'Sign in to access your radar feed, active bookings, and wallet earnings'}
           </p>
         </div>
 
-        {/* Alert Messages */}
         {error && (
-          <div className="mb-4 p-3 bg-red-950/70 border border-red-500/40 rounded-xl text-xs text-red-300 flex items-center gap-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
             <span>{error}</span>
           </div>
         )}
         {successMsg && (
-          <div className="mb-4 p-3 bg-emerald-950/70 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successMsg}</span>
           </div>
         )}
@@ -208,7 +202,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
           {/* Partner Specialization Selector (in Registration Mode) */}
           {isRegister && (
             <div className="space-y-2 pb-2">
-              <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                 1. Choose Partner Specialization
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -221,22 +215,22 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                       onClick={() => handlePartnerTypeSelect(type.id)}
                       className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-orange-500/15 border-orange-500 text-white shadow-md shadow-orange-500/10'
-                          : 'bg-slate-800/60 border-slate-700/70 text-slate-400 hover:border-slate-600 hover:text-slate-300'
+                          ? 'bg-orange-50 border-orange-500 text-slate-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-orange-200'
                       }`}
                     >
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xl">{type.icon}</span>
                           {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-orange-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
+                            <span className="w-4 h-4 rounded-full bg-orange-500 text-white flex items-center justify-center text-[10px] font-black">
                               ✓
                             </span>
                           )}
                         </div>
-                        <div className="font-bold text-xs text-white leading-tight">{type.label}</div>
+                        <div className="font-bold text-xs text-slate-900 leading-tight">{type.label}</div>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-snug">{type.sublabel}</p>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-snug">{type.sublabel}</p>
                     </button>
                   );
                 })}
@@ -246,18 +240,18 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
 
           {/* Multi-Select Service Skills (When service or both is selected) */}
           {isRegister && (formData.partnerType === 'service' || formData.partnerType === 'both') && (
-            <div className="space-y-4 p-4 bg-slate-950/70 border border-orange-500/30 rounded-2xl animate-in fade-in">
+            <div className="space-y-4 p-4 bg-orange-50/40 border border-orange-200 rounded-2xl animate-in fade-in">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <div>
-                  <label className="text-xs font-bold text-orange-400 flex items-center gap-1.5 uppercase tracking-wider">
+                  <label className="text-xs font-bold text-orange-700 flex items-center gap-1.5 uppercase tracking-wider">
                     <Sparkles className="w-3.5 h-3.5" />
                     2. Select Your Service Skills (Multiple Allowed)
                   </label>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500">
                     Pick all services you can professionally deliver at customers&apos; doorsteps
                   </p>
                 </div>
-                <span className="self-start sm:self-auto text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                <span className="self-start sm:self-auto text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
                   {formData.skills.length} Selected
                 </span>
               </div>
@@ -265,11 +259,11 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
               {/* Home Services Group */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-300">🏠 Home & Appliance Services</span>
+                  <span className="font-bold text-slate-800">🏠 Home & Appliance Services</span>
                   <button
                     type="button"
                     onClick={() => handleSelectAllCategory('home')}
-                    className="text-[11px] text-orange-400 hover:underline font-semibold cursor-pointer"
+                    className="text-[11px] text-orange-600 hover:underline font-bold cursor-pointer"
                   >
                     Toggle All
                   </button>
@@ -284,8 +278,8 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                         onClick={() => toggleSkill(skill.id)}
                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           isChecked
-                            ? 'bg-orange-500/20 border-orange-500 text-white font-semibold'
-                            : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:border-slate-600'
+                            ? 'bg-orange-50 border-orange-500 text-orange-950 font-bold shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                         }`}
                       >
                         <div className="flex items-center gap-2 text-xs">
@@ -295,8 +289,8 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                         <div
                           className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
                             isChecked
-                              ? 'bg-orange-500 border-orange-500 text-slate-950'
-                              : 'border-slate-600'
+                              ? 'bg-orange-500 border-orange-500 text-white'
+                              : 'border-slate-300 bg-white'
                           }`}
                         >
                           {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
@@ -308,13 +302,13 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
               </div>
 
               {/* Vehicle Services Group */}
-              <div className="space-y-2 pt-2 border-t border-slate-800">
+              <div className="space-y-2 pt-2 border-t border-orange-200/60">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-300">🚗 Vehicle Care & Roadside Assistance</span>
+                  <span className="font-bold text-slate-800">🚗 Vehicle Care & Roadside Assistance</span>
                   <button
                     type="button"
                     onClick={() => handleSelectAllCategory('vehicle')}
-                    className="text-[11px] text-orange-400 hover:underline font-semibold cursor-pointer"
+                    className="text-[11px] text-orange-600 hover:underline font-bold cursor-pointer"
                   >
                     Toggle All
                   </button>
@@ -329,8 +323,8 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                         onClick={() => toggleSkill(skill.id)}
                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           isChecked
-                            ? 'bg-orange-500/20 border-orange-500 text-white font-semibold'
-                            : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:border-slate-600'
+                            ? 'bg-orange-50 border-orange-500 text-orange-950 font-bold shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                         }`}
                       >
                         <div className="flex items-center gap-2 text-xs">
@@ -340,8 +334,8 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                         <div
                           className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
                             isChecked
-                              ? 'bg-orange-500 border-orange-500 text-slate-950'
-                              : 'border-slate-600'
+                              ? 'bg-orange-500 border-orange-500 text-white'
+                              : 'border-slate-300 bg-white'
                           }`}
                         >
                           {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
@@ -353,15 +347,15 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
               </div>
 
               {/* Experience Years */}
-              <div className="pt-2 border-t border-slate-800">
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <div className="pt-2 border-t border-orange-200/60">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Professional Experience
                 </label>
                 <select
                   name="experienceYears"
                   value={formData.experienceYears}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-orange-500 cursor-pointer"
                 >
                   <option value={1}>1 Year of Field Experience</option>
                   <option value={2}>2 Years of Experience</option>
@@ -376,7 +370,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
           {isRegister && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Legal Name</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Legal Name</label>
                 <input
                   type="text"
                   name="name"
@@ -385,12 +379,12 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   placeholder="e.g. Ramesh Kumar"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Mobile Phone (WhatsApp)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile Phone (WhatsApp)</label>
                 <input
                   type="tel"
                   name="phone"
@@ -399,7 +393,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   placeholder="+91 98765 43210"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                 />
               </div>
             </>
@@ -407,7 +401,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
 
           {/* Email */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
             <input
               type="email"
               name="email"
@@ -416,19 +410,19 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
               placeholder="rider@shopindia.com"
               value={formData.email}
               onChange={handleChange}
-              className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
             />
           </div>
 
           {/* Password */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-slate-300">Password</label>
+              <label className="text-xs font-semibold text-slate-700">Password</label>
               {!isRegister && (
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
-                  className="text-xs text-orange-400 hover:text-orange-300 hover:underline font-semibold cursor-pointer transition-colors"
+                  className="text-xs text-orange-600 hover:text-orange-700 hover:underline font-bold cursor-pointer transition-colors"
                 >
                   Forgot Password?
                 </button>
@@ -443,12 +437,12 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 pr-10"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white pr-10 transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -457,24 +451,24 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
 
           {/* Registration KYC & Vehicle Section */}
           {isRegister && (
-            <div className="pt-2 space-y-4 border-t border-slate-800">
+            <div className="pt-2 space-y-4 border-t border-slate-200">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   3. Vehicle & Documents (KYC)
                 </span>
                 {formData.partnerType === 'service' && (
-                  <span className="text-[10px] text-slate-400 italic">Vehicle Optional for Technicians</span>
+                  <span className="text-[10px] text-slate-500 italic">Vehicle Optional for Technicians</span>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle Type</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Vehicle Type</label>
                   <select
                     name="vehicleType"
                     value={formData.vehicleType}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                   >
                     <option value="bike">Motorcycle (Bike)</option>
                     <option value="scooter">Electric Scooter</option>
@@ -484,7 +478,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Vehicle Number {formData.partnerType === 'service' ? '(Optional)' : ''}
                   </label>
                   <input
@@ -493,13 +487,13 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                     placeholder="TS 09 AB 1234"
                     value={formData.vehicleNumber}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Driving License (DL) Number {formData.partnerType === 'service' ? '(Optional)' : ''}
                 </label>
                 <input
@@ -508,43 +502,43 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   placeholder="TS0920230004567"
                   value={formData.licenseNumber}
                   onChange={handleChange}
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Aadhaar Number</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Aadhaar Number</label>
                   <input
                     type="text"
                     name="aadhaarNumber"
                     placeholder="12-digit UID"
                     value={formData.aadhaarNumber}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">PAN Number</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">PAN Number</label>
                   <input
                     type="text"
                     name="panNumber"
                     placeholder="ABCDE1234F"
                     value={formData.panNumber}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-semibold text-slate-300">Base Station / Address</label>
+                  <label className="text-xs font-semibold text-slate-700">Base Station / Address</label>
                   <button
                     type="button"
                     onClick={handleDetectLocation}
                     disabled={isDetectingLocation}
-                    className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold disabled:opacity-50 cursor-pointer transition-colors"
+                    className="text-[11px] text-orange-600 hover:text-orange-700 flex items-center gap-1 font-bold disabled:opacity-50 cursor-pointer transition-colors"
                   >
                     <MapPin className={`w-3.5 h-3.5 ${isDetectingLocation ? 'animate-bounce' : ''}`} />
                     <span>{isDetectingLocation ? 'Detecting Location...' : 'Auto-Detect Location (GPS)'}</span>
@@ -556,39 +550,39 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   placeholder="Road No, Colony/Village, Mandal, District/City, State, Pincode"
                   value={formData.address}
                   onChange={handleChange}
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                 />
 
                 {/* Structured Breakdown Card if location detected */}
                 {detectedDetails && (
-                  <div className="mt-2.5 p-3 bg-orange-950/30 border border-orange-500/30 rounded-xl text-xs space-y-2 animate-in fade-in">
+                  <div className="mt-2.5 p-3.5 bg-orange-50/70 border border-orange-200 rounded-xl text-xs space-y-2 animate-in fade-in">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-orange-400 flex items-center gap-1.5 text-[11px]">
-                        <MapPin className="w-3.5 h-3.5" /> Detected Address Details
+                      <span className="font-bold text-orange-800 flex items-center gap-1.5 text-[11px]">
+                        <MapPin className="w-3.5 h-3.5 text-orange-600" /> Detected Address Details
                       </span>
-                      <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      <span className="text-[9px] text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
                         GPS Verified
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-300 pt-1 border-t border-orange-900/40">
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-700 pt-1 border-t border-orange-200/60">
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-semibold">Road / Street</span>
-                        <strong className="text-white text-[11px]">{detectedDetails.road || 'N/A'}</strong>
+                        <strong className="text-slate-900 text-[11px]">{detectedDetails.road || 'N/A'}</strong>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-semibold">Colony / Village</span>
-                        <strong className="text-white text-[11px]">
+                        <strong className="text-slate-900 text-[11px]">
                           {detectedDetails.colony || detectedDetails.village || detectedDetails.neighborhood || 'N/A'}
                         </strong>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-semibold">Mandal</span>
-                        <strong className="text-white text-[11px]">{detectedDetails.mandal || 'N/A'}</strong>
+                        <strong className="text-slate-900 text-[11px]">{detectedDetails.mandal || 'N/A'}</strong>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-semibold">District / City</span>
-                        <strong className="text-white text-[11px]">
+                        <strong className="text-slate-900 text-[11px]">
                           {detectedDetails.district || detectedDetails.city || 'N/A'}
                           {detectedDetails.city && detectedDetails.district && detectedDetails.city !== detectedDetails.district
                             ? ` (${detectedDetails.city})`
@@ -597,12 +591,12 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-semibold">State</span>
-                        <strong className="text-white text-[11px]">{detectedDetails.state || 'N/A'}</strong>
+                        <strong className="text-slate-900 text-[11px]">{detectedDetails.state || 'N/A'}</strong>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-semibold">PIN Code & Country</span>
-                        <strong className="text-orange-300 font-mono text-[11px]">{detectedDetails.pincode || 'N/A'}</strong>
-                        <span className="text-slate-400 ml-1">({detectedDetails.country || 'India'})</span>
+                        <strong className="text-orange-700 font-mono text-[11px]">{detectedDetails.pincode || 'N/A'}</strong>
+                        <span className="text-slate-500 ml-1">({detectedDetails.country || 'India'})</span>
                       </div>
                     </div>
                   </div>
@@ -611,9 +605,9 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
 
               {/* Service Radius Slider */}
               <div>
-                <div className="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                   <span>Operating Radius</span>
-                  <span className="text-orange-400 font-bold">{formData.serviceRadiusKm} km</span>
+                  <span className="text-orange-600 font-bold">{formData.serviceRadiusKm} km</span>
                 </div>
                 <input
                   type="range"
@@ -625,7 +619,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                   onChange={handleChange}
                   className="w-full accent-orange-500 cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-slate-500">
+                <div className="flex justify-between text-[10px] text-slate-400">
                   <span>10 km (Local)</span>
                   <span>50 km (Citywide)</span>
                   <span>100 km (Regional)</span>
@@ -637,10 +631,10 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full mt-2 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-xs transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? (
-              <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
                 <ShieldCheck className="w-5 h-5" />
@@ -659,14 +653,14 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
         </form>
 
         {/* Toggle Login / Register */}
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div className="mt-6 text-center text-xs text-slate-500">
           {isRegister ? (
             <p>
               Already an approved partner?{' '}
               <button
                 type="button"
                 onClick={() => setIsRegister(false)}
-                className="text-orange-400 hover:underline font-bold cursor-pointer"
+                className="text-orange-600 hover:underline font-bold cursor-pointer"
               >
                 Sign In
               </button>
@@ -677,7 +671,7 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
               <button
                 type="button"
                 onClick={() => setIsRegister(true)}
-                className="text-orange-400 hover:underline font-bold cursor-pointer"
+                className="text-orange-600 hover:underline font-bold cursor-pointer"
               >
                 Apply & Register (KYC)
               </button>

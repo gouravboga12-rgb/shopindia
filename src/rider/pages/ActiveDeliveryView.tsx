@@ -60,23 +60,19 @@ export const ActiveDeliveryView: React.FC = () => {
             deliveryId: activeDelivery.id,
             lat,
             lng,
-            bearing,
             speed,
-            stage: activeDelivery.status,
+            bearing,
           });
         },
-        (err) => {
-          console.warn('Geolocation live stream notice:', err.message);
-        },
-        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+        (err) => console.warn('Live rider GPS stream error:', err.message),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 2000 }
       );
     }
 
     return () => {
-      if (watchId !== null && typeof navigator !== 'undefined') {
+      if (watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.clearWatch(watchId);
       }
-      setIsBroadcastingGps(false);
       socket.emit('leave_delivery', { deliveryId: activeDelivery.id });
     };
   }, [activeDelivery?.id, activeDelivery?.status]);
@@ -107,47 +103,47 @@ export const ActiveDeliveryView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-24 text-slate-100 animate-in fade-in duration-200">
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-5 pb-24 text-slate-800 animate-in fade-in duration-200">
       
       {/* Active Trip Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl relative overflow-hidden">
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-700">
                 Active Quick-Commerce Delivery
               </span>
               {isBroadcastingGps && (
-                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30 flex items-center gap-1">
-                  <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
+                <span className="text-[10px] font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1 font-semibold">
+                  <Radio className="w-3 h-3 text-blue-600 animate-pulse" />
                   Live GPS Broadcasting
                 </span>
               )}
             </div>
-            <h2 className="text-xl font-bold text-white mt-1">
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 mt-1">
               Order #{activeDelivery.order?.orderNumber || activeDelivery.orderId.slice(0, 8)}
             </h2>
           </div>
           <div className="text-right">
-            <span className="text-xs text-slate-400">Guaranteed Fee</span>
-            <p className="text-2xl font-black text-emerald-400">₹{activeDelivery.deliveryFee}</p>
+            <span className="text-xs text-slate-400 font-medium">Guaranteed Fee</span>
+            <p className="text-2xl font-black text-emerald-600">₹{activeDelivery.deliveryFee}</p>
           </div>
         </div>
 
         {/* 4-Stage Progress Stepper */}
-        <div className="mt-5 pt-4 border-t border-slate-800">
+        <div className="mt-4 pt-4 border-t border-slate-100">
           <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-[10px] font-bold">
-            <div className={`p-1.5 rounded-lg ${currentStage === 'assigned' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'text-slate-500'}`}>
+            <div className={`p-1.5 rounded-lg ${currentStage === 'assigned' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
               1. To Store
             </div>
-            <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_pickup' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'text-slate-500'}`}>
+            <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_pickup' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
               2. Pickup & Check
             </div>
-            <div className={`p-1.5 rounded-lg ${currentStage === 'picked_up' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'text-slate-500'}`}>
+            <div className={`p-1.5 rounded-lg ${currentStage === 'picked_up' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
               3. In Transit
             </div>
-            <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_customer' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'text-slate-500'}`}>
+            <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_customer' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
               4. OTP Handover
             </div>
           </div>
@@ -166,23 +162,23 @@ export const ActiveDeliveryView: React.FC = () => {
 
       {/* STAGE 1: Heading to Store */}
       {currentStage === 'assigned' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-500/10 text-orange-400 rounded-2xl border border-orange-500/20">
-                <Store className="w-6 h-6" />
+              <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl border border-orange-100 shadow-2xs">
+                <Store className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <span className="text-xs uppercase font-bold text-orange-400 tracking-wider">Pickup Location</span>
-                <h3 className="text-lg font-bold text-white">{activeDelivery.pickupName}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{activeDelivery.pickupAddress}</p>
+                <span className="text-xs uppercase font-extrabold text-orange-600 tracking-wider">Pickup Location</span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.pickupName}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{activeDelivery.pickupAddress}</p>
               </div>
             </div>
 
             {activeDelivery.pickupPhone && (
               <a
                 href={`tel:${activeDelivery.pickupPhone}`}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-orange-400 rounded-2xl transition-colors border border-slate-700"
+                className="p-3 bg-slate-50 hover:bg-slate-100 text-orange-600 rounded-2xl transition-colors border border-slate-200"
               >
                 <Phone className="w-5 h-5" />
               </a>
@@ -201,20 +197,20 @@ export const ActiveDeliveryView: React.FC = () => {
 
       {/* STAGE 2: Store Handover & Verification Checklist */}
       {currentStage === 'arrived_pickup' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs uppercase font-bold text-amber-400 tracking-wider">Item Verification</span>
-              <h3 className="text-lg font-bold text-white">Inspect Packed Items</h3>
-              <p className="text-xs text-slate-400">Verify items against the packed bag before sliding</p>
+              <span className="text-xs uppercase font-extrabold text-amber-600 tracking-wider">Item Verification</span>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Inspect Packed Items</h3>
+              <p className="text-xs text-slate-500">Verify items against the packed bag before sliding</p>
             </div>
-            <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
-              <CheckSquare className="w-6 h-6" />
+            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+              <CheckSquare className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
 
           {/* Item Checklist */}
-          <div className="bg-slate-950/60 rounded-2xl p-4 border border-slate-800/80 space-y-2.5">
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
             {activeDelivery.order?.items && activeDelivery.order.items.length > 0 ? (
               activeDelivery.order.items.map((item) => {
                 const isChecked = !!checkedItems[item.id];
@@ -223,26 +219,26 @@ export const ActiveDeliveryView: React.FC = () => {
                     key={item.id}
                     type="button"
                     onClick={() => toggleItemCheck(item.id)}
-                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-800/50 transition-colors text-left"
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/60 transition-colors text-left cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
                       {isChecked ? (
-                        <CheckSquare className="w-5 h-5 text-emerald-400" />
+                        <CheckSquare className="w-5 h-5 text-emerald-600" />
                       ) : (
-                        <Square className="w-5 h-5 text-slate-500" />
+                        <Square className="w-5 h-5 text-slate-400" />
                       )}
-                      <span className={`text-sm ${isChecked ? 'line-through text-slate-400' : 'text-slate-200 font-medium'}`}>
+                      <span className={`text-xs sm:text-sm ${isChecked ? 'line-through text-slate-400' : 'text-slate-800 font-semibold'}`}>
                         {item.name}
                       </span>
                     </div>
-                    <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                    <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                       x{item.quantity}
                     </span>
                   </button>
                 );
               })
             ) : (
-              <p className="text-xs text-slate-400">1x Sealed ShopIndia Delivery Package</p>
+              <p className="text-xs text-slate-500">1x Sealed ShopIndia Delivery Package</p>
             )}
           </div>
 
@@ -258,23 +254,23 @@ export const ActiveDeliveryView: React.FC = () => {
 
       {/* STAGE 3: In Transit to Customer */}
       {currentStage === 'picked_up' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
-                <MapPin className="w-6 h-6" />
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 shadow-2xs">
+                <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <span className="text-xs uppercase font-bold text-emerald-400 tracking-wider">Customer Destination</span>
-                <h3 className="text-lg font-bold text-white">{activeDelivery.dropoffName}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{activeDelivery.dropoffAddress}</p>
+                <span className="text-xs uppercase font-extrabold text-emerald-700 tracking-wider">Customer Destination</span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.dropoffName}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{activeDelivery.dropoffAddress}</p>
               </div>
             </div>
 
             {activeDelivery.dropoffPhone && (
               <a
                 href={`tel:${activeDelivery.dropoffPhone}`}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-2xl transition-colors border border-slate-700"
+                className="p-3 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-2xl transition-colors border border-slate-200"
               >
                 <Phone className="w-5 h-5" />
               </a>
@@ -293,20 +289,20 @@ export const ActiveDeliveryView: React.FC = () => {
 
       {/* STAGE 4: Customer Handover & 4-Digit OTP Verification */}
       {currentStage === 'arrived_customer' && (
-        <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 shadow-2xl space-y-5">
+        <div className="bg-white border-2 border-emerald-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
           <div className="text-center">
-            <div className="w-14 h-14 mx-auto mb-2 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/20">
-              <KeyRound className="w-7 h-7" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-2 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-2xs">
+              <KeyRound className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
-            <h3 className="text-xl font-extrabold text-white">Enter Customer OTP</h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <h3 className="text-lg sm:text-xl font-black text-slate-900">Enter Customer OTP</h3>
+            <p className="text-xs text-slate-500 mt-1">
               Ask customer for the 4-digit code shown on their ShopIndia order screen
             </p>
           </div>
 
           {otpError && (
-            <div className="p-3 bg-red-950/70 border border-red-500/40 rounded-xl text-xs text-red-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
               <span>{otpError}</span>
             </div>
           )}
@@ -320,17 +316,17 @@ export const ActiveDeliveryView: React.FC = () => {
                 placeholder="0 0 0 0"
                 value={otpInput}
                 onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                className="w-48 text-center text-3xl font-mono font-extrabold tracking-widest bg-slate-950 border-2 border-emerald-500/50 rounded-2xl py-3 text-emerald-400 focus:outline-none focus:border-emerald-400 shadow-inner"
+                className="w-48 text-center text-3xl font-mono font-black tracking-widest bg-slate-50 border-2 border-emerald-500 rounded-2xl py-3 text-emerald-700 focus:outline-none focus:bg-white shadow-inner"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingOtp || otpInput.length !== 4}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 hover:to-teal-500 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isSubmittingOtp ? (
-                <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5" />
@@ -344,19 +340,19 @@ export const ActiveDeliveryView: React.FC = () => {
 
       {/* Completion Modal / Celebration */}
       {completedSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-slate-900 border border-emerald-500/50 rounded-3xl p-6 text-center shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 mx-auto mb-3 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center border border-emerald-500/30">
-              <Sparkles className="w-8 h-8 animate-spin" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white border border-emerald-200 rounded-3xl p-6 text-center shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 mx-auto mb-3 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200 shadow-xs">
+              <Sparkles className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-extrabold text-white">Delivery Completed!</h3>
-            <p className="text-sm text-emerald-400 font-bold mt-1">₹{activeDelivery.deliveryFee} Credited to Wallet</p>
-            <p className="text-xs text-slate-400 mt-2">
+            <h3 className="text-xl font-black text-slate-900">Delivery Completed!</h3>
+            <p className="text-sm text-emerald-600 font-extrabold mt-1">₹{activeDelivery.deliveryFee} Credited to Wallet</p>
+            <p className="text-xs text-slate-500 mt-2">
               Great job! Your shift metrics have been updated and you are ready for your next delivery.
             </p>
             <button
               onClick={() => setCompletedSuccess(false)}
-              className="w-full mt-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl transition-all"
+              className="w-full mt-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs cursor-pointer"
             >
               Return to Radar
             </button>

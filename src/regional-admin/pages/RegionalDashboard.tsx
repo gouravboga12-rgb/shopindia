@@ -55,19 +55,19 @@ export const RegionalDashboard: React.FC = () => {
   }, [token]);
 
   return (
-    <div className="space-y-6 text-slate-100 animate-in fade-in duration-200">
+    <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">
       
       {/* Territory Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950/40 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-blue-400">
-            <Globe2 className="w-5 h-5" />
-            <span className="text-xs uppercase font-bold tracking-wider">Territory Operational Command</span>
+          <div className="flex items-center gap-2 text-blue-600">
+            <Globe2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-[11px] sm:text-xs uppercase font-extrabold tracking-wider">Territory Operational Command</span>
           </div>
-          <h2 className="text-2xl font-black text-white mt-1">
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
             Regional Control: {user?.name || 'Hub Manager'}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Real-time quick-commerce fleet, merchant dispatches, and Shiprocket 3PL performance
           </p>
         </div>
@@ -75,122 +75,134 @@ export const RegionalDashboard: React.FC = () => {
         <button
           onClick={fetchDashboard}
           disabled={loading}
-          className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
+          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl text-xs font-semibold border border-slate-200 transition-colors shadow-2xs"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           <span>Refresh Live Pulse</span>
         </button>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards Grid - 1 Col on narrow mobile, 2 Col on tablet, 4 Col on desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Active Deliveries */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Active Deliveries</span>
-            <Bike className="w-5 h-5 text-orange-400" />
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-blue-200 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Active Deliveries</span>
+            <div className="p-2 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
+              <Bike className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-orange-400">
+          <div className="text-2xl sm:text-3xl font-black text-orange-600">
             {metrics.activeDeliveries}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Live in-transit orders</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">Live in-transit orders</span>
         </div>
 
         {/* Online Riders */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Online Riders</span>
-            <div className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] text-emerald-400 font-bold">READY</span>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-blue-200 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Online Fleet</span>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>READY</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-400">
+          <div className="text-2xl sm:text-3xl font-black text-emerald-600">
             {metrics.onlineRidersCount}{' '}
-            <span className="text-sm font-normal text-slate-500">/ {metrics.totalRegionalRiders}</span>
+            <span className="text-xs sm:text-sm font-normal text-slate-400">/ {metrics.totalRegionalRiders}</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Available for broadcasts</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">Available for broadcasts</span>
         </div>
 
         {/* Regional GMV */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Regional Sales GMV</span>
-            <TrendingUp className="w-5 h-5 text-blue-400" />
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-blue-200 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Regional Sales GMV</span>
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <TrendingUp className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-white">
+          <div className="text-2xl sm:text-3xl font-black text-slate-900">
             ₹{metrics.regionalGmv.toLocaleString('en-IN')}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Across local merchants</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">Across local merchants</span>
         </div>
 
         {/* KYC Verification Pending */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">KYC Approvals Queue</span>
-            <AlertCircle className="w-5 h-5 text-amber-400" />
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-blue-200 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">KYC Approvals Queue</span>
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+              <AlertCircle className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-400">
+          <div className="text-2xl sm:text-3xl font-black text-amber-600">
             {metrics.pendingApprovalRiders}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Awaiting partner verification</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">Awaiting partner verification</span>
         </div>
       </div>
 
       {/* Recent Regional Deliveries Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <Truck className="w-5 h-5 text-blue-400" /> Live Regional Deliveries
-        </h3>
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" /> Live Regional Deliveries
+          </h3>
+          <span className="text-xs text-slate-400 font-medium">{recentDeliveries.length} orders listed</span>
+        </div>
 
         {recentDeliveries.length === 0 ? (
-          <p className="text-xs text-slate-500 py-6 text-center">No active deliveries currently in this zone.</p>
+          <div className="py-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <Truck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs text-slate-500 font-medium">No active deliveries currently in this zone.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-800/80 text-slate-400 uppercase font-semibold">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full text-left text-xs min-w-[550px] sm:min-w-0">
+              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[11px] border-b border-slate-200/80">
                 <tr>
-                  <th className="p-3 rounded-l-xl">Order</th>
+                  <th className="p-3 sm:rounded-l-xl">Order</th>
                   <th className="p-3">Pickup & Dropoff</th>
-                  <th className="p-3">Assigned Rider</th>
+                  <th className="p-3">Assigned Partner</th>
                   <th className="p-3">Status</th>
-                  <th className="p-3 rounded-r-xl">Fee</th>
+                  <th className="p-3 sm:rounded-r-xl">Fee</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {recentDeliveries.map((del) => (
-                  <tr key={del.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="p-3 font-mono font-bold text-white">
+                  <tr key={del.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="p-3 font-mono font-bold text-blue-700">
                       #{del.order?.orderNumber || del.id.slice(0, 8)}
                     </td>
                     <td className="p-3">
-                      <div className="text-slate-200 font-medium truncate max-w-[180px]">{del.pickupName}</div>
-                      <div className="text-slate-500 text-[11px] truncate max-w-[180px]">➔ {del.dropoffName}</div>
+                      <div className="text-slate-800 font-medium truncate max-w-[170px] sm:max-w-[220px]">{del.pickupName}</div>
+                      <div className="text-slate-400 text-[11px] truncate max-w-[170px] sm:max-w-[220px]">➔ {del.dropoffName}</div>
                     </td>
                     <td className="p-3">
                       {del.riderProfile ? (
                         <div>
-                          <span className="font-semibold text-white">{del.riderProfile.user?.name}</span>
+                          <span className="font-semibold text-slate-800">{del.riderProfile.user?.name}</span>
                           <span className="block text-[10px] text-slate-500 uppercase">{del.riderProfile.vehicleType}</span>
                         </div>
                       ) : (
-                        <span className="text-orange-400 text-[11px] italic font-medium">Broadcasted (Claiming)</span>
+                        <span className="text-orange-600 text-[11px] italic font-semibold">Broadcasted (Claiming)</span>
                       )}
                     </td>
                     <td className="p-3">
                       <span
-                        className={`px-2 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                        className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] inline-block ${
                           del.status === 'delivered'
-                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : del.status === 'broadcasted'
-                            ? 'bg-orange-950 text-orange-400 border border-orange-500/30 animate-pulse'
-                            : 'bg-blue-950 text-blue-400 border border-blue-500/30'
+                            ? 'bg-orange-50 text-orange-600 border border-orange-200 animate-pulse'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
                         }`}
                       >
                         {del.status}
                       </span>
                     </td>
-                    <td className="p-3 font-bold text-emerald-400">
+                    <td className="p-3 font-bold text-emerald-600">
                       ₹{del.deliveryFee}
                     </td>
                   </tr>

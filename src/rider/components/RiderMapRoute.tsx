@@ -30,22 +30,22 @@ export const RiderMapRoute: React.FC<RiderMapRouteProps> = ({
   };
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-xl">
+    <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-50 shadow-xs">
       {/* Visual Simulated Route Map Canvas */}
-      <div className="h-56 sm:h-64 bg-slate-900 relative overflow-hidden flex items-center justify-center">
+      <div className="h-52 sm:h-60 bg-gradient-to-b from-orange-50/40 via-white to-emerald-50/40 relative overflow-hidden flex items-center justify-center">
         {/* Subtle Map Grid lines */}
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#f97316_1px,transparent_1px)] [background-size:18px_18px]" />
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:20px_20px]" />
 
         {/* Curved animated SVG polyline */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#f97316" />
+              <stop offset="0%" stopColor="#ea580c" />
               <stop offset="100%" stopColor="#10b981" />
             </linearGradient>
           </defs>
           <path
-            d="M 60,160 Q 200,40 380,110 T 560,90"
+            d="M 60,150 Q 200,30 380,100 T 560,80"
             fill="none"
             stroke="url(#routeGradient)"
             strokeWidth="4"
@@ -55,31 +55,31 @@ export const RiderMapRoute: React.FC<RiderMapRouteProps> = ({
         </svg>
 
         {/* Store Node */}
-        <div className="absolute left-10 sm:left-14 bottom-10 flex flex-col items-center">
-          <div className="p-2.5 rounded-full bg-orange-500 text-slate-950 shadow-lg shadow-orange-500/50 ring-4 ring-orange-950">
-            <Store className="w-5 h-5" />
+        <div className="absolute left-8 sm:left-14 bottom-8 flex flex-col items-center">
+          <div className="p-2.5 rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-4 ring-orange-100">
+            <Store className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <span className="mt-1.5 text-[11px] font-bold text-orange-400 bg-slate-900/90 px-2 py-0.5 rounded border border-orange-500/30">
+          <span className="mt-1 text-[10px] sm:text-[11px] font-bold text-orange-700 bg-white/95 px-2 py-0.5 rounded-full border border-orange-200 shadow-2xs">
             Pickup Store
           </span>
         </div>
 
         {/* In-transit Rider Marker */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-          <div className="p-2.5 rounded-full bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/50 ring-4 ring-amber-950 animate-bounce">
-            <Navigation className="w-5 h-5 rotate-45" />
+          <div className="p-2.5 rounded-full bg-amber-500 text-white shadow-md shadow-amber-500/30 ring-4 ring-amber-100 animate-bounce">
+            <Navigation className="w-4 h-4 sm:w-5 sm:h-5 rotate-45" />
           </div>
-          <span className="mt-1 text-[10px] font-mono font-bold text-amber-300 bg-slate-900/90 px-2 py-0.5 rounded border border-amber-500/30">
+          <span className="mt-1 text-[10px] font-mono font-bold text-slate-800 bg-white/95 px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
             {distanceKm} km • ~12 min
           </span>
         </div>
 
         {/* Customer Node */}
-        <div className="absolute right-10 sm:right-14 top-10 flex flex-col items-center">
-          <div className="p-2.5 rounded-full bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/50 ring-4 ring-emerald-950">
-            <MapPin className="w-5 h-5" />
+        <div className="absolute right-8 sm:right-14 top-8 flex flex-col items-center">
+          <div className="p-2.5 rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30 ring-4 ring-emerald-100">
+            <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <span className="mt-1.5 text-[11px] font-bold text-emerald-400 bg-slate-900/90 px-2 py-0.5 rounded border border-emerald-500/30">
+          <span className="mt-1 text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-white/95 px-2 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
             Customer
           </span>
         </div>
@@ -88,22 +88,22 @@ export const RiderMapRoute: React.FC<RiderMapRouteProps> = ({
         <div className="absolute bottom-3 right-3">
           <button
             onClick={openNavigation}
-            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-lg shadow-blue-600/30 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer"
           >
-            <Navigation className="w-4 h-4" />
+            <Navigation className="w-3.5 h-3.5" />
             <span>Open Google Maps</span>
-            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            <ExternalLink className="w-3 h-3 opacity-80" />
           </button>
         </div>
       </div>
 
       {/* Target Destination Bar */}
-      <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs">
+      <div className="p-3 bg-white border-t border-slate-200/80 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2 truncate">
           <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Navigating to:</span>
-          <span className="text-slate-100 font-semibold truncate">{targetLabel}</span>
+          <span className="text-slate-900 font-bold truncate">{targetLabel}</span>
         </div>
-        <span className="text-slate-400 shrink-0 font-mono text-[11px]">{distanceKm} km away</span>
+        <span className="text-slate-500 shrink-0 font-mono text-[11px] font-medium">{distanceKm} km away</span>
       </div>
     </div>
   );

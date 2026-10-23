@@ -114,31 +114,31 @@ export const RegionalRiders: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 text-slate-100 animate-in fade-in duration-200">
+    <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-white">Territory Fleet & Service Network</h2>
-          <p className="text-xs text-slate-400">
-            Review partner KYC documents, verify service skill qualifications, and manage dispatch capabilities
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900">Territory Fleet & Service Network</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Review partner KYC documents, verify service qualifications, and monitor dispatch capabilities
           </p>
         </div>
 
         <button
           onClick={fetchRiders}
           disabled={loading}
-          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
+          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold border border-blue-200 transition-colors shadow-2xs cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           <span>Refresh Fleet</span>
         </button>
       </div>
 
       {/* KYC Approvals Queue (Priority Alert) */}
       {pendingVerification.length > 0 && (
-        <div className="bg-amber-950/40 border border-amber-500/40 rounded-3xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center gap-2 text-amber-400">
-            <AlertCircle className="w-5 h-5" />
+        <div className="bg-amber-50/70 border border-amber-200 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-amber-800">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
             <h3 className="text-sm font-bold uppercase tracking-wider">
               Pending KYC Verification ({pendingVerification.length})
             </h3>
@@ -148,41 +148,41 @@ export const RegionalRiders: React.FC = () => {
             {pendingVerification.map((rider) => (
               <div
                 key={rider.id}
-                className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 shadow-md space-y-3"
+                className="bg-white border border-amber-200/90 rounded-2xl p-4 shadow-xs space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-white text-base">{rider.user.name}</h4>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 capitalize">
+                      <h4 className="font-bold text-slate-900 text-base">{rider.user.name}</h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 capitalize">
                         {rider.partnerType === 'both' ? '⚡ All-Rounder' : rider.partnerType === 'service' ? '🛠️ Service Pro' : '🚚 Delivery'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400">{rider.user.email} • {rider.user.phone}</p>
+                    <p className="text-xs text-slate-500">{rider.user.email} • {rider.user.phone}</p>
                     {rider.vehicleNumber ? (
-                      <p className="text-xs text-amber-400/90 font-mono mt-1">
+                      <p className="text-xs text-amber-700 font-mono mt-1 font-medium">
                         Vehicle: {rider.vehicleType.toUpperCase()} ({rider.vehicleNumber})
                       </p>
                     ) : (
                       <p className="text-xs text-slate-400 italic mt-1">No vehicle registered (Service Partner)</p>
                     )}
                   </div>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold shrink-0">
+                  <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold shrink-0">
                     Awaiting Review
                   </span>
                 </div>
 
                 {/* Skills tags if service or both */}
                 {rider.skills && rider.skills.length > 0 && (
-                  <div className="p-2 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-orange-400" /> Applied Service Skills ({rider.skills.length})
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-600 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-blue-600" /> Applied Service Skills ({rider.skills.length})
                     </span>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {rider.skills.map((skillId) => (
                         <span
                           key={skillId}
-                          className="text-[10px] bg-orange-950/70 border border-orange-500/30 text-orange-300 px-2 py-0.5 rounded-md"
+                          className="text-[10px] bg-white border border-blue-200 text-blue-700 px-2 py-0.5 rounded-md font-medium shadow-2xs"
                         >
                           {getSkillLabel(skillId)}
                         </span>
@@ -191,12 +191,12 @@ export const RegionalRiders: React.FC = () => {
                   </div>
                 )}
 
-                <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 space-y-1">
-                  <div><span className="text-slate-500">DL:</span> {rider.licenseNumber || 'Not submitted / NA'}</div>
-                  <div><span className="text-slate-500">Aadhaar:</span> {rider.aadhaarNumber || 'Submitted'}</div>
-                  <div><span className="text-slate-500">PAN:</span> {rider.panNumber || 'Submitted'}</div>
+                <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                  <div><span className="text-slate-400 font-medium">DL:</span> {rider.licenseNumber || 'Not submitted / NA'}</div>
+                  <div><span className="text-slate-400 font-medium">Aadhaar:</span> {rider.aadhaarNumber || 'Submitted'}</div>
+                  <div><span className="text-slate-400 font-medium">PAN:</span> {rider.panNumber || 'Submitted'}</div>
                   {rider.experienceYears && (
-                    <div><span className="text-slate-500">Experience:</span> {rider.experienceYears} Years</div>
+                    <div><span className="text-slate-400 font-medium">Experience:</span> {rider.experienceYears} Years</div>
                   )}
                 </div>
 
@@ -204,7 +204,7 @@ export const RegionalRiders: React.FC = () => {
                   <button
                     onClick={() => handleVerify(rider.id, true)}
                     disabled={actionLoading === rider.id}
-                    className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Approve Partner</span>
@@ -212,7 +212,7 @@ export const RegionalRiders: React.FC = () => {
                   <button
                     onClick={() => handleVerify(rider.id, false)}
                     disabled={actionLoading === rider.id}
-                    className="py-2 px-3 bg-red-950 hover:bg-red-900 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    className="py-2 px-3.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs rounded-xl transition-all cursor-pointer"
                   >
                     Reject
                   </button>
@@ -224,16 +224,16 @@ export const RegionalRiders: React.FC = () => {
       )}
 
       {/* Fleet Controls: Search & Tabs */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800 overflow-x-auto">
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Tabs - horizontally scrollable on mobile */}
+          <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/80 overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveTab('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'all'
-                  ? 'bg-orange-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               All Partners ({riders.length})
@@ -242,8 +242,8 @@ export const RegionalRiders: React.FC = () => {
               onClick={() => setActiveTab('delivery')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'delivery'
-                  ? 'bg-orange-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               🚚 Delivery ({riders.filter((r) => r.partnerType === 'delivery').length})
@@ -252,8 +252,8 @@ export const RegionalRiders: React.FC = () => {
               onClick={() => setActiveTab('service')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'service'
-                  ? 'bg-orange-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               🛠️ Service Pros ({riders.filter((r) => r.partnerType === 'service').length})
@@ -262,8 +262,8 @@ export const RegionalRiders: React.FC = () => {
               onClick={() => setActiveTab('both')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'both'
-                  ? 'bg-orange-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               ⚡ All-Rounder ({riders.filter((r) => r.partnerType === 'both').length})
@@ -272,8 +272,8 @@ export const RegionalRiders: React.FC = () => {
               onClick={() => setActiveTab('pending')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'pending'
-                  ? 'bg-amber-500 text-slate-950 shadow-md'
-                  : 'text-amber-400 hover:text-amber-300'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'text-amber-700 hover:text-amber-900'
               }`}
             >
               Pending ({pendingVerification.length})
@@ -281,80 +281,82 @@ export const RegionalRiders: React.FC = () => {
           </div>
 
           {/* Search box */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full md:w-64">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search partner or skill..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
             />
           </div>
         </div>
 
         {/* Fleet Grid */}
         {filteredRiders.length === 0 ? (
-          <p className="text-xs text-slate-500 py-8 text-center">
-            No partners found matching the active filter.
-          </p>
+          <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <p className="text-xs text-slate-500 font-medium">
+              No partners found matching the active filter.
+            </p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 pt-2">
             {filteredRiders.map((rider) => (
               <div
                 key={rider.id}
-                className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-slate-600 transition-colors"
+                className="bg-white border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-blue-300 transition-all shadow-xs"
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
                         rider.isOnline
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-400'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-600'
                       }`}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
-                          rider.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                          rider.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
                         }`}
                       />
                       {rider.isOnline ? 'ONLINE' : 'OFFLINE'}
                     </span>
 
-                    <span className="text-xs text-amber-400 font-bold flex items-center gap-0.5">
-                      <Star className="w-3 h-3 fill-amber-400" />
+                    <span className="text-xs text-amber-600 font-bold flex items-center gap-0.5">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                       {rider.rating.toFixed(1)}
                     </span>
                   </div>
 
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-bold text-white text-sm">{rider.user.name}</h4>
-                      <p className="text-xs text-slate-400">{rider.user.phone}</p>
+                      <h4 className="font-bold text-slate-900 text-sm">{rider.user.name}</h4>
+                      <p className="text-xs text-slate-500">{rider.user.phone}</p>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
                       {rider.partnerType === 'both' ? '⚡ All-Rounder' : rider.partnerType === 'service' ? '🛠️ Service' : '🚚 Delivery'}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     {rider.vehicleNumber ? `${rider.vehicleType.toUpperCase()} • Radius: ${rider.serviceRadiusKm} km` : `Radius: ${rider.serviceRadiusKm} km`}
                   </p>
 
                   {/* Skills tags */}
                   {rider.skills && rider.skills.length > 0 && (
-                    <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex flex-wrap gap-1">
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-1">
                       {rider.skills.slice(0, 4).map((skillId) => (
                         <span
                           key={skillId}
-                          className="text-[9px] bg-slate-900 border border-slate-700 text-slate-300 px-1.5 py-0.5 rounded"
+                          className="text-[9px] bg-slate-50 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium"
                         >
                           {getSkillLabel(skillId)}
                         </span>
                       ))}
                       {rider.skills.length > 4 && (
-                        <span className="text-[9px] bg-slate-900 text-slate-400 px-1 py-0.5 rounded">
+                        <span className="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-medium">
                           +{rider.skills.length - 4} more
                         </span>
                       )}
@@ -362,9 +364,9 @@ export const RegionalRiders: React.FC = () => {
                   )}
                 </div>
 
-                <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Total Deliveries / Jobs:</span>
-                  <span className="font-bold text-white">{rider.totalDeliveries}</span>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Total Deliveries / Jobs:</span>
+                  <span className="font-bold text-slate-900">{rider.totalDeliveries}</span>
                 </div>
               </div>
             ))}

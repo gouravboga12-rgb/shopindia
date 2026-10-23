@@ -61,41 +61,43 @@ export const RegionalLiveMap: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 text-slate-100 animate-in fade-in duration-200">
+    <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-white">Live Regional Dispatch Radar</h2>
-          <p className="text-xs text-slate-400">
-            Real-time tracking of active quick-commerce trips, online fleet, and 3PL courier pickups
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900">Live Dispatch Radar</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Real-time tracking of active quick-commerce trips, online fleet, and 3PL pickups
           </p>
         </div>
 
         <button
           onClick={fetchLive}
           disabled={loading}
-          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
+          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold border border-blue-200 transition-colors shadow-2xs"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           <span>Sync Radar</span>
         </button>
       </div>
 
       {/* Visual Live Map Grid Canvas */}
-      <div className="relative w-full h-80 sm:h-96 rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
+      <div className="relative w-full h-80 sm:h-96 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-blue-50/40 via-white to-slate-50 border border-slate-200/90 shadow-xs overflow-hidden flex items-center justify-center">
         {/* Dynamic Map Coordinate Canvas Grid */}
-        <div className="absolute inset-0 opacity-25 bg-[radial-gradient(#3b82f6_1.5px,transparent_1.5px)] [background-size:24px_24px]" />
+        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#3b82f6_1.5px,transparent_1.5px)] [background-size:24px_24px]" />
 
         {/* Territory Radar Ring Lines */}
-        <div className="absolute w-72 h-72 rounded-full border border-blue-500/10 animate-ping pointer-events-none" />
-        <div className="absolute w-96 h-96 rounded-full border border-blue-500/20 pointer-events-none" />
-        <div className="absolute w-48 h-48 rounded-full border border-blue-500/30 pointer-events-none" />
+        <div className="absolute w-72 h-72 rounded-full border border-blue-400/20 animate-ping pointer-events-none" />
+        <div className="absolute w-96 h-96 rounded-full border border-blue-400/30 pointer-events-none" />
+        <div className="absolute w-48 h-48 rounded-full border border-blue-500/40 pointer-events-none" />
 
         {/* Territory Center Hub */}
-        <div className="relative z-10 p-3 rounded-2xl bg-blue-600/30 border border-blue-400 text-white shadow-xl backdrop-blur-md flex items-center gap-2">
-          <Navigation className="w-5 h-5 text-blue-300" />
-          <span className="text-xs font-bold">Regional Operations Hub</span>
+        <div className="relative z-10 p-3 rounded-2xl bg-white/90 border border-blue-300 text-slate-900 shadow-md backdrop-blur-md flex items-center gap-2.5">
+          <div className="p-1.5 bg-blue-600 text-white rounded-xl shadow-xs">
+            <Navigation className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold text-blue-900">Regional Operations Hub</span>
         </div>
 
         {/* Overlay Online Riders Nodes */}
@@ -113,10 +115,10 @@ export const RegionalLiveMap: React.FC = () => {
               key={rider.id}
               className={`absolute ${positions[idx % positions.length]} z-20 flex flex-col items-center group cursor-pointer`}
             >
-              <div className="p-2 rounded-full bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/40 ring-4 ring-emerald-950/60 animate-bounce">
+              <div className="p-2 rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30 ring-4 ring-emerald-100 animate-bounce">
                 <Bike className="w-4 h-4" />
               </div>
-              <span className="mt-1 text-[10px] font-bold text-emerald-300 bg-slate-900/90 px-2 py-0.5 rounded border border-emerald-500/30 shadow">
+              <span className="mt-1 text-[10px] font-bold text-slate-800 bg-white/95 px-2 py-0.5 rounded-full border border-emerald-200 shadow-xs">
                 {rider.user?.name || 'Rider'}
               </span>
             </div>
@@ -131,10 +133,10 @@ export const RegionalLiveMap: React.FC = () => {
               key={del.id}
               className={`absolute ${positions[idx % positions.length]} z-20 flex flex-col items-center group cursor-pointer`}
             >
-              <div className="p-2 rounded-full bg-orange-500 text-slate-950 shadow-lg shadow-orange-500/40 ring-4 ring-orange-950/60 animate-pulse">
+              <div className="p-2 rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-4 ring-orange-100 animate-pulse">
                 <Package className="w-4 h-4" />
               </div>
-              <span className="mt-1 text-[10px] font-bold text-orange-300 bg-slate-900/90 px-2 py-0.5 rounded border border-orange-500/30 shadow">
+              <span className="mt-1 text-[10px] font-bold text-orange-700 bg-white/95 px-2 py-0.5 rounded-full border border-orange-200 shadow-xs">
                 #{del.order?.orderNumber || del.id.slice(0, 6)}
               </span>
             </div>
@@ -142,64 +144,66 @@ export const RegionalLiveMap: React.FC = () => {
         })}
 
         {/* Legend Overlay */}
-        <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 backdrop-blur-md flex items-center gap-4 text-[11px] text-slate-300">
+        <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 bg-white/95 border border-slate-200 rounded-xl p-2 sm:p-2.5 backdrop-blur-md flex items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] text-slate-700 shadow-xs">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Online Rider</span>
+            <span className="font-medium">Online Fleet</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            <span>Active Quick Order</span>
+            <span className="font-medium">Active Quick Order</span>
           </div>
         </div>
       </div>
 
       {/* Active Trips Dispatch Oversight Cards */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <Package className="w-5 h-5 text-orange-400" /> Active Quick-Commerce In-Transit Oversight
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+        <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+          <Package className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" /> Active Quick-Commerce In-Transit Oversight
         </h3>
 
         {deliveries.length === 0 ? (
-          <p className="text-xs text-slate-500 py-6 text-center">No active trips currently in transit.</p>
+          <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <p className="text-xs text-slate-500 font-medium">No active trips currently in transit.</p>
+          </div>
         ) : (
-          <div className="divide-y divide-slate-800">
+          <div className="divide-y divide-slate-100">
             {deliveries.map((del) => (
-              <div key={del.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div key={del.id} className="py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-white text-sm">
+                    <span className="font-mono font-bold text-blue-700 text-sm">
                       #{del.order?.orderNumber || del.id.slice(0, 8)}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                      className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
                         del.status === 'broadcasted'
-                          ? 'bg-orange-950 text-orange-400 border border-orange-500/30'
-                          : 'bg-blue-950 text-blue-400 border border-blue-500/30'
+                          ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200'
                       }`}
                     >
                       {del.status}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-300 mt-1 flex items-center gap-2">
-                    <Store className="w-3.5 h-3.5 text-orange-400" />
-                    <span>{del.pickupName}</span>
-                    <span className="text-slate-600">➔</span>
-                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{del.dropoffName}</span>
+                  <p className="text-xs text-slate-700 mt-1 flex items-center gap-2">
+                    <Store className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                    <span className="font-medium">{del.pickupName}</span>
+                    <span className="text-slate-400">➔</span>
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="font-medium">{del.dropoffName}</span>
                   </p>
 
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Assigned Partner: <strong className="text-white">{del.riderProfile?.user?.name || 'Searching Nearby Partner...'}</strong>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Assigned Partner: <strong className="text-slate-900">{del.riderProfile?.user?.name || 'Searching Nearby Partner...'}</strong>
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <button
                     onClick={() => handleEmergencyReassign(del.id)}
                     disabled={reassigningId === del.id}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-semibold transition-all shadow-2xs"
                   >
                     <RotateCcw className={`w-3.5 h-3.5 ${reassigningId === del.id ? 'animate-spin' : ''}`} />
                     <span>Re-Broadcast Job</span>

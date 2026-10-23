@@ -18,18 +18,18 @@ export const RegionalAdminSidebar: React.FC<RegionalAdminSidebarProps> = ({ curr
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-200 flex flex-col min-h-screen">
+    <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-white border-r border-slate-200/80 text-slate-700 min-h-screen">
       {/* Brand Header */}
-      <div className="p-6 border-b border-slate-800">
+      <div className="p-6 border-b border-slate-200/80">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20 text-white font-bold">
+          <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl shadow-md shadow-blue-500/20 text-white font-bold">
             <Globe2 className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
-              ShopIndia <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-mono">ZONE</span>
+            <h1 className="text-base font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
+              ShopIndia <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200/80 px-1.5 py-0.5 rounded font-mono font-bold">ZONE</span>
             </h1>
-            <p className="text-xs text-slate-400 truncate max-w-[130px]">{user?.name || 'Regional Hub'}</p>
+            <p className="text-xs text-slate-500 truncate max-w-[130px] font-medium">{user?.name || 'Regional Hub'}</p>
           </div>
         </div>
       </div>
@@ -45,25 +45,29 @@ export const RegionalAdminSidebar: React.FC<RegionalAdminSidebarProps> = ({ curr
               onClick={() => onTabChange(item.id)}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                 isActive
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/80 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
                 <span>{item.label}</span>
               </div>
-              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isActive ? 'text-blue-400 translate-x-0.5' : 'text-slate-600'}`} />
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isActive ? 'text-blue-600 translate-x-0.5' : 'text-slate-400'}`} />
             </button>
           );
         })}
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-slate-200/80 space-y-3">
+        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+          <div className="text-[11px] font-bold text-slate-800 truncate">{user?.name || 'Hub Manager'}</div>
+          <div className="text-[10px] text-slate-500 truncate">{user?.email}</div>
+        </div>
         <button
           onClick={logout}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium border border-transparent hover:border-red-200/60"
         >
           <LogOut className="w-3.5 h-3.5" />
           <span>Exit Regional Hub</span>

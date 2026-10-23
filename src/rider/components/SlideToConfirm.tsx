@@ -21,22 +21,22 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
 
   const colorStyles = {
     orange: {
-      track: 'bg-orange-950/60 border-orange-500/40',
-      thumb: 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 shadow-orange-500/30',
-      fill: 'bg-orange-500/30',
-      text: 'text-orange-200',
+      track: 'bg-orange-50 border-orange-200',
+      thumb: 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/25',
+      fill: 'bg-orange-100',
+      text: 'text-orange-800 font-bold',
     },
     emerald: {
-      track: 'bg-emerald-950/60 border-emerald-500/40',
-      thumb: 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-emerald-500/30',
-      fill: 'bg-emerald-500/30',
-      text: 'text-emerald-200',
+      track: 'bg-emerald-50 border-emerald-200',
+      thumb: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25',
+      fill: 'bg-emerald-100',
+      text: 'text-emerald-800 font-bold',
     },
     blue: {
-      track: 'bg-blue-950/60 border-blue-500/40',
-      thumb: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-blue-500/30',
-      fill: 'bg-blue-500/30',
-      text: 'text-blue-200',
+      track: 'bg-blue-50 border-blue-200',
+      thumb: 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25',
+      fill: 'bg-blue-100',
+      text: 'text-blue-800 font-bold',
     },
   }[color];
 

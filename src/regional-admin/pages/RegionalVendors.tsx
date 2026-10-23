@@ -49,27 +49,27 @@ export const RegionalVendors: React.FC = () => {
   }, [token]);
 
   return (
-    <div className="space-y-6 text-slate-100 animate-in fade-in duration-200">
+    <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-white">Territory Merchants & Stores</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900">Territory Merchants & Stores</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Monitor merchant packing speed, pending dispatch queues, and store contacts
           </p>
         </div>
-        <span className="text-xs font-bold bg-blue-950 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-full self-start">
+        <span className="text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80 px-3 py-1.5 rounded-full self-start shadow-2xs">
           {vendors.length} Active Stores
         </span>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-slate-500 text-xs">Loading local merchants...</div>
+        <div className="py-12 text-center text-slate-400 text-xs">Loading local merchants...</div>
       ) : vendors.length === 0 ? (
-        <div className="py-16 text-center text-slate-500 bg-slate-900 border border-slate-800 rounded-3xl">
-          <Store className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No vendors registered under this region yet.</p>
+        <div className="py-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-8">
+          <Store className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+          <p className="text-sm text-slate-500 font-medium">No vendors registered under this region yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -78,24 +78,24 @@ export const RegionalVendors: React.FC = () => {
             return (
               <div
                 key={vendor.id}
-                className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all"
+                className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-blue-300 transition-all"
               >
                 <div>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-3 bg-blue-500/10 text-blue-400 rounded-2xl border border-blue-500/20">
-                        <Store className="w-6 h-6" />
+                      <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 shadow-2xs">
+                        <Store className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
                       <div>
-                        <h3 className="text-base font-bold text-white">{vendor.businessName}</h3>
-                        <p className="text-xs text-slate-400">{vendor.contactName}</p>
+                        <h3 className="text-base font-bold text-slate-900">{vendor.businessName}</h3>
+                        <p className="text-xs text-slate-500">{vendor.contactName}</p>
                       </div>
                     </div>
 
                     {vendor.phone && (
                       <a
                         href={`tel:${vendor.phone}`}
-                        className="p-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl transition-colors border border-slate-700"
+                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-colors border border-emerald-200"
                         title="Call Store Manager"
                       >
                         <Phone className="w-4 h-4" />
@@ -103,8 +103,8 @@ export const RegionalVendors: React.FC = () => {
                     )}
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-400 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <p className="mt-3 text-xs text-slate-500 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">
                       {vendor.street ? `${vendor.street}, ${vendor.city || ''} ${vendor.pincode || ''}` : 'Location unmapped'}
                     </span>
@@ -112,16 +112,16 @@ export const RegionalVendors: React.FC = () => {
                 </div>
 
                 {/* Pending Orders Alert */}
-                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4 text-orange-400" />
-                    <span className="text-slate-300 font-medium">Pending Packing / Dispatch:</span>
+                    <Package className="w-4 h-4 text-orange-600" />
+                    <span className="text-slate-600 font-medium">Pending Packing / Dispatch:</span>
                   </div>
                   <span
-                    className={`font-mono font-bold px-2 py-0.5 rounded-full ${
+                    className={`font-mono font-bold px-2.5 py-0.5 rounded-full text-[11px] ${
                       pendingOrders.length > 0
-                        ? 'bg-orange-950 text-orange-400 border border-orange-500/30'
-                        : 'bg-slate-800 text-slate-400'
+                        ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                        : 'bg-slate-100 text-slate-600'
                     }`}
                   >
                     {pendingOrders.length} Orders

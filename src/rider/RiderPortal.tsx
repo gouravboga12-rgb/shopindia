@@ -37,7 +37,7 @@ const RiderContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       {/* Top sticky status header */}
       <RiderHeader />
 
@@ -46,7 +46,7 @@ const RiderContent: React.FC = () => {
         <RiderSidebar currentTab={tab} onTabChange={setTab} />
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8 max-w-5xl mx-auto w-full">
           {renderTab()}
         </main>
       </div>

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { RegionalAdminSidebar } from './RegionalAdminSidebar';
+import { RegionalAdminHeader } from './components/RegionalAdminHeader';
+import { RegionalAdminBottomNav } from './components/RegionalAdminBottomNav';
 import { RegionalAdminLogin } from './pages/RegionalAdminLogin';
 import { RegionalAdminRegister } from './pages/RegionalAdminRegister';
 import { RegionalDashboard } from './pages/RegionalDashboard';
@@ -38,11 +40,20 @@ const RegionalAdminContent: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row">
+      {/* Mobile / Tablet Sticky Header */}
+      <RegionalAdminHeader />
+
+      {/* Desktop Persistent Left Sidebar */}
       <RegionalAdminSidebar currentTab={tab} onTabChange={setTab} />
-      <main className="flex-1 p-6 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+
+      {/* Main Content View */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 overflow-y-auto max-w-7xl mx-auto w-full">
         {renderTab()}
       </main>
+
+      {/* Mobile Sticky Bottom Navigation */}
+      <RegionalAdminBottomNav currentTab={tab} onTabChange={setTab} />
     </div>
   );
 };
