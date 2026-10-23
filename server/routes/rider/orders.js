@@ -195,7 +195,7 @@ router.get('/active-job', async (req, res) => {
       },
     });
 
-    res.json({ activeJob: activeJob || null });
+    res.json({ activeJob: activeJob || null, activeDelivery: activeJob || null });
   } catch (err) {
     console.error('Fetch active job error:', err);
     res.status(500).json({ error: err.message });

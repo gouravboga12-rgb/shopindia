@@ -4,14 +4,25 @@ import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
 
 export interface RiderProfileData {
   id: string;
+  userId?: string;
   partnerType?: 'delivery' | 'service' | 'both' | string;
   skills?: string[];
   experienceYears?: number;
   vehicleType: string;
   vehicleNumber?: string;
   licenseNumber?: string;
+  licenseUrl?: string;
   aadhaarNumber?: string;
+  aadhaarUrl?: string;
   panNumber?: string;
+  panUrl?: string;
+  rcUrl?: string;
+  photoUrl?: string;
+  upiId?: string;
+  accountHolder?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  bankName?: string;
   isOnline: boolean;
   isApproved: boolean;
   serviceRadiusKm: number;
@@ -41,9 +52,16 @@ export interface ActiveDeliveryData {
   pickupName: string;
   pickupAddress: string;
   pickupPhone?: string;
+  pickupLat?: number;
+  pickupLng?: number;
   dropoffName: string;
   dropoffAddress: string;
   dropoffPhone?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  riderLat?: number;
+  riderLng?: number;
+  riderBearing?: number;
   order?: {
     orderNumber: string;
     total: number;
@@ -75,7 +93,8 @@ interface RiderContextType {
   isOnline: boolean;
   toggleOnline: () => Promise<void>;
   updateRadius: (radiusKm: number) => Promise<void>;
-  updatePartnerProfile: (data: Partial<RiderProfileData>) => Promise<boolean>;
+  updatePartnerProfile: (data: Partial<RiderProfileData> & { name?: string; phone?: string; avatar?: string }) => Promise<boolean>;
+  uploadRiderDoc: (file: File, docType: string) => Promise<{ success: boolean; url?: string; error?: string }>;
   activeDelivery: ActiveDeliveryData | null;
   incomingBroadcast: BroadcastDelivery | null;
   acceptOrder: (deliveryId: string) => Promise<{ success: boolean; error?: string }>;
@@ -155,8 +174,9 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (resActive.ok) {
         const activeData = await resActive.json();
-        setActiveDelivery(activeData.activeDelivery || null);
-        if (activeData.activeDelivery) {
+        const activeJob = activeData.activeDelivery || activeData.activeJob || null;
+        setActiveDelivery(activeJob);
+        if (activeJob) {
           setIncomingBroadcast(null); // Clear broadcast alert if already on a job
         }
       }
@@ -168,6 +188,31 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // Direct upload of Rider Documents to AWS S3
+  const uploadRiderDoc = async (file: File, docType: string): Promise<{ success: boolean; url?: string; error?: string }> => {
+    if (!token) return { success: false, error: 'Unauthorized' };
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('docType', docType);
+
+      const res = await fetch('/api/rider/profile/upload-doc', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to upload document to AWS S3');
+      return { success: true, url: json.url };
+    } catch (err: unknown) {
+      console.error('Doc upload error:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Upload failed' };
+    }
+  };
 
   // Toggle Online / Offline status
   const toggleOnline = async () => {
@@ -208,7 +253,9 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const updatePartnerProfile = async (updateData: Partial<RiderProfileData>): Promise<boolean> => {
+  const updatePartnerProfile = async (
+    updateData: Partial<RiderProfileData> & { name?: string; phone?: string; avatar?: string }
+  ): Promise<boolean> => {
     if (!token) return false;
     try {
       const res = await fetch('/api/rider/profile', {
@@ -219,6 +266,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok) {
         const json = await res.json();
         setProfile((prev) => prev ? { ...prev, ...(json.profile || updateData) } : null);
+        await refreshData();
         return true;
       }
       return false;
@@ -372,6 +420,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleOnline,
         updateRadius,
         updatePartnerProfile,
+        uploadRiderDoc,
         activeDelivery,
         incomingBroadcast,
         acceptOrder,

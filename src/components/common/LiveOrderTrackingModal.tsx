@@ -10,6 +10,7 @@ import {
   Star,
   KeyRound,
 } from 'lucide-react';
+import { RealWorldMap } from './RealWorldMap';
 
 interface TrackingData {
   deliveryId: string;
@@ -213,69 +214,32 @@ export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
                 </div>
               </div>
 
-              {/* Mapbox Styled Visual Live Route Canvas */}
-              <div className="relative w-full h-52 sm:h-60 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden shadow-inner flex items-center justify-center">
-                {/* Subtle Map Grid lines */}
-                <div className="absolute inset-0 opacity-25 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]" />
-
-                {/* Animated Curved SVG Road Polyline */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M 50,150 Q 180,50 340,110 T 520,70"
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="3.5"
-                    strokeDasharray="6 4"
-                    className="opacity-80 animate-pulse"
-                  />
-                </svg>
-
-                {/* Store Pin (Left) */}
-                <div className="absolute left-6 sm:left-10 bottom-6 sm:bottom-8 flex flex-col items-center">
-                  <div className="p-2.5 rounded-full bg-orange-500 text-slate-950 shadow-lg shadow-orange-500/40 ring-4 ring-orange-950">
-                    <Store className="w-4 h-4" />
-                  </div>
-                  <span className="mt-1 text-[10px] font-bold text-orange-300 bg-slate-900/95 px-2 py-0.5 rounded border border-orange-500/30 max-w-[120px] truncate text-center">
-                    {data.pickup.name}
-                  </span>
-                </div>
-
-                {/* In-Transit Moving Rider Pin (Center Animated) */}
-                <div
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-700 ease-out z-10"
-                  style={{
-                    transform: `translate(-50%, -50%)`,
-                  }}
-                >
-                  <div className="relative">
-                    <div className="absolute -inset-2 rounded-full bg-amber-400/20 animate-ping" />
-                    <div className="p-2.5 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 shadow-xl shadow-amber-400/50 ring-4 ring-amber-950">
-                      <Bike
-                        className="w-5 h-5 transition-transform duration-500"
-                        style={{ transform: `rotate(${riderCoords?.bearing || 0}deg)` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="mt-1 text-[10px] font-mono font-extrabold text-amber-300 bg-slate-900/95 px-2 py-0.5 rounded-full border border-amber-500/40 shadow-md">
-                    {liveStage === 'assigned' ? 'To Store' : liveStage === 'picked_up' ? 'To Doorstep' : 'At Location'}
-                  </span>
-                </div>
-
-                {/* Customer Pin (Right) */}
-                <div className="absolute right-6 sm:right-10 top-6 sm:top-8 flex flex-col items-center">
-                  <div className="p-2.5 rounded-full bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/40 ring-4 ring-emerald-950">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <span className="mt-1 text-[10px] font-bold text-emerald-300 bg-slate-900/95 px-2 py-0.5 rounded border border-emerald-500/30 max-w-[120px] truncate text-center">
-                    {data.dropoff.name}
-                  </span>
-                </div>
-
-                {/* Live Speed & Coordinates overlay */}
-                <div className="absolute bottom-2 left-3 text-[10px] font-mono text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
-                  ⚡ Live Stream: {riderCoords ? `${riderCoords.lat.toFixed(4)}, ${riderCoords.lng.toFixed(4)}` : 'Waiting for GPS...'}
-                </div>
-              </div>
+              {/* Real World Interactive Street Map (Swiggy / Zomato / Uber Style) */}
+              <RealWorldMap
+                pickup={{
+                  name: data.pickup.name,
+                  address: data.pickup.address,
+                  lat: data.pickup.lat,
+                  lng: data.pickup.lng,
+                }}
+                dropoff={{
+                  name: data.dropoff.name,
+                  address: data.dropoff.address,
+                  lat: data.dropoff.lat,
+                  lng: data.dropoff.lng,
+                }}
+                rider={{
+                  lat: riderCoords?.lat,
+                  lng: riderCoords?.lng,
+                  bearing: riderCoords?.bearing,
+                  speed: riderCoords?.speed,
+                  name: data.rider?.name,
+                  vehicleType: data.rider?.vehicleType,
+                }}
+                currentStage={liveStage}
+                height="260px"
+                darkMode={true}
+              />
 
               {/* Customer 4-Digit Verification OTP (Displayed for Customer) */}
               {viewerRole === 'customer' && data.deliveryOtp && (

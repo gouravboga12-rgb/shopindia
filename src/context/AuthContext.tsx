@@ -10,6 +10,7 @@ export interface AuthUser {
   permissions: string[];
   vendorId?: string;
   avatar?: string;
+  phone?: string;
   branchId?: string;
 }
 
