@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Package, ShoppingBag, BarChart3, Wallet, LogOut, Store, Wrench } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, BarChart3, Wallet, LogOut, Store, Wrench, Headphones } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
@@ -17,6 +17,7 @@ export const VendorSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange 
     { id: 'analytics', label: 'Sales Analytics', icon: BarChart3 },
     { id: 'wallet', label: 'Wallet & Payouts', icon: Wallet },
     { id: 'technicians', label: 'Technicians', icon: Wrench },
+    { id: 'support', label: 'Support Queue', icon: Headphones },
   ];
 
   return (

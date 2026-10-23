@@ -3,6 +3,7 @@ const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 const { emitDeliveryStageChange, cleanDeliveryTracking } = require('../../lib/socket');
+const { recordRiderCredit } = require('../../lib/ledger');
 
 const router = express.Router();
 router.use(verifyToken, requireRole('rider'));
@@ -276,31 +277,41 @@ router.post('/orders/:id/complete', async (req, res) => {
 
     const feeToCredit = delivery.deliveryFee || 50;
 
-    // Transaction: mark delivery completed, update order, credit rider wallet
-    const [updatedDelivery] = await prisma.$transaction([
-      prisma.delivery.update({
+    // Atomic transaction: mark delivery completed, update order, credit rider wallet, write ledger entry
+    let updatedDelivery;
+    await prisma.$transaction(async (tx) => {
+      updatedDelivery = await tx.delivery.update({
         where: { id: req.params.id },
         data: {
           status: 'delivered',
           deliveredAt: new Date(),
           proofPhotoUrl: proofPhotoUrl || undefined,
         },
-      }),
-      prisma.order.update({
+      });
+
+      await tx.order.update({
         where: { id: delivery.orderId },
         data: {
           status: 'delivered',
           paymentStatus: 'paid',
         },
-      }),
-      prisma.riderProfile.update({
+      });
+
+      await tx.riderProfile.update({
         where: { id: profile.id },
         data: {
           walletBalance: { increment: feeToCredit },
           totalDeliveries: { increment: 1 },
         },
-      }),
-    ]);
+      });
+
+      // Write immutable ledger entry for this delivery fee credit
+      await recordRiderCredit(tx, {
+        orderId: delivery.orderId,
+        riderProfileId: profile.id,
+        deliveryFee: feeToCredit,
+      });
+    });
 
     emitDeliveryStageChange(req.params.id, { stage: 'delivered' });
     cleanDeliveryTracking(req.params.id);

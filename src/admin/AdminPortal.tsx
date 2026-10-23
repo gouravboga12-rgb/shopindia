@@ -11,7 +11,7 @@ import { BranchesPage } from './pages/BranchesPage';
 import { RBACPage } from './pages/RBACPage';
 import { ServiceAreasPage } from './pages/ServiceAreasPage';
 import { SupportPage } from './pages/SupportPage';
-import { CommissionsPage } from './pages/CommissionsPage';
+import { PricingSettingsPage } from './pages/PricingSettingsPage';
 import { RidersPage } from './pages/RidersPage';
 import { RegionalAdminsPage } from './pages/RegionalAdminsPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -54,7 +54,8 @@ const AdminContent: React.FC = () => {
       case 'rbac': return <RBACPage />;
       case 'service-areas': return <ServiceAreasPage />;
       case 'support': return <SupportPage />;
-      case 'commissions': return <CommissionsPage />;
+      case 'commissions': return <PricingSettingsPage />;
+      case 'pricing': return <PricingSettingsPage />;
       case 'riders': return <RidersPage />;
       case 'reports': return <ReportsPage />;
       case 'promotions': return <PromotionsPage />;

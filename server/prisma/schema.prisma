@@ -119,6 +119,55 @@ enum RefundStatus {
   rejected
 }
 
+// ─── Finance / Ledger Enums ────────────────────────────────────────────────────
+
+enum LedgerType {
+  CREDIT
+  DEBIT
+}
+
+enum LedgerParty {
+  VENDOR
+  RIDER
+  REGIONAL_ADMIN
+  PLATFORM
+  GATEWAY
+  CUSTOMER
+}
+
+enum PayoutStatus {
+  pending
+  under_review
+  approved
+  processing
+  completed
+  rejected
+  on_hold
+}
+
+// ─── COD / Cash Clearance Enums ───────────────────────────────────────────────
+
+enum CODClearanceMode {
+  end_of_day
+  after_n_orders
+}
+
+enum CODRemittanceStatus {
+  pending
+  submitted_to_admin
+  paid_online
+  verified
+}
+
+// ─── Payment Record Enums ─────────────────────────────────────────────────────
+
+enum PaymentRecordStatus {
+  initiated
+  captured
+  failed
+  refunded
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -191,13 +240,20 @@ model Vendor {
   approvedBy     User?                @relation("VendorApprovedBy", fields: [approvedById], references: [id])
   approvedAt     DateTime?
 
-  walletBalance  Float   @default(0) // paise / cents or currency amount
+  walletBalance  Float   @default(0)
   commissionRate Decimal @default(10.00) @db.Decimal(5, 2)
 
   accountHolder String?
   accountNumber String?
   ifsc          String?
   bankName      String?
+  upiId         String?  // NEW: Vendor UPI ID for fast payouts
+
+  // NEW: Hyper-local quick-commerce fields
+  lat               Float?   // GPS latitude of vendor store
+  lng               Float?   // GPS longitude of vendor store
+  deliveryRadiusKm  Float?   @default(5)  // Radius for quick-commerce delivery
+  supportsQuick     Boolean  @default(false) // Does this vendor handle quick orders?
 
   logo        String?
   description String?
@@ -210,6 +266,8 @@ model Vendor {
   linkedUsers User[]           @relation("UserVendor")
   technicians Technician[]
   shiprocketShipments ShiprocketShipment[]
+  ledgerEntries LedgerEntry[]  @relation("VendorLedger")
+  payoutRequests PayoutRequest[] @relation("VendorPayouts")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -249,6 +307,11 @@ model Product {
   tags            String[]        @default([])
   serviceSlots    String[]        @default([])
   durationEstimate String?
+
+  // NEW: Pricing engine — vendor receives exactly vendorPrice; platform fee is added on top
+  vendorPrice     Float?   // What vendor actually receives (set by vendor, overrides basePrice if set)
+  pricingRuleId   String?  // FK to product-level PricingRule override
+  pricingRule     PricingRule? @relation("ProductPricingRule", fields: [pricingRuleId], references: [id], onDelete: SetNull)
 
   variants      ProductVariant[]
   images        ProductImage[]
@@ -329,6 +392,8 @@ model Order {
   delivery     Delivery?
   shiprocketShipment ShiprocketShipment?
   transactions Transaction[] @relation("OrderTransactions")
+  paymentRecord PaymentRecord?    // Razorpay payment record for this order
+  ledgerEntries LedgerEntry[]     // All ledger entries tied to this order
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -346,8 +411,15 @@ model OrderItem {
   product   Product? @relation(fields: [productId], references: [id])
   vendorId  String?
   name      String
-  price     Float
+  price     Float    // Customer-facing price (basePrice + platform fee)
   quantity  Int
+
+  // NEW: Per-item financial breakdown for accurate vendor payout
+  vendorPrice       Float?   // Exact amount vendor receives per unit
+  platformFee       Float?   // Platform commission per unit (incl. gateway share)
+  gatewayFeeShare   Float?   // Razorpay fee portion allocated to this item
+  vendorPaidOut     Boolean  @default(false) // True after ledger credit on delivery
+
   reviews   Review[]
 
   @@map("order_items")
@@ -432,6 +504,15 @@ model Ticket {
   refundRequested Boolean      @default(false)
   refundAmount    Float?
   refundStatus    RefundStatus @default(none)
+
+  // NEW: 3-tier support queue fields
+  vendorId          String?   // Auto-resolved from orderId
+  regionId          String?   // Regional Admin region (pincode-based)
+  tier              Int       @default(1)      // 1=Customer-facing, 2=Regional Admin, 3=Super Admin
+  escalatedAt       DateTime?
+  slaDeadline       DateTime? // Computed on creation based on priority
+  internalNotes     String?   // Visible only to Admin/Regional Admin
+  refundAtFault     String?   // 'vendor' | 'platform' | 'rider' — set on refund approval
 
   messages TicketMessage[]
 
@@ -541,11 +622,25 @@ model RiderProfile {
   totalDeliveries Int            @default(0)
   rating          Float          @default(5.0)
 
+  // NEW: Bank/UPI for payouts
+  upiId           String?
+  accountHolder   String?
+  accountNumber   String?
+  ifsc            String?
+  bankName        String?
+
+  // NEW: COD cash-in-hand tracking
+  codCashFloat    Float          @default(0)  // Unremitted cash on hand
+  codFloatLimit   Float          @default(3000) // Max allowed before forced clearance
+
   branchId        String?
   branch          Branch?        @relation(fields: [branchId], references: [id])
 
   deliveries      Delivery[]
   payouts         RiderPayout[]
+  ledgerEntries   LedgerEntry[]  @relation("RiderLedger")
+  payoutRequests  PayoutRequest[] @relation("RiderPayouts")
+  codRemittances  CODRemittance[] @relation("RiderCODRemittances")
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -582,6 +677,13 @@ model Delivery {
   pickedUpAt      DateTime?
   deliveredAt     DateTime?
   proofPhotoUrl   String?
+
+  // NEW: COD payment tracking
+  paymentMode         String?   // 'prepaid' | 'cod_cash' | 'cod_online'
+  codAmount           Float?    // Amount collected on delivery
+  codCollectedAt      DateTime?
+  codRemittanceId     String?
+  codRemittance       CODRemittance? @relation(fields: [codRemittanceId], references: [id], onDelete: SetNull)
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -671,6 +773,11 @@ model Coupon {
   usedCount     Int      @default(0)
   isActive      Boolean  @default(true)
 
+  // NEW: Scope coupon to vendor/category/vertical
+  vendorId      String?
+  categoryId    String?
+  vertical      String?  // 'shop' | 'quick' | 'services'
+
   orders Order[]
 
   createdAt DateTime @default(now())
@@ -710,6 +817,18 @@ model ServiceJob {
   status        String    @default("pending") // pending, scheduled, in_progress, completed, failed
   scheduledDate DateTime?
   notes         String?
+
+  // NEW: Doorstep service bill adjustment (Rapido-style)
+  originalAmount    Float?   // Initial quoted/order amount
+  adjustedAmount    Float?   // Final adjusted amount after on-site inspection
+  adjustmentReason  String?  // e.g. "Extra parts required"
+  customerApproved  Boolean  @default(false) // Customer approved the adjusted bill in-app
+  approvedAt        DateTime?
+
+  // COD for service jobs
+  paymentMode       String?  // 'prepaid' | 'cod_cash' | 'cod_online'
+  codAmount         Float?
+  codCollectedAt    DateTime?
 
   completedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -978,5 +1097,197 @@ model Brand {
   updatedAt   DateTime @updatedAt
 
   @@map("brands")
+}
+
+// ─── Finance & Ledger Models ─────────────────────────────────────────────────
+
+// Immutable double-entry ledger — every money movement is recorded here.
+// NEVER update or delete these rows; only append.
+model LedgerEntry {
+  id          String       @id @default(uuid())
+  type        LedgerType   // CREDIT or DEBIT
+  party       LedgerParty  // Who this entry belongs to
+  partyId     String       // vendorId | riderProfileId | userId etc.
+  amount      Float        // In INR (2 decimal precision enforced in application)
+  entryType   String       // VENDOR_CREDIT | RIDER_CREDIT | PLATFORM_FEE | GATEWAY_FEE | GATEWAY_TAX | REFUND | PAYOUT | OPENING_BALANCE | COD_COLLECTION | COD_REMITTANCE
+  orderId     String?
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  description String?
+  metadata    Json?        // Store raw Razorpay fee/tax breakdown or any extra data
+
+  // Vendor relations (optional — populated when party=VENDOR)
+  vendorId    String?
+  vendor      Vendor?      @relation("VendorLedger", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // Rider relations (optional — populated when party=RIDER)
+  riderProfileId String?
+  riderProfile   RiderProfile? @relation("RiderLedger", fields: [riderProfileId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime     @default(now())
+
+  @@index([partyId, party, createdAt(sort: Desc)])
+  @@index([orderId])
+  @@map("ledger_entries")
+}
+
+// Unified payout requests — vendors, riders, and technicians all use this.
+model PayoutRequest {
+  id              String       @id @default(uuid())
+  partyType       LedgerParty  // VENDOR | RIDER
+  partyId         String       // vendorId or riderProfileId
+  amount          Float
+  status          PayoutStatus @default(pending)
+  requestedAt     DateTime     @default(now())
+  reviewedAt      DateTime?
+  processedAt     DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  bankSnapshot    Json?        // Snapshot of bank/UPI details at time of request
+  razorpayPayoutId String?     // Razorpay X payout ID
+  notes           String?      // Admin notes
+
+  // Vendor relation
+  vendorId    String?
+  vendor      Vendor?      @relation("VendorPayouts", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // Rider relation
+  riderProfileId String?
+  riderProfile   RiderProfile? @relation("RiderPayouts", fields: [riderProfileId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partyId, partyType, status])
+  @@map("payout_requests")
+}
+
+// Pricing rules — hierarchy: Product > Vendor > Category > Vertical > Global
+// commissionPct is applied on top of vendorPrice to compute customer price.
+// The Razorpay fee portion (2.36%) is optionally absorbed here or at global level.
+model PricingRule {
+  id             String   @id @default(uuid())
+  scope          String   // 'global' | 'vertical' | 'category' | 'vendor' | 'product'
+  scopeId        String?  // null for global; categoryId/vendorId/productId for others
+  vertical       String?  // 'shop' | 'quick' | 'services'
+  commissionPct  Decimal  @db.Decimal(5, 2)  // e.g. 15.00 = 15%
+  includeGateway Boolean  @default(true)      // If true, gateway fee is added inside platform fee
+  deliveryFeeRules Json?  // Tiered delivery fee config stored as JSON
+  isActive       Boolean  @default(true)
+  description    String?
+
+  products       Product[] @relation("ProductPricingRule")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope, scopeId])
+  @@map("pricing_rules")
+}
+
+// Delivery pay rules — defines rider earning per km / per order / zone.
+model DeliveryPayRule {
+  id              String   @id @default(uuid())
+  scope           String   // 'global' | 'zone' | 'vertical'
+  scopeId         String?  // branchId or null
+  vertical        String?  // 'quick' | 'services'
+  basePayPerOrder Float    @default(30)  // Base earning per delivery
+  payPerKm        Float    @default(5)   // Extra pay per km
+  maxDistanceKm   Float    @default(15)
+  isActive        Boolean  @default(true)
+  description     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("delivery_pay_rules")
+}
+
+// Key-value store for all configurable platform settings.
+// e.g., cod_clearance_mode, cod_max_float, cod_deadline_orders, global_commission_pct
+model AppSetting {
+  key         String   @id  // Unique setting key
+  value       String   // Stored as string; application parses to correct type
+  description String?
+  updatedBy   String?  // userId of last admin who changed this
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+// Audit trail for every settings change.
+model SettingsAuditLog {
+  id         String   @id @default(uuid())
+  settingKey String
+  oldValue   String?
+  newValue   String
+  changedBy  String   // userId
+  changedAt  DateTime @default(now())
+
+  @@index([settingKey])
+  @@map("settings_audit_logs")
+}
+
+// Tracks every Razorpay payment — gateway order, payment capture, and exact fees.
+model PaymentRecord {
+  id                  String              @id @default(uuid())
+  orderId             String              @unique
+  order               Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  razorpayOrderId     String?             @unique  // rzp_order_xxx
+  razorpayPaymentId   String?             @unique  // pay_xxx
+  razorpaySignature   String?
+  amount              Float               // Total charged to customer (in INR)
+  gatewayFee          Float?              // Razorpay fee in INR (extracted from webhook)
+  gatewayTax          Float?              // GST on gateway fee (extracted from webhook)
+  netReceived         Float?              // amount - gatewayFee - gatewayTax
+  currency            String              @default("INR")
+  status              PaymentRecordStatus @default(initiated)
+  refundedAmount      Float?              @default(0)
+  webhookPayload      Json?               // Raw Razorpay webhook payload for audit
+  capturedAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([orderId])
+  @@map("payment_records")
+}
+
+// Tracks Razorpay settlement batches for reconciliation.
+model GatewaySettlement {
+  id                   String   @id @default(uuid())
+  razorpaySettlementId String   @unique
+  amount               Float    // Net settlement credited to bank
+  fee                  Float    @default(0)
+  tax                  Float    @default(0)
+  settledAt            DateTime?
+  rawPayload           Json?    // Full Razorpay settlement payload
+  createdAt            DateTime @default(now())
+
+  @@map("gateway_settlements")
+}
+
+// ─── COD / Cash Clearance Models ─────────────────────────────────────────────
+
+// Tracks each batch of COD cash a rider collects and then remits.
+// A rider may remit online (Razorpay) or submit physically to a Regional Admin.
+model CODRemittance {
+  id               String               @id @default(uuid())
+  riderProfileId   String
+  riderProfile     RiderProfile         @relation("RiderCODRemittances", fields: [riderProfileId], references: [id], onDelete: Cascade)
+  amount           Float                // Total cash remitted
+  status           CODRemittanceStatus  @default(pending)
+  clearanceMode    String?              // 'online' | 'physical'
+  razorpayPaymentId String?             // If cleared online
+  regionalAdminId  String?              // If submitted to a Regional Admin
+  receivedByAdminAt DateTime?
+  remittedToSuperAt DateTime?
+  superAdminRazorpayId String?          // Super Admin's Razorpay payment reference
+  notes            String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  deliveries       Delivery[]           // All deliveries included in this remittance batch
+
+  @@index([riderProfileId, status])
+  @@map("cod_remittances")
 }
 

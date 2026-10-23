@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
+const { recordVendorCredit } = require('../../lib/ledger');
 
 const router = express.Router();
 router.use(verifyToken, requireRole('vendor'));
@@ -80,14 +81,15 @@ router.patch('/:id/status', async (req, res) => {
 
     let order;
     if (status === 'delivered' && existing.status !== 'delivered') {
+      // Fetch vendor to get commission rate
       const vendor = await prisma.vendor.findUnique({ where: { id: req.user.vendorId } });
       const commRateRaw = Number(vendor?.commissionRate) || 10;
       const commRate = commRateRaw > 1 ? commRateRaw / 100 : commRateRaw;
-      const commission = existing.total * commRate;
-      const netEarnings = existing.total - commission;
+      const commission = parseFloat(((existing.total || 0) * commRate).toFixed(2));
+      const netEarnings = parseFloat(((existing.total || 0) - commission).toFixed(2));
 
-      const [updatedOrder] = await prisma.$transaction([
-        prisma.order.update({
+      await prisma.$transaction(async (tx) => {
+        order = await tx.order.update({
           where: { id: req.params.id },
           data: {
             status: 'delivered',
@@ -95,14 +97,31 @@ router.patch('/:id/status', async (req, res) => {
             commission,
           },
           include: { items: true },
-        }),
-        prisma.vendor.update({
+        });
+
+        await tx.vendor.update({
           where: { id: req.user.vendorId },
           data: {
-            walletBalance: { increment: netEarnings }
-          }
-        })
-      ]);
+            walletBalance: { increment: netEarnings },
+          },
+        });
+
+        // Mark all items as paid out
+        await tx.orderItem.updateMany({
+          where: { orderId: req.params.id },
+          data: { vendorPaidOut: true },
+        });
+
+        // Write immutable ledger entries (VENDOR_CREDIT + PLATFORM_FEE)
+        await recordVendorCredit(tx, {
+          orderId: req.params.id,
+          vendorId: req.user.vendorId,
+          vendorAmount: netEarnings,
+          commission,
+          orderTotal: existing.total || 0,
+        });
+      });
+    } else {
       order = await prisma.order.update({
         where: { id: req.params.id },
         data: { status },

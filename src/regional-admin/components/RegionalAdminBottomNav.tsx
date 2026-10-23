@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Radar, Store, Bike } from 'lucide-react';
+import { LayoutDashboard, Radar, Store, Bike, Headphones } from 'lucide-react';
 
 interface RegionalAdminBottomNavProps {
   currentTab: string;
@@ -12,6 +12,7 @@ export const RegionalAdminBottomNav: React.FC<RegionalAdminBottomNavProps> = ({ 
     { id: 'live-map', label: 'Radar Map', icon: Radar },
     { id: 'vendors', label: 'Merchants', icon: Store },
     { id: 'riders', label: 'Fleet & KYC', icon: Bike },
+    { id: 'support', label: 'Support', icon: Headphones },
   ];
 
   return (

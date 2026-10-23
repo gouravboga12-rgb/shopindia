@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../../lib/prisma');
 const { verifyToken }      = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/rbac');
+const { calculateItemPricing } = require('../../lib/pricing');
 
 const router = express.Router();
 router.use(verifyToken, requirePermission('manage_products'));
@@ -39,6 +40,24 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { variants, images, ...data } = req.body;
+
+    if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
+      const pricing = await calculateItemPricing({
+        vendorPrice: parseFloat(data.vendorPrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        context: { vendorId: data.vendorId, categoryId: data.categoryId }
+      });
+      data.basePrice = pricing.customerPrice;
+      data.vendorPrice = pricing.vendorPrice;
+    } else if (data.basePrice != null) {
+      const pricing = await calculateItemPricing({
+        basePrice: parseFloat(data.basePrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        context: { vendorId: data.vendorId, categoryId: data.categoryId }
+      });
+      data.vendorPrice = pricing.vendorPrice;
+    }
+
     const product = await prisma.product.create({
       data: {
         ...data,
@@ -55,6 +74,24 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { variants: _v, images: _i, vendor: _vd, ...data } = req.body;
+
+    if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
+      const pricing = await calculateItemPricing({
+        vendorPrice: parseFloat(data.vendorPrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        context: { vendorId: data.vendorId, categoryId: data.categoryId }
+      });
+      data.basePrice = pricing.customerPrice;
+      data.vendorPrice = pricing.vendorPrice;
+    } else if (data.basePrice != null) {
+      const pricing = await calculateItemPricing({
+        basePrice: parseFloat(data.basePrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        context: { vendorId: data.vendorId, categoryId: data.categoryId }
+      });
+      data.vendorPrice = pricing.vendorPrice;
+    }
+
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data,

@@ -26,7 +26,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'rbac', label: 'RBAC Controls', icon: ShieldCheck, perm: 'manage_users' },
     { id: 'service-areas', label: 'Service Areas', icon: MapPin, perm: 'manage_service_areas' },
     { id: 'support', label: 'Support Queue', icon: Headphones, perm: 'view_support' },
-    { id: 'commissions', label: 'Commissions', icon: Percent, perm: 'manage_commissions' },
+    { id: 'commissions', label: 'Pricing & Commissions', icon: Percent, perm: 'manage_commissions' },
     { id: 'promotions', label: 'Promotions', icon: Image, perm: 'manage_commissions' },
     { id: 'offers', label: 'Offers & Coupons', icon: Tag, perm: 'manage_commissions' },
     { id: 'categories', label: 'Categories', icon: LayoutGrid, perm: 'view_products' },

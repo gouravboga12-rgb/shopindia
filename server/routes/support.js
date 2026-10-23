@@ -4,7 +4,22 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
-// Helper to optionally extract authenticated user ID
+// Helper to extract and VERIFY authenticated user ID from JWT
+const getVerifiedUserId = (req) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      return decoded?.id || decoded?.userId || decoded?.sub || null;
+    }
+  } catch (e) {
+    // Invalid or expired token
+  }
+  return null;
+};
+
+// Legacy helper kept for backward compatibility in ticket creation only (uses decode not verify)
 const getOptionalUserId = (req) => {
   try {
     const authHeader = req.headers.authorization;
@@ -146,16 +161,73 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
     const formattedPriority = validPriorities.includes(priority.toLowerCase()) ? priority.toLowerCase() : 'medium';
 
+    // Compute SLA Deadline based on priority:
+    // urgent: 15 min, high: 1 hr, medium: 4 hrs, low: 24 hrs
+    const now = new Date();
+    let slaMinutes = 240;
+    if (formattedPriority === 'urgent') slaMinutes = 15;
+    else if (formattedPriority === 'high') slaMinutes = 60;
+    else if (formattedPriority === 'low') slaMinutes = 1440;
+    const slaDeadline = new Date(now.getTime() + slaMinutes * 60 * 1000);
+
+    // Auto-resolve vendorId and regionalAdmin from orderId if provided
+    let resolvedVendorId = req.body.vendorId || null;
+    let resolvedRegionId = null;
+    let initialTier = 1;
+
+    if (req.body.orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: req.body.orderId },
+        select: { vendorId: true, deliveryPincode: true }
+      });
+      if (order) {
+        if (!resolvedVendorId && order.vendorId) {
+          resolvedVendorId = order.vendorId;
+        }
+        if (order.deliveryPincode) {
+          const regAdmin = await prisma.regionalAdminProfile.findFirst({
+            where: { assignedPincodes: { has: order.deliveryPincode }, status: 'approved' }
+          });
+          if (regAdmin) resolvedRegionId = regAdmin.id;
+        }
+      }
+    }
+
+    // Determine initial handling tier:
+    // Tier 1: Vendor (if product/vendor order issue)
+    // Tier 2: Regional Admin (if delivery/fleet issue or no vendor)
+    // Tier 3: Super Admin (if payment issue or no regional manager)
+    if (formattedCategory === 'payment') {
+      initialTier = 3;
+    } else if (formattedCategory === 'delivery' && resolvedRegionId) {
+      initialTier = 2;
+    } else if (resolvedVendorId) {
+      initialTier = 1;
+    } else if (resolvedRegionId) {
+      initialTier = 2;
+    } else {
+      initialTier = 3;
+    }
+
     const ticketNumber = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
+    const isRefundReq = req.body.refundRequested === true || formattedCategory === 'refund';
 
     const ticket = await prisma.ticket.create({
       data: {
         ticketNumber,
         customerId,
+        orderId: req.body.orderId || null,
+        vendorId: resolvedVendorId,
+        regionId: resolvedRegionId,
+        tier: initialTier,
+        slaDeadline,
         subject,
         category: formattedCategory,
         priority: formattedPriority,
         status: 'open',
+        refundRequested: isRefundReq,
+        refundAmount: isRefundReq && req.body.refundAmount ? parseFloat(req.body.refundAmount) : null,
+        refundStatus: isRefundReq ? 'requested' : 'none',
         messages: {
           create: [
             {
@@ -192,14 +264,17 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
 
 /**
  * GET /api/support/tickets & /api/support/ticket - Get customer tickets
+ * Security: Requires one of: (a) valid JWT token, (b) email param, (c) ticketNumber param.
+ * Without any identifier, returns empty array (no public data leakage).
  */
 router.get(['/tickets', '/ticket'], async (req, res) => {
   try {
-    const customerId = getOptionalUserId(req);
+    const customerId = getVerifiedUserId(req);
     const { email, ticketNumber } = req.query;
 
     let where = {};
     if (ticketNumber) {
+      // Lookup by ticket number — allowed for guest tracking (no auth needed)
       where.ticketNumber = String(ticketNumber).trim();
     } else if (customerId) {
       where.customerId = customerId;
@@ -208,13 +283,8 @@ router.get(['/tickets', '/ticket'], async (req, res) => {
       if (user) where.customerId = user.id;
       else return res.json({ tickets: [] });
     } else {
-      // Return latest public/guest tickets for easy tracking if no auth
-      const tickets = await prisma.ticket.findMany({
-        include: { messages: true },
-        orderBy: { createdAt: 'desc' },
-        take: 10
-      });
-      return res.json({ tickets });
+      // No identifier provided — return empty list (security fix: was exposing latest 10 tickets publicly)
+      return res.json({ tickets: [] });
     }
 
     const tickets = await prisma.ticket.findMany({
@@ -234,9 +304,13 @@ router.get(['/tickets', '/ticket'], async (req, res) => {
 
 /**
  * GET /api/support/tickets/:id - Get single ticket with full message history
+ * Security: Requires caller to be the ticket owner (via JWT) OR provide matching ticketNumber+email.
  */
 router.get('/tickets/:id', async (req, res) => {
   try {
+    const callerId = getVerifiedUserId(req);
+    const { email } = req.query;
+
     const ticket = await prisma.ticket.findFirst({
       where: {
         OR: [
@@ -255,6 +329,15 @@ router.get('/tickets/:id', async (req, res) => {
     });
 
     if (!ticket) return res.status(404).json({ error: 'Ticket not found.' });
+
+    // Ownership check: must be the ticket owner OR provide the correct account email
+    const isOwner = callerId && callerId === ticket.customerId;
+    const emailMatch = email && ticket.customer?.email === String(email).toLowerCase().trim();
+
+    if (!isOwner && !emailMatch) {
+      return res.status(403).json({ error: 'Access denied. Please provide valid authentication or your registered email.' });
+    }
+
     res.json({ ticket });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -263,9 +346,15 @@ router.get('/tickets/:id', async (req, res) => {
 
 /**
  * POST /api/support/tickets/:id/reply & /api/support/ticket/:id/reply - Customer reply to a ticket
+ * Security: Requires valid JWT matching the ticket's customerId.
  */
 router.post(['/tickets/:id/reply', '/ticket/:id/reply'], async (req, res) => {
   try {
+    const callerId = getVerifiedUserId(req);
+    if (!callerId) {
+      return res.status(401).json({ error: 'Authentication required to reply to a ticket.' });
+    }
+
     const { text } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ error: 'Reply text is required.' });
@@ -284,6 +373,11 @@ router.post(['/tickets/:id/reply', '/ticket/:id/reply'], async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found.' });
     }
 
+    // Ownership check: only the ticket owner can reply via this customer endpoint
+    if (ticket.customerId !== callerId) {
+      return res.status(403).json({ error: 'Access denied. You can only reply to your own tickets.' });
+    }
+
     const message = await prisma.ticketMessage.create({
       data: {
         ticketId: ticket.id,
@@ -293,7 +387,7 @@ router.post(['/tickets/:id/reply', '/ticket/:id/reply'], async (req, res) => {
       }
     });
 
-    // If ticket was closed/resolved, re-open to in_progress
+    // If ticket was resolved, re-open it when customer replies
     const updatedTicket = await prisma.ticket.update({
       where: { id: ticket.id },
       data: { status: ticket.status === 'resolved' ? 'open' : ticket.status },

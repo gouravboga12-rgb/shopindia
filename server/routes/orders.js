@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const customerAuth = require('../middleware/customerAuth');
+const { calculateItemPricing, calculateDeliveryPricing } = require('../lib/pricing');
 
 const router = express.Router();
 
@@ -193,6 +194,8 @@ router.post('/', async (req, res) => {
     const productMap = new Map(products.map((p) => [p.id, p]));
 
     const resolved = [];
+    let totalCommission = 0;
+
     for (const it of items) {
       const product = productMap.get(it.productId);
       if (!product) {
@@ -201,12 +204,31 @@ router.post('/', async (req, res) => {
       if (product.isOutOfStock || product.stock < it.quantity) {
         return res.status(400).json({ error: `Product "${product.name}" is out of stock.` });
       }
+
+      // Resolve pricing breakdown per item via Central Pricing Engine
+      const itemPricing = await calculateItemPricing({
+        vendorPrice: product.vendorPrice,
+        basePrice: product.basePrice,
+        mrp: product.mrp,
+        context: {
+          productId: product.id,
+          vendorId: product.vendorId,
+          categoryId: product.categoryId
+        }
+      });
+
+      const qty = Number(it.quantity) || 1;
+      totalCommission += (itemPricing.commissionAmount * qty);
+
       resolved.push({
         productId: product.id,
         vendorId: product.vendorId,
         name: product.name,
         price: product.basePrice,
-        quantity: it.quantity,
+        quantity: qty,
+        vendorPrice: itemPricing.vendorPrice,
+        platformFee: itemPricing.platformFee,
+        gatewayFeeShare: itemPricing.gatewayBuffer
       });
     }
 
@@ -227,7 +249,16 @@ router.post('/', async (req, res) => {
 
     const subtotal = resolved.reduce((sum, it) => sum + it.price * it.quantity, 0);
     const discount = 0;
-    const total = subtotal - discount;
+
+    // Calculate delivery pricing based on fulfillment type
+    const deliveryPricing = await calculateDeliveryPricing({
+      fulfillmentType: mapType(resolvedVertical),
+      subtotal,
+      distanceKm: 3.5
+    });
+
+    const deliveryFee = deliveryPricing.customerDeliveryFee || 0;
+    const total = subtotal - discount + deliveryFee;
     const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
 
     // Geographic Routing based on Pincode
@@ -268,7 +299,7 @@ router.post('/', async (req, res) => {
         status: 'placed',
         subtotal,
         discount,
-        commission: 0,
+        commission: totalCommission,
         total,
         paymentMethod: paymentMethod || 'COD',
         paymentStatus: 'pending',
@@ -281,6 +312,10 @@ router.post('/', async (req, res) => {
             name: it.name,
             price: it.price,
             quantity: it.quantity,
+            vendorPrice: it.vendorPrice,
+            platformFee: it.platformFee,
+            gatewayFeeShare: it.gatewayFeeShare,
+            vendorPaidOut: false
           })),
         },
       },

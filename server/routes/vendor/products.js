@@ -4,11 +4,28 @@ const prisma  = require('../../lib/prisma');
 const { uploadToS3 }   = require('../../lib/s3');
 const { verifyToken }  = require('../../middleware/auth');
 const { requireRole }  = require('../../middleware/rbac');
+const { calculateItemPricing } = require('../../lib/pricing');
 
 const router = express.Router();
 router.use(verifyToken, requireRole('vendor'));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+/** POST /api/vendor/products/preview-price — Live preview of customer price & commission */
+router.post('/preview-price', async (req, res) => {
+  try {
+    const { vendorPrice, basePrice, mrp, categoryId } = req.body;
+    const pricing = await calculateItemPricing({
+      vendorPrice: vendorPrice != null ? parseFloat(vendorPrice) : undefined,
+      basePrice: basePrice != null ? parseFloat(basePrice) : undefined,
+      mrp: mrp ? parseFloat(mrp) : null,
+      context: { vendorId: req.user.vendorId, categoryId }
+    });
+    res.json({ success: true, pricing });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /** GET /api/vendor/products — FR-02.2: Vendor's own products */
 router.get('/', async (req, res) => {
@@ -52,6 +69,32 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { variants, images, ...data } = req.body;
+
+    // Apply central pricing engine calculation
+    if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
+      const pricing = await calculateItemPricing({
+        vendorPrice: parseFloat(data.vendorPrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        context: { vendorId: req.user.vendorId, categoryId: data.categoryId }
+      });
+
+      if (data.mrp && pricing.customerPrice > data.mrp) {
+        return res.status(400).json({
+          error: `Customer price (₹${pricing.customerPrice}) exceeds MRP (₹${data.mrp}). Please reduce your base payout price or increase MRP.`
+        });
+      }
+
+      data.basePrice = pricing.customerPrice; // Customer storefront price
+      data.vendorPrice = pricing.vendorPrice; // Vendor net payout per unit
+    } else if (data.basePrice != null) {
+      const pricing = await calculateItemPricing({
+        basePrice: parseFloat(data.basePrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        context: { vendorId: req.user.vendorId, categoryId: data.categoryId }
+      });
+      data.vendorPrice = pricing.vendorPrice;
+    }
+
     const product = await prisma.product.create({
       data: {
         ...data,
@@ -91,6 +134,32 @@ router.put('/:id', async (req, res) => {
       where: { id: req.params.id, vendorId: req.user.vendorId },
     });
     if (!existing) return res.status(404).json({ error: 'Product not found.' });
+
+    // Apply central pricing engine calculation
+    if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
+      const pricing = await calculateItemPricing({
+        vendorPrice: parseFloat(data.vendorPrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : existing.mrp,
+        context: { vendorId: req.user.vendorId, categoryId: data.categoryId || existing.categoryId }
+      });
+
+      const effectiveMrp = data.mrp ? parseFloat(data.mrp) : existing.mrp;
+      if (effectiveMrp && pricing.customerPrice > effectiveMrp) {
+        return res.status(400).json({
+          error: `Customer price (₹${pricing.customerPrice}) exceeds MRP (₹${effectiveMrp}). Please reduce your base payout price or increase MRP.`
+        });
+      }
+
+      data.basePrice = pricing.customerPrice;
+      data.vendorPrice = pricing.vendorPrice;
+    } else if (data.basePrice != null) {
+      const pricing = await calculateItemPricing({
+        basePrice: parseFloat(data.basePrice),
+        mrp: data.mrp ? parseFloat(data.mrp) : existing.mrp,
+        context: { vendorId: req.user.vendorId, categoryId: data.categoryId || existing.categoryId }
+      });
+      data.vendorPrice = pricing.vendorPrice;
+    }
 
     const product = await prisma.product.update({
       where: { id: req.params.id },

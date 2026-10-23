@@ -65,6 +65,7 @@ app.use('/api/admin/rbac', require('./routes/admin/rbac'));
 app.use('/api/admin/service-areas', require('./routes/admin/serviceAreas'));
 app.use('/api/admin/support', require('./routes/admin/support'));
 app.use('/api/admin/commissions', require('./routes/admin/commissions'));
+app.use('/api/admin/pricing', require('./routes/admin/pricing'));
 app.use('/api/admin/riders', require('./routes/admin/riders'));
 app.use('/api/admin/regional-admins', require('./routes/admin/regionalAdmins'));
 app.use('/api/admin/reports', require('./routes/admin/reports'));
@@ -76,6 +77,7 @@ app.use('/api/admin/reviews', require('./routes/admin/reviews'));
 
 // Regional Admin routes
 app.use('/api/regional-admin/auth', require('./routes/regional-admin/auth'));
+app.use('/api/regional-admin/support', require('./routes/regional-admin/support'));
 app.use('/api/regional-admin', require('./routes/regional-admin/operations'));
 
 // Rider & Delivery Partner routes
@@ -86,6 +88,12 @@ app.use('/api/rider/wallet', require('./routes/rider/wallet'));
 
 // Shiprocket 3PL Logistics routes
 app.use('/api/shiprocket', require('./routes/shiprocket/shipments'));
+
+// Payment gateway routes (Razorpay)
+app.use('/api/payments', require('./routes/payments'));
+
+// Razorpay webhooks — mounted BEFORE global json() because the handler uses express.raw() internally
+app.use('/api/webhooks/razorpay', require('./routes/webhooks/razorpay'));
 
 // Real-time Live Order & Rider Tracking routes
 app.use('/api/tracking', require('./routes/tracking'));
@@ -99,7 +107,9 @@ app.use('/api/vendor/wallet', require('./routes/vendor/wallet'));
 app.use('/api/vendor/reviews', require('./routes/vendor/reviews'));
 app.use('/api/vendor/technicians', require('./routes/vendor/technicians'));
 app.use('/api/vendor/service-jobs', require('./routes/vendor/service-jobs'));
+app.use('/api/vendor/support', require('./routes/vendor/support'));
 
+const { startSlaEscalationJob } = require('./jobs/slaEscalation');
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
@@ -111,7 +121,10 @@ app.use((err, _req, res, _next) => {
 prisma.$connect()
   .then(() => {
     console.log(`✅ PostgreSQL / Amazon RDS connected via Prisma ORM`);
-    server.listen(PORT, () => console.log(`🚀 Server with WebSockets listening on http://localhost:${PORT}`));
+    server.listen(PORT, () => {
+      console.log(`🚀 Server with WebSockets listening on http://localhost:${PORT}`);
+      startSlaEscalationJob();
+    });
   })
   .catch((err) => {
     console.error('❌ RDS connection failed:', err.message);

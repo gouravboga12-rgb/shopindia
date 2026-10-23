@@ -9,6 +9,7 @@ import { RegionalDashboard } from './pages/RegionalDashboard';
 import { RegionalLiveMap } from './pages/RegionalLiveMap';
 import { RegionalVendors } from './pages/RegionalVendors';
 import { RegionalRiders } from './pages/RegionalRiders';
+import { RegionalSupport } from './pages/RegionalSupport';
 
 const RegionalAdminContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -34,6 +35,8 @@ const RegionalAdminContent: React.FC = () => {
         return <RegionalVendors />;
       case 'riders':
         return <RegionalRiders />;
+      case 'support':
+        return <RegionalSupport />;
       default:
         return <RegionalDashboard />;
     }

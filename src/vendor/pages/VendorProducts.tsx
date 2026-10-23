@@ -23,6 +23,11 @@ export const VendorProducts: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Dynamic Pricing Engine Fields
+  const [vendorPrice, setVendorPrice] = useState<number>(0);
+  const [mrp, setMrp] = useState<number>(0);
+  const [pricePreview, setPricePreview] = useState<any>(null);
+
   // Service Timing Slots & Duration
   const [serviceSlots, setServiceSlots] = useState<string[]>(['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM']);
   const [durationEstimate, setDurationEstimate] = useState('45-90 min');
@@ -44,9 +49,36 @@ export const VendorProducts: React.FC = () => {
       .catch(console.error);
   }, []);
 
+  // Live preview pricing resolution
+  useEffect(() => {
+    const val = Number(vendorPrice) || Number(price);
+    if (val > 0) {
+      api.post('/api/vendor/products/preview-price', {
+        vendorPrice: val,
+        mrp: mrp > 0 ? mrp : null,
+        categoryId: categoryId || undefined
+      }).then((res: any) => {
+        if (res?.pricing) setPricePreview(res.pricing);
+      }).catch(() => {
+        const comm = Math.round(val * 0.1);
+        const buf = Math.round(val * 0.0236);
+        const cust = val + comm + buf;
+        setPricePreview({
+          customerPrice: cust,
+          platformFee: comm + buf,
+          commissionPct: 10,
+          mrpExceeded: mrp > 0 && cust > mrp
+        });
+      });
+    } else {
+      setPricePreview(null);
+    }
+  }, [vendorPrice, price, mrp, categoryId]);
+
   const resetForm = () => {
     setEditingId(null);
     setName(''); setBrand(''); setPrice(0); setStock(10);
+    setVendorPrice(0); setMrp(0); setPricePreview(null);
     setFulfillmentType('traditional'); setSubVertical('grocery');
     setIsVeg(true); setIsRx(false); setVehicleType('car');
     setCategoryId(''); setImageFile(null);
@@ -75,6 +107,8 @@ export const VendorProducts: React.FC = () => {
     setName(p.name);
     setBrand(p.brand || '');
     setPrice(Number(p.basePrice || 0));
+    setVendorPrice(Number(p.vendorPrice || p.basePrice || 0));
+    setMrp(Number(p.mrp || 0));
     setStock(Number(p.stock || 0));
     setFulfillmentType(p.fulfillmentType || 'traditional');
 
@@ -162,6 +196,8 @@ export const VendorProducts: React.FC = () => {
         name,
         brand: brand || undefined,
         basePrice: price,
+        vendorPrice: vendorPrice > 0 ? vendorPrice : price,
+        mrp: mrp > 0 ? mrp : undefined,
         stock,
         fulfillmentType: finalFulfillment,
         tags,
@@ -498,15 +534,76 @@ export const VendorProducts: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Price (₹)</label>
-                <input type="number" required value={price} onChange={e => setPrice(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl text-sm font-numbers" />
+            {/* Dynamic Add-On Pricing & Payout Section */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800">Product Pricing & Payout</span>
+                <span className="text-[10px] text-gray-500 font-medium">Add-on Commission Model</span>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Available Units / Capacity</label>
-                <input type="number" required value={stock} onChange={e => setStock(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl text-sm font-numbers" />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Your Payout (Base Price ₹) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={vendorPrice || price || ''}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setVendorPrice(val);
+                      setPrice(val);
+                    }}
+                    placeholder="Amount you receive"
+                    className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700 bg-white"
+                  />
+                  <span className="text-[10px] text-gray-400">Guaranteed amount credited to your wallet</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    MRP (Maximum Retail Price ₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={mrp || ''}
+                    onChange={e => setMrp(Number(e.target.value))}
+                    placeholder="Printed label price"
+                    className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-gray-700 bg-white"
+                  />
+                  <span className="text-[10px] text-gray-400">Customer price cannot exceed this</span>
+                </div>
               </div>
+
+              {/* Live Preview Card */}
+              {pricePreview && (
+                <div className={`p-3 rounded-xl border text-xs flex flex-col gap-1 transition-all ${
+                  pricePreview.mrpExceeded
+                    ? 'bg-red-50 border-red-200 text-red-900'
+                    : 'bg-emerald-50/80 border-emerald-200/80 text-emerald-950'
+                }`}>
+                  <div className="flex justify-between items-center font-bold">
+                    <span>Customer Storefront Price:</span>
+                    <span className="text-sm font-black font-numbers">₹{pricePreview.customerPrice}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-gray-500 font-medium border-t border-black/5 pt-1">
+                    <span>Platform Fee ({pricePreview.commissionPct || 10}% commission + buffer):</span>
+                    <span>+₹{pricePreview.platformFee}</span>
+                  </div>
+                  {pricePreview.mrpExceeded && (
+                    <span className="text-[11px] font-bold text-red-600 mt-1">
+                      ⚠️ Customer price (₹{pricePreview.customerPrice}) exceeds MRP (₹{mrp}). Please reduce your base payout price or raise MRP.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Available Units / Capacity</label>
+              <input type="number" required value={stock} onChange={e => setStock(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl text-sm font-numbers" />
             </div>
 
             <div>
