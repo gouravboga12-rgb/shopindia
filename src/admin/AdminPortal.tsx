@@ -21,7 +21,8 @@ import { PromotionsPage } from './pages/PromotionsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { AdminVendorView } from './pages/AdminVendorView';
 import { FinancePage } from './pages/FinancePage';
-import { PayoutsPage } from './pages/PayoutsPage';
+import { VendorPayoutsPage } from './pages/VendorPayoutsPage';
+import { FleetPayoutsPage } from './pages/FleetPayoutsPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { AccountStatementPage } from './pages/AccountStatementPage';
 
@@ -62,7 +63,9 @@ const AdminContent: React.FC = () => {
     switch (tab) {
       case 'dashboard': return <Dashboard />;
       case 'finance': return <FinancePage />;
-      case 'payouts': return <PayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
+      case 'payouts-vendors': return <VendorPayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
+      case 'payouts-fleet': return <FleetPayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
+      case 'payouts': return <VendorPayoutsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'accounts': return <AccountsPage onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'regional-admins': return <RegionalAdminsPage />;
       case 'vendors': return <VendorsPage onManage={setManagedVendor} />;

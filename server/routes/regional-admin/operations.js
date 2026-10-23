@@ -150,7 +150,7 @@ router.get('/riders', async (req, res) => {
     const riders = await prisma.riderProfile.findMany({
       where: branchFilter,
       include: {
-        user: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+        user: { select: { id: true, name: true, email: true, phone: true, avatar: true, status: true } },
         branch: { select: { id: true, name: true, city: true } },
         _count: {
           select: { deliveries: true },
@@ -183,6 +183,13 @@ router.patch('/riders/:id/verify', async (req, res) => {
       },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+
+    if (rider?.user?.id) {
+      await prisma.user.update({
+        where: { id: rider.user.id },
+        data: { status: approved ? 'active' : 'rejected' },
+      });
+    }
 
     res.json({
       success: true,

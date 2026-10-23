@@ -20,7 +20,7 @@ router.use(verifyToken, requireRole('super_admin'));
  */
 router.get('/', async (req, res) => {
   try {
-    const { queue = 'all', status, page = 1, limit = 25 } = req.query;
+    const { queue = 'all', status, role, startDate, endDate, page = 1, limit = 50 } = req.query;
     const pageNum = Number(page);
     const limitNum = Number(limit);
 
@@ -31,8 +31,18 @@ router.get('/', async (req, res) => {
 
     if (queue === 'vendor') {
       where.partyType = 'VENDOR';
-    } else if (queue === 'rider' || queue === 'technician') {
+    } else if (queue === 'rider' || queue === 'technician' || queue === 'fleet') {
       where.partyType = 'RIDER';
+    }
+
+    if (startDate || endDate) {
+      where.requestedAt = {};
+      if (startDate) where.requestedAt.gte = new Date(startDate);
+      if (endDate) {
+        const endD = new Date(endDate);
+        endD.setHours(23, 59, 59, 999);
+        where.requestedAt.lte = endD;
+      }
     }
 
     const [requests, total, queueStats] = await Promise.all([
@@ -66,9 +76,10 @@ router.get('/', async (req, res) => {
         take: limitNum,
       }),
       prisma.payoutRequest.count({ where }),
-      // Aggregate stats per status
+      // Aggregate stats per status within the active filter
       prisma.payoutRequest.groupBy({
         by: ['status'],
+        where: queue === 'vendor' ? { partyType: 'VENDOR' } : queue === 'fleet' || queue === 'rider' || queue === 'technician' ? { partyType: 'RIDER' } : {},
         _count: { id: true },
         _sum: { amount: true },
       }),
@@ -408,16 +419,47 @@ router.get('/statement/:partyType/:partyId', async (req, res) => {
       currentBalance = r.walletBalance;
     }
 
-    // Fetch chronological ledger entries
+    // Fetch chronological ledger entries with optional date range
+    const { startDate, endDate } = req.query;
+    let start = null;
+    let end = null;
+    if (startDate) start = new Date(startDate);
+    if (endDate) {
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    let openingBalance = 0;
+    if (start) {
+      const priorEntries = await prisma.ledgerEntry.findMany({
+        where: {
+          party: normalizedParty,
+          partyId: partyId,
+          createdAt: { lt: start },
+        },
+      });
+      priorEntries.forEach(e => {
+        openingBalance += (e.type === 'CREDIT' ? e.amount : -e.amount);
+      });
+      openingBalance = Math.round(openingBalance * 100) / 100;
+    }
+
+    const where = {
+      party: normalizedParty,
+      partyId: partyId,
+    };
+    if (start || end) {
+      where.createdAt = {};
+      if (start) where.createdAt.gte = start;
+      if (end) where.createdAt.lte = end;
+    }
+
     const entries = await prisma.ledgerEntry.findMany({
-      where: {
-        party: normalizedParty,
-        partyId: partyId,
-      },
+      where,
       orderBy: { createdAt: 'asc' },
     });
 
-    let runningBalance = 0;
+    let runningBalance = openingBalance;
     const statementRows = entries.map(e => {
       const change = e.type === 'CREDIT' ? e.amount : -e.amount;
       runningBalance += change;
@@ -442,7 +484,7 @@ router.get('/statement/:partyType/:partyId', async (req, res) => {
         accountName,
         currentBalance,
       },
-      openingBalance: 0,
+      openingBalance,
       closingBalance: Math.round(runningBalance * 100) / 100,
       entriesCount: statementRows.length,
       statement: statementRows.reverse(), // Newest on top for UI display

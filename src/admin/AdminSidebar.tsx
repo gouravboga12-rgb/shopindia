@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
   Building2, ShieldCheck, MapPin, Headphones, Percent, LogOut,
   Truck, Tag, BarChart3, Bell, LayoutGrid, Image, Globe2,
-  DollarSign, Wallet, CreditCard
+  DollarSign, CreditCard, Bike
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -18,7 +18,8 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'view_dashboard' },
     { id: 'finance', label: 'Finance Center', icon: DollarSign, perm: 'manage_commissions' },
-    { id: 'payouts', label: 'Partner Payouts', icon: Wallet, perm: 'manage_commissions' },
+    { id: 'payouts-vendors', label: 'Merchant Payouts', icon: Store, perm: 'manage_commissions' },
+    { id: 'payouts-fleet', label: 'Fleet & Service Payouts', icon: Bike, perm: 'manage_commissions' },
     { id: 'accounts', label: 'Accounts & Statements', icon: CreditCard, perm: 'manage_commissions' },
     { id: 'commissions', label: 'Pricing & Commission', icon: Percent, perm: 'manage_commissions' },
     { id: 'regional-admins', label: 'Regional Admins', icon: Globe2, perm: 'manage_users' },

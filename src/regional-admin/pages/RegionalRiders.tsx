@@ -23,6 +23,7 @@ interface RiderItem {
   isOnline: boolean;
   isApproved: boolean;
   isActive: boolean;
+  isRejected?: boolean;
   walletBalance: number;
   totalDeliveries: number;
   rating: number;
@@ -32,6 +33,7 @@ interface RiderItem {
     name: string;
     email: string;
     phone: string;
+    status?: string;
   };
   _count?: {
     deliveries: number;
@@ -43,7 +45,7 @@ export const RegionalRiders: React.FC = () => {
   const [riders, setRiders] = useState<RiderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'delivery' | 'service' | 'both' | 'pending'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'delivery' | 'service' | 'both' | 'pending' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchRiders = async () => {
@@ -82,7 +84,17 @@ export const RegionalRiders: React.FC = () => {
       });
       if (res.ok) {
         setRiders((prev) =>
-          prev.map((r) => (r.id === riderId ? { ...r, isApproved: approve, isActive: approve } : r))
+          prev.map((r) =>
+            r.id === riderId
+              ? {
+                  ...r,
+                  isApproved: approve,
+                  isActive: approve,
+                  isRejected: !approve,
+                  user: { ...r.user, status: approve ? 'active' : 'rejected' },
+                }
+              : r
+          )
         );
       }
     } catch (e) {
@@ -92,10 +104,17 @@ export const RegionalRiders: React.FC = () => {
     }
   };
 
-  const pendingVerification = riders.filter((r) => !r.isApproved);
+  const pendingVerification = riders.filter(
+    (r) => !r.isApproved && !r.isRejected && r.user?.status !== 'rejected' && r.isActive !== false
+  );
 
   const filteredRiders = riders.filter((r) => {
+    const isRiderRejected = r.isRejected || r.user?.status === 'rejected' || (!r.isApproved && !r.isActive);
+
     // Tab filter
+    if (activeTab === 'rejected') return isRiderRejected;
+    if (isRiderRejected && activeTab !== 'all') return false;
+
     if (activeTab === 'pending' && r.isApproved) return false;
     if (activeTab === 'delivery' && r.partnerType !== 'delivery') return false;
     if (activeTab === 'service' && r.partnerType !== 'service') return false;
@@ -277,6 +296,16 @@ export const RegionalRiders: React.FC = () => {
               }`}
             >
               Pending ({pendingVerification.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('rejected')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'rejected'
+                  ? 'bg-red-600 text-white shadow-xs'
+                  : 'text-red-600 hover:text-red-900'
+              }`}
+            >
+              Rejected ({riders.filter((r) => r.isRejected || r.user?.status === 'rejected' || (!r.isApproved && !r.isActive)).length})
             </button>
           </div>
 

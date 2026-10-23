@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
-  FileText, ArrowLeft, Download, RefreshCw
+  FileText, ArrowLeft, Download, RefreshCw, Calendar
 } from 'lucide-react';
 
 interface StatementEntry {
@@ -34,11 +34,46 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
   const [account, setAccount] = useState<any>(null);
   const [openingBalance, setOpeningBalance] = useState<number>(0);
   const [closingBalance, setClosingBalance] = useState<number>(0);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | '7d' | '30d' | 'custom'>('all');
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
+
+  const getDateRangeParams = () => {
+    const now = new Date();
+    if (dateFilter === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      return { startDate: start };
+    }
+    if (dateFilter === 'yesterday') {
+      const yest = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const start = new Date(yest.getFullYear(), yest.getMonth(), yest.getDate()).toISOString();
+      const end = new Date(yest.getFullYear(), yest.getMonth(), yest.getDate(), 23, 59, 59, 999).toISOString();
+      return { startDate: start, endDate: end };
+    }
+    if (dateFilter === '7d') {
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      return { startDate: start };
+    }
+    if (dateFilter === '30d') {
+      const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      return { startDate: start };
+    }
+    if (dateFilter === 'custom' && customStart) {
+      return { startDate: customStart, endDate: customEnd || undefined };
+    }
+    return {};
+  };
 
   const loadStatement = async () => {
     setLoading(true);
     try {
-      const res: any = await api.get(`/api/admin/payouts/statement/${partyType.toLowerCase()}/${partyId}`);
+      const dateParams = getDateRangeParams();
+      const queryParams = new URLSearchParams({
+        ...(dateParams.startDate ? { startDate: dateParams.startDate } : {}),
+        ...(dateParams.endDate ? { endDate: dateParams.endDate } : {}),
+      });
+
+      const res: any = await api.get(`/api/admin/payouts/statement/${partyType.toLowerCase()}/${partyId}?${queryParams.toString()}`);
       if (res?.success) {
         setStatement(res.statement || []);
         setAccount(res.account);
@@ -54,7 +89,7 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
 
   useEffect(() => {
     loadStatement();
-  }, [partyType, partyId]);
+  }, [partyType, partyId, dateFilter, customStart, customEnd]);
 
   const formatINR = (val?: number) => `₹${(val || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
@@ -120,6 +155,53 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
+      </div>
+
+      {/* Date-Range Selector Bar */}
+      <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto">
+            <span className="px-2 text-gray-500 font-bold flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Date Range:</span>
+            {(['all', 'today', 'yesterday', '7d', '30d', 'custom'] as const).map(d => (
+              <button
+                key={d}
+                onClick={() => setDateFilter(d)}
+                className={`px-3 py-1 rounded-lg font-bold transition-all capitalize cursor-pointer ${dateFilter === d ? 'bg-white text-emerald-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                {d === '7d' ? 'Last 7 Days' : d === '30d' ? 'Last 30 Days' : d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {dateFilter === 'custom' && (
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">From:</span>
+              <input
+                type="date"
+                value={customStart}
+                onChange={e => setCustomStart(e.target.value)}
+                className="px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">To:</span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={e => setCustomEnd(e.target.value)}
+                className="px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium"
+              />
+            </div>
+            <button
+              onClick={loadStatement}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-colors cursor-pointer"
+            >
+              Filter Statement
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Account Balance Summary Card */}

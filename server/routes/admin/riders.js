@@ -71,4 +71,51 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/riders/:id — Permanently delete rider profile and user record
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: { riderProfile: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Rider not found.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (user.riderProfile) {
+        const rpId = user.riderProfile.id;
+        // Unlink or clean up related child records
+        await tx.payoutRequest.deleteMany({ where: { partyType: 'RIDER', partyId: rpId } });
+        await tx.cODRemittance.deleteMany({ where: { riderId: rpId } });
+        await tx.riderPayout.deleteMany({ where: { riderId: rpId } });
+        await tx.ledgerEntry.deleteMany({ where: { party: 'RIDER', partyId: rpId } });
+        await tx.delivery.updateMany({
+          where: { riderProfileId: rpId },
+          data: { riderProfileId: null },
+        });
+        await tx.riderProfile.delete({ where: { id: rpId } });
+      }
+
+      await tx.address.deleteMany({ where: { userId: id } });
+      await tx.review.deleteMany({ where: { userId: id } });
+      await tx.userNotification.deleteMany({ where: { userId: id } });
+      await tx.userActivity.deleteMany({ where: { userId: id } });
+      await tx.user.delete({ where: { id } });
+    });
+
+    res.json({
+      success: true,
+      message: `Rider ${user.name} (${user.email}) and user account permanently deleted.`,
+    });
+  } catch (error) {
+    console.error('Error deleting rider:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete rider.' });
+  }
+});
+
 module.exports = router;
+
