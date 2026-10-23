@@ -244,7 +244,7 @@ router.get('/deliveries/live', async (req, res) => {
         take: 20,
         orderBy: { createdAt: 'desc' },
         include: {
-          order: { select: { orderNumber: true, total: true, shippingAddress: true } },
+          order: { select: { orderNumber: true, total: true, deliveryLine1: true, deliveryCity: true, deliveryPincode: true } },
           vendor: { select: { businessName: true, city: true } },
         },
       }),
