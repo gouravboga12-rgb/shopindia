@@ -138,6 +138,9 @@
   - `server/routes/vendor/support.js`: Dedicated vendor dispute queue with live SLA countdowns, customer chat, private internal notes, and refund forwarding.
   - `server/routes/regional-admin/support.js`: Territory manager support queue with territory pincode matching, rider contact cards, and escalation to Super Admin.
   - `server/routes/admin/support.js`: Upgraded Super Admin queue with multi-tab filters (`All`, `SLA Breached`, `Escalated`, `Refund Requests`) and 1-click refund approval with automatic `REFUND_DEBIT` ledger postings against the at-fault merchant or delivery rider.
+  - **Git Commits:** `6b6e9bd` (feat: Phase 1-4 full implementation), `63198b7` (fix: delivery address select in regional operations).
+  - **AWS EC2 Deployment:** Pulled to `/home/ubuntu/shopindia`, dependencies installed, `npx prisma generate` & `npx prisma db push` synchronized with Amazon RDS, PM2 service `shopindia-api` restarted online.
+  - **Vercel Live Verification:** Verified on `https://shopindia-three.vercel.app`. Proxy rewrite to AWS EC2 verified, Super Admin login verified, dynamic pricing simulation verified, 3-tier support ticket queues verified. Ready to proceed to Phase 5.
   - `src/vendor/pages/VendorSupport.tsx`: Merchant dispute UI mounted in `VendorPortal.tsx` and `VendorSidebar.tsx`.
   - `src/regional-admin/pages/RegionalSupport.tsx`: Territory support UI mounted in `RegionalAdminPortal.tsx`, `RegionalAdminSidebar.tsx`, and `RegionalAdminBottomNav.tsx`.
   - `src/admin/pages/SupportPage.tsx`: Upgraded with queue tabs, SLA countdown timers, and at-fault ledger refund debit modal.
