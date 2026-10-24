@@ -36,6 +36,25 @@ async function createOrder(amountInPaise, receipt, notes = {}) {
 }
 
 /**
+ * Flexible Razorpay order creator supporting both signature types:
+ * 1. createRazorpayOrder({ amount, currency, receipt, notes }) - amount in INR rupees
+ * 2. createRazorpayOrder(amountInPaise, receipt, notes) - amount in paise
+ */
+async function createRazorpayOrder(arg1, arg2, arg3) {
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    const { amount, currency = 'INR', receipt, notes = {} } = arg1;
+    const amountInPaise = Math.round(parseFloat(amount) * 100);
+    return getRzp().orders.create({
+      amount: amountInPaise,
+      currency,
+      receipt: String(receipt || `rec_${Date.now()}`).slice(0, 40),
+      notes,
+    });
+  }
+  return createOrder(arg1, arg2, arg3);
+}
+
+/**
  * Verify Razorpay payment signature (HMAC SHA-256).
  * @param {string} razorpayOrderId
  * @param {string} razorpayPaymentId
@@ -90,6 +109,7 @@ async function createRefund(paymentId, amountPaise, notes = {}) {
 module.exports = {
   getRzp,
   createOrder,
+  createRazorpayOrder,
   verifyPaymentSignature,
   verifyWebhookSignature,
   fetchPaymentDetails,
