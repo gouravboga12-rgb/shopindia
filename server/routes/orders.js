@@ -447,7 +447,7 @@ router.post('/', async (req, res) => {
             : isService 
             ? `Your service appointment #${order.orderNumber} has been booked. Technician will arrive at scheduled time.`
             : `Your E-Commerce order #${order.orderNumber} is confirmed! Estimated delivery in 2-4 business days.`,
-          channel: 'in_app',
+          channel: 'IN_APP',
           isRead: false,
           link: `/orders/${order.id}`,
         }
