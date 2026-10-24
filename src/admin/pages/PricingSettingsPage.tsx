@@ -771,20 +771,32 @@ export const PricingSettingsPage: React.FC = () => {
             </div>
 
             {/* Right: Calculated Breakdown (7 Cols) */}
+            {/* Right: Calculated Breakdown (7 Cols) */}
             <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-3">
               {simResult ? (
                 <>
-                  <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
-                    <span className="text-[11px] text-white/60 font-semibold">Customer Pays</span>
+                  {/* Card 1: Total Customer Checkout Amount */}
+                  <div className="p-4 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-2xl border border-blue-400/30 flex flex-col justify-between col-span-2 sm:col-span-1 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-blue-200 font-bold uppercase tracking-wider">Customer Pays (Total)</span>
+                      <span className="text-[10px] bg-blue-400/20 text-blue-300 px-2 py-0.5 rounded-full font-mono font-bold">Checkout</span>
+                    </div>
                     <div className="my-2">
-                      <span className="text-2xl font-black font-numbers text-white">₹{simResult.customerPrice}</span>
+                      <span className="text-3xl font-black font-numbers text-white">₹{simResult.grossTotal}</span>
+                      <div className="mt-1 text-[11px] font-bold text-emerald-300 flex items-center gap-1">
+                        <span>₹{simResult.customerPrice}</span>
+                        <span className="text-white/60 font-normal">item +</span>
+                        <span>{simResult.customerDelivery === 0 ? 'FREE' : `₹${simResult.customerDelivery}`}</span>
+                        <span className="text-white/60 font-normal">delivery</span>
+                      </div>
                       {simResult.isCappedAtMrp && (
-                        <span className="block text-[10px] text-amber-300 font-bold mt-1">⚠️ Capped at MRP</span>
+                        <span className="block text-[10px] text-amber-300 font-bold mt-1">⚠️ Capped at MRP ₹{simResult.mrp}</span>
                       )}
                     </div>
-                    <span className="text-[10px] text-white/40">Includes platform commission</span>
+                    <span className="text-[10px] text-white/50">Full order amount charged to customer</span>
                   </div>
 
+                  {/* Card 2: Vendor Receives */}
                   <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
                     <span className="text-[11px] text-white/60 font-semibold">Vendor Receives</span>
                     <div className="my-2">
@@ -793,6 +805,7 @@ export const PricingSettingsPage: React.FC = () => {
                     <span className="text-[10px] text-white/40">100% guaranteed base payout</span>
                   </div>
 
+                  {/* Card 3: Delivery Charge */}
                   <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
                     <span className="text-[11px] text-white/60 font-semibold">Delivery Charge</span>
                     <div className="my-2">
@@ -800,25 +813,28 @@ export const PricingSettingsPage: React.FC = () => {
                         {simResult.customerDelivery === 0 ? 'FREE' : `₹${simResult.customerDelivery}`}
                       </span>
                     </div>
-                    <span className="text-[10px] text-white/40">Cost: ₹{simResult.deliveryCost}</span>
+                    <span className="text-[10px] text-white/40">Cost: ₹{simResult.deliveryCost} (Margin: {simResult.deliveryMargin >= 0 ? `+₹${simResult.deliveryMargin}` : `-₹${Math.abs(simResult.deliveryMargin)}`})</span>
                   </div>
 
+                  {/* Card 4: Razorpay Deducts */}
                   <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
                     <span className="text-[11px] text-white/60 font-semibold">Razorpay Deducts</span>
                     <div className="my-2">
                       <span className="text-2xl font-black font-numbers text-red-300">₹{simResult.gatewayFeeActual}</span>
                     </div>
-                    <span className="text-[10px] text-white/40">2% + 18% GST (2.36%)</span>
+                    <span className="text-[10px] text-white/40">2.36% on ₹{simResult.grossTotal} Total</span>
                   </div>
 
+                  {/* Card 5: Platform Fee Collected */}
                   <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
                     <span className="text-[11px] text-white/60 font-semibold">Platform Fee Collected</span>
                     <div className="my-2">
                       <span className="text-2xl font-black font-numbers text-indigo-300">₹{simResult.platformFee}</span>
                     </div>
-                    <span className="text-[10px] text-white/40">Commission + buffer</span>
+                    <span className="text-[10px] text-white/40">Comm ₹{simResult.commissionAmount} + Buffer ₹{simResult.gatewayBuffer}</span>
                   </div>
 
+                  {/* Card 6: Platform Net Profit */}
                   <div className={`p-4 rounded-2xl border flex flex-col justify-between ${
                     simResult.isProfitable
                       ? 'bg-emerald-500/20 border-emerald-400/40'
@@ -833,8 +849,21 @@ export const PricingSettingsPage: React.FC = () => {
                       </span>
                     </div>
                     <span className="text-[10px] text-white/70">
-                      {simResult.isProfitable ? 'Safe margin retained' : 'Loss incurred'}
+                      {simResult.isProfitable ? 'Safe margin retained at HQ' : 'Loss incurred'}
                     </span>
+                  </div>
+
+                  {/* Summary Ribbon: Explaining the Full Customer Equation */}
+                  <div className="col-span-2 sm:col-span-3 bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                    <div className="flex items-center gap-2 text-white/90 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                      <span>
+                        <b>Customer Checkout Equation:</b> ₹{simResult.customerPrice} (item) + {simResult.customerDelivery === 0 ? '₹0 (FREE Delivery)' : `₹${simResult.customerDelivery} (delivery)`} = <b className="text-emerald-300 text-sm font-numbers">₹{simResult.grossTotal} Total Paid</b>
+                      </span>
+                    </div>
+                    <div className="text-white/60 text-[11px] font-mono">
+                      Razorpay 2.36% on ₹{simResult.grossTotal} = ₹{simResult.gatewayFeeActual}
+                    </div>
                   </div>
                 </>
               ) : (
