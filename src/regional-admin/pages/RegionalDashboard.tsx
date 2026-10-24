@@ -7,6 +7,8 @@ import {
   RefreshCw,
   AlertCircle,
   Truck,
+  Bell,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface RegionalMetrics {
@@ -29,6 +31,7 @@ export const RegionalDashboard: React.FC = () => {
     totalOrdersCount: 0,
   });
   const [recentDeliveries, setRecentDeliveries] = useState<any[]>([]);
+  const [demandLeads, setDemandLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDashboard = async () => {
@@ -42,6 +45,14 @@ export const RegionalDashboard: React.FC = () => {
         const data = await res.json();
         setMetrics(data.metrics || {});
         setRecentDeliveries(data.recentDeliveries || []);
+      }
+
+      const leadsRes = await fetch('/api/regional-admin/demand-leads', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (leadsRes.ok) {
+        const leadsData = await leadsRes.json();
+        setDemandLeads(Array.isArray(leadsData) ? leadsData : []);
       }
     } catch (e) {
       console.error('Regional dashboard error', e);
@@ -204,6 +215,68 @@ export const RegionalDashboard: React.FC = () => {
                     </td>
                     <td className="p-3 font-bold text-emerald-600">
                       ₹{del.deliveryFee}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Glacons Service Demand Leads (Unserved Localities) */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5 text-slate-800">
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base sm:text-lg text-slate-900 font-heading">
+                Unserved Service Demand Leads
+              </h3>
+              <p className="text-xs text-slate-400">
+                Customer doorstep service requests in your territory where no active technician was available
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+            {demandLeads.length} Leads
+          </span>
+        </div>
+
+        {demandLeads.length === 0 ? (
+          <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+            <p className="text-xs text-slate-600 font-medium">All customer doorstep requests in your territory currently have active technician coverage!</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[500px]">
+              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[11px] border-b border-slate-200/80">
+                <tr>
+                  <th className="p-3">Service</th>
+                  <th className="p-3">Category</th>
+                  <th className="p-3">Location / Pincode</th>
+                  <th className="p-3">Contact</th>
+                  <th className="p-3">Requested At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {demandLeads.map((lead) => (
+                  <tr key={lead.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="p-3 font-bold text-slate-800">{lead.serviceName}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                        {lead.category}
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono font-semibold text-slate-700">
+                      {lead.city || 'Territory'} {lead.pincode ? `(${lead.pincode})` : ''}
+                    </td>
+                    <td className="p-3 text-slate-600">{lead.phone || 'In-App Customer'}</td>
+                    <td className="p-3 text-slate-400 text-[11px]">
+                      {new Date(lead.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                   </tr>
                 ))}

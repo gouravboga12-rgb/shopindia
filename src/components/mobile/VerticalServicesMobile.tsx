@@ -5,7 +5,7 @@ import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
   Star, Heart, Calendar, Home, Wrench,
-  Clock
+  Clock, Bell, MapPin
 } from 'lucide-react';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
 import { TimeSlotWheelPickerModal } from '../common/TimeSlotWheelPickerModal';
@@ -33,7 +33,7 @@ const VEHICLE_CATEGORIES = [
 ];
 
 export const VerticalServicesMobile: React.FC = () => {
-  const { addToCart, navigateTo } = useApp();
+  const { addToCart, navigateTo, userCoords, addNotification } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
 
@@ -42,6 +42,7 @@ export const VerticalServicesMobile: React.FC = () => {
   const [bookingService, setBookingService] = useState<Product | null>(null);
   const [selectedDate, setSelectedDate] = useState('Tomorrow');
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
+  const [notifiedLeadIds, setNotifiedLeadIds] = useState<Record<string, boolean>>({});
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
 
   // Selected Vehicle state
@@ -120,6 +121,41 @@ export const VerticalServicesMobile: React.FC = () => {
     addToCart(bookingDetails);
     setBookingService(null);
     navigateTo('cart');
+  };
+
+  const handleNotifyMe = async (service: Product, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (notifiedLeadIds[service.id]) return;
+
+    try {
+      const rawBase = import.meta.env.VITE_API_URL || '';
+      const base = rawBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+      await fetch(`${base}/api/products/demand-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceName: service.title,
+          category: service.category,
+          pincode: userCoords?.pincode,
+          city: userCoords?.city,
+          lat: userCoords?.lat,
+          lng: userCoords?.lng,
+        }),
+      });
+
+      setNotifiedLeadIds((prev) => ({ ...prev, [service.id]: true }));
+
+      addNotification({
+        type: 'service',
+        title: 'Demand Request Registered 🔔',
+        message: `We've noted your request for "${service.title}" in ${userCoords?.city || 'your area'}. We will notify you when service coverage begins!`,
+        icon: Bell,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50',
+      });
+    } catch (err) {
+      console.error('Failed to register demand lead:', err);
+    }
   };
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
@@ -255,6 +291,13 @@ export const VerticalServicesMobile: React.FC = () => {
                       <Clock size={11} className="text-amber-600" />
                       <span>{service.durationEstimate || '45-90 min'}</span>
                     </div>
+
+                    {service.isServiceAvailable === false && (
+                      <div className="flex items-center gap-1 text-[9.5px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 mt-0.5">
+                        <MapPin size={10} className="text-amber-600 shrink-0" />
+                        <span>Not Available in Your Locality Yet</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between mt-1">
@@ -265,16 +308,30 @@ export const VerticalServicesMobile: React.FC = () => {
                       )}
                     </div>
 
-                    <button
-                      onClick={(e) => handleBookClick(service, e)}
-                      className={`px-3 py-1.5 text-xs font-black rounded-xl text-white shadow-sm flex items-center gap-1 ${activeSubVertical === 'home'
-                          ? 'bg-amber-600 hover:bg-amber-700'
-                          : 'bg-blue-600 hover:bg-blue-700'
+                    {service.isServiceAvailable === false ? (
+                      <button
+                        onClick={(e) => handleNotifyMe(service, e)}
+                        className={`px-2.5 py-1 text-[10.5px] font-black rounded-xl shadow-xs flex items-center gap-1 ${
+                          notifiedLeadIds[service.id]
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
                         }`}
-                    >
-                      <Calendar size={11} />
-                      <span>Book Slot</span>
-                    </button>
+                      >
+                        <Bell size={10} className={notifiedLeadIds[service.id] ? 'fill-emerald-600' : ''} />
+                        <span>{notifiedLeadIds[service.id] ? 'Notified ✓' : 'Notify Me'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => handleBookClick(service, e)}
+                        className={`px-3 py-1.5 text-xs font-black rounded-xl text-white shadow-sm flex items-center gap-1 ${activeSubVertical === 'home'
+                            ? 'bg-amber-600 hover:bg-amber-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                      >
+                        <Calendar size={11} />
+                        <span>Book Slot</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -6,7 +6,15 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 
-export const detectCurrentLocation = async (): Promise<{ formatted: string; city?: string; pincode?: string }> => {
+export interface DetectedLocation {
+  formatted: string;
+  city?: string;
+  pincode?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export const detectCurrentLocation = async (): Promise<DetectedLocation> => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser.'));
@@ -31,9 +39,9 @@ export const detectCurrentLocation = async (): Promise<{ formatted: string; city
           const parts = [area, city, postcode].filter(Boolean);
           const formatted = parts.length > 0 ? parts.join(', ') : `${city}, ${state}`;
 
-          resolve({ formatted: `📍 ${formatted}`, city, pincode: postcode });
+          resolve({ formatted: `📍 ${formatted}`, city, pincode: postcode, lat: latitude, lng: longitude });
         } catch {
-          resolve({ formatted: `📍 Location (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)` });
+          resolve({ formatted: `📍 Location (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`, lat: latitude, lng: longitude });
         }
       },
       (err) => {
@@ -48,17 +56,26 @@ export const detectCurrentLocation = async (): Promise<{ formatted: string; city
   });
 };
 
-const POPULAR_CITIES = [
-  'Bengaluru, Karnataka',
-  'Mumbai, Maharashtra',
-  'Delhi NCR, New Delhi',
-  'Hyderabad, Telangana',
-  'Chennai, Tamil Nadu',
-  'Pune, Maharashtra',
-  'Kolkata, West Bengal',
-  'Ahmedabad, Gujarat',
-  'Jaipur, Rajasthan',
-  'Kochi, Kerala'
+export interface PopularCityConfig {
+  name: string;
+  lat: number;
+  lng: number;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export const POPULAR_CITIES: PopularCityConfig[] = [
+  { name: 'Bengaluru, Karnataka', lat: 12.9716, lng: 77.5946, city: 'Bengaluru', state: 'Karnataka', pincode: '560001' },
+  { name: 'Mumbai, Maharashtra', lat: 19.0760, lng: 72.8777, city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+  { name: 'Delhi NCR, New Delhi', lat: 28.6139, lng: 77.2090, city: 'New Delhi', state: 'Delhi', pincode: '110001' },
+  { name: 'Hyderabad, Telangana', lat: 17.3850, lng: 78.4867, city: 'Hyderabad', state: 'Telangana', pincode: '500001' },
+  { name: 'Chennai, Tamil Nadu', lat: 13.0827, lng: 80.2707, city: 'Chennai', state: 'Tamil Nadu', pincode: '600001' },
+  { name: 'Pune, Maharashtra', lat: 18.5204, lng: 73.8567, city: 'Pune', state: 'Maharashtra', pincode: '411001' },
+  { name: 'Kolkata, West Bengal', lat: 22.5726, lng: 88.3639, city: 'Kolkata', state: 'West Bengal', pincode: '700001' },
+  { name: 'Ahmedabad, Gujarat', lat: 23.0225, lng: 72.5714, city: 'Ahmedabad', state: 'Gujarat', pincode: '380001' },
+  { name: 'Jaipur, Rajasthan', lat: 26.9124, lng: 75.7873, city: 'Jaipur', state: 'Rajasthan', pincode: '302001' },
+  { name: 'Kochi, Kerala', lat: 9.9312, lng: 76.2673, city: 'Kochi', state: 'Kerala', pincode: '682001' }
 ];
 
 export const LocationModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -90,7 +107,12 @@ export const LocationModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     setSuccessMsg(null);
     try {
       const loc = await detectCurrentLocation();
-      setLocation(loc.formatted);
+      setLocation(loc.formatted, {
+        lat: loc.lat ?? null,
+        lng: loc.lng ?? null,
+        city: loc.city,
+        pincode: loc.pincode
+      });
       setManualInput(loc.formatted.replace(/^📍\s*/, ''));
       saveToRecent(loc.formatted);
       setSuccessMsg('Live location captured successfully!');
@@ -108,14 +130,36 @@ export const LocationModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     e.preventDefault();
     const clean = manualInput.trim();
     if (!clean) return;
-    setLocation(clean);
+    const found = POPULAR_CITIES.find(c =>
+      c.name.toLowerCase().includes(clean.toLowerCase()) ||
+      c.city.toLowerCase().includes(clean.toLowerCase())
+    );
+    if (found) {
+      setLocation(clean, { lat: found.lat, lng: found.lng, city: found.city, pincode: found.pincode });
+    } else {
+      setLocation(clean);
+    }
     saveToRecent(clean);
     onClose();
   };
 
-  const handleSelectCity = (city: string) => {
-    setLocation(city);
-    saveToRecent(city);
+  const handleSelectCity = (cityConfig: PopularCityConfig | string) => {
+    if (typeof cityConfig === 'string') {
+      const found = POPULAR_CITIES.find(c => 
+        c.name.toLowerCase() === cityConfig.toLowerCase() || 
+        c.city.toLowerCase() === cityConfig.toLowerCase()
+      );
+      if (found) {
+        setLocation(found.name, { lat: found.lat, lng: found.lng, city: found.city, pincode: found.pincode });
+        saveToRecent(found.name);
+      } else {
+        setLocation(cityConfig);
+        saveToRecent(cityConfig);
+      }
+    } else {
+      setLocation(cityConfig.name, { lat: cityConfig.lat, lng: cityConfig.lng, city: cityConfig.city, pincode: cityConfig.pincode });
+      saveToRecent(cityConfig.name);
+    }
     onClose();
   };
 
@@ -269,11 +313,11 @@ export const LocationModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
               <div className="flex flex-wrap gap-1.5">
                 {POPULAR_CITIES.map((city) => (
                   <button
-                    key={city}
+                    key={city.name}
                     onClick={() => handleSelectCity(city)}
                     className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10.5px] font-bold transition-colors cursor-pointer"
                   >
-                    {city.split(',')[0]}
+                    {city.city || city.name.split(',')[0]}
                   </button>
                 ))}
               </div>

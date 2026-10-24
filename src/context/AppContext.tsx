@@ -75,7 +75,8 @@ interface AppContextType {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   location: string;
-  setLocation: (loc: string) => void;
+  userCoords: { lat: number | null; lng: number | null; city?: string; pincode?: string };
+  setLocation: (loc: string, coords?: { lat?: number | null; lng?: number | null; city?: string; pincode?: string }) => void;
   cart: OrderItem[];
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
@@ -129,14 +130,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Business vertical
   const [currentVertical, setCurrentVerticalState] = useState<VerticalType>(initialRoute.vertical);
 
-  // Location
+  // Location & GPS Coordinates
   const [location, setLocationState] = useState<string>(() => {
     return localStorage.getItem('shopindia_user_location') || 'Bengaluru, Karnataka';
   });
 
-  const setLocation = (loc: string) => {
+  const [userCoords, setUserCoords] = useState<{ lat: number | null; lng: number | null; city?: string; pincode?: string }>(() => {
+    try {
+      const stored = localStorage.getItem('shopindia_user_coords');
+      return stored ? JSON.parse(stored) : { lat: 12.9716, lng: 77.5946, city: 'Bengaluru', pincode: '560001' };
+    } catch {
+      return { lat: 12.9716, lng: 77.5946, city: 'Bengaluru', pincode: '560001' };
+    }
+  });
+
+  const setLocation = (loc: string, coords?: { lat?: number | null; lng?: number | null; city?: string; pincode?: string }) => {
     setLocationState(loc);
     localStorage.setItem('shopindia_user_location', loc);
+    if (coords) {
+      setUserCoords(prev => {
+        const next = {
+          lat: coords.lat !== undefined ? coords.lat : prev.lat,
+          lng: coords.lng !== undefined ? coords.lng : prev.lng,
+          city: coords.city !== undefined ? coords.city : prev.city,
+          pincode: coords.pincode !== undefined ? coords.pincode : prev.pincode,
+        };
+        localStorage.setItem('shopindia_user_coords', JSON.stringify(next));
+        return next;
+      });
+    }
   };
 
   // Cart
@@ -476,6 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         searchQuery,
         setSearchQuery,
         location,
+        userCoords,
         setLocation,
         cart,
         addToCart,

@@ -34,10 +34,14 @@ router.post('/register', async (req, res) => {
       },
     });
 
-    const street = address ? address.street : undefined;
-    const city = address ? address.city : undefined;
-    const state = address ? address.state : undefined;
-    const pincode = address ? address.pincode : undefined;
+    const street = req.body.street || (address ? address.street : undefined);
+    const city = req.body.city || (address ? address.city : undefined);
+    const state = req.body.state || (address ? address.state : undefined);
+    const pincode = req.body.pincode || (address ? address.pincode : undefined);
+    const lat = req.body.lat !== undefined && req.body.lat !== null && req.body.lat !== '' ? parseFloat(req.body.lat) : null;
+    const lng = req.body.lng !== undefined && req.body.lng !== null && req.body.lng !== '' ? parseFloat(req.body.lng) : null;
+    const deliveryRadiusKm = req.body.deliveryRadiusKm !== undefined && req.body.deliveryRadiusKm !== null ? parseFloat(req.body.deliveryRadiusKm) : 25;
+    const supportsQuick = req.body.supportsQuick !== undefined ? Boolean(req.body.supportsQuick) : true;
 
     const vendor = await prisma.vendor.create({
       data: {
@@ -52,6 +56,10 @@ router.post('/register', async (req, res) => {
         city,
         state,
         pincode,
+        lat,
+        lng,
+        deliveryRadiusKm,
+        supportsQuick,
         description,
         category,
       },

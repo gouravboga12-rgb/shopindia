@@ -1295,3 +1295,22 @@ model CODRemittance {
   @@map("cod_remittances")
 }
 
+// ─── Glacons Service Demand Leads (Unserved Localities) ──────────────────────
+model ServiceDemandLead {
+  id          String   @id @default(uuid())
+  userId      String?
+  phone       String?
+  category    String   // e.g. "ac_service", "plumbing", "cleaning", "electrician", etc.
+  serviceName String
+  pincode     String?
+  city        String?
+  lat         Float?
+  lng         Float?
+  status      String   @default("pending") // pending, notified, fulfilled
+  createdAt   DateTime @default(now())
+
+  @@index([pincode])
+  @@index([category])
+  @@map("service_demand_leads")
+}
+

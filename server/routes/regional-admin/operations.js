@@ -297,4 +297,31 @@ router.post('/deliveries/:id/reassign', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/regional-admin/demand-leads
+ * Fetches service demand leads matching regional admin's assigned pincodes
+ */
+router.get('/demand-leads', async (req, res) => {
+  try {
+    const profile = await getAdminProfile(req.user.userId);
+    const assignedPincodes = profile?.assignedPincodes || [];
+
+    const where = assignedPincodes.length > 0
+      ? { pincode: { in: assignedPincodes } }
+      : {};
+
+    const leads = await prisma.serviceDemandLead.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    res.json(leads);
+  } catch (err) {
+    console.error('[RegionalAdmin] Error fetching demand leads:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+

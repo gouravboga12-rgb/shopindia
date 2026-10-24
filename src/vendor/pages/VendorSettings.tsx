@@ -495,18 +495,34 @@ export const VendorSettings: React.FC = () => {
 
                 <input
                   type="range"
-                  min="1"
-                  max="25"
-                  step="0.5"
-                  value={form.deliveryRadiusKm || 5}
+                  min="5"
+                  max="100"
+                  step="1"
+                  value={form.deliveryRadiusKm || 25}
                   onChange={e => setForm({ ...form, deliveryRadiusKm: parseFloat(e.target.value) })}
                   className="w-full accent-emerald-600 cursor-pointer"
                 />
-                <div className="flex justify-between text-[11px] font-semibold text-gray-400">
-                  <span>1 km (Ultra local)</span>
-                  <span>5 km (Standard)</span>
-                  <span>15 km (Wide city)</span>
-                  <span>25 km (Maximum)</span>
+                <div className="flex justify-between items-center text-[11px] font-semibold text-gray-500 pt-1">
+                  <span>5 km (Ultra local)</span>
+                  <span>25 km (Standard Hub)</span>
+                  <span>50 km (Metro Zone)</span>
+                  <span>100 km (Regional Max)</span>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  {[10, 25, 50, 100].map(rad => (
+                    <button
+                      key={rad}
+                      type="button"
+                      onClick={() => setForm({ ...form, deliveryRadiusKm: rad })}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                        form.deliveryRadiusKm === rad
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
+                      }`}
+                    >
+                      {rad} km
+                    </button>
+                  ))}
                 </div>
               </div>
 

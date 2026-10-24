@@ -6,7 +6,8 @@ import { useCategories } from '../../hooks/useCategories';
 import {
   Star, Clock, Calendar, ShieldCheck,
   Heart, LayoutGrid,
-  Home, Wrench, Shield, PhoneCall
+  Home, Wrench, Shield, PhoneCall,
+  Bell, MapPin
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
@@ -37,12 +38,13 @@ const VEHICLE_CATEGORIES = [
 ];
 
 export const VerticalServices: React.FC = () => {
-  const { addToCart, navigateTo } = useApp();
+  const { addToCart, navigateTo, userCoords, addNotification } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
 
   const [activeSubVertical, setActiveSubVertical] = useState<ServiceSubVertical>('home');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [notifiedLeadIds, setNotifiedLeadIds] = useState<Record<string, boolean>>({});
 
   // Selected Vehicle state
   const [selectedVehicle, setSelectedVehicle] = useState<{
@@ -127,6 +129,41 @@ export const VerticalServices: React.FC = () => {
     addToCart(bookingDetails);
     setSelectedServiceForBooking(null);
     navigateTo('cart');
+  };
+
+  const handleNotifyMe = async (service: Product, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (notifiedLeadIds[service.id]) return;
+
+    try {
+      const rawBase = import.meta.env.VITE_API_URL || '';
+      const base = rawBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+      await fetch(`${base}/api/products/demand-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceName: service.title,
+          category: service.category,
+          pincode: userCoords?.pincode,
+          city: userCoords?.city,
+          lat: userCoords?.lat,
+          lng: userCoords?.lng,
+        }),
+      });
+
+      setNotifiedLeadIds((prev) => ({ ...prev, [service.id]: true }));
+
+      addNotification({
+        type: 'service',
+        title: 'Demand Request Registered 🔔',
+        message: `We've noted your request for "${service.title}" in ${userCoords?.city || 'your area'}. We will notify you when service coverage begins!`,
+        icon: Bell,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50',
+      });
+    } catch (err) {
+      console.error('Failed to register demand lead:', err);
+    }
   };
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
@@ -352,7 +389,15 @@ export const VerticalServices: React.FC = () => {
                         </p>
                       </div>
 
-                      {/* Price & Book Button */}
+                      {/* Locality Service Availability Notice */}
+                      {service.isServiceAvailable === false && (
+                        <div className="mb-3 p-2 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center gap-1.5 text-[11px] text-amber-800 font-semibold">
+                          <MapPin size={12} className="text-amber-600 shrink-0" />
+                          <span>Service Not Available in Your Locality Yet</span>
+                        </div>
+                      )}
+
+                      {/* Price & Book / Notify Button */}
                       <div className="flex items-center justify-between pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                         <div>
                           <span className="text-base font-black text-slate-900">₹{service.price}</span>
@@ -361,16 +406,31 @@ export const VerticalServices: React.FC = () => {
                           )}
                         </div>
 
-                        <button
-                          onClick={(e) => handleBookNow(service, e)}
-                          className={`px-5 py-2 text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1.5 text-white ${activeSubVertical === 'home'
-                              ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/25'
-                              : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
+                        {service.isServiceAvailable === false ? (
+                          <button
+                            onClick={(e) => handleNotifyMe(service, e)}
+                            className={`px-3.5 py-2 text-[11px] font-black rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer ${
+                              notifiedLeadIds[service.id]
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
+                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/20'
                             }`}
-                        >
-                          <Calendar size={13} />
-                          <span>Book Slot</span>
-                        </button>
+                          >
+                            <Bell size={13} className={notifiedLeadIds[service.id] ? 'fill-emerald-600' : ''} />
+                            <span>{notifiedLeadIds[service.id] ? 'Notification Set ✓' : 'Notify Me When Available'}</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => handleBookNow(service, e)}
+                            className={`px-5 py-2 text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1.5 text-white cursor-pointer ${
+                              activeSubVertical === 'home'
+                                ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/25'
+                                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
+                            }`}
+                          >
+                            <Calendar size={13} />
+                            <span>Book Slot</span>
+                          </button>
+                        )}
                       </div>
                     </motion.div>
                   );

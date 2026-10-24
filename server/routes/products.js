@@ -2,7 +2,10 @@
 /**
  * server/routes/products.js
  * Public Storefront Products Catalog.
- * Implements hyper-local quick-commerce radius filtering while keeping Pan-India products nationwide.
+ * Implements:
+ * 1. Hyper-local quick-commerce radius filtering (5km - 100km slider) with dynamic prepTime
+ * 2. Glacons real-time technician & skill radius checking with demand capture
+ * 3. Pan-India traditional e-commerce nationwide catalog (exempt from distance checks)
  */
 
 const express = require('express');
@@ -27,13 +30,29 @@ function haversineDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+/**
+ * Normalizes service categories/tags into canonical technician skill tags
+ */
+function getServiceSkillTag(category, tags, name) {
+  const text = `${category || ''} ${(tags || []).join(' ')} ${name || ''}`.toLowerCase();
+  if (text.includes('ac ') || text.includes('air condition') || text.includes('hvac')) return 'ac_service';
+  if (text.includes('electric') || text.includes('wiring') || text.includes('switch') || text.includes('fan')) return 'electrician';
+  if (text.includes('plumb') || text.includes('pipe') || text.includes('tap') || text.includes('leak') || text.includes('geyser')) return 'plumbing';
+  if (text.includes('clean') || text.includes('sanitize') || text.includes('wash') || text.includes('pest')) return 'cleaning';
+  if (text.includes('salon') || text.includes('groom') || text.includes('spa') || text.includes('facial') || text.includes('haircut')) return 'salon';
+  if (text.includes('car') || text.includes('bike') || text.includes('vehicle') || text.includes('mechanic') || text.includes('towing') || text.includes('battery')) return 'vehicle_service';
+  if (text.includes('paint')) return 'painting';
+  if (text.includes('carpent')) return 'carpentry';
+  return 'general_service';
+}
+
 /** GET /api/products — public storefront catalog */
 router.get('/', async (req, res) => {
   try {
     const { lat, lng, city, pincode, vertical: requestedVertical } = req.query;
 
-    const customerLat = lat !== undefined && lat !== '' ? parseFloat(lat) : null;
-    const customerLng = lng !== undefined && lng !== '' ? parseFloat(lng) : null;
+    const customerLat = lat !== undefined && lat !== '' && !isNaN(parseFloat(lat)) ? parseFloat(lat) : null;
+    const customerLng = lng !== undefined && lng !== '' && !isNaN(parseFloat(lng)) ? parseFloat(lng) : null;
     const customerCity = city ? String(city).trim().toLowerCase() : null;
     const customerPincode = pincode ? String(pincode).trim() : null;
 
@@ -60,6 +79,31 @@ router.get('/', async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // If query could involve Glacons services, fetch active, approved technicians
+    let technicians = [];
+    if (!requestedVertical || requestedVertical === 'services') {
+      try {
+        technicians = await prisma.riderProfile.findMany({
+          where: {
+            isActive: true,
+            isApproved: true,
+            partnerType: { in: ['service', 'both'] },
+          },
+          select: {
+            id: true,
+            currentLat: true,
+            currentLng: true,
+            address: true,
+            serviceRadiusKm: true,
+            skills: true,
+            isOnline: true,
+          },
+        });
+      } catch (techErr) {
+        console.warn('[Products] Technician query warning:', techErr.message);
+      }
+    }
+
     const mapped = [];
 
     for (const p of products) {
@@ -85,9 +129,9 @@ router.get('/', async (req, res) => {
           continue;
         }
 
-        const maxRadius = p.vendor?.deliveryRadiusKm || 5;
+        const maxRadius = p.vendor?.deliveryRadiusKm || 25;
 
-        if (customerLat !== null && customerLng !== null && !isNaN(customerLat) && !isNaN(customerLng)) {
+        if (customerLat !== null && customerLng !== null) {
           if (p.vendor?.lat != null && p.vendor?.lng != null) {
             const dist = haversineDistanceKm(customerLat, customerLng, p.vendor.lat, p.vendor.lng);
             if (dist > maxRadius) {
@@ -96,7 +140,6 @@ router.get('/', async (req, res) => {
             }
             distanceKm = Math.round(dist * 10) / 10;
           } else if (customerCity && p.vendor?.city) {
-            // Fallback: If vendor doesn't have lat/lng yet, match city
             const vendorCity = p.vendor.city.toLowerCase();
             if (!vendorCity.includes(customerCity) && !customerCity.includes(vendorCity)) {
               continue;
@@ -117,6 +160,46 @@ router.get('/', async (req, res) => {
           }
         }
       }
+
+      // ─── Glacons Doorstep Services Technician Availability ─────────────────
+      let isServiceAvailable = true;
+      let nearbyTechniciansCount = 0;
+
+      if (vertical === 'services') {
+        const requiredSkill = getServiceSkillTag(p.category?.name, p.tags, p.name);
+
+        if ((customerLat !== null && customerLng !== null) || customerCity || customerPincode) {
+          const matchingTechnicians = technicians.filter((tech) => {
+            // Check skill coverage
+            const hasSkill =
+              !tech.skills ||
+              tech.skills.length === 0 ||
+              tech.skills.some((s) => {
+                const sl = s.toLowerCase();
+                return sl.includes(requiredSkill) || requiredSkill.includes(sl) || sl === 'all';
+              });
+            if (!hasSkill) return false;
+
+            // Check geographical radius coverage
+            if (customerLat !== null && customerLng !== null && tech.currentLat != null && tech.currentLng != null) {
+              const techDist = haversineDistanceKm(customerLat, customerLng, tech.currentLat, tech.currentLng);
+              const techRadius = tech.serviceRadiusKm || 25;
+              return techDist <= techRadius;
+            }
+
+            // Fallback: match address/city string
+            if (customerCity && tech.address) {
+              return tech.address.toLowerCase().includes(customerCity);
+            }
+
+            return false;
+          });
+
+          nearbyTechniciansCount = matchingTechnicians.length;
+          isServiceAvailable = matchingTechnicians.length > 0;
+        }
+      }
+
       // Traditional products (Shop / Pan-India) remain universally visible across India!
 
       // Determine clean category display name
@@ -131,6 +214,23 @@ router.get('/', async (req, res) => {
         else resolvedCategory = p.tags[0];
       }
       if (!resolvedCategory && p.vendor?.category) resolvedCategory = p.vendor.category;
+
+      // Dynamic preparation / delivery time estimate based on distance
+      let prepTime = '10-15 min';
+      if (vertical === 'quick') {
+        if (distanceKm != null) {
+          if (distanceKm <= 5) prepTime = '10-15 min';
+          else if (distanceKm <= 15) prepTime = '25-35 min';
+          else if (distanceKm <= 50) prepTime = '45-60 min';
+          else prepTime = 'Same-Day Express';
+        } else {
+          prepTime = subVertical === 'food' ? '20-30 min' : '10-15 min';
+        }
+      } else if (vertical === 'services') {
+        prepTime = isServiceAvailable ? 'Arrives in 45 min' : 'Currently Unavailable';
+      } else {
+        prepTime = '2-4 days';
+      }
 
       mapped.push({
         id: p.id,
@@ -156,19 +256,17 @@ router.get('/', async (req, res) => {
           pincode: p.vendor?.pincode,
           lat: p.vendor?.lat,
           lng: p.vendor?.lng,
-          deliveryRadiusKm: p.vendor?.deliveryRadiusKm || 5,
+          deliveryRadiusKm: p.vendor?.deliveryRadiusKm || 25,
           distanceKm: distanceKm != null ? distanceKm : undefined,
         },
+        distanceKm: distanceKm != null ? distanceKm : undefined,
+        isServiceAvailable: vertical === 'services' ? isServiceAvailable : undefined,
+        nearbyTechniciansCount: vertical === 'services' ? nearbyTechniciansCount : undefined,
         // Specific metadata inferred or default
         isVeg:
           p.tags?.some((t) => t.toLowerCase().includes('veg')) ||
           !p.tags?.some((t) => t.toLowerCase().includes('non-veg')),
-        prepTime:
-          subVertical === 'food'
-            ? '20-30 min'
-            : vertical === 'quick'
-            ? '10-15 min'
-            : '2-4 days',
+        prepTime,
         restaurantName: subVertical === 'food' ? p.brand || 'ShopIndia Cloud Kitchen' : undefined,
         cuisine: subVertical === 'food' ? p.tags?.[0] || 'Indian & Continental' : undefined,
         requiresPrescription:
@@ -195,6 +293,39 @@ router.get('/', async (req, res) => {
     res.json(mapped);
   } catch (err) {
     console.error('[Products] GET error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/demand-lead
+ * Captures demand for unserved localities when customer taps "Notify Me When Available"
+ */
+router.post('/demand-lead', async (req, res) => {
+  try {
+    const { userId, phone, category, serviceName, pincode, city, lat, lng } = req.body;
+
+    if (!serviceName) {
+      return res.status(400).json({ error: 'Service name is required' });
+    }
+
+    const lead = await prisma.serviceDemandLead.create({
+      data: {
+        userId: userId || null,
+        phone: phone || null,
+        category: category || 'general_service',
+        serviceName,
+        pincode: pincode ? String(pincode).trim() : null,
+        city: city ? String(city).trim() : null,
+        lat: lat ? parseFloat(lat) : null,
+        lng: lng ? parseFloat(lng) : null,
+        status: 'pending',
+      },
+    });
+
+    res.status(201).json({ success: true, lead });
+  } catch (err) {
+    console.error('[DemandLead] Error saving lead:', err);
     res.status(500).json({ error: err.message });
   }
 });

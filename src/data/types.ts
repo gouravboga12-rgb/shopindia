@@ -49,6 +49,21 @@ export interface Product {
   // Vehicle Services specifics
   vehicleType?: 'car' | 'bike' | 'both';
   serviceLocationType?: 'doorstep' | 'garage' | 'both';
+
+  // Hyper-local & Glacons service availability
+  distanceKm?: number;
+  isServiceAvailable?: boolean;
+  nearbyTechniciansCount?: number;
+  vendor?: {
+    id?: string;
+    name?: string;
+    city?: string;
+    pincode?: string;
+    lat?: number;
+    lng?: number;
+    deliveryRadiusKm?: number;
+    distanceKm?: number;
+  };
 }
 
 export interface Category {

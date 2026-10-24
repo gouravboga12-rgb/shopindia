@@ -3,17 +3,18 @@ import { useApp } from '../context/AppContext';
 import { useProducts } from '../hooks/useProducts';
 import { useCustomer } from '../context/CustomerContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, BadgePercent, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2 } from 'lucide-react';
+import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, BadgePercent, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2, Bell } from 'lucide-react';
 import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
-  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart } = useApp();
+  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart, userCoords, addNotification } = useApp();
   const { reviews, wishlist, toggleWishlist } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
   const [pincode, setPincode] = useState('');
   const [pincodeCheckResult, setPincodeCheckResult] = useState<string | null>(null);
+  const [isNotified, setIsNotified] = useState(false);
 
   const cartItemCount = (cart || []).reduce((acc, item) => acc + item.quantity, 0);
 
@@ -70,6 +71,38 @@ export const ProductDetailPage: React.FC = () => {
       };
       addToCart(bookingDetails);
       navigateTo('cart');
+    }
+  };
+
+  const handleNotifyMe = async () => {
+    if (!product || isNotified) return;
+    try {
+      const rawBase = import.meta.env.VITE_API_URL || '';
+      const base = rawBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+      await fetch(`${base}/api/products/demand-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceName: product.title,
+          category: product.category,
+          pincode: userCoords?.pincode,
+          city: userCoords?.city,
+          lat: userCoords?.lat,
+          lng: userCoords?.lng,
+        }),
+      });
+
+      setIsNotified(true);
+      addNotification({
+        type: 'service',
+        title: 'Demand Request Registered 🔔',
+        message: `We've noted your request for "${product.title}" in ${userCoords?.city || 'your area'}. We will notify you when coverage goes live!`,
+        icon: Bell,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50',
+      });
+    } catch (err) {
+      console.error('Failed to register demand lead:', err);
     }
   };
 
@@ -159,16 +192,37 @@ export const ProductDetailPage: React.FC = () => {
                 <span>{isServices ? 'Currently Unavailable' : 'Out of Stock'}</span>
               </div>
             ) : isServices ? (
-              <div className="w-full">
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={handleBookNow}
-                  className="w-full py-4 rounded-button bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2.5 shadow-premium transition-all uppercase tracking-wider font-black text-sm font-heading"
-                >
-                  <Calendar size={18} />
-                  <span>Book Service Now</span>
-                </motion.button>
-              </div>
+              product.isServiceAvailable === false ? (
+                <div className="w-full space-y-2.5">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 font-semibold flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Service Not Available in Your Locality Yet</span>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={handleNotifyMe}
+                    className={`w-full py-4 rounded-button text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-premium cursor-pointer transition-all ${
+                      isNotified
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+                    }`}
+                  >
+                    <Bell size={16} className={isNotified ? 'fill-emerald-600' : ''} />
+                    <span>{isNotified ? 'Notification Set ✓' : 'Notify Me When Available'}</span>
+                  </motion.button>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={handleBookNow}
+                    className="w-full py-4 rounded-button bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2.5 shadow-premium transition-all uppercase tracking-wider font-black text-sm font-heading cursor-pointer"
+                  >
+                    <Calendar size={18} />
+                    <span>Book Service Now</span>
+                  </motion.button>
+                </div>
+              )
             ) : (
               <div className="grid grid-cols-2 gap-3 text-xs font-extrabold select-none font-heading">
                 <motion.button
@@ -752,13 +806,27 @@ export const ProductDetailPage: React.FC = () => {
               <span>{isServices ? 'Service Currently Unavailable' : 'Out of Stock'}</span>
             </div>
           ) : isServices ? (
-            <button
-              onClick={handleBookNow}
-              className="w-full h-[52px] bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2 uppercase active:scale-[0.98] transition-all rounded-full tracking-wide shadow-[0_4px_16px_rgba(217,119,6,0.35)] font-black text-sm font-heading"
-            >
-              <Calendar size={18} strokeWidth={2.5} />
-              <span>Book Service Now</span>
-            </button>
+            product.isServiceAvailable === false ? (
+              <button
+                onClick={handleNotifyMe}
+                className={`w-full h-[52px] text-white flex items-center justify-center gap-2 uppercase active:scale-[0.98] transition-all rounded-full tracking-wide font-black text-sm font-heading shadow-md cursor-pointer ${
+                  isNotified
+                    ? 'bg-emerald-600'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                }`}
+              >
+                <Bell size={18} className={isNotified ? 'fill-white' : ''} />
+                <span>{isNotified ? 'Notification Set ✓' : 'Notify Me When Available'}</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleBookNow}
+                className="w-full h-[52px] bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2 uppercase active:scale-[0.98] transition-all rounded-full tracking-wide shadow-[0_4px_16px_rgba(217,119,6,0.35)] font-black text-sm font-heading cursor-pointer"
+              >
+                <Calendar size={18} strokeWidth={2.5} />
+                <span>Book Service Now</span>
+              </button>
+            )
           ) : (
             <div className="grid grid-cols-2 gap-3 text-xs font-extrabold font-heading">
               <button

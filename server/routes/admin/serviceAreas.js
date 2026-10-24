@@ -105,4 +105,16 @@ router.post('/check-pincode', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+/** GET /api/admin/service-areas/demand-leads — nationwide service demand leads */
+router.get('/demand-leads', async (req, res) => {
+  try {
+    const leads = await prisma.serviceDemandLead.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json(leads);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;
+

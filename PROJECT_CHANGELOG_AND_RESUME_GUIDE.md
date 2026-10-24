@@ -304,5 +304,27 @@ When you resume in the morning, here are the ready next steps:
 
 ---
 
+## 9. Location & Radius-Based Store Availability & Vendor Onboarding Architecture (Phases 1–5 Complete)
+
+### Summary of Enhancements:
+1. **Multi-Vertical Availability Rules:**
+   - **ShopIndia (Traditional E-Commerce):** Pan-India fulfillment (nationwide via 3PL like Shiprocket/Delhivery). Exempt from local distance checks; all products universally visible nationwide.
+   - **Quick Shopping (Hyperlocal Products):** Vendor-controlled delivery radius (from 5 km to 100 km). In registration and settings, vendors set their store address, auto-detect GPS coordinates, and set their radius slider. Catalog query computes Haversine distance against customer coordinates. Shows dynamic prepTime (`10-15 min`, `25-35 min`, `45-60 min`, `Same-Day Express`) or an out-of-service banner if no store serves that area with an instant button to switch to the Pan-India store.
+   - **Glacons (Doorstep Services - Technicians/Mechanics):** Real-time service availability based on active, approved `RiderProfile` technicians with matching skills within their service radius of the customer's coordinates. If no technician is nearby, the service card displays *"Service Not Available in Your Locality Yet"* with a 1-tap **`[🔔 Notify Me When Available]`** demand-capture button.
+2. **Customer Location Coordinates in State (`AppContext.tsx`, `LocationModal.tsx`, `useProducts.ts`):**
+   - Coordinates (`lat`, `lng`, `city`, `pincode`) stored in `AppContext` state and persisted to `localStorage` (`shopindia_user_coords`).
+   - `LocationModal.tsx` provides live GPS capture and pre-configured popular city coordinates.
+   - `useProducts` hook dynamically appends user coordinates to `/api/products` query and re-fetches upon location change.
+3. **Glacons Demand Lead Capture (`ServiceDemandLead`):**
+   - Added `ServiceDemandLead` model in `schema.prisma`.
+   - Endpoint `POST /api/products/demand-lead` captures customer requests for unserved localities.
+   - Displays in-app confirmation alert and updates button to *"Notification Set ✓"*.
+4. **Regional Admin & Super Admin Intelligence:**
+   - **Regional Admin (`/regional-admin`):** Added `Unserved Service Demand Leads` table widget on `RegionalDashboard.tsx` scoped to assigned pincodes.
+   - **Super Admin (`/admin/service-areas`):** Added tabs for *"Active Service Zones"* and *"Unserved Locality Demand Leads"* with customer contact, service requested, and timestamp.
+
+---
+
 *Document updated and saved to `shopindia/PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`.*
+
 
