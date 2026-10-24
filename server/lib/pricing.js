@@ -97,6 +97,17 @@ async function resolvePricingRule({ productId, vendorId, categoryId, vertical = 
   if (vertical) {
     const r = list.find(r => r.scope === 'vertical' && r.vertical === vertical);
     if (r) return r;
+    const { settings } = await getCachedRules();
+    if (vertical === 'services' && settings && settings['service_commission_pct']) {
+      return {
+        id: 'settings_services',
+        scope: 'vertical',
+        vertical: 'services',
+        commissionPct: parseFloat(settings['service_commission_pct']),
+        includeGateway: true,
+        isActive: true
+      };
+    }
   }
 
   // 5. Global level
@@ -428,6 +439,11 @@ async function simulatePricing({
     const isFree = customerPrice >= freeShippingAbove;
     customerDelivery = isFree ? 0 : parseFloat(shippingFee);
     deliveryCost = 45; // Estimated Shiprocket courier cost
+    deliveryMargin = customerDelivery - deliveryCost;
+  } else if (fulfillmentType === 'services' || fulfillmentType === 'hvac_service') {
+    // Doorstep Services & Repairs
+    customerDelivery = parseFloat(shippingFee) >= 0 ? parseFloat(shippingFee) : 199; // Visit charge paid by customer
+    deliveryCost = parseFloat(riderBasePay) >= 0 ? parseFloat(riderBasePay) : 149; // Guaranteed minimum pay credited to technician
     deliveryMargin = customerDelivery - deliveryCost;
   } else {
     // Quick commerce

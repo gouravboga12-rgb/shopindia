@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   Calculator, Percent, Truck, Wrench, ShieldAlert, Plus,
   Save, Trash2, CheckCircle2, AlertTriangle, RefreshCw, History,
-  Sparkles, Layers
+  Sparkles, Layers, ArrowRight, Zap, ExternalLink, CreditCard, ShieldCheck
 } from 'lucide-react';
 
 interface PricingRule {
@@ -39,6 +39,7 @@ interface AppSettings {
   gateway_fee_percent: string;
   service_visit_charge: string;
   service_technician_min_pay: string;
+  service_commission_pct: string;
 }
 
 export const PricingSettingsPage: React.FC = () => {
@@ -67,7 +68,8 @@ export const PricingSettingsPage: React.FC = () => {
     include_gateway_in_platform_fee: 'true',
     gateway_fee_percent: '2.36',
     service_visit_charge: '199',
-    service_technician_min_pay: '149'
+    service_technician_min_pay: '149',
+    service_commission_pct: '15'
   });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -76,8 +78,8 @@ export const PricingSettingsPage: React.FC = () => {
   const [newRule, setNewRule] = useState({
     scope: 'category',
     scopeId: '',
-    vertical: 'shop',
-    commissionPct: 10,
+    vertical: 'services',
+    commissionPct: 15,
     includeGateway: true,
     description: ''
   });
@@ -87,7 +89,7 @@ export const PricingSettingsPage: React.FC = () => {
   const [simMrp, setSimMrp] = useState<number>(399);
   const [simCommissionPct, setSimCommissionPct] = useState<number>(12);
   const [simIncludeGateway, setSimIncludeGateway] = useState<boolean>(true);
-  const [simFulfillment, setSimFulfillment] = useState<'traditional' | 'quick_commerce'>('traditional');
+  const [simFulfillment, setSimFulfillment] = useState<'traditional' | 'quick_commerce' | 'services'>('traditional');
   const [simDistanceKm, setSimDistanceKm] = useState<number>(4);
   const [simResult, setSimResult] = useState<any>(null);
   const [simLoading, setSimLoading] = useState(false);
@@ -116,7 +118,12 @@ export const PricingSettingsPage: React.FC = () => {
           description: 'Global Quick Commerce Rider Pay Rule'
         }]);
       }
-      if (sRes?.settings) setSettings(sRes.settings);
+      if (sRes?.settings) {
+        setSettings({
+          ...sRes.settings,
+          service_commission_pct: sRes.settings.service_commission_pct || '15'
+        });
+      }
     } catch (err: any) {
       console.error('Failed to load pricing data:', err);
     } finally {
@@ -142,6 +149,7 @@ export const PricingSettingsPage: React.FC = () => {
     const runSim = async () => {
       setSimLoading(true);
       try {
+        const isServices = simFulfillment === 'services';
         const res: any = await api.post('/api/admin/pricing/simulate', {
           vendorPrice: simVendorPrice,
           mrp: simMrp,
@@ -149,8 +157,14 @@ export const PricingSettingsPage: React.FC = () => {
           includeGateway: simIncludeGateway,
           fulfillmentType: simFulfillment,
           distanceKm: simDistanceKm,
-          shippingFee: parseFloat(settings.shiprocket_base_fee || '49'),
-          freeShippingAbove: parseFloat(settings.shiprocket_free_threshold || '499')
+          shippingFee: isServices
+            ? parseFloat(settings.service_visit_charge || '199')
+            : parseFloat(settings.shiprocket_base_fee || '49'),
+          freeShippingAbove: parseFloat(settings.shiprocket_free_threshold || '499'),
+          riderBasePay: isServices
+            ? parseFloat(settings.service_technician_min_pay || '149')
+            : (parseFloat(deliveryRules[0]?.basePayPerOrder as any) || 30),
+          riderPayPerKm: parseFloat(deliveryRules[0]?.payPerKm as any) || 5
         });
         if (res?.simulation) setSimResult(res.simulation);
       } catch (err) {
@@ -162,7 +176,7 @@ export const PricingSettingsPage: React.FC = () => {
 
     const timer = setTimeout(runSim, 200);
     return () => clearTimeout(timer);
-  }, [simVendorPrice, simMrp, simCommissionPct, simIncludeGateway, simFulfillment, simDistanceKm, settings]);
+  }, [simVendorPrice, simMrp, simCommissionPct, simIncludeGateway, simFulfillment, simDistanceKm, settings, deliveryRules]);
 
   const handleSaveSettings = async () => {
     setSaving(true);
@@ -207,13 +221,16 @@ export const PricingSettingsPage: React.FC = () => {
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/api/admin/pricing/rules', newRule);
+      await api.post('/api/admin/pricing/rules', {
+        ...newRule,
+        scopeId: newRule.scope === 'vertical' ? null : newRule.scopeId
+      });
       setShowRuleModal(false);
       setNewRule({
         scope: 'category',
         scopeId: '',
-        vertical: 'shop',
-        commissionPct: 10,
+        vertical: 'services',
+        commissionPct: 15,
         includeGateway: true,
         description: ''
       });
@@ -349,7 +366,7 @@ export const PricingSettingsPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-5 py-4 font-semibold text-gray-800">
-                          {rule.targetName || (rule.scope === 'global' ? 'All Products Platform-Wide' : (rule.scopeId || '—'))}
+                          {rule.targetName || (rule.scope === 'global' ? 'All Products Platform-Wide' : (rule.scope === 'vertical' ? (rule.vertical === 'services' ? 'Doorstep Services & Repairs' : rule.vertical === 'quick' ? 'Quick Commerce Hyperlocal' : 'Pan-India E-commerce Shop') : (rule.scopeId || '—')))}
                         </td>
                         <td className="px-5 py-4 capitalize text-gray-600 font-medium">
                           {rule.vertical || 'All Verticals'}
@@ -554,45 +571,166 @@ export const PricingSettingsPage: React.FC = () => {
       {/* Tab 3: Services & Technicians */}
       {activeTab === 'services' && (
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-premium space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-              <Wrench className="w-4 h-4" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-sm">
+                <Wrench className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 font-heading">Doorstep Services & Technician Payout Architecture</h3>
+                <p className="text-xs text-gray-500">AC repair, plumbing, electrician, appliance services, & technician partner compensation</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-gray-900">Doorstep Services & Technician Payouts</h3>
-              <p className="text-xs text-gray-500">AC service, plumbing, electrician & vehicle repairs</p>
-            </div>
+
+            <a
+              href="/admin/fleet-payouts"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition-colors border border-indigo-200"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open Fleet & Technician Payouts</span>
+            </a>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
+          {/* Revenue Architecture Banner */}
+          <div className="p-4 bg-amber-50/70 border border-amber-200/90 rounded-2xl space-y-2 text-xs text-amber-950 leading-relaxed font-sans">
+            <div className="flex items-center gap-2 font-bold text-amber-900">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>How Money Flows for Services & Technicians:</span>
+            </div>
+            <p>
+              When a customer books a doorstep repair or maintenance service, <b>100% of the funds (Service Rate + Diagnostic Visit Charge)</b> are paid online via Razorpay directly into the Super Admin account.
+              The pricing engine deducts the platform commission % + visit margin. When the technician completes the service and the customer provides the <b>4-digit OTP</b>, the technician's partner wallet is credited immediately.
+            </p>
+          </div>
+
+          {/* Controls Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1 font-sans">
+            {/* Control 1: Service Commission Pct */}
+            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
+              <label className="block text-xs font-bold text-gray-800">
+                Service Commission Rate (%)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="75"
+                value={settings.service_commission_pct || '15'}
+                onChange={e => setSettings({ ...settings, service_commission_pct: e.target.value })}
+                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-indigo-600 bg-white"
+              />
+              <span className="text-[11px] text-gray-500 block leading-tight">
+                Platform commission percentage deducted from service labor rate card.
+              </span>
+            </div>
+
+            {/* Control 2: Visit Charge */}
+            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
+              <label className="block text-xs font-bold text-gray-800">
                 Standard Doorstep Visit Charge (₹)
               </label>
               <input
                 type="number"
                 value={settings.service_visit_charge}
                 onChange={e => setSettings({ ...settings, service_visit_charge: e.target.value })}
-                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold"
+                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold bg-white"
               />
-              <span className="text-[11px] text-gray-400">Customer diagnostic / minimum call-out charge</span>
+              <span className="text-[11px] text-gray-500 block leading-tight">
+                Diagnostic / inspection call-out fee charged to customer at checkout.
+              </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Technician Guaranteed Minimum Pay (₹)
+            {/* Control 3: Technician Pay */}
+            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
+              <label className="block text-xs font-bold text-gray-800">
+                Technician Guaranteed Pay (₹)
               </label>
               <input
                 type="number"
                 value={settings.service_technician_min_pay}
                 onChange={e => setSettings({ ...settings, service_technician_min_pay: e.target.value })}
-                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700"
+                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700 bg-white"
               />
-              <span className="text-[11px] text-gray-400">Guaranteed earning credited to technician on completed inspection</span>
+              <span className="text-[11px] text-gray-500 block leading-tight">
+                Guaranteed earning credited to technician on completed inspection.
+              </span>
+            </div>
+
+            {/* KPI 4: HQ Visit Margin */}
+            <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex flex-col justify-between">
+              <div>
+                <span className="text-xs font-bold text-emerald-900 block">HQ Visit Margin Retained</span>
+                <span className="text-[11px] text-emerald-700/80 block mt-0.5">Retained by Super Admin per visit</span>
+              </div>
+              <div className="my-2">
+                <span className="text-2xl font-black font-numbers text-emerald-700">
+                  +₹{Math.max(0, (parseFloat(settings.service_visit_charge || '199') - parseFloat(settings.service_technician_min_pay || '149')))}
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-600 font-medium">
+                Customer (₹{settings.service_visit_charge || 199}) - Tech (₹{settings.service_technician_min_pay || 149})
+              </span>
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-gray-100">
+          {/* Visual Step-by-Step Flow Pipeline */}
+          <div className="space-y-3 pt-2">
+            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider font-heading">
+              Complete Payment Collection & Partner Distribution Pipeline
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <h5 className="font-bold text-xs text-gray-900">1. Customer Pays via Razorpay</h5>
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Customer books doorstep service online. 100% of order total is collected in Super Admin's Razorpay account.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Calculator className="w-4 h-4" />
+                </div>
+                <h5 className="font-bold text-xs text-gray-900">2. Commission & Margin Retained</h5>
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Platform engine retains {settings.service_commission_pct || '15'}% commission on labor + ₹{Math.max(0, (parseFloat(settings.service_visit_charge || '199') - parseFloat(settings.service_technician_min_pay || '149')))} visit margin + 2.36% buffer.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <h5 className="font-bold text-xs text-gray-900">3. Instant Wallet Credit on OTP</h5>
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Technician completes the job. Customer provides 4-digit OTP. Technician's partner wallet is instantly credited.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <h5 className="font-bold text-xs text-gray-900">4. Disbursed via UPI / Bank</h5>
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Technician requests withdrawal. Admin disburses payout via IMPS/UPI in the Fleet & Service Payouts queue.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+            <a
+              href="/admin/fleet-payouts"
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
+            >
+              <span>Manage Partner Withdrawal Requests</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+
             <button
               onClick={handleSaveSettings}
               disabled={saving}
@@ -759,7 +897,9 @@ export const PricingSettingsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-white/70 mb-1">Vendor Price (You Receive ₹)</label>
+                  <label className="block text-[11px] font-bold text-white/70 mb-1">
+                    {simFulfillment === 'services' ? 'Service Labor Base (₹)' : 'Vendor Price (You Receive ₹)'}
+                  </label>
                   <input
                     type="number"
                     value={simVendorPrice}
@@ -768,7 +908,9 @@ export const PricingSettingsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-white/70 mb-1">Product MRP (Cap ₹)</label>
+                  <label className="block text-[11px] font-bold text-white/70 mb-1">
+                    {simFulfillment === 'services' ? 'Quoted Rate Card / Cap (₹)' : 'Product MRP (Cap ₹)'}
+                  </label>
                   <input
                     type="number"
                     value={simMrp}
@@ -792,11 +934,18 @@ export const PricingSettingsPage: React.FC = () => {
                   <label className="block text-[11px] font-bold text-white/70 mb-1">Fulfillment Mode</label>
                   <select
                     value={simFulfillment}
-                    onChange={e => setSimFulfillment(e.target.value as any)}
+                    onChange={e => {
+                      const mode = e.target.value as any;
+                      setSimFulfillment(mode);
+                      if (mode === 'services' && settings.service_commission_pct) {
+                        setSimCommissionPct(Number(settings.service_commission_pct) || 15);
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-slate-800 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none"
                   >
                     <option value="traditional">Pan-India (Shiprocket)</option>
                     <option value="quick_commerce">⚡ Quick Commerce (Rider)</option>
+                    <option value="services">🔧 Doorstep Services (Technician)</option>
                   </select>
                 </div>
               </div>
@@ -816,6 +965,25 @@ export const PricingSettingsPage: React.FC = () => {
                 </div>
               )}
 
+              {simFulfillment === 'services' && (
+                <div className="p-3 bg-amber-500/10 border border-amber-400/30 rounded-xl text-[11px] text-amber-200 space-y-1">
+                  <div className="flex items-center justify-between font-bold">
+                    <span>Doorstep Diagnostic Visit:</span>
+                    <span className="font-numbers">₹{settings.service_visit_charge || 199}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-white/70">
+                    <span>Technician Guaranteed Pay:</span>
+                    <span className="font-numbers text-emerald-400">₹{settings.service_technician_min_pay || 149}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-white/70 border-t border-amber-400/20 pt-1">
+                    <span>Admin Visit Margin Retained:</span>
+                    <span className="font-numbers font-bold text-amber-300">
+                      +₹{Math.max(0, parseFloat(settings.service_visit_charge || '199') - parseFloat(settings.service_technician_min_pay || '149'))}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
                 <span className="text-xs text-white/80 font-medium">Add Gateway Buffer (+2.36%)</span>
                 <input
@@ -827,7 +995,6 @@ export const PricingSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Calculated Breakdown (7 Cols) */}
             {/* Right: Calculated Breakdown (7 Cols) */}
             <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-3">
               {simResult ? (
@@ -842,35 +1009,47 @@ export const PricingSettingsPage: React.FC = () => {
                       <span className="text-3xl font-black font-numbers text-white">₹{simResult.grossTotal}</span>
                       <div className="mt-1 text-[11px] font-bold text-emerald-300 flex items-center gap-1">
                         <span>₹{simResult.customerPrice}</span>
-                        <span className="text-white/60 font-normal">item +</span>
+                        <span className="text-white/60 font-normal">{simFulfillment === 'services' ? 'service +' : 'item +'}</span>
                         <span>{simResult.customerDelivery === 0 ? 'FREE' : `₹${simResult.customerDelivery}`}</span>
-                        <span className="text-white/60 font-normal">delivery</span>
+                        <span className="text-white/60 font-normal">{simFulfillment === 'services' ? 'visit' : 'delivery'}</span>
                       </div>
                       {simResult.isCappedAtMrp && (
-                        <span className="block text-[10px] text-amber-300 font-bold mt-1">⚠️ Capped at MRP ₹{simResult.mrp}</span>
+                        <span className="block text-[10px] text-amber-300 font-bold mt-1">⚠️ Capped at Rate ₹{simResult.mrp}</span>
                       )}
                     </div>
-                    <span className="text-[10px] text-white/50">Full order amount charged to customer</span>
+                    <span className="text-[10px] text-white/50">Full amount paid online via Razorpay</span>
                   </div>
 
-                  {/* Card 2: Vendor Receives */}
+                  {/* Card 2: Vendor / Technician Receives */}
                   <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
-                    <span className="text-[11px] text-white/60 font-semibold">Vendor Receives</span>
+                    <span className="text-[11px] text-white/60 font-semibold">
+                      {simFulfillment === 'services' ? 'Technician Payout' : 'Vendor Receives'}
+                    </span>
                     <div className="my-2">
-                      <span className="text-2xl font-black font-numbers text-emerald-400">₹{simResult.vendorPrice}</span>
+                      <span className="text-2xl font-black font-numbers text-emerald-400">
+                        ₹{simFulfillment === 'services' ? (simResult.vendorPrice + (simResult.deliveryCost || 0)) : simResult.vendorPrice}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-white/40">100% guaranteed base payout</span>
+                    <span className="text-[10px] text-white/40">
+                      {simFulfillment === 'services' ? `Base labor + ₹${simResult.deliveryCost} visit pay` : '100% guaranteed base payout'}
+                    </span>
                   </div>
 
-                  {/* Card 3: Delivery Charge */}
+                  {/* Card 3: Delivery / Visit Charge */}
                   <div className="p-4 bg-white/10 rounded-2xl border border-white/10 flex flex-col justify-between">
-                    <span className="text-[11px] text-white/60 font-semibold">Delivery Charge</span>
+                    <span className="text-[11px] text-white/60 font-semibold">
+                      {simFulfillment === 'services' ? 'Doorstep Visit Fee' : 'Delivery Charge'}
+                    </span>
                     <div className="my-2">
                       <span className="text-2xl font-black font-numbers text-blue-300">
                         {simResult.customerDelivery === 0 ? 'FREE' : `₹${simResult.customerDelivery}`}
                       </span>
                     </div>
-                    <span className="text-[10px] text-white/40">Cost: ₹{simResult.deliveryCost} (Margin: {simResult.deliveryMargin >= 0 ? `+₹${simResult.deliveryMargin}` : `-₹${Math.abs(simResult.deliveryMargin)}`})</span>
+                    <span className="text-[10px] text-white/40">
+                      {simFulfillment === 'services'
+                        ? `Tech: ₹${simResult.deliveryCost} (Margin: +₹${simResult.deliveryMargin})`
+                        : `Cost: ₹${simResult.deliveryCost} (Margin: ${simResult.deliveryMargin >= 0 ? `+₹${simResult.deliveryMargin}` : `-₹${Math.abs(simResult.deliveryMargin)}`})`}
+                    </span>
                   </div>
 
                   {/* Card 4: Razorpay Deducts */}
@@ -915,11 +1094,13 @@ export const PricingSettingsPage: React.FC = () => {
                     <div className="flex items-center gap-2 text-white/90 font-medium">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
                       <span>
-                        <b>Customer Checkout Equation:</b> ₹{simResult.customerPrice} (item) + {simResult.customerDelivery === 0 ? '₹0 (FREE Delivery)' : `₹${simResult.customerDelivery} (delivery)`} = <b className="text-emerald-300 text-sm font-numbers">₹{simResult.grossTotal} Total Paid</b>
+                        <b>Customer Checkout Equation:</b> ₹{simResult.customerPrice} ({simFulfillment === 'services' ? 'service rate' : 'item'}) + {simResult.customerDelivery === 0 ? '₹0 (FREE Delivery)' : `₹${simResult.customerDelivery} (${simFulfillment === 'services' ? 'diagnostic visit' : 'delivery'})`} = <b className="text-emerald-300 text-sm font-numbers">₹{simResult.grossTotal} Total Paid via Razorpay</b>
                       </span>
                     </div>
                     <div className="text-white/60 text-[11px] font-mono">
-                      Razorpay 2.36% on ₹{simResult.grossTotal} = ₹{simResult.gatewayFeeActual}
+                      {simFulfillment === 'services'
+                        ? 'Partner wallet credited upon OTP. Disbursed via Fleet Payouts.'
+                        : `Razorpay 2.36% on ₹${simResult.grossTotal} = ₹${simResult.gatewayFeeActual}`}
                     </div>
                   </div>
                 </>
@@ -958,18 +1139,33 @@ export const PricingSettingsPage: React.FC = () => {
                 </select>
               </div>
 
-              {newRule.scope !== 'global' && (
+              {newRule.scope === 'vertical' ? (
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Target ID / Scope ID</label>
+                  <label className="block font-bold text-gray-700 mb-1">Select Vertical</label>
+                  <select
+                    value={newRule.vertical}
+                    onChange={e => setNewRule({ ...newRule, vertical: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs font-semibold"
+                  >
+                    <option value="services">🔧 Doorstep Services & Repairs (services)</option>
+                    <option value="quick">⚡ Quick Commerce Hyperlocal (quick)</option>
+                    <option value="shop">📦 Pan-India E-commerce Shop (shop)</option>
+                  </select>
+                </div>
+              ) : newRule.scope !== 'global' ? (
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    {newRule.scope === 'category' ? 'Category ID' : newRule.scope === 'vendor' ? 'Vendor ID' : 'Product ID'}
+                  </label>
                   <input
                     value={newRule.scopeId}
                     onChange={e => setNewRule({ ...newRule, scopeId: e.target.value })}
-                    placeholder="Enter categoryId, vendorId, or productId"
+                    placeholder={`Enter ${newRule.scope} ID`}
                     className="w-full px-3 py-2 border rounded-xl text-xs font-mono"
                     required
                   />
                 </div>
-              )}
+              ) : null}
 
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Commission Rate (%)</label>
@@ -1003,7 +1199,7 @@ export const PricingSettingsPage: React.FC = () => {
                 <input
                   value={newRule.description}
                   onChange={e => setNewRule({ ...newRule, description: e.target.value })}
-                  placeholder="e.g. Standard Electronics commission rule"
+                  placeholder="e.g. Standard Services commission rule"
                   className="w-full px-3 py-2 border rounded-xl text-xs"
                 />
               </div>
