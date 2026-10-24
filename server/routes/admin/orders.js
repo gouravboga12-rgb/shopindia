@@ -152,24 +152,46 @@ router.delete('/:id', async (req, res) => {
     });
     if (!existing) return res.status(404).json({ error: 'Order not found.' });
 
+    const orderId = req.params.id;
+
     await prisma.$transaction(async (tx) => {
       if (existing.status === 'delivered' && existing.paymentStatus === 'paid' && existing.vendorId) {
         const vendor = await tx.vendor.findUnique({ where: { id: existing.vendorId } });
-        const commRateRaw = Number(vendor?.commissionRate) || 10;
-        const commRate = commRateRaw > 1 ? commRateRaw / 100 : commRateRaw;
-        const commission = existing.total * commRate;
-        const netEarnings = existing.total - commission;
-        await tx.vendor.update({
-          where: { id: existing.vendorId },
-          data: { walletBalance: { decrement: netEarnings } },
-        });
+        if (vendor) {
+          const commRateRaw = Number(vendor.commissionRate) || 10;
+          const commRate = commRateRaw > 1 ? commRateRaw / 100 : commRateRaw;
+          const commission = (existing.commission != null && existing.commission > 0)
+            ? existing.commission
+            : (existing.total * commRate);
+          const netEarnings = Math.max(0, existing.total - commission);
+          await tx.vendor.update({
+            where: { id: existing.vendorId },
+            data: { walletBalance: Math.max(0, (vendor.walletBalance || 0) - netEarnings) },
+          });
+        }
       }
 
-      await tx.ticket.updateMany({ where: { orderId: req.params.id }, data: { orderId: null } });
-      await tx.serviceJob.deleteMany({ where: { orderId: req.params.id } }).catch(() => {});
-      await tx.transaction.deleteMany({ where: { orderId: req.params.id } }).catch(() => {});
-      await tx.orderItem.deleteMany({ where: { orderId: req.params.id } });
-      await tx.order.delete({ where: { id: req.params.id } });
+      // 1. Detach non-cascading foreign keys
+      await tx.ticket.updateMany({ where: { orderId }, data: { orderId: null } });
+      await tx.ledgerEntry.updateMany({ where: { orderId }, data: { orderId: null } });
+      await tx.transaction.updateMany({ where: { orderId }, data: { orderId: null } });
+
+      // 2. Detach review references from order items
+      const orderItems = await tx.orderItem.findMany({ where: { orderId }, select: { id: true } });
+      const orderItemIds = orderItems.map(i => i.id);
+      if (orderItemIds.length > 0) {
+        await tx.review.updateMany({ where: { orderItemId: { in: orderItemIds } }, data: { orderItemId: null } });
+      }
+
+      // 3. Delete dependent records
+      await tx.shiprocketShipment.deleteMany({ where: { orderId } });
+      await tx.delivery.deleteMany({ where: { orderId } });
+      await tx.paymentRecord.deleteMany({ where: { orderId } });
+      await tx.serviceJob.deleteMany({ where: { orderId } });
+
+      // 4. Delete items and finally the order
+      await tx.orderItem.deleteMany({ where: { orderId } });
+      await tx.order.delete({ where: { id: orderId } });
     });
 
     res.json({ success: true, message: 'Order deleted successfully.' });
