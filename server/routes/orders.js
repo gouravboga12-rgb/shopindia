@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const customerAuth = require('../middleware/customerAuth');
 const { calculateItemPricing, calculateDeliveryPricing } = require('../lib/pricing');
+const { verifyPaymentSignature } = require('../lib/razorpay');
 
 const router = express.Router();
 
@@ -199,7 +200,7 @@ router.get('/', customerAuth, async (req, res) => {
 /** POST /api/orders — place a storefront order (binds to customer if token sent) */
 router.post('/', async (req, res) => {
   try {
-    const { items, vertical, location, paymentMethod } = req.body || {};
+    const { items, vertical, location, paymentMethod, paymentMethodId, addressId, latitude, longitude, razorpayPayment } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Cart is empty.' });
@@ -278,6 +279,40 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Disallow COD for ShopIndia standard courier delivery
+    const isOnlinePayment = paymentMethod === 'razorpay' || paymentMethod === 'online' || paymentMethodId === 'razorpay';
+    const isCodPayment = paymentMethod === 'cod' || paymentMethod === 'COD' || paymentMethodId === 'COD';
+
+    if (isCodPayment && (resolvedVertical === 'shop' || resolvedVertical === 'traditional')) {
+      return res.status(400).json({ error: 'Cash on Delivery is not available for standard ShopIndia courier orders. Please pay online via Razorpay.' });
+    }
+
+    // Atomic Razorpay verification — order is recorded only if signature is valid
+    if (isOnlinePayment) {
+      if (!razorpayPayment || !razorpayPayment.orderId || !razorpayPayment.paymentId || !razorpayPayment.signature) {
+        return res.status(400).json({ error: 'Online payment requires completed Razorpay details (orderId, paymentId, signature).' });
+      }
+      const isValid = verifyPaymentSignature(razorpayPayment.orderId, razorpayPayment.paymentId, razorpayPayment.signature);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid Razorpay payment signature. Payment verification failed.' });
+      }
+    }
+
+    // Resolve delivery GPS coordinates
+    let orderLat = latitude ? parseFloat(latitude) : null;
+    let orderLng = longitude ? parseFloat(longitude) : null;
+    if ((!orderLat || !orderLng) && addressId) {
+      try {
+        const userAddr = await prisma.address.findUnique({ where: { id: addressId } });
+        if (userAddr) {
+          if (!orderLat && userAddr.latitude) orderLat = userAddr.latitude;
+          if (!orderLng && userAddr.longitude) orderLng = userAddr.longitude;
+        }
+      } catch (_addrErr) {
+        // ignore
+      }
+    }
+
     const customerId = resolveCustomerId(req) || (await getGuestCustomer()).id;
 
     const subtotal = resolved.reduce((sum, it) => sum + it.price * it.quantity, 0);
@@ -334,10 +369,13 @@ router.post('/', async (req, res) => {
         discount,
         commission: totalCommission,
         total,
-        paymentMethod: paymentMethod || 'COD',
-        paymentStatus: 'pending',
+        paymentMethod: isOnlinePayment ? 'razorpay' : 'COD',
+        paymentStatus: isOnlinePayment ? 'paid' : 'pending',
+        paymentRef: isOnlinePayment ? razorpayPayment.paymentId : null,
         deliveryLine1: location || '',
         deliveryPincode,
+        deliveryLat: orderLat,
+        deliveryLng: orderLng,
         items: {
           create: resolved.map((it) => ({
             productId: it.productId,
@@ -380,6 +418,20 @@ router.post('/', async (req, res) => {
         }
       })
     );
+
+    // If online payment was verified, create PaymentRecord in captured state
+    if (isOnlinePayment && razorpayPayment) {
+      await prisma.paymentRecord.create({
+        data: {
+          orderId: order.id,
+          razorpayOrderId: razorpayPayment.orderId,
+          razorpayPaymentId: razorpayPayment.paymentId,
+          amount: order.total,
+          currency: 'INR',
+          status: 'captured',
+        }
+      }).catch(err => console.error('Failed to create PaymentRecord on order placement:', err));
+    }
 
     // Save notification to PostgreSQL for the customer
     if (customerId) {

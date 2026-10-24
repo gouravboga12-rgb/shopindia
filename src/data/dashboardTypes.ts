@@ -15,6 +15,8 @@ export interface Address {
   country: string;
   pincode: string;
   landmark?: string;
+  latitude?: number;
+  longitude?: number;
   isDefault: boolean;
 }
 

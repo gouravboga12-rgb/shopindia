@@ -10,7 +10,9 @@ import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
-import { Home, User, MapPin, X, Search, ChevronDown, Zap, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare } from 'lucide-react';
+import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
+import { useCustomer } from '../../context/CustomerContext';
+import { Home, User, MapPin, X, Search, ChevronDown, Zap, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
 import { LocationModal } from '../common/LocationModal';
@@ -29,6 +31,9 @@ export const MobileApp: React.FC = () => {
     setSearchQuery,
     notifications
   } = useApp();
+
+  const { wishlist } = useCustomer();
+  const wishlistCount = wishlist?.length || 0;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -90,6 +95,10 @@ export const MobileApp: React.FC = () => {
         return <ProfilePage />;
       case 'notifications':
         return <NotificationsPage />;
+      case 'dashboard':
+        return <DashboardInner />;
+      case 'wishlist':
+        return <DashboardInner initialTab="wishlist" />;
       default:
         return <VerticalShopMobile />;
     }
@@ -229,7 +238,15 @@ export const MobileApp: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4 px-1 shrink-0">
-            <button onClick={() => navigateTo('notifications')} className="relative transition-transform active:scale-95">
+            <button onClick={() => navigateTo('wishlist')} className="relative transition-transform active:scale-95" title="Wishlist">
+              <Heart size={18} strokeWidth={2.2} className="text-red-500 fill-red-50" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-brand-red px-1 text-[9px] font-black text-white font-numbers shadow-sm border border-white">
+                  {wishlistCount}
+                </span>
+              )}
+            </button>
+            <button onClick={() => navigateTo('notifications')} className="relative transition-transform active:scale-95" title="Alerts">
               <Bell size={18} strokeWidth={2.2} className="text-slate-800" />
               {unreadNotificationsCount > 0 && (
                 <span className="absolute -top-1 -right-1.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-brand-red px-1 text-[9px] font-black text-white font-numbers shadow-sm border border-white">

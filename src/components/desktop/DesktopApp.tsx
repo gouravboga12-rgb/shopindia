@@ -47,6 +47,8 @@ export const DesktopApp: React.FC = () => {
         return <NotificationsPage />;
       case 'dashboard':
         return <DashboardInner />;
+      case 'wishlist':
+        return <DashboardInner initialTab="wishlist" />;
       default:
         return <VerticalShop />;
     }

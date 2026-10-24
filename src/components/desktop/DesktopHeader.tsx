@@ -7,7 +7,7 @@ import { LocationModal } from '../common/LocationModal';
 import servicesImg from '../../assets/services.png';
 import { 
   Search, Zap, Bell, ShoppingCart, User, 
-  Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase 
+  Sparkles, MapPin, ChevronDown, Package, LogOut, Briefcase, Heart 
 } from 'lucide-react';
 
 export const DesktopHeader: React.FC = () => {
@@ -23,7 +23,7 @@ export const DesktopHeader: React.FC = () => {
     notifications
   } = useApp();
 
-  const { isAuthenticated, profile, logout } = useCustomer();
+  const { isAuthenticated, profile, logout, wishlist } = useCustomer();
 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -34,6 +34,7 @@ export const DesktopHeader: React.FC = () => {
   const suggestionRef = useRef<HTMLDivElement>(null);
   const { products } = useProducts();
   const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+  const wishlistCount = wishlist?.length || 0;
 
   // Handle outside click for search suggestions
   useEffect(() => {
@@ -317,6 +318,23 @@ export const DesktopHeader: React.FC = () => {
               )}
             </div>
             <span className={currentVertical === 'services' ? 'text-white' : ''}>Alerts</span>
+          </button>
+
+          {/* Wishlist Button */}
+          <button 
+            onClick={() => navigateTo('wishlist')}
+            className={`flex items-center gap-2 py-2 px-3 rounded-button transition-all hover:bg-slate-100 cursor-pointer ${theme.buttonBg.replace('bg-', 'hover:bg-').replace('text-white', 'text-brand-graphite')}`}
+            title="My Wishlist"
+          >
+            <div className="relative">
+              <Heart size={18} className="text-red-500 fill-red-50" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-brand-red px-1 text-[8px] font-black text-white font-numbers border border-white">
+                  {wishlistCount}
+                </span>
+              )}
+            </div>
+            <span className={currentVertical === 'services' ? 'text-white' : ''}>Wishlist</span>
           </button>
 
           {/* Profile Dropdown */}

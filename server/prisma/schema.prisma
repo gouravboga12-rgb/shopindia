@@ -375,6 +375,8 @@ model Order {
   deliveryState   String?
   deliveryPincode String?
   deliveryCountry String? @default("India")
+  deliveryLat     Float?
+  deliveryLng     Float?
 
   paymentMethod String?
   paymentStatus PaymentStatus @default(pending)
@@ -958,6 +960,8 @@ model Address {
   country   String      @default("India")
   pincode   String
   landmark  String?
+  latitude  Float?
+  longitude Float?
   isDefault Boolean     @default(false)
   isActive  Boolean     @default(true)
 

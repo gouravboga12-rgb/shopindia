@@ -255,9 +255,9 @@ router.post('/:id/broadcast', async (req, res) => {
       dropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
     }
 
-    // Dropoff coordinates (offset from vendor store if not explicitly set)
-    const dropoffLat = pickupLat + 0.015;
-    const dropoffLng = pickupLng - 0.008;
+    // Dropoff coordinates: use exact customer GPS pin from order if present, else fallback
+    const dropoffLat = order.deliveryLat || (pickupLat + 0.015);
+    const dropoffLng = order.deliveryLng || (pickupLng - 0.008);
 
     const pickupAddress = [order.vendor.street, order.vendor.city, order.vendor.state, order.vendor.pincode]
       .filter(p => typeof p === 'string' && p.trim() && p.trim() !== ',')

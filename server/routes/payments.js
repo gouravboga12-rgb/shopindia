@@ -15,6 +15,50 @@ const { createOrder, verifyPaymentSignature } = require('../lib/razorpay');
 const router = express.Router();
 
 /**
+ * POST /api/payments/create-intent
+ * Creates a Razorpay order from the customer's cart total without creating a database Order upfront.
+ * Returns { razorpayOrderId, amount, currency, keyId, receiptNumber }.
+ * Zero database order created at this stage.
+ */
+router.post('/create-intent', verifyToken, async (req, res) => {
+  try {
+    const { items, total, vertical } = req.body || {};
+    
+    let finalAmountINR = Number(total);
+
+    if (!finalAmountINR || finalAmountINR <= 0) {
+      if (Array.isArray(items) && items.length > 0) {
+        finalAmountINR = items.reduce((sum, it) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
+      }
+    }
+
+    if (!finalAmountINR || finalAmountINR <= 0) {
+      return res.status(400).json({ error: 'Valid checkout amount or items required.' });
+    }
+
+    const amountPaise = Math.round(finalAmountINR * 100);
+    const receipt = 'RCPT-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
+
+    const rzpOrder = await createOrder(amountPaise, receipt, {
+      customer_id: req.user.userId || 'customer',
+      vertical: vertical || 'shop',
+      is_preorder_intent: 'true',
+    });
+
+    res.json({
+      razorpayOrderId: rzpOrder.id,
+      amount: rzpOrder.amount, // in paise
+      currency: rzpOrder.currency || 'INR',
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
+      receiptNumber: receipt,
+    });
+  } catch (err) {
+    console.error('Create payment intent error:', err);
+    res.status(500).json({ error: err.message || 'Failed to initialize Razorpay checkout intent.' });
+  }
+});
+
+/**
  * POST /api/payments/create-order
  * Creates a Razorpay order for a given internal order ID.
  * Customer must be authenticated.

@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 import { getCustomerToken, requireCustomerAuth } from '../lib/customerAuth';
 
 export type VerticalType = 'shop' | 'quick' | 'services';
-export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category';
+export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category' | 'wishlist';
 
 export interface OrderItem {
   product: Product;
@@ -83,7 +83,7 @@ interface AppContextType {
   clearCart: () => void;
   getCartTotal: () => number;
   orders: Order[];
-  placeOrder: (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string }) => Promise<any>;
+  placeOrder: (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => Promise<any>;
   cancelOrder: (orderId: string) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<void>;
   notifications: Notification[];
@@ -388,7 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Order placement (persists to the backend API)
-  const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string }) => {
+  const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => {
     try {
       const created = await api.post<any>('/api/orders', { 
         ...payload, 
