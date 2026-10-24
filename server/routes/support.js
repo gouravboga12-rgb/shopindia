@@ -239,9 +239,27 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
         }
       },
       include: {
-        messages: true
+        messages: true,
+        order: {
+          select: { id: true, orderNumber: true, total: true, status: true }
+        }
       }
     });
+
+    // In-App Alert Notification for Customer
+    if (customerId) {
+      await prisma.userNotification.create({
+        data: {
+          userId: customerId,
+          category: 'order',
+          title: `Support Ticket #${ticket.ticketNumber} Raised 🎫`,
+          message: `Your ticket regarding "${ticket.subject}" has been received. Our resolution team will update you shortly.`,
+          channel: 'IN_APP',
+          isRead: false,
+          link: '/dashboard?tab=support'
+        }
+      }).catch(err => console.error('Failed to create ticket userNotification:', err));
+    }
 
     res.status(201).json({
       success: true,
@@ -252,7 +270,8 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
         category: ticket.category,
         priority: ticket.priority,
         status: ticket.status,
-        createdAt: ticket.createdAt
+        createdAt: ticket.createdAt,
+        order: ticket.order
       },
       message: 'Support ticket successfully raised. A service specialist will contact you shortly.'
     });
@@ -290,7 +309,10 @@ router.get(['/tickets', '/ticket'], async (req, res) => {
     const tickets = await prisma.ticket.findMany({
       where,
       include: {
-        messages: true
+        messages: true,
+        order: {
+          select: { id: true, orderNumber: true, total: true, status: true }
+        }
       },
       orderBy: { createdAt: 'desc' },
       take: 20
@@ -324,6 +346,9 @@ router.get('/tickets/:id', async (req, res) => {
         },
         customer: {
           select: { name: true, email: true, phone: true }
+        },
+        order: {
+          select: { id: true, orderNumber: true, total: true, status: true }
         }
       }
     });

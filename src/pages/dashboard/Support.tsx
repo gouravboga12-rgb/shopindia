@@ -3,9 +3,11 @@ import { PageHeader, PrimaryButton, fieldCls, selectCls, Badge } from '../../com
 import { 
   MessageSquare, Mail, Phone, ChevronDown, LifeBuoy, 
   Send, Ticket, CheckCircle2, Bot, ArrowLeft, RefreshCw,
-  Sparkles
+  Sparkles, Package
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 
 const FAQS = [
   { q: 'How do I track my order or service booking?', a: 'Head to My Orders / Bookings in your dashboard. Each order has a live tracking timeline with technician or delivery updates.' },
@@ -20,6 +22,9 @@ const INITIAL_CHAT = [
 ];
 
 export const SupportCenterPage: React.FC = () => {
+  const { orders, addNotification } = useApp();
+  const { addNotification: addCustomerNotification } = useCustomer();
+
   // Ticket Creation Form State
   const [ticketForm, setTicketForm] = useState({ 
     subject: '', 
@@ -28,7 +33,8 @@ export const SupportCenterPage: React.FC = () => {
     message: '',
     name: '',
     phone: '',
-    email: ''
+    email: '',
+    orderId: ''
   });
   const [submittingTicket, setSubmittingTicket] = useState(false);
   const [ticketSuccessMessage, setTicketSuccessMessage] = useState<string | null>(null);
@@ -51,6 +57,8 @@ export const SupportCenterPage: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedOrder = orders?.find(o => o.id === ticketForm.orderId);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -88,7 +96,33 @@ export const SupportCenterPage: React.FC = () => {
         const res = await api.get<{ ticket: any }>(`/api/support/tickets/${ticketId}`);
         if (res.ticket && res.ticket.messages) {
           setActiveTicket((prev: any) => {
-            if (!prev || prev.messages?.length !== res.ticket.messages?.length || prev.status !== res.ticket.status) {
+            if (!prev) return res.ticket;
+            const prevLen = prev.messages?.length || 0;
+            const newLen = res.ticket.messages.length;
+            if (newLen > prevLen) {
+              const lastMsg = res.ticket.messages[newLen - 1];
+              if (lastMsg && lastMsg.senderRole !== 'customer') {
+                const roleTitle = lastMsg.senderRole === 'regional_admin' ? 'Regional Support' : lastMsg.senderRole === 'vendor' ? 'Store Merchant' : 'Support Specialist';
+                addNotification({
+                  type: 'order',
+                  title: `New Reply on Ticket #${res.ticket.ticketNumber} 💬`,
+                  message: `${roleTitle}: "${lastMsg.text.slice(0, 80)}${lastMsg.text.length > 80 ? '...' : ''}"`,
+                  actionText: 'View',
+                  icon: MessageSquare,
+                  color: 'text-brand-blue',
+                  bg: 'bg-blue-50'
+                });
+                if (addCustomerNotification) {
+                  addCustomerNotification({
+                    category: 'order',
+                    title: `New Reply on Ticket #${res.ticket.ticketNumber} 💬`,
+                    message: `${roleTitle}: "${lastMsg.text.slice(0, 80)}${lastMsg.text.length > 80 ? '...' : ''}"`
+                  });
+                }
+              }
+              return res.ticket;
+            }
+            if (prev.status !== res.ticket.status) {
               return res.ticket;
             }
             return prev;
@@ -100,7 +134,7 @@ export const SupportCenterPage: React.FC = () => {
     }, 3000);
 
     return () => clearInterval(timer);
-  }, [activeTicket?.id, activeTicket?.ticketNumber]);
+  }, [activeTicket?.id, activeTicket?.ticketNumber, addNotification, addCustomerNotification]);
 
   // Submit real ticket directly to PostgreSQL API
   const submitTicket = async (e: React.FormEvent) => {
@@ -109,10 +143,36 @@ export const SupportCenterPage: React.FC = () => {
     setTicketSuccessMessage(null);
 
     try {
-      const res = await api.post<{ success: boolean; ticket: any; message: string }>('/api/support/ticket', ticketForm);
+      const payload: any = { ...ticketForm };
+      if (!payload.orderId) delete payload.orderId;
+
+      const res = await api.post<{ success: boolean; ticket: any; message: string }>('/api/support/ticket', payload);
       if (res.success && res.ticket) {
         setTicketSuccessMessage(`Ticket #${res.ticket.ticketNumber} created successfully! A specialist is reviewing your issue.`);
-        setTicketForm({ subject: '', category: 'order_issue', message: '', priority: 'medium', name: '', phone: '', email: '' });
+        
+        // Trigger In-App Notification Alert
+        try {
+          addNotification({
+            type: 'order',
+            title: `Support Ticket #${res.ticket.ticketNumber} Raised 🎫`,
+            message: `Your request regarding "${ticketForm.subject}" has been received. Our team will assist shortly.`,
+            actionText: 'View Ticket',
+            icon: Ticket,
+            color: 'text-brand-blue',
+            bg: 'bg-blue-50'
+          });
+          if (addCustomerNotification) {
+            addCustomerNotification({
+              category: 'order',
+              title: `Support Ticket #${res.ticket.ticketNumber} Raised 🎫`,
+              message: `Your request regarding "${ticketForm.subject}" has been received.`
+            });
+          }
+        } catch (notifErr) {
+          console.warn('In-app alert notification error:', notifErr);
+        }
+
+        setTicketForm({ subject: '', category: 'order_issue', message: '', priority: 'medium', name: '', phone: '', email: '', orderId: '' });
         setActiveTicket(res.ticket);
         loadTickets();
       }
@@ -299,7 +359,15 @@ export const SupportCenterPage: React.FC = () => {
                   </Badge>
                 </div>
                 <h4 className="font-extrabold text-brand-graphite">{activeTicket.subject}</h4>
-                <span className="text-[10.5px] text-brand-slate uppercase font-bold">Category: {activeTicket.category}</span>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10.5px] text-brand-slate uppercase font-bold">Category: {activeTicket.category}</span>
+                  {(activeTicket.order || activeTicket.orderId) && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-blue bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-full font-mono">
+                      <Package size={10} />
+                      <span>Order #{activeTicket.order?.orderNumber || activeTicket.orderId?.slice(-6)}</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Message timeline */}
@@ -357,6 +425,83 @@ export const SupportCenterPage: React.FC = () => {
                 <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                   <span>{ticketSuccessMessage}</span>
+                </div>
+              )}
+
+              {/* Associated Order Dropdown */}
+              {orders && orders.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10.5px] font-black uppercase text-brand-slate font-heading flex items-center gap-1.5">
+                      <Package size={12} className="text-brand-blue" />
+                      <span>Associated Order (Optional)</span>
+                    </label>
+                    {ticketForm.orderId && (
+                      <button
+                        type="button"
+                        onClick={() => setTicketForm(prev => ({ ...prev, orderId: '' }))}
+                        className="text-[10px] text-brand-slate hover:text-red-500 font-bold underline cursor-pointer"
+                      >
+                        Clear Order
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative w-full">
+                    <select 
+                      className={selectCls} 
+                      value={ticketForm.orderId} 
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        const found = orders.find(o => o.id === selectedId);
+                        setTicketForm(prev => ({
+                          ...prev,
+                          orderId: selectedId,
+                          subject: found && (!prev.subject || prev.subject.startsWith('Issue with Order #'))
+                            ? `Issue with Order #${found.orderNumber || found.id.slice(-6)}`
+                            : prev.subject,
+                          category: prev.category === 'other' ? 'order_issue' : prev.category
+                        }));
+                      }}
+                    >
+                      <option value="">-- No specific order (General inquiry) --</option>
+                      {orders.map((o) => {
+                        const num = o.orderNumber || `OD-${o.id.slice(-6)}`;
+                        const firstItem = o.items?.[0]?.product?.title || (o.items?.[0]?.product as any)?.name || 'Items';
+                        const moreCount = (o.items?.length || 0) - 1;
+                        const itemsSummary = moreCount > 0 ? `${firstItem} +${moreCount} more` : firstItem;
+                        return (
+                          <option key={o.id} value={o.id}>
+                            #{num} — {itemsSummary} (₹{o.total}) • [{o.status?.toUpperCase()}]
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-brand-slate">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
+
+                  {/* Selected order summary badge */}
+                  {selectedOrder && (
+                    <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-brand-graphite font-heading">
+                            Order #{selectedOrder.orderNumber || selectedOrder.id.slice(-6)}
+                          </span>
+                          <span className="text-[9.5px] uppercase font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded">
+                            {selectedOrder.status}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-brand-slate">
+                          {selectedOrder.items?.map(it => `${it.product?.title || (it.product as any)?.name || 'Item'} (x${it.quantity})`).join(', ') || 'Order items'}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <span className="font-mono font-black text-brand-blue block">₹{selectedOrder.total}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -455,6 +600,11 @@ export const SupportCenterPage: React.FC = () => {
                       <div className="max-w-[70%]">
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="font-mono text-xs font-bold text-brand-blue">#{t.ticketNumber}</span>
+                          {(t.order?.orderNumber || t.orderId) && (
+                            <span className="text-[9px] font-bold text-brand-slate bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200 font-mono">
+                              #{t.order?.orderNumber || t.orderId.slice(-6)}
+                            </span>
+                          )}
                           {hasReply && (
                             <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                               New Reply

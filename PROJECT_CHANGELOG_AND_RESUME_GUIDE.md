@@ -282,4 +282,27 @@ When you resume in the morning, here are the ready next steps:
 
 ---
 
+## 8. Support Center: Order Linking & In-App Alert Notifications (Recommendation 2)
+
+### Summary of Enhancements:
+1. **Order Linking Dropdown in Customer Support Form (`src/pages/dashboard/Support.tsx`):**
+   - Direct integration with `orders` from `useApp()`.
+   - Customers can link any recent order (`#OD-XXXXXX`) with one tap when raising a support ticket.
+   - Automatically pre-fills the issue subject (e.g. `Issue with Order #OD-123456`) and sets category to `order_issue`.
+   - Displays live order summary card with item names, status pill, and total amount.
+   - Provides an inline "Clear Order" button if the customer prefers a general inquiry.
+   - In ticket conversation and "My Tickets" list, displays clickable badges showing the linked order number and details.
+2. **In-App Alert Notifications across All Platform Panels:**
+   - **Ticket Creation:** Emits instant in-app alerts and writes to PostgreSQL `user_notifications` (`category: 'order'`, `channel: 'IN_APP'`) for the customer.
+   - **Super Admin Reply (`/api/admin/support/tickets/:id/reply`):** Dispatches customer notification `Support Specialist Replied #TKT-XXXXXX 💬` with message preview.
+   - **Regional Admin Reply (`/api/regional-admin/support/tickets/:id/reply`):** Dispatches customer notification `Regional Support Replied #TKT-XXXXXX 💬`.
+   - **Vendor / Merchant Reply (`/api/vendor/support/tickets/:id/reply`):** Dispatches customer notification `Merchant Replied on #TKT-XXXXXX 💬`.
+   - **Refund Approvals & Rejections:** Emits in-app alerts informing the customer of the refund status and at-fault ledger resolution.
+   - **Real-Time Client Polling:** When viewing an active ticket, client polls every 3 seconds; newly received staff replies immediately trigger `addNotification` to badge the customer's header alert bell in real time.
+3. **External Notifications:**
+   - External SMS/WhatsApp notifications deferred to future app development as requested.
+
+---
+
 *Document updated and saved to `shopindia/PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`.*
+

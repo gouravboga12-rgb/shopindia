@@ -163,6 +163,23 @@ router.post('/tickets/:id/reply', async (req, res) => {
       data: { status: 'in_progress' },
       include: { messages: true },
     });
+
+    // In-App Alert Notification to Customer
+    if (ticket.customerId) {
+      const preview = text.trim().length > 100 ? text.trim().slice(0, 100) + '...' : text.trim();
+      await prisma.userNotification.create({
+        data: {
+          userId: ticket.customerId,
+          category: 'order',
+          title: `Support Specialist Replied #${ticket.ticketNumber} 💬`,
+          message: `Support Desk: "${preview}"`,
+          channel: 'IN_APP',
+          isRead: false,
+          link: '/dashboard?tab=support'
+        }
+      }).catch(err => console.error('Admin reply userNotification error:', err));
+    }
+
     res.json(ticket);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -227,6 +244,22 @@ router.post('/tickets/:id/refund', async (req, res) => {
           sentAt: new Date()
         }
       });
+
+      // In-App Alert Notification for Refund Rejection
+      if (ticket.customerId) {
+        await prisma.userNotification.create({
+          data: {
+            userId: ticket.customerId,
+            category: 'order',
+            title: `Refund Request Declined #${ticket.ticketNumber}`,
+            message: `Your refund request was declined: ${adminNotes || 'Does not meet refund criteria'}.`,
+            channel: 'IN_APP',
+            isRead: false,
+            link: '/dashboard?tab=support'
+          }
+        }).catch(e => console.error('Refund rejection userNotification error:', e));
+      }
+
       return res.json({ success: true, ticket: updated });
     }
 
@@ -301,6 +334,21 @@ router.post('/tickets/:id/refund', async (req, res) => {
           }
         });
       });
+
+      // In-App Alert Notification for Refund Approval
+      if (ticket.customerId) {
+        await prisma.userNotification.create({
+          data: {
+            userId: ticket.customerId,
+            category: 'order',
+            title: `Refund Approved: ₹${finalRefundAmt} 🎉`,
+            message: `Your refund request for Ticket #${ticket.ticketNumber} has been approved and processed.`,
+            channel: 'IN_APP',
+            isRead: false,
+            link: '/dashboard?tab=support'
+          }
+        }).catch(e => console.error('Refund approval userNotification error:', e));
+      }
 
       const refreshed = await prisma.ticket.findUnique({
         where: { id: ticket.id },

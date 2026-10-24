@@ -166,6 +166,22 @@ router.post('/tickets/:id/reply', async (req, res) => {
       include: { messages: { orderBy: { sentAt: 'asc' } } }
     });
 
+    // In-App Alert Notification to Customer
+    if (ticket.customerId) {
+      const preview = text.trim().length > 100 ? text.trim().slice(0, 100) + '...' : text.trim();
+      await prisma.userNotification.create({
+        data: {
+          userId: ticket.customerId,
+          category: 'order',
+          title: `Regional Support Replied #${ticket.ticketNumber} 💬`,
+          message: `Regional Manager: "${preview}"`,
+          channel: 'IN_APP',
+          isRead: false,
+          link: '/dashboard?tab=support'
+        }
+      }).catch(err => console.error('Regional admin reply userNotification error:', err));
+    }
+
     res.json({ success: true, message, ticket });
   } catch (err) {
     console.error('[RegionalSupport] Reply error:', err);
