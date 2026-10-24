@@ -4,12 +4,13 @@ const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 
-router.use(verifyToken, requireRole('regional_admin'));
+router.use(verifyToken, requireRole('regional_admin', 'branch_manager', 'super_admin'));
 
 /**
  * Helper to fetch regional admin profile for logged-in user
  */
 async function getRegionalProfile(userId) {
+  if (!userId) return null;
   return await prisma.regionalAdminProfile.findUnique({
     where: { userId }
   });
@@ -21,24 +22,26 @@ async function getRegionalProfile(userId) {
  */
 router.get('/tickets', async (req, res) => {
   try {
-    const profile = await getRegionalProfile(req.user.id);
-    if (!profile) {
+    const userId = req.user?.userId || req.user?.id;
+    const profile = await getRegionalProfile(userId);
+    if (!profile && req.user?.role !== 'super_admin') {
       return res.status(403).json({ error: 'Regional admin profile not found' });
     }
 
     const { status, tier, priority, page = 1, limit = 25 } = req.query;
     
     // Find tickets assigned directly to this region OR matching assigned pincodes
-    const where = {
-      OR: [
+    const where = {};
+    if (profile) {
+      where.OR = [
         { regionId: profile.id },
         {
           order: {
             deliveryPincode: { in: profile.assignedPincodes || [] }
           }
         }
-      ]
-    };
+      ];
+    }
 
     if (status) where.status = status;
     if (priority) where.priority = priority;
@@ -220,13 +223,16 @@ router.post('/tickets/:id/internal-note', async (req, res) => {
 router.post('/tickets/:id/escalate', async (req, res) => {
   try {
     const { reason } = req.body;
+    const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Ticket not found' });
+
     const ticket = await prisma.ticket.update({
       where: { id: req.params.id },
       data: {
         tier: 3,
         escalatedAt: new Date(),
         priority: 'urgent',
-        internalNotes: `${ticket?.internalNotes || ''}\n[Escalated to Super Admin: ${reason || 'Regional intervention needed'}]`
+        internalNotes: `${existing.internalNotes ? existing.internalNotes + '\n' : ''}[Escalated to Super Admin: ${reason || 'Regional intervention needed'}]`
       }
     });
 

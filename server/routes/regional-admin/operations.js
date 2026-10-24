@@ -10,6 +10,7 @@ router.use(verifyToken, requireRole('regional_admin', 'branch_manager', 'super_a
  * Helper to fetch Regional Admin Profile and branch association
  */
 async function getAdminProfile(userId) {
+  if (!userId) return null;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { regionalAdminProfile: true },
@@ -23,7 +24,7 @@ async function getAdminProfile(userId) {
  */
 router.get('/dashboard', async (req, res) => {
   try {
-    const profile = await getAdminProfile(req.user.userId);
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
     const branchFilter = profile?.branchId ? { branchId: profile.branchId } : {};
 
     // Parallel fetch scoped statistics
@@ -109,7 +110,7 @@ router.get('/dashboard', async (req, res) => {
  */
 router.get('/vendors', async (req, res) => {
   try {
-    const profile = await getAdminProfile(req.user.userId);
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
     const branchFilter = profile?.branchId ? { branchId: profile.branchId } : {};
 
     const vendors = await prisma.vendor.findMany({
@@ -144,7 +145,7 @@ router.get('/vendors', async (req, res) => {
  */
 router.get('/riders', async (req, res) => {
   try {
-    const profile = await getAdminProfile(req.user.userId);
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
     const branchFilter = profile?.branchId ? { branchId: profile.branchId } : {};
 
     const riders = await prisma.riderProfile.findMany({
@@ -187,7 +188,7 @@ router.patch('/riders/:id/verify', async (req, res) => {
     if (rider?.user?.id) {
       await prisma.user.update({
         where: { id: rider.user.id },
-        data: { status: approved ? 'active' : 'rejected' },
+        data: { status: approved ? 'active' : 'suspended' },
       });
     }
 
@@ -303,7 +304,7 @@ router.post('/deliveries/:id/reassign', async (req, res) => {
  */
 router.get('/demand-leads', async (req, res) => {
   try {
-    const profile = await getAdminProfile(req.user.userId);
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
     const assignedPincodes = profile?.assignedPincodes || [];
 
     const where = assignedPincodes.length > 0

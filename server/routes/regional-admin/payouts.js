@@ -18,22 +18,32 @@ router.use(verifyToken, requireRole('regional_admin', 'super_admin'));
  */
 router.get('/', async (req, res) => {
   try {
+    const userId = req.user?.userId || req.user?.id;
     const profile = await prisma.regionalAdminProfile.findUnique({
-      where: { userId: req.user.userId },
+      where: { userId },
+      include: { branch: true },
     });
 
     const assignedPincodes = profile?.assignedPincodes || [];
+    const branchId = profile?.branchId;
 
-    // Filter requests where vendor or rider resides in assigned pincodes
+    // Filter requests where vendor or rider resides in assigned pincodes or branch
     const where = {
       status: { in: ['pending', 'under_review', 'approved'] },
     };
 
+    const orConditions = [];
+    if (branchId) {
+      orConditions.push({ vendor: { branchId } });
+      orConditions.push({ riderProfile: { branchId } });
+    }
     if (assignedPincodes.length > 0) {
-      where.OR = [
-        { vendor: { pincode: { in: assignedPincodes } } },
-        { riderProfile: { address: { in: assignedPincodes } } },
-      ];
+      orConditions.push({ vendor: { pincode: { in: assignedPincodes } } });
+      orConditions.push({ riderProfile: { address: { in: assignedPincodes } } });
+    }
+
+    if (orConditions.length > 0) {
+      where.OR = orConditions;
     }
 
     const requests = await prisma.payoutRequest.findMany({

@@ -235,7 +235,7 @@ router.post('/verify-razorpay-remittance', async (req, res) => {
         data: {
           riderProfileId: rider.id,
           amount: clearedAmount,
-          status: 'remitted_to_super',
+          status: 'paid_online',
           clearanceMode: 'online',
           razorpayPaymentId,
           receivedByAdminAt: new Date(),

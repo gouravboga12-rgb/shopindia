@@ -244,7 +244,7 @@ router.post('/riders/:id/force-clear', async (req, res) => {
         data: {
           riderProfileId: id,
           amount: floatToClear,
-          status: 'remitted_to_super',
+          status: 'verified',
           clearanceMode: 'admin_manual',
           notes: notes?.trim() || `Manual clearance by Super Admin (${adminId})`,
           receivedByAdminAt: new Date(),

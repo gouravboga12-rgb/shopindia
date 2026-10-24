@@ -20,20 +20,21 @@ router.use(verifyToken, requireRole('regional_admin', 'super_admin'));
  */
 router.get('/', async (req, res) => {
   try {
+    const userId = req.user?.userId || req.user?.id;
     const profile = await prisma.regionalAdminProfile.findUnique({
-      where: { userId: req.user.userId },
+      where: { userId },
       include: { branch: true },
     });
 
     const regionalAdminId = profile?.id;
-    const branchId = profile?.branchId;
 
     const [pendingSubmissions, collectedPool, pastRemittances] = await Promise.all([
-      // 1. Pending handovers from territory riders
+      // 1. Pending handovers from territory riders (physical submission not yet verified by admin)
       prisma.cODRemittance.findMany({
         where: {
-          status: 'pending',
+          status: { in: ['pending', 'submitted_to_admin'] },
           clearanceMode: 'physical',
+          receivedByAdminAt: null,
           ...(regionalAdminId ? { regionalAdminId } : {}),
         },
         include: {
@@ -44,11 +45,13 @@ router.get('/', async (req, res) => {
         orderBy: { createdAt: 'desc' },
       }),
 
-      // 2. Cash physically held by this regional admin not yet remitted to Super Admin
+      // 2. Cash physically verified and held in custody by this regional admin not yet remitted to Super Admin
       prisma.cODRemittance.findMany({
         where: {
-          status: 'received_by_regional',
+          status: 'verified',
           clearanceMode: 'physical',
+          receivedByAdminAt: { not: null },
+          remittedToSuperAt: null,
           ...(regionalAdminId ? { regionalAdminId } : {}),
         },
         include: {
@@ -62,24 +65,29 @@ router.get('/', async (req, res) => {
       // 3. Past completed remittances to Super Admin
       prisma.cODRemittance.findMany({
         where: {
-          status: 'remitted_to_super',
+          remittedToSuperAt: { not: null },
           ...(regionalAdminId ? { regionalAdminId } : {}),
+        },
+        include: {
+          riderProfile: {
+            include: { user: { select: { name: true, phone: true } } },
+          },
         },
         orderBy: { remittedToSuperAt: 'desc' },
         take: 20,
       }),
     ]);
 
-    const totalCashInCustody = collectedPool.reduce((acc, r) => acc + r.amount, 0);
+    const totalCashInCustody = collectedPool.reduce((acc, r) => acc + (r.amount || 0), 0);
 
     res.json({
       success: true,
-      hubName: profile?.branch?.name || profile?.branch?.city || 'Regional Hub',
+      hubName: profile?.branch?.name || profile?.regionName || profile?.branch?.city || 'Regional Hub',
       totalCashInCustody,
       pendingCount: pendingSubmissions.length,
-      pendingSubmissions,
-      collectedPool,
-      pastRemittances,
+      pendingSubmissions: pendingSubmissions.map((r) => ({ ...r, status: 'pending' })),
+      collectedPool: collectedPool.map((r) => ({ ...r, status: 'received_by_regional' })),
+      pastRemittances: pastRemittances.map((r) => ({ ...r, status: 'remitted_to_super' })),
     });
   } catch (err) {
     console.error('[Regional Admin COD] Fetch error:', err);
@@ -106,19 +114,19 @@ router.post('/:id/confirm-receipt', async (req, res) => {
     });
 
     if (!remittance) return res.status(404).json({ error: 'Remittance record not found.' });
-    if (remittance.status !== 'pending') {
-      return res.status(400).json({ error: `Remittance is already ${remittance.status}.` });
+    if (remittance.receivedByAdminAt) {
+      return res.status(400).json({ error: 'Remittance is already verified and received.' });
     }
 
     const rider = remittance.riderProfile;
     const amount = remittance.amount;
 
     await prisma.$transaction(async (tx) => {
-      // 1. Mark remittance as received by regional admin
+      // 1. Mark remittance as verified and received by regional admin
       await tx.cODRemittance.update({
         where: { id },
         data: {
-          status: 'received_by_regional',
+          status: 'verified',
           receivedByAdminAt: new Date(),
           notes: notes?.trim() || remittance.notes,
         },
@@ -141,11 +149,11 @@ router.post('/:id/confirm-receipt', async (req, res) => {
             partyId: rider.id,
             amount,
             entryType: 'COD_REMITTANCE',
-            description: `Physical COD cash submitted by ${rider.user?.name} to Regional Admin`,
+            description: `Physical COD cash submitted by ${rider.user?.name || 'Rider'} to Regional Admin`,
             metadata: {
               remittanceId: id,
               clearedAt: new Date().toISOString(),
-              receivedBy: req.user.userId,
+              receivedBy: req.user?.userId || req.user?.id,
             },
             riderProfileId: rider.id,
           },
@@ -156,7 +164,7 @@ router.post('/:id/confirm-receipt', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Confirmed receipt of ₹${amount} cash from ${rider.user?.name}. Rider float decremented.`,
+      message: `Confirmed receipt of ₹${amount} cash from ${rider.user?.name || 'Rider'}. Rider float decremented.`,
     });
   } catch (err) {
     console.error('[Regional Admin Confirm Cash] Error:', err);
@@ -179,7 +187,8 @@ router.post('/create-super-remittance-order', async (req, res) => {
     const remittances = await prisma.cODRemittance.findMany({
       where: {
         id: { in: remittanceIds },
-        status: 'received_by_regional',
+        status: 'verified',
+        remittedToSuperAt: null,
       },
     });
 
@@ -187,14 +196,14 @@ router.post('/create-super-remittance-order', async (req, res) => {
       return res.status(400).json({ error: 'No valid collected cash batches found to remit.' });
     }
 
-    const totalToRemit = remittances.reduce((acc, r) => acc + r.amount, 0);
+    const totalToRemit = remittances.reduce((acc, r) => acc + (r.amount || 0), 0);
 
     const rzpOrder = await createRazorpayOrder({
       amount: totalToRemit,
       currency: 'INR',
       receipt: `reg_remit_${Date.now()}`,
       notes: {
-        regionalAdminId: req.user.userId,
+        regionalAdminId: req.user?.userId || req.user?.id,
         remittanceCount: remittances.length,
         type: 'REGIONAL_ADMIN_COD_REMITTANCE',
       },
@@ -236,7 +245,7 @@ router.post('/verify-super-remittance', async (req, res) => {
       await tx.cODRemittance.updateMany({
         where: { id: { in: remittanceIds } },
         data: {
-          status: 'remitted_to_super',
+          status: 'verified',
           remittedToSuperAt: new Date(),
           superAdminRazorpayId: razorpayPaymentId,
         },
