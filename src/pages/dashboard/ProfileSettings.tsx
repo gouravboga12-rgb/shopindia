@@ -17,9 +17,7 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ShieldCheck,
   LogOut,
-  ChevronRight,
   AlertCircle,
   Loader2,
   Sparkles
@@ -187,41 +185,40 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 font-heading">Profile Settings</h1>
-        <p className="text-xs text-gray-500 mt-0.5">Manage your personal information, delivery contact, and account security</p>
+    <div className="space-y-3.5 max-w-xl mx-auto px-1 sm:px-0 pb-16">
+      {/* Top Page Title */}
+      <div className="px-1 pt-1">
+        <h1 className="text-xl font-bold text-gray-900 font-heading">Profile Settings</h1>
+        <p className="text-xs text-gray-500 mt-0.5">Manage your personal information and account security</p>
       </div>
 
       {/* Global Success Notification */}
       {profileSuccess && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-800 font-bold animate-in fade-in duration-200">
-          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2 text-xs text-emerald-800 font-bold animate-in fade-in duration-200">
+          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
           <span>{profileSuccess}</span>
         </div>
       )}
 
-      {/* 1. Profile Hero Card */}
-      <div className="bg-white border border-brand-border/80 rounded-3xl p-6 shadow-premium relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-          {/* Avatar with Camera Trigger */}
-          <div className="relative group shrink-0">
-            <div className="w-24 h-24 rounded-full overflow-hidden bg-brand-blue/10 border-3 border-white shadow-md flex items-center justify-center text-brand-blue text-3xl font-black">
+      {/* 1. Profile Hero Card (Compact, Proportional Mobile Layout) */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          {/* Avatar with Camera Overlay */}
+          <div className="relative shrink-0">
+            <div className="w-14 h-14 rounded-full overflow-hidden bg-blue-50 border-2 border-white shadow-xs flex items-center justify-center text-brand-blue text-xl font-black">
               {avatar ? (
                 <img src={avatar} alt={profile.name} className="w-full h-full object-cover" />
               ) : (
                 <span>{(profile.name?.[0] || 'G').toUpperCase()}</span>
               )}
             </div>
-
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute -bottom-1 -right-1 p-2 bg-[#0F2C59] hover:bg-[#1A3D73] text-white rounded-full shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white"
-              title="Upload profile picture"
+              className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#0F2C59] hover:bg-[#1A3D73] text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer border border-white transition-transform active:scale-95"
+              title="Change Photo"
             >
-              <Camera size={14} />
+              <Camera size={11} />
             </button>
             <input
               type="file"
@@ -232,264 +229,235 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
             />
           </div>
 
-          {/* User Meta */}
-          <div className="flex-1 text-center sm:text-left min-w-0">
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
-              <h2 className="text-xl font-black text-brand-graphite font-heading truncate">
+          {/* User Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-extrabold text-gray-900 truncate">
                 {profile.name || 'ShopIndia Customer'}
               </h2>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200/80">
-                <Sparkles size={11} className="text-emerald-600" />
+              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold border border-emerald-200/60 shrink-0">
+                <Sparkles size={9} className="text-emerald-600" />
                 <span>Plus Member</span>
               </span>
             </div>
-            <p className="text-xs text-gray-500 font-medium">{profile.email}</p>
-            <p className="text-[11px] text-gray-400 mt-1">
-              Customer Account • Active Member
-            </p>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-brand-blue hover:underline cursor-pointer"
-            >
-              <Camera size={12} />
-              <span>Change Profile Picture</span>
-            </button>
+            <p className="text-xs text-gray-500 truncate mt-0.5">{profile.email}</p>
+            <p className="text-[11px] font-mono text-gray-400 mt-0.5">{profile.phone || '+91 98765 43210'}</p>
           </div>
         </div>
       </div>
 
-      {/* 2. Quick Shortcuts Strip (Orders, Saved Addresses, Wishlist) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* 2. Quick Shortcuts (Orders, Addresses, Wishlist - Uniform 3 Columns) */}
+      <div className="grid grid-cols-3 gap-2">
         {/* Shortcut 1: My Orders */}
         <button
           onClick={() => handleShortcutNavigate('orders')}
-          className="bg-white hover:bg-gray-50 border border-gray-200/80 rounded-2xl p-4 shadow-xs text-left transition-all active:scale-[0.98] cursor-pointer flex items-center justify-between group"
+          className="bg-white hover:bg-gray-50 border border-gray-100 rounded-2xl p-3 shadow-xs text-center transition-all active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 group"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Package size={18} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-900 font-heading">My Orders</p>
-              <p className="text-[11px] text-gray-500">{orders?.length ? `${orders.length} placed` : 'Track purchases'}</p>
-            </div>
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Package size={15} />
           </div>
-          <ChevronRight size={14} className="text-gray-400 group-hover:text-blue-600 transition-colors" />
+          <span className="text-xs font-bold text-gray-900 leading-tight">My Orders</span>
+          <span className="text-[10px] text-gray-400">{orders?.length ? `${orders.length} placed` : 'Track'}</span>
         </button>
 
         {/* Shortcut 2: Saved Addresses */}
         <button
           onClick={() => handleShortcutNavigate('addresses')}
-          className="bg-white hover:bg-gray-50 border border-gray-200/80 rounded-2xl p-4 shadow-xs text-left transition-all active:scale-[0.98] cursor-pointer flex items-center justify-between group"
+          className="bg-white hover:bg-gray-50 border border-gray-100 rounded-2xl p-3 shadow-xs text-center transition-all active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 group"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <MapPin size={18} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-900 font-heading">Saved Addresses</p>
-              <p className="text-[11px] text-gray-500">{addresses?.length ? `${addresses.length} saved` : 'Delivery locations'}</p>
-            </div>
+          <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <MapPin size={15} />
           </div>
-          <ChevronRight size={14} className="text-gray-400 group-hover:text-emerald-600 transition-colors" />
+          <span className="text-xs font-bold text-gray-900 leading-tight">Addresses</span>
+          <span className="text-[10px] text-gray-400">{addresses?.length ? `${addresses.length} saved` : 'Locations'}</span>
         </button>
 
         {/* Shortcut 3: Wishlist */}
         <button
           onClick={() => handleShortcutNavigate('wishlist')}
-          className="bg-white hover:bg-gray-50 border border-gray-200/80 rounded-2xl p-4 shadow-xs text-left transition-all active:scale-[0.98] cursor-pointer flex items-center justify-between group"
+          className="bg-white hover:bg-gray-50 border border-gray-100 rounded-2xl p-3 shadow-xs text-center transition-all active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 group"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Heart size={18} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-900 font-heading">My Wishlist</p>
-              <p className="text-[11px] text-gray-500">{wishlist?.length ? `${wishlist.length} saved` : 'Saved items'}</p>
-            </div>
+          <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Heart size={15} />
           </div>
-          <ChevronRight size={14} className="text-gray-400 group-hover:text-rose-600 transition-colors" />
+          <span className="text-xs font-bold text-gray-900 leading-tight">Wishlist</span>
+          <span className="text-[10px] text-gray-400">{wishlist?.length ? `${wishlist.length} saved` : 'Saved'}</span>
         </button>
       </div>
 
-      {/* 3. Personal Details Card (Default View Mode with Edit Profile Toggle) */}
-      <div className="bg-white border border-brand-border/80 rounded-3xl p-6 shadow-premium space-y-5">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      {/* 3. Personal Details (Uniform Settings List Layout) */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-xs space-y-3">
+        {/* Section Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <div>
-            <h3 className="font-bold text-base text-gray-900 font-heading">Personal Details</h3>
-            <p className="text-xs text-gray-500">Contact information used across deliveries and notifications</p>
+            <h3 className="font-bold text-xs uppercase tracking-wider text-gray-500">Personal Information</h3>
           </div>
 
           {!isEditingProfile ? (
             <button
               type="button"
               onClick={() => setIsEditingProfile(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-bold transition-all cursor-pointer border border-blue-200/60"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-all cursor-pointer border border-blue-200/50"
             >
-              <Edit3 size={13} />
-              <span>Edit Profile</span>
+              <Edit3 size={11} />
+              <span>Edit</span>
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCancelProfile}
-                disabled={isSavingProfile}
-                className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 rounded-xl transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleCancelProfile}
+              disabled={isSavingProfile}
+              className="px-2 py-1 text-xs font-bold text-gray-500 hover:text-gray-800 transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
           )}
         </div>
 
         {profileError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2">
-            <AlertCircle size={14} className="shrink-0 text-red-500" />
+          <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-1.5">
+            <AlertCircle size={13} className="shrink-0 text-red-500" />
             <span>{profileError}</span>
           </div>
         )}
 
-        {/* View Mode (Clean, formatted display) */}
+        {/* View Mode (Clean, native list rows with dividers) */}
         {!isEditingProfile ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-3.5 bg-gray-50/70 rounded-2xl border border-gray-100">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Full Name</span>
-              <p className="text-sm font-bold text-gray-900">{profile.name || 'Not provided'}</p>
+          <div className="divide-y divide-gray-100 text-xs">
+            {/* Full Name */}
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-gray-500 font-medium flex items-center gap-2">
+                <User size={13} className="text-gray-400" />
+                <span>Full Name</span>
+              </span>
+              <span className="font-bold text-gray-900">{profile.name || 'Not provided'}</span>
             </div>
 
-            <div className="p-3.5 bg-gray-50/70 rounded-2xl border border-gray-100">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Email Address</span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                  <CheckCircle2 size={10} /> Verified
+            {/* Email Address */}
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-gray-500 font-medium flex items-center gap-2">
+                <Mail size={13} className="text-gray-400" />
+                <span>Email Address</span>
+              </span>
+              <div className="flex items-center gap-1.5 text-right">
+                <span className="font-bold text-gray-900 truncate max-w-[170px]">{profile.email}</span>
+                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-full font-bold shrink-0">
+                  ✓
                 </span>
               </div>
-              <p className="text-sm font-bold text-gray-900">{profile.email}</p>
             </div>
 
-            <div className="p-3.5 bg-gray-50/70 rounded-2xl border border-gray-100">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Mobile Number</span>
-              <p className="text-sm font-bold text-gray-900 font-mono">{profile.phone || '+91 98765 43210'}</p>
+            {/* Mobile Number */}
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-gray-500 font-medium flex items-center gap-2">
+                <Phone size={13} className="text-gray-400" />
+                <span>Mobile Number</span>
+              </span>
+              <span className="font-bold text-gray-900 font-mono">{profile.phone || '+91 98765 43210'}</span>
             </div>
 
-            <div className="p-3.5 bg-gray-50/70 rounded-2xl border border-gray-100">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Gender</span>
-              <p className="text-sm font-bold text-gray-900 capitalize">{profile.gender || 'Not specified'}</p>
+            {/* Gender */}
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-gray-500 font-medium">Gender</span>
+              <span className="font-bold text-gray-900 capitalize">{profile.gender || 'Not specified'}</span>
             </div>
 
-            <div className="p-3.5 bg-gray-50/70 rounded-2xl border border-gray-100 md:col-span-2">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Date of Birth</span>
-              <p className="text-sm font-bold text-gray-900">
-                {profile.dob ? new Date(profile.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not provided'}
-              </p>
+            {/* Date of Birth */}
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-gray-500 font-medium flex items-center gap-2">
+                <Calendar size={13} className="text-gray-400" />
+                <span>Date of Birth</span>
+              </span>
+              <span className="font-bold text-gray-900">
+                {profile.dob ? new Date(profile.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not provided'}
+              </span>
             </div>
           </div>
         ) : (
-          /* Edit Mode (Interactive inputs) */
-          <form onSubmit={handleSaveProfile} className="space-y-4 text-xs animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Full Name */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <User size={13} className="text-gray-400" />
-                  <span>Full Name</span>
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  placeholder="Enter your full name"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
-                />
-              </div>
+          /* Edit Mode (Clean, uniform input form) */
+          <form onSubmit={handleSaveProfile} className="space-y-3 text-xs pt-1 animate-in fade-in duration-200">
+            {/* Full Name */}
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Full Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
+              />
+            </div>
 
-              {/* Email Address (Read Only) */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <Mail size={13} className="text-gray-400" />
-                  <span>Email Address</span>
-                  <span className="text-[10px] text-emerald-600 font-bold ml-auto flex items-center gap-0.5">
-                    <CheckCircle2 size={10} /> Verified
-                  </span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  disabled
-                  className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 cursor-not-allowed"
-                />
-              </div>
+            {/* Email Address */}
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Email Address (Registered)</label>
+              <input
+                type="email"
+                value={email}
+                disabled
+                className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-semibold text-gray-500 cursor-not-allowed"
+              />
+            </div>
 
-              {/* Mobile Number */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <Phone size={13} className="text-gray-400" />
-                  <span>Mobile Number</span>
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
-                />
-              </div>
+            {/* Mobile Number */}
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Mobile Number</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
+              />
+            </div>
 
-              {/* Gender Selector */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700">Gender</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Male', 'Female', 'Other'].map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGender(g)}
-                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                        gender.toLowerCase() === g.toLowerCase()
-                          ? 'bg-[#0F2C59] text-white border-[#0F2C59]'
-                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Date of Birth */}
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <Calendar size={13} className="text-gray-400" />
-                  <span>Date of Birth</span>
-                </label>
-                <input
-                  type="date"
-                  value={dob ? dob.slice(0, 10) : ''}
-                  onChange={(e) => setDob(e.target.value)}
-                  className="w-full sm:w-64 px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
-                />
+            {/* Gender Toggle */}
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Gender</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['Male', 'Female', 'Other'].map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGender(g)}
+                    className={`py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      gender.toLowerCase() === g.toLowerCase()
+                        ? 'bg-[#0F2C59] text-white border-[#0F2C59]'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Save / Cancel Action Bar */}
-            <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+            {/* Date of Birth */}
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Date of Birth</label>
+              <input
+                type="date"
+                value={dob ? dob.slice(0, 10) : ''}
+                onChange={(e) => setDob(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 disabled={isSavingProfile}
-                className="px-5 py-2.5 bg-[#0F2C59] hover:bg-[#1A3D73] text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-60"
+                className="flex-1 py-2.5 bg-[#0F2C59] hover:bg-[#1A3D73] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
               >
-                {isSavingProfile && <Loader2 size={13} className="animate-spin" />}
-                <span>{isSavingProfile ? 'Saving Changes...' : 'Save Changes'}</span>
+                {isSavingProfile && <Loader2 size={12} className="animate-spin" />}
+                <span>{isSavingProfile ? 'Saving...' : 'Save Changes'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleCancelProfile}
                 disabled={isSavingProfile}
-                className="px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -498,29 +466,29 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
         )}
       </div>
 
-      {/* 4. Login & Security Card (Default View Mode with Change Password Toggle) */}
-      <div className="bg-white border border-brand-border/80 rounded-3xl p-6 shadow-premium space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      {/* 4. Login & Security (Uniform Settings List Layout) */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-xs space-y-3">
+        {/* Section Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <div>
-            <h3 className="font-bold text-base text-gray-900 font-heading">Login &amp; Security</h3>
-            <p className="text-xs text-gray-500">Manage account authentication for {profile.email}</p>
+            <h3 className="font-bold text-xs uppercase tracking-wider text-gray-500">Security</h3>
           </div>
 
           {!isEditingPassword ? (
             <button
               type="button"
               onClick={() => setIsEditingPassword(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition-all cursor-pointer border border-gray-200/80"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-xs font-bold transition-all cursor-pointer border border-gray-200/60"
             >
-              <Lock size={12} />
-              <span>Change Password</span>
+              <Lock size={11} />
+              <span>Change</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handleCancelPassword}
               disabled={isSavingPassword}
-              className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 rounded-xl transition-all cursor-pointer"
+              className="px-2 py-1 text-xs font-bold text-gray-500 hover:text-gray-800 transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -528,61 +496,56 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
         </div>
 
         {passwordSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2 animate-in fade-in duration-200">
-            <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-1.5 animate-in fade-in duration-200">
+            <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
             <span>{passwordSuccess}</span>
           </div>
         )}
 
         {passwordError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2 animate-in fade-in duration-200">
-            <AlertCircle size={14} className="text-red-500 shrink-0" />
+          <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-1.5 animate-in fade-in duration-200">
+            <AlertCircle size={13} className="text-red-500 shrink-0" />
             <span>{passwordError}</span>
           </div>
         )}
 
-        {/* View Mode (Masked password display) */}
+        {/* View Mode (Clean single row) */}
         {!isEditingPassword ? (
-          <div className="p-4 bg-gray-50/70 rounded-2xl border border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gray-200/80 text-gray-700 flex items-center justify-center shrink-0">
-                <ShieldCheck size={18} />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Account Password</span>
-                <span className="text-sm font-mono tracking-widest text-gray-700 font-black">••••••••••••</span>
-              </div>
-            </div>
-            <span className="text-[11px] text-gray-400 hidden sm:inline">Encrypted &amp; Secured</span>
+          <div className="py-2 flex items-center justify-between text-xs">
+            <span className="text-gray-500 font-medium flex items-center gap-2">
+              <Lock size={13} className="text-gray-400" />
+              <span>Account Password</span>
+            </span>
+            <span className="text-xs font-mono tracking-widest text-gray-600 font-black">••••••••••••</span>
           </div>
         ) : (
-          /* Edit Mode (Password Change Form) */
-          <form onSubmit={handleSavePassword} className="space-y-3.5 text-xs animate-in fade-in duration-200">
+          /* Edit Mode (Uniform Password Change Form) */
+          <form onSubmit={handleSavePassword} className="space-y-3 text-xs pt-1 animate-in fade-in duration-200">
             {/* Current Password */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Current Password</label>
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Current Password</label>
               <div className="relative">
                 <input
                   type={showCurrentPass ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
-                  placeholder="Enter your current password"
-                  className="w-full px-3.5 py-2.5 pr-10 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
+                  placeholder="Enter current password"
+                  className="w-full px-3 py-2 pr-9 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPass(!showCurrentPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
                 >
-                  {showCurrentPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showCurrentPass ? <EyeOff size={13} /> : <Eye size={13} />}
                 </button>
               </div>
             </div>
 
             {/* New Password */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">New Password (minimum 6 characters)</label>
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">New Password (min 6 chars)</label>
               <div className="relative">
                 <input
                   type={showNewPass ? 'text' : 'password'}
@@ -590,22 +553,22 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   minLength={6}
-                  placeholder="Enter new strong password"
-                  className="w-full px-3.5 py-2.5 pr-10 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
+                  placeholder="Enter new password"
+                  className="w-full px-3 py-2 pr-9 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPass(!showNewPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
                 >
-                  {showNewPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showNewPass ? <EyeOff size={13} /> : <Eye size={13} />}
                 </button>
               </div>
             </div>
 
             {/* Confirm New Password */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Confirm New Password</label>
+            <div>
+              <label className="block text-gray-500 font-semibold mb-1">Confirm New Password</label>
               <div className="relative">
                 <input
                   type={showConfirmPass ? 'text' : 'password'}
@@ -614,33 +577,33 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
                   required
                   minLength={6}
                   placeholder="Confirm new password"
-                  className="w-full px-3.5 py-2.5 pr-10 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
+                  className="w-full px-3 py-2 pr-9 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/15"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPass(!showConfirmPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
                 >
-                  {showConfirmPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showConfirmPass ? <EyeOff size={13} /> : <Eye size={13} />}
                 </button>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-2">
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 disabled={isSavingPassword || !currentPassword || !newPassword || !confirmPassword}
-                className="px-5 py-2.5 bg-[#0F2C59] hover:bg-[#1A3D73] text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                className="flex-1 py-2.5 bg-[#0F2C59] hover:bg-[#1A3D73] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                {isSavingPassword && <Loader2 size={13} className="animate-spin" />}
-                <span>{isSavingPassword ? 'Updating Password...' : 'Update Password'}</span>
+                {isSavingPassword && <Loader2 size={12} className="animate-spin" />}
+                <span>{isSavingPassword ? 'Updating...' : 'Update Password'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleCancelPassword}
                 disabled={isSavingPassword}
-                className="px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -649,14 +612,14 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({ onNavi
         )}
       </div>
 
-      {/* 5. Minimal Account Actions (Logout) */}
-      <div className="pt-2 text-center sm:text-left">
+      {/* 5. Account Actions (Full-Width, Uniform Proportional Logout Button) */}
+      <div className="pt-1">
         <button
           onClick={logout}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200/80 transition-all cursor-pointer"
+          className="w-full py-3 px-4 bg-red-50 hover:bg-red-100/80 active:scale-[0.99] text-red-600 rounded-2xl border border-red-200/60 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer"
         >
           <LogOut size={14} />
-          <span>Log out from this device</span>
+          <span>Log out from ShopIndia</span>
         </button>
       </div>
     </div>
