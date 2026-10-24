@@ -2,8 +2,8 @@
 ## Project Changelog, Architectural Summary & Next-Steps Resume Guide
 
 **File Location:** `PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`  
-**Date of Record:** October 23, 2026 (Updated: 10:30 PM IST — End of Day Master Log)  
-**Status:** All 7 Master Phases + Dispatch & Telemetry + Invoice & Fee Transparency Overhaul Complete. Deployed on AWS EC2 & Vercel (0 TypeScript Errors, Production Bundle Verified).
+**Date of Record:** October 24, 2026 (Updated: 11:50 AM IST)  
+**Status:** Razorpay Test Gateway Keys (`rzp_test_TrcIdNBK1BkfF0`) Deployed across Checkout, Rider Doorstep Handover, and Remittances. Dummy QR Removed. Deployed on AWS EC2 & Vercel (0 TypeScript Errors, Production Bundle Verified).
 
 ---
 
@@ -260,7 +260,7 @@ npm run dev
   - `https://api.codetechawsurl1.shop/api/health`
 - **Live Production Frontend:**
   - `https://shopindia-three.vercel.app`
-- **Latest Production Commit:** `aadb595` (`fix(invoice): fix GST equality and fee itemization; feat(tracking): activate customer live tracking strictly post-pickup with direct rider-to-doorstep routing`)
+- **Latest Production Commit:** `fe566ca` (`feat(payments): integrate official Razorpay gateway keys across checkout, orders, and rider doorstep handover; remove dummy QR and mock payments`)
 
 ---
 
