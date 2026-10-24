@@ -604,20 +604,25 @@ export const PricingSettingsPage: React.FC = () => {
           </div>
 
           {/* Controls Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1 font-sans">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 font-sans">
             {/* Control 1: Service Commission Pct */}
-            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
-              <label className="block text-xs font-bold text-gray-800">
-                Service Commission Rate (%)
-              </label>
+            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-gray-800">
+                  Service Commission Rate (%)
+                </label>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md">
+                  Labor Cut
+                </span>
+              </div>
               <input
                 type="number"
                 step="0.1"
                 min="0"
                 max="75"
-                value={settings.service_commission_pct || '15'}
+                value={settings.service_commission_pct ?? '15'}
                 onChange={e => setSettings({ ...settings, service_commission_pct: e.target.value })}
-                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-indigo-600 bg-white"
+                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-indigo-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
               <span className="text-[11px] text-gray-500 block leading-tight">
                 Platform commission percentage deducted from service labor rate card.
@@ -626,14 +631,19 @@ export const PricingSettingsPage: React.FC = () => {
 
             {/* Control 2: Visit Charge */}
             <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
-              <label className="block text-xs font-bold text-gray-800">
-                Standard Doorstep Visit Charge (₹)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-gray-800">
+                  Standard Doorstep Visit Charge (₹)
+                </label>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md">
+                  Customer Pays
+                </span>
+              </div>
               <input
                 type="number"
-                value={settings.service_visit_charge}
+                value={settings.service_visit_charge ?? '199'}
                 onChange={e => setSettings({ ...settings, service_visit_charge: e.target.value })}
-                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold bg-white"
+                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
               <span className="text-[11px] text-gray-500 block leading-tight">
                 Diagnostic / inspection call-out fee charged to customer at checkout.
@@ -642,36 +652,90 @@ export const PricingSettingsPage: React.FC = () => {
 
             {/* Control 3: Technician Pay */}
             <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
-              <label className="block text-xs font-bold text-gray-800">
-                Technician Guaranteed Pay (₹)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-gray-800">
+                  Technician Guaranteed Pay (₹)
+                </label>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">
+                  Tech Receives
+                </span>
+              </div>
               <input
                 type="number"
-                value={settings.service_technician_min_pay}
+                value={settings.service_technician_min_pay ?? '149'}
                 onChange={e => setSettings({ ...settings, service_technician_min_pay: e.target.value })}
-                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700 bg-white"
+                className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
               <span className="text-[11px] text-gray-500 block leading-tight">
                 Guaranteed earning credited to technician on completed inspection.
               </span>
             </div>
-
-            {/* KPI 4: HQ Visit Margin */}
-            <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-bold text-emerald-900 block">HQ Visit Margin Retained</span>
-                <span className="text-[11px] text-emerald-700/80 block mt-0.5">Retained by Super Admin per visit</span>
-              </div>
-              <div className="my-2">
-                <span className="text-2xl font-black font-numbers text-emerald-700">
-                  +₹{Math.max(0, (parseFloat(settings.service_visit_charge || '199') - parseFloat(settings.service_technician_min_pay || '149')))}
-                </span>
-              </div>
-              <span className="text-[10px] text-emerald-600 font-medium">
-                Customer (₹{settings.service_visit_charge || 199}) - Tech (₹{settings.service_technician_min_pay || 149})
-              </span>
-            </div>
           </div>
+
+          {/* Dynamic Real-Time Revenue Breakdown Card (Updates LIVE as you type!) */}
+          {(() => {
+            const commRate = parseFloat(settings.service_commission_pct || '15') || 0;
+            const visitCharge = parseFloat(settings.service_visit_charge || '199') || 0;
+            const techPay = parseFloat(settings.service_technician_min_pay || '149') || 0;
+            const visitMargin = visitCharge - techPay;
+            const sampleLabor = 500;
+            const laborCommission = Math.round(sampleLabor * (commRate / 100));
+            const totalAdminProfit = laborCommission + visitMargin;
+            const techTotalPayout = (sampleLabor - laborCommission) + techPay;
+
+            return (
+              <div className="p-5 rounded-2xl border border-emerald-300 bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-indigo-50/50 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/60 pb-3">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5 font-heading">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      <span>Live Revenue Calculation (Example: ₹{sampleLabor} AC Repair Job)</span>
+                    </span>
+                    <span className="text-[11px] text-gray-600 block mt-0.5">
+                      This updates dynamically in real-time as you edit the percentage or visit charges above.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-gray-500">Customer Total Paid:</span>
+                    <span className="text-sm font-black font-numbers text-gray-900 bg-white px-2.5 py-1 rounded-lg border border-gray-200">
+                      ₹{sampleLabor + visitCharge}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  {/* Item 1: Commission Cut */}
+                  <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm space-y-1">
+                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">1. Labor Commission ({commRate}%)</span>
+                    <span className="text-lg font-black font-numbers text-indigo-900 block">+₹{laborCommission}</span>
+                    <span className="text-[10px] text-gray-400 block">{commRate}% cut on ₹{sampleLabor} labor</span>
+                  </div>
+
+                  {/* Item 2: Visit Margin */}
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm space-y-1">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">2. Visit Margin Difference</span>
+                    <span className="text-lg font-black font-numbers text-amber-900 block">{visitMargin >= 0 ? `+₹${visitMargin}` : `-₹${Math.abs(visitMargin)}`}</span>
+                    <span className="text-[10px] text-gray-400 block">₹{visitCharge} visit - ₹{techPay} tech pay</span>
+                  </div>
+
+                  {/* Item 3: Total Super Admin Profit */}
+                  <div className="bg-emerald-600 text-white p-3 rounded-xl shadow-md space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 block">Total Super Admin Profit</span>
+                    <span className="text-xl font-black font-numbers block">₹{totalAdminProfit}</span>
+                    <span className="text-[10px] text-emerald-200 block">₹{laborCommission} comm + ₹{visitMargin} visit margin</span>
+                  </div>
+
+                  {/* Item 4: Technician Receives */}
+                  <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-sm space-y-1">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Technician Receives (Total)</span>
+                    <span className="text-lg font-black font-numbers text-emerald-900 block">₹{techTotalPayout}</span>
+                    <span className="text-[10px] text-gray-400 block">₹{sampleLabor - laborCommission} labor + ₹{techPay} visit</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Visual Step-by-Step Flow Pipeline */}
           <div className="space-y-3 pt-2">

@@ -391,6 +391,38 @@ router.post('/settings', async (req, res) => {
       );
     }
 
+    // Automatically keep PricingRule for vertical 'services' synchronized
+    if (settings.service_commission_pct != null) {
+      const commPct = parseFloat(settings.service_commission_pct);
+      if (!isNaN(commPct) && commPct >= 0) {
+        const existingServicesRule = await prisma.pricingRule.findFirst({
+          where: { scope: 'vertical', vertical: 'services' }
+        });
+
+        if (existingServicesRule) {
+          await prisma.pricingRule.update({
+            where: { id: existingServicesRule.id },
+            data: {
+              commissionPct: commPct,
+              description: 'Doorstep Services & Repairs Commission',
+              isActive: true
+            }
+          });
+        } else {
+          await prisma.pricingRule.create({
+            data: {
+              scope: 'vertical',
+              vertical: 'services',
+              commissionPct: commPct,
+              includeGateway: true,
+              description: 'Doorstep Services & Repairs Commission',
+              isActive: true
+            }
+          });
+        }
+      }
+    }
+
     if (updates.length > 0) {
       await prisma.$transaction(updates);
     }
