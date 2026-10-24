@@ -2,8 +2,8 @@
 ## Project Changelog, Architectural Summary & Next-Steps Resume Guide
 
 **File Location:** `PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`  
-**Date of Record:** October 24, 2026 (Updated: 11:50 AM IST)  
-**Status:** Razorpay Test Gateway Keys (`rzp_test_TrcIdNBK1BkfF0`) Deployed across Checkout, Rider Doorstep Handover, and Remittances. Dummy QR Removed. Deployed on AWS EC2 & Vercel (0 TypeScript Errors, Production Bundle Verified).
+**Date of Record:** October 25, 2026 (Updated: 01:15 AM IST)  
+**Status:** Full Multi-Channel Dispatch, Rapido 2-Leg Route Breakdown, Services & Repairs Catalog with Doorstep Visit Charge & Technician Guaranteed Pay, Vendor Rider Contact Cards, and Rider COD Remittance Deployed. Pushed to `main` (Commits: `0fb24c7`, `4d16b54`). Live on AWS EC2 (`pm2 status online`) & Vercel. 0 TypeScript Errors.
 
 ---
 
@@ -322,6 +322,116 @@ When you resume in the morning, here are the ready next steps:
 4. **Regional Admin & Super Admin Intelligence:**
    - **Regional Admin (`/regional-admin`):** Added `Unserved Service Demand Leads` table widget on `RegionalDashboard.tsx` scoped to assigned pincodes.
    - **Super Admin (`/admin/service-areas`):** Added tabs for *"Active Service Zones"* and *"Unserved Locality Demand Leads"* with customer contact, service requested, and timestamp.
+
+---
+
+## 10. Multi-Channel Dispatch, Services & Repairs Catalog, Dynamic Routing & COD Remittance Architecture (October 24–25, 2026 Session)
+
+### 10.1 Overview of Implemented Systems
+
+During this session, six major operational pillars were implemented, unified across all five panels (Customer, Vendor, Rider, Regional Admin, Super Admin), and deployed live to AWS EC2 & Vercel:
+
+1. **Dedicated Services & Repairs Catalog (`ServicesManagementPage.tsx`):**
+   - **Separation of Concerns:** Physical products and doorstep repair services were decoupled in the Super Admin panel.
+   - **Doorstep Rate Architecture:**
+     - **Standard Doorstep Visit Charge (₹)** (`basePrice`): Customer-facing fee billed at booking.
+     - **Technician Guaranteed Pay (₹)** (`vendorPrice`): Guaranteed amount credited to the technician partner wallet upon customer 4-digit OTP completion.
+     - **Platform Net Margin (₹ / %)**: Calculated in real-time as `Doorstep Visit Charge - Technician Guaranteed Pay`.
+     - **MRP / Strike Price (₹)**: Reference crossed-out rate for customer discount optics.
+     - **Live Economics Preview:** Interactive calculation card inside the Add/Edit modal alerting the administrator to negative margins before publishing.
+   - **Time Slot & Duration Controls:** Configurable duration estimates (e.g., `45 mins`, `60 mins`, `2 hours`) and interactive multi-select appointment time slots (`08:00 - 10:00 AM`, `10:00 - 12:00 PM`, etc.).
+   - **Backend Price Integrity (`server/routes/admin/products.js`):** Updated `POST /api/admin/products` and `PUT /api/admin/products/:id` so that when both `basePrice` and `vendorPrice` are explicitly supplied by an administrator, both are preserved in PostgreSQL RDS without automated markup overrides.
+   - **Navigation:** Added to `AdminSidebar.tsx` and wired under `case 'services'` in `AdminPortal.tsx`.
+
+2. **Physical Products Catalog Optimization & Demand Badges (`ProductsPage.tsx`):**
+   - Restricted strictly to physical goods (`vertical=products`).
+   - **Sales Velocity Demand Badges:** Automatically calculated from order volume:
+     - 🔥 **High Demand** (≥ 15 orders): Green/orange highlight.
+     - ⚡ **Steady Demand** (5–14 orders): Electric blue highlight.
+     - 💤 **Low Demand** (< 5 orders): Slate highlight for slow inventory.
+   - **Fulfillment Filters:** Filter catalog by All, ⚡ Quick Commerce (10-30 min), or 📦 Traditional (Pan-India 3PL).
+
+3. **Rider Radar Dispatch Modal UX & Timer Fix (`IncomingRadarModal.tsx` & `RiderContext.tsx`):**
+   - **Countdown Reset Bug Fixed:** The 30-second timer was previously resetting back to 30 every 6 seconds due to polling state object churn in `RiderContext.tsx`. Resolved by maintaining referential equality (`if (candidate && prev?.id === candidate.id) return prev;`) and locking the countdown strictly to `incomingBroadcast.id`.
+   - **Rapido/Swiggy 2-Leg Route Breakdown:**
+     - **Leg 1 (Pickup):** Rider Current GPS ➔ Merchant Store (pickup distance in km + est. time in mins).
+     - **Leg 2 (Dropoff):** Merchant Store ➔ Customer Doorstep (drop distance in km + est. time in mins).
+     - **Total Trip:** Combined distance & estimated trip duration.
+   - **Dynamic Haversine Calculation (`server/routes/vendor/orders.js`):** Replaced hardcoded `4.2 km` with dynamic Haversine formula between merchant store coordinates `[lat, lng]` and customer doorstep coordinates `[deliveryLat, deliveryLng]`.
+   - **Package Items Chip Overview:** Riders see package item counts and item labels (`📦 3 Items: Milk, Bread, etc.`) directly on the incoming modal before accepting.
+
+4. **Prominent Rider COD Float & Remittance ("Pay to Admin"):**
+   - **Header & Dashboard Visibility:** High-visibility COD cash-in-hand float card added to `RiderDashboard.tsx` and top bar `RiderHeader.tsx` (`COD Cash: ₹X [PAY]`).
+   - **Direct Clearance Actions:**
+     - `[Pay Online via UPI / Razorpay]`: Instant online clearance.
+     - `[Handover to Regional Hub OTP]`: Generates verified 4-digit OTP for physical handover to regional administrator.
+   - **Razorpay SDK Unification (`server/lib/razorpay.js`):** Created flexible `createRazorpayOrder` supporting both object options `{ amount, currency, receipt, notes }` (in INR Rupees) and positional arguments `(amountInPaise, receipt, notes)`, fixing previous `TypeError` on remittance creation.
+
+5. **Vendor Direct Rider Visibility (`VendorOrders.tsx`):**
+   - When an order is assigned or in delivery, vendor order cards now display the assigned delivery rider's Name, clickable Phone (`tel:...`), Vehicle Type badge, and direct `Track GPS` button.
+   - Backend updated to include full rider profile relations (`delivery: { include: { riderProfile: { include: { user: true } } } }`).
+
+6. **Admin Fleet Governance (`RidersPage.tsx` & `server/routes/admin/riders.js`):**
+   - Added columns for **Operating City & Hub**, **Partner Specialization** (`Delivery`, `Service Technician`, `Both`), and **COD Float Held** with warning badges when exceeding limits.
+   - Added dropdown filters for **City** and **Partner Specialization Role**.
+
+---
+
+### 10.2 Session File Modification Summary
+
+| File Path | Scope | Changes Made |
+|---|---|---|
+| `src/admin/pages/ServicesManagementPage.tsx` | Frontend (**Created**) | Dedicated Services & Repairs catalog; doorstep visit charge, technician guaranteed pay, live economics card, slot chips, category filters. |
+| `src/admin/AdminSidebar.tsx` | Frontend | Added `Services & Repairs` navigation item with `Wrench` icon. |
+| `src/admin/AdminPortal.tsx` | Frontend | Wired `case 'services': return <ServicesManagementPage />;`. |
+| `src/admin/pages/ProductsPage.tsx` | Frontend | Restricted to physical goods; added sales velocity Demand Badges (🔥 High, ⚡ Steady, 💤 Low); fulfillment filter. |
+| `src/admin/pages/RidersPage.tsx` | Frontend | Added Operating City & Hub, Partner Specialization, COD Float Held with limit warnings, and city/role filters. |
+| `src/rider/context/RiderContext.tsx` | Frontend | Fixed polling object reference churn; added pickup/dropoff coordinates to `BroadcastDelivery`. |
+| `src/rider/components/IncomingRadarModal.tsx` | Frontend | Timer countdown locked to broadcast ID; Rapido 2-leg route breakdown; package item chips overview. |
+| `src/rider/components/RiderHeader.tsx` | Frontend | Added prominent glowing `COD Cash: ₹X [PAY]` pill with direct navigation. |
+| `src/rider/pages/RiderDashboard.tsx` | Frontend | Added high-visibility COD Cash float in hand widget with one-tap Razorpay & Hub OTP buttons. |
+| `src/vendor/pages/VendorOrders.tsx` | Frontend | Added assigned rider contact card (Name, clickable Phone, Vehicle, Track GPS) on order rows. |
+| `server/routes/admin/products.js` | Backend | Added `vertical=services` query filter; preserved explicit `basePrice` and `vendorPrice`; auto-assigned platform vendor. |
+| `server/routes/admin/riders.js` | Backend | Included `branch` and `riderProfile.branch` in fleet query. |
+| `server/routes/vendor/orders.js` | Backend | Dynamic Haversine distance replacing hardcoded `4.2 km`; included rider user contact relations in orders list. |
+| `server/lib/razorpay.js` | Backend | Exported flexible `createRazorpayOrder` supporting object options for COD cash float remittances. |
+
+---
+
+### 10.3 Verification & Deployment Record
+
+- **TypeScript Compilation:** Passed with 0 errors (`npm run build`).
+- **Vite Bundle:** Successfully generated (`dist/assets/index-n2ctnKe9.js`).
+- **Git Commits on `main`:**
+  - `0fb24c7`: *feat: complete services & repairs catalog with doorstep visit charge and technician guaranteed pay, wire admin portal, fix rider countdown loop, 2-leg route breakdown, and prominent COD remittance*
+  - `4d16b54`: *fix: export createRazorpayOrder in razorpay.js for rider and regional admin COD remittance*
+- **AWS EC2 Production Server:**
+  - IP: `18.61.145.65` (User: `ubuntu`)
+  - PM2 Process: `shopindia-api` restarted (Process ID: 0, status: `online`).
+  - API Health Check: `http://localhost:5001/api/health` returned `{"status":"ok","engine":"PostgreSQL/RDS"}`.
+
+---
+
+## 11. Quick-Start Guide to Resume Tomorrow
+
+When resuming work tomorrow, follow these quick check steps:
+
+1. **Local Development:**
+   ```bash
+   cd "d:\Company Projects\SHOP INDIA\shopindia"
+   npm run dev
+   ```
+2. **Check AWS EC2 Backend Status:**
+   ```bash
+   ssh -i "ec2-key.pem" ubuntu@18.61.145.65 "pm2 status"
+   ```
+3. **Super Admin URLs to Test:**
+   - `/admin` ➔ Click **Services & Repairs** on the sidebar to view the Doorstep Visit Charges, Technician Guaranteed Pays, and Net Margins.
+   - `/admin` ➔ Click **Products Catalog** to view physical products with 🔥 High / ⚡ Steady / 💤 Low Demand Badges.
+   - `/admin` ➔ Click **Riders & Fleets** to view Operating City, Partner Roles, and COD Floats.
+4. **Rider Portal to Test:**
+   - `/rider` ➔ Observe the COD Cash pill in header and prominent Pay Online / Hub Handover cards on the dashboard.
+   - Broadcast an order from `/vendor` and observe the Rapido 2-leg route card on `/rider` with non-resetting 30s countdown.
 
 ---
 
