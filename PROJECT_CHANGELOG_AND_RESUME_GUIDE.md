@@ -75,7 +75,11 @@ This document provides a comprehensive, centralized record of the multi-panel di
 | `server/routes/tracking.js` | Created | Real-time order tracking (`GET /api/tracking/order/:orderId`) and backend reverse-geocode service (`GET /api/tracking/reverse-geocode`). |
 | `server/lib/shiprocket.js` | Created | Master Shiprocket client with token caching, pickup registration, label generation, and AWB tracking. |
 | `server/routes/shiprocket/shipments.js` | Created | Shipment generation, courier tracking, and webhook listener. |
-| `server/routes/admin/regionalAdmins.js` | Created | Super Admin API to list, approve, suspend, or reject regional admin applications. |
+| `server/routes/payments.js` | **Modified** | Added `POST /api/payments/create-intent` for atomic pre-order payment intent creation without premature DB order booking. |
+| `server/routes/orders.js` | **Modified** | Enforced COD restriction on `shop` vertical; atomically verified Razorpay HMAC SHA-256 signatures before creating paid orders; saved customer GPS coordinates; fixed `channel: 'IN_APP'`. |
+| `server/routes/customer/addresses.js` | **Modified** | Added `latitude` and `longitude` coordinate fields to customer address CRUD operations. |
+| `server/routes/vendor/orders.js` | **Modified** | Dispatches deliveries with exact customer GPS coordinates (`deliveryLat`/`deliveryLng`) instead of estimated offset. |
+| `server/prisma/schema.prisma` | **Modified** | Added `latitude Float?` & `longitude Float?` to `Address`, and `deliveryLat Float?` & `deliveryLng Float?` to `Order`. |
 | `server/index.js` | Modified | Centrally mounted all Rider, Regional Admin, Shiprocket, and Admin Regional routes. |
 
 ---
