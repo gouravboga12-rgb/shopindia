@@ -5,11 +5,13 @@ import { Power, Wallet, ShieldCheck, AlertCircle, LogOut } from 'lucide-react';
 
 interface RiderHeaderProps {
   onLogout?: () => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
-export const RiderHeader: React.FC<RiderHeaderProps> = () => {
+export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => {
   const { profile, isOnline, toggleOnline } = useRider();
   const { user, logout } = useAuth();
+  const cashInHand = profile?.codCashFloat ?? 0;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 border-b border-slate-200/80 text-slate-800 shadow-xs backdrop-blur-md">
@@ -48,6 +50,24 @@ export const RiderHeader: React.FC<RiderHeaderProps> = () => {
 
         {/* Center / Right: Online Status Toggle & Wallet */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* COD Cash in Hand (if holding customer cash) */}
+          {cashInHand > 0 && (
+            <button
+              type="button"
+              onClick={() => onNavigateToTab?.('wallet')}
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                cashInHand >= (profile?.codFloatLimit || 3000)
+                  ? 'bg-red-50 text-red-700 border-red-300 animate-pulse'
+                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+              }`}
+              title="Click to remit customer cash to Admin"
+            >
+              <span className="text-[10px] uppercase font-bold text-amber-600 hidden md:inline">COD Cash:</span>
+              <span>₹{cashInHand.toLocaleString('en-IN')}</span>
+              <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.2 rounded font-bold">PAY</span>
+            </button>
+          )}
+
           {/* Wallet Balance Pill */}
           <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-emerald-200/80 shadow-2xs">
             <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />

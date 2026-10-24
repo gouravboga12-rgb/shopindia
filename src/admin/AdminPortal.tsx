@@ -26,6 +26,7 @@ import { FleetPayoutsPage } from './pages/FleetPayoutsPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { AccountStatementPage } from './pages/AccountStatementPage';
 import { CODSettingsPage } from './pages/CODSettingsPage';
+import { ServicesManagementPage } from './pages/ServicesManagementPage';
 
 export interface ManagedVendor { id: string; name: string; }
 
@@ -73,6 +74,7 @@ const AdminContent: React.FC = () => {
       case 'vendors': return <VendorsPage onManage={setManagedVendor} />;
       case 'users': return <UsersPage />;
       case 'products': return <ProductsPage />;
+      case 'services': return <ServicesManagementPage />;
       case 'orders': return <OrdersPage />;
       case 'branches': return <BranchesPage />;
       case 'rbac': return <RBACPage />;

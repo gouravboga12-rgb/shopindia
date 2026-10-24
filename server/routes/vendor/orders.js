@@ -25,6 +25,16 @@ router.get('/', async (req, res) => {
         include: {
           customer: { select: { id: true, name: true, email: true, phone: true } },
           vendor: { select: { id: true, businessName: true, phone: true, email: true, street: true, city: true, state: true, pincode: true, gstNumber: true } },
+          delivery: {
+            include: {
+              riderProfile: {
+                include: {
+                  user: { select: { id: true, name: true, phone: true } },
+                },
+              },
+            },
+          },
+          shiprocketShipment: true,
           items: {
             include: {
               product: {
@@ -285,6 +295,22 @@ router.post('/:id/broadcast', async (req, res) => {
       .filter(p => typeof p === 'string' && p.trim() && p.trim() !== ',')
       .join(', ') || 'Vendor Store, Hyderabad';
 
+    // Calculate accurate dynamic distance between store and customer doorstep
+    let calculatedDist = 3.5;
+    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+      const R = 6371;
+      const dLat = ((dropoffLat - pickupLat) * Math.PI) / 180;
+      const dLon = ((dropoffLng - pickupLng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((pickupLat * Math.PI) / 180) *
+          Math.cos((dropoffLat * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      calculatedDist = Math.max(0.5, Math.round(R * c * 10) / 10);
+    }
+
     // Calculate delivery fee (base ₹50 + ₹10/km or fixed ₹60)
     const deliveryFee = 60;
 
@@ -294,7 +320,7 @@ router.post('/:id/broadcast', async (req, res) => {
         orderId: order.id,
         status: 'broadcasted',
         deliveryFee,
-        distanceKm: 4.2,
+        distanceKm: calculatedDist,
         deliveryOtp: otp,
         pickupName: order.vendor.businessName || 'Merchant Store',
         pickupAddress,
@@ -311,6 +337,7 @@ router.post('/:id/broadcast', async (req, res) => {
         status: 'broadcasted',
         riderProfileId: null,
         deliveryOtp: otp,
+        distanceKm: calculatedDist,
         assignedAt: null,
         pickupLat,
         pickupLng,

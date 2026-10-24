@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
   Building2, ShieldCheck, MapPin, Headphones, Percent, LogOut,
   Truck, Tag, BarChart3, Bell, LayoutGrid, Image, Globe2,
-  DollarSign, CreditCard, Bike, Banknote
+  DollarSign, CreditCard, Bike, Banknote, Wrench
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +28,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'riders', label: 'Riders Operations', icon: Truck, perm: 'view_users' },
     { id: 'users', label: 'Users & Roles', icon: Users, perm: 'view_users' },
     { id: 'products', label: 'Products Catalog', icon: Package, perm: 'view_products' },
+    { id: 'services', label: 'Services & Repairs', icon: Wrench, perm: 'view_products' },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, perm: 'view_orders' },
     { id: 'branches', label: 'Branches', icon: Building2, perm: 'view_branches' },
     { id: 'rbac', label: 'RBAC Controls', icon: ShieldCheck, perm: 'manage_users' },

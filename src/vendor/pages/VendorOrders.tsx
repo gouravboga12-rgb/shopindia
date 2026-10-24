@@ -389,20 +389,58 @@ export const VendorOrders: React.FC = () => {
                         )}
 
                         {o.delivery && (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              onClick={() => setTrackingOrderId(o.id)}
-                              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
-                              title="Track rider live GPS position"
-                            >
-                              <Bike size={11} className="text-orange-600" />
-                              <span>Track Rider</span>
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            </button>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-                              <Zap size={10} className="fill-orange-500 text-orange-500" />
-                              <span>{o.delivery.status}</span>
-                            </span>
+                          <div className="flex flex-col gap-1.5 mt-1">
+                            {o.delivery.riderProfile?.user ? (
+                              <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 bg-emerald-500 text-white rounded-lg shadow-2xs">
+                                    <Bike size={13} />
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                      <span>{o.delivery.riderProfile.user.name}</span>
+                                      <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded capitalize">
+                                        {o.delivery.riderProfile.vehicleType || 'Bike'}
+                                      </span>
+                                    </div>
+                                    {o.delivery.riderProfile.user.phone && (
+                                      <a
+                                        href={`tel:${o.delivery.riderProfile.user.phone}`}
+                                        className="text-[11px] text-emerald-700 font-mono font-semibold hover:underline flex items-center gap-1 mt-0.5"
+                                      >
+                                        <Phone size={10} />
+                                        <span>{o.delivery.riderProfile.user.phone}</span>
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => setTrackingOrderId(o.id)}
+                                  className="px-2.5 py-1 bg-white hover:bg-emerald-100/50 text-emerald-900 border border-emerald-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+                                  title="Track rider live GPS position"
+                                >
+                                  <Zap size={11} className="fill-emerald-500 text-emerald-500" />
+                                  <span>Track GPS</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  onClick={() => setTrackingOrderId(o.id)}
+                                  className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                                  title="Track rider live GPS position"
+                                >
+                                  <Bike size={11} className="text-orange-600" />
+                                  <span>Track Rider</span>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                </button>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
+                                  <Zap size={10} className="fill-orange-500 text-orange-500" />
+                                  <span>{o.delivery.status === 'broadcasted' ? 'Searching Nearby Riders' : o.delivery.status}</span>
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
 

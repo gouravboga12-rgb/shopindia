@@ -2,18 +2,28 @@ const express = require('express');
 const prisma = require('../../lib/prisma');
 const { verifyToken }      = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/rbac');
-const { calculateItemPricing } = require('../../lib/pricing');
+const { calculateItemPricing, invalidatePricingCache } = require('../../lib/pricing');
 
 const router = express.Router();
 router.use(verifyToken, requirePermission('manage_products'));
 
-/** GET /api/admin/products — FR-05.3 */
+/** GET /api/admin/products — Supports vertical filtering ('services' vs 'products') & order demand counts */
 router.get('/', async (req, res) => {
   try {
-    const { vendorId, status = 'active', page = 1, limit = 20, q } = req.query;
-    const where = { status };
+    const { vendorId, status = 'active', page = 1, limit = 50, q, vertical, fulfillmentType } = req.query;
+    const where = {};
+    if (status && status !== 'all') where.status = status;
     if (vendorId) where.vendorId = vendorId;
     if (q)        where.name = { contains: q, mode: 'insensitive' };
+
+    // Vertical / Fulfillment Filtering
+    if (fulfillmentType && fulfillmentType !== 'all') {
+      where.fulfillmentType = fulfillmentType;
+    } else if (vertical === 'services') {
+      where.fulfillmentType = { in: ['hvac_service', 'hvac'] };
+    } else if (vertical === 'products') {
+      where.fulfillmentType = { in: ['traditional', 'quick_commerce'] };
+    }
 
     const pageNum = Number(page);
     const limitNum = Number(limit);
@@ -22,9 +32,13 @@ router.get('/', async (req, res) => {
       prisma.product.findMany({
         where,
         include: {
-          vendor: { select: { businessName: true } },
+          vendor: { select: { id: true, businessName: true, city: true } },
+          category: { select: { id: true, name: true, vertical: true } },
           variants: true,
           images: true,
+          _count: {
+            select: { orderItems: true }
+          }
         },
         orderBy: { createdAt: 'desc' },
         skip: (pageNum - 1) * limitNum,
@@ -36,12 +50,29 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-/** POST /api/admin/products */
+/** POST /api/admin/products — Admin creation of products or services */
 router.post('/', async (req, res) => {
   try {
     const { variants, images, ...data } = req.body;
 
-    if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
+    // Auto-assign master platform vendor if not specified by admin
+    if (!data.vendorId) {
+      const masterVendor = await prisma.vendor.findFirst({
+        where: { approvalStatus: 'approved' },
+        orderBy: { createdAt: 'asc' }
+      });
+      if (masterVendor) data.vendorId = masterVendor.id;
+    }
+
+    // Default stock for services if not provided
+    if ((data.fulfillmentType === 'hvac_service' || data.fulfillmentType === 'hvac') && !data.stock) {
+      data.stock = 999;
+    }
+
+    if (data.basePrice != null && data.vendorPrice != null && Number(data.basePrice) > 0 && Number(data.vendorPrice) > 0) {
+      data.basePrice = parseFloat(data.basePrice);
+      data.vendorPrice = parseFloat(data.vendorPrice);
+    } else if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
       const pricing = await calculateItemPricing({
         vendorPrice: parseFloat(data.vendorPrice),
         mrp: data.mrp ? parseFloat(data.mrp) : null,
@@ -64,8 +95,10 @@ router.post('/', async (req, res) => {
         variants: variants && variants.length ? { create: variants } : undefined,
         images: images && images.length ? { create: images.map((url, i) => ({ url, displayOrder: i })) } : undefined,
       },
-      include: { variants: true, images: true },
+      include: { variants: true, images: true, category: true, vendor: true },
     });
+
+    invalidatePricingCache();
     res.status(201).json(product);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -73,9 +106,12 @@ router.post('/', async (req, res) => {
 /** PUT /api/admin/products/:id */
 router.put('/:id', async (req, res) => {
   try {
-    const { variants: _v, images: _i, vendor: _vd, ...data } = req.body;
+    const { variants: _v, images: _i, vendor: _vd, category: _cat, _count: _cnt, ...data } = req.body;
 
-    if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
+    if (data.basePrice != null && data.vendorPrice != null && Number(data.basePrice) > 0 && Number(data.vendorPrice) > 0) {
+      data.basePrice = parseFloat(data.basePrice);
+      data.vendorPrice = parseFloat(data.vendorPrice);
+    } else if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
       const pricing = await calculateItemPricing({
         vendorPrice: parseFloat(data.vendorPrice),
         mrp: data.mrp ? parseFloat(data.mrp) : null,
@@ -95,8 +131,10 @@ router.put('/:id', async (req, res) => {
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data,
-      include: { variants: true, images: true },
+      include: { variants: true, images: true, category: true, vendor: true },
     });
+
+    invalidatePricingCache();
     res.json(product);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -108,6 +146,7 @@ router.delete('/:id', async (req, res) => {
       where: { id: req.params.id },
       data: { status: 'deleted' },
     });
+    invalidatePricingCache();
     res.json({ message: 'Product deleted.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

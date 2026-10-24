@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Search, Trash2, Edit2, Clock, X } from 'lucide-react';
+import { Search, Trash2, Edit2, X, Package, Zap, Truck, Flame, TrendingDown, RefreshCw, MapPin } from 'lucide-react';
 
 export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [q, setQ] = useState('');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState('all');
+  const [demandFilter, setDemandFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
   // Edit Modal State
@@ -12,15 +14,14 @@ export const ProductsPage: React.FC = () => {
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editStock, setEditStock] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<string>('active');
-  const [editDuration, setEditDuration] = useState<string>('45-90 min');
-  const [editSlots, setEditSlots] = useState<string[]>([]);
-  const [newSlotText, setNewSlotText] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
-    api.get<{ products: any[] }>(`/api/admin/products?q=${q}`)
-      .then(d => setProducts(d.products))
+    let url = `/api/admin/products?vertical=products&limit=100`;
+    if (q) url += `&q=${encodeURIComponent(q)}`;
+    api.get<{ products: any[] }>(url)
+      .then(d => setProducts(d.products || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -32,22 +33,6 @@ export const ProductsPage: React.FC = () => {
     setEditPrice(Number(p.basePrice || 0));
     setEditStock(Number(p.stock || 0));
     setEditStatus(p.status || 'active');
-    setEditDuration(p.durationEstimate || '45-90 min');
-    setEditSlots(p.serviceSlots && p.serviceSlots.length > 0 ? p.serviceSlots : ['08:00 AM', '10:00 AM', '01:00 PM', '04:00 PM', '06:00 PM']);
-    setNewSlotText('');
-  };
-
-  const handleAddSlot = (slotToAdd?: string) => {
-    const slot = (slotToAdd || newSlotText).trim();
-    if (!slot) return;
-    if (!editSlots.includes(slot)) {
-      setEditSlots(prev => [...prev, slot]);
-    }
-    if (!slotToAdd) setNewSlotText('');
-  };
-
-  const handleRemoveSlot = (slotToRemove: string) => {
-    setEditSlots(prev => prev.filter(s => s !== slotToRemove));
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -55,19 +40,11 @@ export const ProductsPage: React.FC = () => {
     if (!editingProduct) return;
     setSaving(true);
     try {
-      const isService = editingProduct.fulfillmentType === 'hvac' || editingProduct.fulfillmentType === 'hvac_service' ||
-        (editingProduct.tags && (editingProduct.tags.includes('home_service') || editingProduct.tags.includes('vehicle_service')));
-
       const payload: any = {
         basePrice: editPrice,
         stock: editStock,
         status: editStatus,
       };
-
-      if (isService) {
-        payload.durationEstimate = editDuration;
-        payload.serviceSlots = editSlots;
-      }
 
       await api.put(`/api/admin/products/${editingProduct.id || editingProduct._id}`, payload);
       setEditingProduct(null);
@@ -79,8 +56,8 @@ export const ProductsPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete "${name}" from the catalog?`)) return;
     try {
       await api.delete(`/api/admin/products/${id}`);
       load();
@@ -89,101 +66,236 @@ export const ProductsPage: React.FC = () => {
     }
   };
 
-  const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q.toLowerCase()));
+  const filtered = products.filter(p => {
+    const matchesQ = !q || p.name.toLowerCase().includes(q.toLowerCase()) || p.vendor?.businessName?.toLowerCase().includes(q.toLowerCase());
+    const matchesFulfillment = fulfillmentFilter === 'all' || p.fulfillmentType === fulfillmentFilter;
+    
+    const orderCount = p._count?.orderItems || 0;
+    let matchesDemand = true;
+    if (demandFilter === 'high') matchesDemand = orderCount >= 10;
+    else if (demandFilter === 'moderate') matchesDemand = orderCount >= 3 && orderCount < 10;
+    else if (demandFilter === 'low') matchesDemand = orderCount < 3;
+
+    return matchesQ && matchesFulfillment && matchesDemand;
+  });
+
+  const quickCount = products.filter(p => p.fulfillmentType === 'quick_commerce').length;
+  const highDemandCount = products.filter(p => (p._count?.orderItems || 0) >= 10).length;
+  const lowDemandCount = products.filter(p => (p._count?.orderItems || 0) < 3).length;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5 text-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Product &amp; Catalog Management</h1>
-          <p className="text-sm text-gray-500">Monitor and curate marketplace catalog products</p>
+          <h1 className="text-2xl font-bold text-gray-900 font-heading flex items-center gap-2">
+            <Package className="w-6 h-6 text-[#0F2C59]" />
+            <span>Physical Products &amp; Catalog</span>
+          </h1>
+          <p className="text-sm text-gray-500">
+            Monitor vendor inventory, analyze high/low demand products, and manage selling prices
+          </p>
+        </div>
+
+        <button
+          onClick={load}
+          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh Catalog</span>
+        </button>
+      </div>
+
+      {/* Demand & Inventory KPI Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-premium">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Catalog Products</span>
+          <span className="text-xl font-black text-gray-900 font-numbers mt-1 block">{products.length} SKUs</span>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-premium">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">⚡ Quick Commerce SKUs</span>
+          <span className="text-xl font-black text-orange-700 font-numbers mt-1 block">{quickCount} Local Items</span>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-premium">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">🔥 High Demand (Top Sellers)</span>
+          <span className="text-xl font-black text-emerald-700 font-numbers mt-1 block">{highDemandCount} High Runners</span>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-premium">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">💤 Low Demand / Stagnant</span>
+          <span className="text-xl font-black text-slate-700 font-numbers mt-1 block">{lowDemandCount} Items</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      {/* Filter and Search Bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-2xl border border-gray-100 shadow-premium">
+        <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
-            placeholder="Search products..."
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20"
+            placeholder="Search by product title or vendor..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20"
           />
         </div>
-        <button onClick={load} className="px-4 py-2.5 bg-[#0F2C59] text-white rounded-xl text-sm font-medium hover:bg-[#1a3d73] transition-colors">
-          Search
-        </button>
+
+        {/* Fulfillment Channel Filter */}
+        <select
+          value={fulfillmentFilter}
+          onChange={e => setFulfillmentFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20"
+        >
+          <option value="all">📦 All Fulfillment Channels</option>
+          <option value="quick_commerce">⚡ Quick Commerce Hyperlocal</option>
+          <option value="traditional">🚚 Pan-India Traditional</option>
+        </select>
+
+        {/* Demand Level Filter */}
+        <select
+          value={demandFilter}
+          onChange={e => setDemandFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20"
+        >
+          <option value="all">📊 All Demand Levels</option>
+          <option value="high">🔥 High Demand (10+ Orders)</option>
+          <option value="moderate">⚡ Steady Demand (3-9 Orders)</option>
+          <option value="low">💤 Low Demand (&lt;3 Orders)</option>
+        </select>
       </div>
 
+      {/* Products Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-premium overflow-hidden">
         <table className="w-full text-sm text-left">
-          <thead className="bg-gray-50 border-b border-gray-100 text-gray-600">
+          <thead className="bg-gray-50 border-b border-gray-100 text-gray-600 text-xs uppercase tracking-wider font-semibold">
             <tr>
-              <th className="px-5 py-3.5 font-semibold">Product</th>
-              <th className="px-5 py-3.5 font-semibold">Vendor</th>
-              <th className="px-5 py-3.5 font-semibold">Price</th>
-              <th className="px-5 py-3.5 font-semibold">Stock</th>
-              <th className="px-5 py-3.5 font-semibold">Type</th>
-              <th className="px-5 py-3.5 font-semibold">Status</th>
-              <th className="px-5 py-3.5 font-semibold">Actions</th>
+              <th className="px-5 py-3.5">Product &amp; Category</th>
+              <th className="px-5 py-3.5">Demand Level</th>
+              <th className="px-5 py-3.5">Vendor &amp; City</th>
+              <th className="px-5 py-3.5">Price</th>
+              <th className="px-5 py-3.5">Stock</th>
+              <th className="px-5 py-3.5">Fulfillment</th>
+              <th className="px-5 py-3.5">Status</th>
+              <th className="px-5 py-3.5">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {loading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 skeleton-shimmer rounded" /></td></tr>
+              Array.from({ length: 4 }).map((_, i) => (
+                <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 skeleton-shimmer rounded" /></td></tr>
               ))
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-400">No products found.</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-gray-400">No physical products found.</td></tr>
             ) : (
-              filtered.map(p => (
-                <tr key={p.id || p._id} className="hover:bg-gray-50/50">
-                  <td className="px-5 py-4 font-semibold text-gray-900">{p.name}</td>
-                  <td className="px-5 py-4 text-gray-600">{p.vendor?.businessName || '—'}</td>
-                  <td className="px-5 py-4 font-numbers font-medium text-gray-900">₹{p.basePrice}</td>
-                  <td className="px-5 py-4">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${p.isOutOfStock ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                      {p.isOutOfStock ? 'Out of Stock' : `${p.stock} units`}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="capitalize text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                      {p.fulfillmentType?.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${p.status === 'active' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-600'}`}>
-                      {p.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => openEditModal(p)}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          p.fulfillmentType === 'hvac' || p.fulfillmentType === 'hvac_service'
-                            ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                        }`}
-                        title={
-                          p.fulfillmentType === 'hvac' || p.fulfillmentType === 'hvac_service'
-                            ? 'Edit Service & Timing Slots'
-                            : 'Edit Product'
-                        }
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.id || p._id)}
-                        className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                        title="Delete Product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filtered.map(p => {
+                const ordersCount = p._count?.orderItems || 0;
+                const isQuick = p.fulfillmentType === 'quick_commerce';
+                const hasImg = p.images?.[0]?.url;
+
+                return (
+                  <tr key={p.id || p._id} className="hover:bg-gray-50/50">
+                    {/* Product Name */}
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        {hasImg ? (
+                          <img src={hasImg} alt={p.name} className="w-10 h-10 rounded-xl object-cover border border-gray-200 shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                            <Package className="w-5 h-5" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-gray-900 leading-snug">{p.name}</p>
+                          <span className="text-[11px] text-gray-400">
+                            {p.category?.name || 'General Product'} {p.brand ? `• ${p.brand}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Demand Level Badge */}
+                    <td className="px-5 py-4">
+                      {ordersCount >= 10 ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shadow-2xs">
+                          <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />
+                          <span>High Demand ({ordersCount})</span>
+                        </span>
+                      ) : ordersCount >= 3 ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
+                          <Zap className="w-3 h-3 text-indigo-500" />
+                          <span>Steady ({ordersCount})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                          <TrendingDown className="w-3 h-3 text-slate-400" />
+                          <span>Low ({ordersCount})</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Vendor & Location */}
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-gray-800 text-xs">{p.vendor?.businessName || 'Platform Vendor'}</p>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
+                        <MapPin className="w-3 h-3 text-red-400" />
+                        <span>{p.vendor?.city || 'Local Hub'}</span>
+                      </span>
+                    </td>
+
+                    {/* Price */}
+                    <td className="px-5 py-4 font-numbers font-black text-gray-900">
+                      ₹{p.basePrice}
+                    </td>
+
+                    {/* Stock */}
+                    <td className="px-5 py-4">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                        p.isOutOfStock || p.stock === 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                      }`}>
+                        {p.isOutOfStock || p.stock === 0 ? 'Out of Stock' : `${p.stock} units`}
+                      </span>
+                    </td>
+
+                    {/* Fulfillment */}
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                        isQuick
+                          ? 'bg-orange-50 text-orange-700 border-orange-200'
+                          : 'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}>
+                        {isQuick ? <Zap className="w-3 h-3 text-orange-500" /> : <Truck className="w-3 h-3 text-blue-500" />}
+                        <span>{isQuick ? 'Quick Commerce' : 'Pan-India'}</span>
+                      </span>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-5 py-4">
+                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                        p.status === 'active' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-600'
+                      }`}>
+                        {p.status}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditModal(p)}
+                          className="p-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                          title="Edit Price & Inventory"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p.id || p._id, p.name)}
+                          className="p-1.5 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -244,131 +356,6 @@ export const ProductsPage: React.FC = () => {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-
-            {/* Service-Specific Timing Slots & Duration Config */}
-            {(editingProduct.fulfillmentType === 'hvac' ||
-              editingProduct.fulfillmentType === 'hvac_service' ||
-              (editingProduct.tags &&
-                (editingProduct.tags.includes('home_service') ||
-                  editingProduct.tags.includes('vehicle_service')))) && (
-              <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-3.5">
-                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                  <span>Service Duration & Admin Timing Slots</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Service Duration Estimate (Customer Badge)
-                  </label>
-                  <input
-                    value={editDuration}
-                    onChange={e => setEditDuration(e.target.value)}
-                    placeholder="e.g. 45-90 min"
-                    className="w-full px-3 py-1.5 bg-white border border-amber-200 rounded-xl text-xs focus:ring-1 focus:ring-amber-500"
-                  />
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {['30-45 min', '45-90 min', '1-2 hrs', '2-3 hrs'].map(preset => (
-                      <button
-                        type="button"
-                        key={preset}
-                        onClick={() => setEditDuration(preset)}
-                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${
-                          editDuration === preset
-                            ? 'bg-amber-600 text-white border-amber-600 font-bold'
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300'
-                        }`}
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-gray-700">
-                      Available Time Slots ({editSlots.length})
-                    </label>
-                    <span className="text-[10px] text-gray-500">Live booking slots for customers</span>
-                  </div>
-
-                  {/* Active Chips */}
-                  <div className="flex flex-wrap gap-1.5 mb-2.5 min-h-[38px] p-2 bg-white rounded-xl border border-amber-200">
-                    {editSlots.length === 0 ? (
-                      <span className="text-xs text-red-500 italic">No slots defined. Add at least one slot.</span>
-                    ) : (
-                      editSlots.map(slot => (
-                        <span
-                          key={slot}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300"
-                        >
-                          {slot}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSlot(slot)}
-                            className="text-amber-700 hover:text-red-600 p-0.5"
-                            title="Remove slot"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Add Slot Input */}
-                  <div className="flex gap-2">
-                    <input
-                      value={newSlotText}
-                      onChange={e => setNewSlotText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddSlot();
-                        }
-                      }}
-                      placeholder="e.g. 09:30 AM or 05:00 PM"
-                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-amber-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddSlot()}
-                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs"
-                    >
-                      + Add Slot
-                    </button>
-                  </div>
-
-                  {/* Quick-add presets */}
-                  <div className="mt-2">
-                    <span className="text-[10px] text-gray-500 block mb-1">Quick Add Common Slots:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {['08:00 AM', '10:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '04:00 PM', '06:00 PM', '08:00 PM'].map(
-                        preset => {
-                          const exists = editSlots.includes(preset);
-                          return (
-                            <button
-                              type="button"
-                              key={preset}
-                              onClick={() => handleAddSlot(preset)}
-                              disabled={exists}
-                              className={`text-[10px] px-2 py-0.5 rounded-md border transition-all ${
-                                exists
-                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'
-                                  : 'bg-white text-gray-700 border-gray-200 hover:border-amber-400 hover:text-amber-700'
-                              }`}
-                            >
-                              + {preset}
-                            </button>
-                          );
-                        }
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="flex gap-2 pt-3 border-t">
               <button

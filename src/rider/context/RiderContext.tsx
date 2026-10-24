@@ -81,6 +81,10 @@ export interface BroadcastDelivery {
   pickupAddress: string;
   dropoffName: string;
   dropoffAddress: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropoffLat?: number | null;
+  dropoffLng?: number | null;
   order?: {
     orderNumber: string;
     total: number;
@@ -328,8 +332,9 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setIncomingBroadcast((prev) => {
               if (prev?.id !== candidate.id) {
                 playDispatchChime();
+                return candidate;
               }
-              return candidate;
+              return prev; // Maintain stable reference to prevent countdown timer resets
             });
           } else {
             setIncomingBroadcast(null);

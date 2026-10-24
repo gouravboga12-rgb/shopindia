@@ -83,48 +83,61 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
         </div>
       </div>
 
-      {/* Floating Cash in Hand Alert Banner (if holding COD cash) */}
+      {/* Floating Cash in Hand Alert Banner (Prominent COD Cash Remittance to Super Admin) */}
       {(profile?.codCashFloat ?? 0) > 0 && (
-        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${
+        <div className={`p-5 rounded-2xl sm:rounded-3xl border-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm ${
           (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-            ? 'bg-red-50 border-red-200 text-red-900'
-            : 'bg-orange-50 border-orange-200 text-orange-950'
+            ? 'bg-red-50 border-red-300 text-red-900'
+            : 'bg-gradient-to-r from-amber-50 to-orange-50 border-orange-300 text-orange-950'
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl border ${
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className={`p-3 rounded-2xl border shadow-xs shrink-0 ${
               (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-                ? 'bg-red-500 text-white border-red-600 shadow-xs'
-                : 'bg-orange-500 text-white border-orange-600 shadow-xs'
+                ? 'bg-red-500 text-white border-red-600'
+                : 'bg-orange-500 text-white border-orange-600'
             }`}>
-              <Banknote className="w-5 h-5" />
+              <Banknote className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm sm:text-base font-black uppercase tracking-tight">
                   Cash in Hand: ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
                 </span>
-                {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000) && (
-                  <span className="text-[10px] bg-red-200 text-red-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <ShieldAlert className="w-3 h-3" /> Radar Paused
+                {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000) ? (
+                  <span className="text-[10px] bg-red-200 text-red-900 font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-red-300">
+                    <ShieldAlert className="w-3 h-3" /> RADAR PAUSED (LIMIT REACHED)
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-amber-200/90 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                    Remit to Admin (Limit ₹{(profile?.codFloatLimit || 3000).toLocaleString('en-IN')})
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-600 mt-0.5">
+              <p className="text-xs text-slate-600 mt-1">
                 {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-                  ? 'Maximum float limit exceeded. Please remit cash to receive new order dispatches.'
-                  : 'Customer COD cash held. Clear online via Razorpay or submit to your Regional Admin.'}
+                  ? 'Your cash float reached the threshold. Pay to Admin online or submit to Regional Admin to continue receiving orders.'
+                  : 'Customer COD cash collected. Remit online via UPI/Razorpay or generate cash handover code for your local hub.'}
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onNavigateToTab?.('wallet')}
-            className="self-start sm:self-auto px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-          >
-            <span>Clear Cash Float</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-2.5 self-start lg:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => onNavigateToTab?.('wallet')}
+              className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-xs rounded-xl shadow-md shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+            >
+              <span>Pay Online via UPI / Razorpay</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateToTab?.('wallet')}
+              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs"
+            >
+              <span>Hub Handover</span>
+            </button>
+          </div>
         </div>
       )}
 

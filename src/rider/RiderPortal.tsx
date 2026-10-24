@@ -39,7 +39,7 @@ const RiderContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       {/* Top sticky status header */}
-      <RiderHeader />
+      <RiderHeader onNavigateToTab={setTab} />
 
       <div className="flex flex-1">
         {/* Desktop Sidebar Navigation */}
