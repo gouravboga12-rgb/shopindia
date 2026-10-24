@@ -73,7 +73,7 @@ router.post('/create-order', verifyToken, async (req, res) => {
       razorpayOrderId: rzpOrder.id,
       amount: rzpOrder.amount,       // in paise
       currency: rzpOrder.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
       orderNumber: order.orderNumber,
     });
   } catch (err) {
@@ -101,26 +101,60 @@ router.post('/verify', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid payment signature. Payment verification failed.' });
     }
 
-    // Update PaymentRecord
-    await prisma.paymentRecord.update({
-      where: { razorpayOrderId },
-      data: {
-        razorpayPaymentId,
-        razorpaySignature,
-        status: 'captured',
-        capturedAt: new Date(),
-      },
-    });
+    // Upsert or update PaymentRecord
+    try {
+      const existing = await prisma.paymentRecord.findFirst({
+        where: {
+          OR: [
+            { razorpayOrderId },
+            ...(orderId ? [{ orderId }] : []),
+          ],
+        },
+      });
 
-    // Update Order payment status
+      if (existing) {
+        await prisma.paymentRecord.update({
+          where: { id: existing.id },
+          data: {
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+            status: 'captured',
+            capturedAt: new Date(),
+          },
+        });
+      } else if (orderId) {
+        const ord = await prisma.order.findUnique({ where: { id: orderId } });
+        await prisma.paymentRecord.create({
+          data: {
+            orderId,
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+            amount: ord ? ord.total : 0,
+            currency: 'INR',
+            status: 'captured',
+            capturedAt: new Date(),
+          },
+        });
+      }
+    } catch (recErr) {
+      console.warn('PaymentRecord update warning:', recErr.message);
+    }
+
+    // Update Order payment status and method
     if (orderId) {
       await prisma.order.update({
         where: { id: orderId },
-        data: { paymentStatus: 'paid', paymentRef: razorpayPaymentId },
+        data: {
+          paymentStatus: 'paid',
+          paymentMethod: 'razorpay',
+          paymentRef: razorpayPaymentId,
+        },
       });
     }
 
-    res.json({ success: true, message: 'Payment verified successfully.' });
+    res.json({ success: true, message: 'Payment verified and recorded successfully.', paymentId: razorpayPaymentId });
   } catch (err) {
     console.error('Verify payment error:', err);
     res.status(500).json({ error: err.message });

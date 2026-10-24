@@ -83,7 +83,7 @@ interface AppContextType {
   clearCart: () => void;
   getCartTotal: () => number;
   orders: Order[];
-  placeOrder: (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number }) => Promise<void>;
+  placeOrder: (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string }) => Promise<any>;
   cancelOrder: (orderId: string) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<void>;
   notifications: Notification[];
@@ -388,36 +388,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Order placement (persists to the backend API)
-  const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType }) => {
+  const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string }) => {
     try {
-      await api.post('/api/orders', { ...payload, vertical: payload.vertical || currentVertical });
-        // Fetch orders again to get the new order
-        const res = await api.get<{ orders: Order[] }>('/api/orders');
-        if (res.orders) setOrders(res.orders);
-        
-        // Add a live notification for the placed order
-        const isQuick = currentVertical === 'quick';
-        const isService = currentVertical === 'services';
-        
-        // Use lucide-react icons dynamically or pass string names. 
-        // For simplicity, we just use string names that Notifications.tsx can map, or pass any generic object.
-        // But since we are inside AppContext we can't easily import icons here without adding them to AppContext.
-        addNotification({
-          type: isQuick ? 'quick' : isService ? 'service' : 'order',
-          title: isQuick ? 'Arriving in 10 mins! ⚡' : isService ? 'Service Booked 🛠️' : 'Order Placed! 🎉',
-          message: isQuick 
-            ? 'Your 10 Min delivery order has been placed and is being packed.' 
-            : isService 
-            ? 'Your service appointment has been successfully booked.' 
-            : 'Your order has been placed! Expected delivery in 2-4 business days via express courier.',
-          actionText: 'Track Order',
-          icon: isQuick ? 'Zap' : isService ? 'Wrench' : 'Package',
-          color: isQuick ? 'text-[#E5B500]' : isService ? 'text-amber-600' : 'text-blue-600',
-          bg: isQuick ? 'bg-[#FFDF00]/20' : isService ? 'bg-amber-50' : 'bg-blue-50'
-        });
+      const created = await api.post<any>('/api/orders', { 
+        ...payload, 
+        paymentMethod: payload.paymentMethod || (payload.paymentMethodId === 'COD' ? 'cod' : 'razorpay'),
+        vertical: payload.vertical || currentVertical 
+      });
+      // Fetch orders again to get the new order
+      const res = await api.get<{ orders: Order[] }>('/api/orders');
+      if (res.orders) setOrders(res.orders);
+      
+      // Add a live notification for the placed order
+      const isQuick = currentVertical === 'quick';
+      const isService = currentVertical === 'services';
+      
+      addNotification({
+        type: isQuick ? 'quick' : isService ? 'service' : 'order',
+        title: isQuick ? 'Arriving in 10 mins! ⚡' : isService ? 'Service Booked 🛠️' : 'Order Placed! 🎉',
+        message: isQuick 
+          ? 'Your 10 Min delivery order has been placed and is being packed.' 
+          : isService 
+          ? 'Your service appointment has been successfully booked.' 
+          : 'Your order has been placed! Expected delivery in 2-4 business days via express courier.',
+        actionText: 'Track Order',
+        icon: isQuick ? 'Zap' : isService ? 'Wrench' : 'Package',
+        color: isQuick ? 'text-[#E5B500]' : isService ? 'text-amber-600' : 'text-blue-600',
+        bg: isQuick ? 'bg-[#FFDF00]/20' : isService ? 'bg-amber-50' : 'bg-blue-50'
+      });
 
-        clearCart();
-        navigateTo('orders');
+      clearCart();
+      navigateTo('orders');
+      return created;
     } catch (err) {
       console.error('Failed to place order', err);
       throw err;

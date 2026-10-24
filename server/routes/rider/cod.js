@@ -183,7 +183,7 @@ router.post('/create-razorpay-order', async (req, res) => {
       orderId: rzpOrder.id,
       amount: rzpOrder.amount, // in paise
       currency: rzpOrder.currency,
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
       rider: {
         name: rider.user.name,
         email: rider.user.email,

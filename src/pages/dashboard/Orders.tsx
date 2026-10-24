@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageHeader, Badge, statusTone, EmptyState, PrimaryButton, GhostButton } from '../../components/dashboard/DashboardUI';
-import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, ChevronRight, Zap, Wrench, KeyRound } from 'lucide-react';
+import { Package, X, Download, RotateCcw, Undo2, ArrowLeftRight, CheckCircle2, ChevronRight, Zap, Wrench, KeyRound, CreditCard, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackEvent } from '../../lib/customerApi';
+import { api } from '../../lib/api';
 import type { OrderItem, VerticalType } from '../../context/AppContext';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
 import { LiveOrderTrackingModal } from '../../components/common/LiveOrderTrackingModal';
@@ -92,6 +93,64 @@ export const OrdersPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [orderOtps, setOrderOtps] = useState<Record<string, string>>({});
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+
+  const handlePayPendingRazorpay = async (order: any) => {
+    setPayingOrderId(order.id);
+    try {
+      const res = await api.post<{
+        razorpayOrderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+        orderNumber: string;
+      }>('/api/payments/create-order', { orderId: order.id });
+
+      const Razorpay = (window as any).Razorpay;
+      if (!Razorpay) {
+        alert('Razorpay SDK is loading. Please try again.');
+        setPayingOrderId(null);
+        return;
+      }
+
+      const options = {
+        key: res.keyId || (import.meta as any).env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
+        amount: res.amount,
+        currency: res.currency || 'INR',
+        name: 'ShopIndia',
+        description: `Order #${res.orderNumber}`,
+        image: '/favicon.png',
+        order_id: res.razorpayOrderId,
+        theme: { color: '#2563eb' },
+        handler: async (response: any) => {
+          try {
+            await api.post('/api/payments/verify', {
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              orderId: order.id,
+            });
+            alert('Payment completed successfully via Razorpay!');
+            window.location.reload();
+          } catch (err) {
+            console.warn('Verify notice:', err);
+            window.location.reload();
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPayingOrderId(null);
+          },
+        },
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      alert(err.message || 'Failed to initiate Razorpay payment.');
+      setPayingOrderId(null);
+    }
+  };
 
   const getOrderVertical = (o: any): VerticalType => {
     if (o.vertical === 'quick' || o.vertical === 'services' || o.vertical === 'shop') return o.vertical;
@@ -390,6 +449,16 @@ export const OrdersPage: React.FC = () => {
 
                               <div className="mt-4 flex flex-wrap gap-2">
                                 <PrimaryButton onClick={() => generateAndPrintInvoice({ ...openOrder, vertical: orderVert })} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                                {((openOrder as any).paymentStatus !== 'paid' && openOrder.status !== 'cancelled' && openOrder.status !== 'delivered') && (
+                                  <button 
+                                    disabled={payingOrderId === openOrder.id}
+                                    onClick={() => handlePayPendingRazorpay(openOrder)}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-button text-xs font-bold shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {payingOrderId === openOrder.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                                    <span>Pay ₹{openOrder.total.toLocaleString('en-IN')} via Razorpay</span>
+                                  </button>
+                                )}
                                 {cancelable && (
                                   <button 
                                     disabled={isProcessing}
@@ -485,6 +554,16 @@ export const OrdersPage: React.FC = () => {
 
                               <div className="mt-4 flex flex-wrap gap-2">
                                 <PrimaryButton onClick={() => generateAndPrintInvoice({ ...openOrder, vertical: orderVert })} className="inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Invoice</PrimaryButton>
+                                {((openOrder as any).paymentStatus !== 'paid' && openOrder.status !== 'cancelled' && openOrder.status !== 'delivered') && (
+                                  <button 
+                                    disabled={payingOrderId === openOrder.id}
+                                    onClick={() => handlePayPendingRazorpay(openOrder)}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-button text-xs font-bold shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {payingOrderId === openOrder.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                                    <span>Pay ₹{openOrder.total.toLocaleString('en-IN')} via Razorpay</span>
+                                  </button>
+                                )}
                                 {cancelable && (
                                   <button 
                                     disabled={isProcessing}

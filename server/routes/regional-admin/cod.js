@@ -205,7 +205,7 @@ router.post('/create-super-remittance-order', async (req, res) => {
       orderId: rzpOrder.id,
       amount: rzpOrder.amount,
       totalINR: totalToRemit,
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
       remittanceIds,
     });
   } catch (err) {

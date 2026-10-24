@@ -13,8 +13,8 @@ let _rzp = null;
 function getRzp() {
   if (!_rzp) {
     _rzp = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
+      key_secret: process.env.RAZORPAY_KEY_SECRET || 'Qo9u5rOfjFo6ov36FQCe2P8i',
     });
   }
   return _rzp;
@@ -43,9 +43,10 @@ async function createOrder(amountInPaise, receipt, notes = {}) {
  * @returns {boolean}
  */
 function verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature) {
+  const secret = process.env.RAZORPAY_KEY_SECRET || 'Qo9u5rOfjFo6ov36FQCe2P8i';
   const body = `${razorpayOrderId}|${razorpayPaymentId}`;
   const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .createHmac('sha256', secret)
     .update(body)
     .digest('hex');
   return expectedSignature === razorpaySignature;

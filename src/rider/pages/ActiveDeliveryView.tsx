@@ -3,6 +3,7 @@ import { useRider } from '../context/RiderContext';
 import { RiderMapRoute } from '../components/RiderMapRoute';
 import { SlideToConfirm } from '../components/SlideToConfirm';
 import { getSocket } from '../../lib/socket';
+import { api } from '../../lib/api';
 import {
   Store,
   MapPin,
@@ -16,7 +17,8 @@ import {
   Radio,
   Navigation,
   Banknote,
-  QrCode
+  CreditCard,
+  Loader2
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
@@ -27,7 +29,10 @@ export const ActiveDeliveryView: React.FC = () => {
   const [otpError, setOtpError] = useState<string | null>(null);
   const [completedSuccess, setCompletedSuccess] = useState(false);
   const [isBroadcastingGps, setIsBroadcastingGps] = useState(false);
-  const [showDynamicQr, setShowDynamicQr] = useState(false);
+  const [isOnlinePaying, setIsOnlinePaying] = useState(false);
+  const [doorstepPaidOnline, setDoorstepPaidOnline] = useState<boolean>(activeDelivery?.order?.paymentStatus === 'paid');
+  const [onlinePaymentId, setOnlinePaymentId] = useState<string | null>(null);
+  const [onlinePaymentError, setOnlinePaymentError] = useState<string | null>(null);
   const [currentRiderCoords, setCurrentRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // High-frequency live GPS streaming to Customer & Vendor via WebSockets
@@ -89,6 +94,77 @@ export const ActiveDeliveryView: React.FC = () => {
 
   const toggleItemCheck = (id: string) => {
     setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCollectViaRazorpay = async () => {
+    if (!activeDelivery?.id) return;
+    setIsOnlinePaying(true);
+    setOnlinePaymentError(null);
+    try {
+      const res = await api.post<{
+        success: boolean;
+        orderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+        customer: { name: string; phone: string; email: string };
+        orderNumber: string;
+        totalINR: number;
+      }>(`/api/rider/orders/${activeDelivery.id}/create-doorstep-razorpay-order`, {});
+
+      const Razorpay = (window as any).Razorpay;
+      if (!Razorpay) {
+        alert('Razorpay SDK is loading. Please try again in a moment.');
+        setIsOnlinePaying(false);
+        return;
+      }
+
+      const options = {
+        key: res.keyId || (import.meta as any).env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
+        amount: res.amount,
+        currency: res.currency || 'INR',
+        name: 'ShopIndia',
+        description: `Doorstep Payment — Order #${res.orderNumber}`,
+        image: '/favicon.png',
+        order_id: res.orderId,
+        prefill: {
+          name: res.customer.name,
+          contact: res.customer.phone,
+          email: res.customer.email,
+        },
+        theme: { color: '#f97316' },
+        handler: async (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            await api.post(`/api/rider/orders/${activeDelivery.id}/verify-doorstep-razorpay`, {
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            setDoorstepPaidOnline(true);
+            setOnlinePaymentId(response.razorpay_payment_id);
+            setIsOnlinePaying(false);
+          } catch (verifyErr: any) {
+            setOnlinePaymentError(verifyErr.message || 'Payment signature verification failed.');
+            setIsOnlinePaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsOnlinePaying(false);
+          },
+        },
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      setOnlinePaymentError(err.message || 'Failed to initialize Razorpay payment.');
+      setIsOnlinePaying(false);
+    }
   };
 
   const handleOtpVerify = async (e: React.FormEvent) => {
@@ -350,46 +426,92 @@ export const ActiveDeliveryView: React.FC = () => {
       {currentStage === 'arrived_customer' && (
         <div className="bg-white border-2 border-emerald-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
           
-          {/* Doorstep COD Collection Card */}
+          {/* Doorstep Payment Clearance Card (Cash vs Razorpay) */}
           {activeDelivery.order?.total ? (
-            <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
+            doorstepPaidOnline || activeDelivery.order?.paymentStatus === 'paid' ? (
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-400/80 rounded-2xl space-y-2 animate-in fade-in duration-200">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-orange-500 text-white rounded-xl shadow-xs">
-                    <Banknote className="w-5 h-5" />
+                  <div className="p-2 bg-emerald-500 text-white rounded-xl shadow-xs">
+                    <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-orange-700 tracking-wider">Doorstep Payment</span>
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Payment Verified</span>
                     <h4 className="text-base font-black text-slate-900">
-                      Collect ₹{activeDelivery.order.total.toLocaleString('en-IN')} Cash
+                      ₹{activeDelivery.order.total.toLocaleString('en-IN')} Paid via Razorpay
                     </h4>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowDynamicQr(!showDynamicQr)}
-                  className="px-3 py-1.5 bg-white border border-orange-300 text-orange-700 rounded-xl text-xs font-bold hover:bg-orange-100/60 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>{showDynamicQr ? 'Hide QR' : 'Show UPI QR'}</span>
-                </button>
+                <p className="text-xs text-emerald-800 font-medium">
+                  Payment settled directly to ShopIndia Admin. <strong>No cash to collect from customer.</strong>
+                </p>
+                {onlinePaymentId && (
+                  <span className="text-[10px] font-mono text-emerald-600 block">
+                    Razorpay Ref: {onlinePaymentId}
+                  </span>
+                )}
               </div>
-
-              {showDynamicQr && (
-                <div className="pt-2 border-t border-orange-200/80 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
-                  <p className="text-xs text-slate-600 mb-2">Customer can scan with GPay, PhonePe, or Paytm:</p>
-                  <div className="p-3 bg-white rounded-2xl border-2 border-orange-400 shadow-sm inline-block">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=shopindia@upi&pn=ShopIndia&am=${activeDelivery.order.total}&cu=INR`)}`}
-                      alt="Customer UPI QR"
-                      className="w-36 h-36"
-                    />
+            ) : (
+              <div className="p-4 bg-orange-50/70 border-2 border-orange-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-orange-500 text-white rounded-xl shadow-xs">
+                      <Banknote className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-orange-700 tracking-wider">Doorstep Payment (₹{activeDelivery.order.total.toLocaleString('en-IN')})</span>
+                      <h4 className="text-sm sm:text-base font-black text-slate-900">
+                        Select Collection Method
+                      </h4>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400 mt-1">Direct instant settlement to ShopIndia</span>
                 </div>
-              )}
-            </div>
+
+                {onlinePaymentError && (
+                  <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    <span>{onlinePaymentError}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {/* Option 1: Cash Collection */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Option 1</span>
+                      <h5 className="text-xs font-black text-slate-900">Collect Physical Cash</h5>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Collect ₹{activeDelivery.order.total.toLocaleString('en-IN')} cash (added to your COD cash float).</p>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Razorpay Online Payment */}
+                  <div className="p-3 bg-white border-2 border-orange-400 rounded-xl flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-orange-600 uppercase">Option 2 (Instant)</span>
+                      <h5 className="text-xs font-black text-slate-900">Pay via Razorpay</h5>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Customer pays via UPI, QR, or Card directly to ShopIndia.</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isOnlinePaying}
+                      onClick={handleCollectViaRazorpay}
+                      className="mt-2.5 w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                    >
+                      {isOnlinePaying ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Opening Razorpay...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Open Razorpay Modal</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
           ) : null}
 
           <div className="text-center">

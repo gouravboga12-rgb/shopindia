@@ -4,6 +4,7 @@ const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 const { emitDeliveryStageChange, cleanDeliveryTracking } = require('../../lib/socket');
 const { recordRiderCredit } = require('../../lib/ledger');
+const { createOrder: createRazorpayOrder, verifyPaymentSignature } = require('../../lib/razorpay');
 
 const router = express.Router();
 router.use(verifyToken, requireRole('rider'));
@@ -259,6 +260,135 @@ router.patch(['/:id/stage', '/orders/:id/stage'], async (req, res) => {
 });
 
 /**
+ * POST /api/rider/orders/:id/create-doorstep-razorpay-order
+ * Allows rider to initiate an instant Razorpay payment for customer at the doorstep.
+ */
+router.post(['/:id/create-doorstep-razorpay-order', '/orders/:id/create-doorstep-razorpay-order'], async (req, res) => {
+  try {
+    const profile = await getRiderProfile(req.user.userId);
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: {
+        order: {
+          include: {
+            customer: { select: { id: true, name: true, phone: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (!delivery) return res.status(404).json({ error: 'Delivery job not found.' });
+    if (!delivery.order) return res.status(404).json({ error: 'Associated order not found.' });
+    if (delivery.order.paymentStatus === 'paid') {
+      return res.status(400).json({ error: 'Order is already paid.' });
+    }
+
+    const amountInPaise = Math.round(delivery.order.total * 100);
+    const receipt = `doorstep_${delivery.id.slice(0, 8)}_${Date.now()}`;
+    const rzpOrder = await createRazorpayOrder(amountInPaise, receipt, {
+      deliveryId: delivery.id,
+      orderId: delivery.order.id,
+      riderId: profile.id,
+      type: 'DOORSTEP_CUSTOMER_PAYMENT',
+    });
+
+    // Upsert PaymentRecord
+    try {
+      await prisma.paymentRecord.upsert({
+        where: { orderId: delivery.order.id },
+        create: {
+          orderId: delivery.order.id,
+          razorpayOrderId: rzpOrder.id,
+          amount: delivery.order.total,
+          currency: 'INR',
+          status: 'initiated',
+        },
+        update: {
+          razorpayOrderId: rzpOrder.id,
+          amount: delivery.order.total,
+          status: 'initiated',
+        },
+      });
+    } catch (recErr) {
+      console.warn('Doorstep PaymentRecord upsert warning:', recErr.message);
+    }
+
+    res.json({
+      success: true,
+      orderId: rzpOrder.id,
+      amount: rzpOrder.amount, // in paise
+      currency: rzpOrder.currency,
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
+      customer: {
+        name: delivery.order.customer?.name || 'Customer',
+        phone: delivery.order.customer?.phone || '',
+        email: delivery.order.customer?.email || '',
+      },
+      orderNumber: delivery.order.orderNumber,
+      totalINR: delivery.order.total,
+    });
+  } catch (err) {
+    console.error('Doorstep Razorpay Order Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rider/orders/:id/verify-doorstep-razorpay
+ * Verifies customer payment at doorstep, marks order paid directly to admin,
+ * so rider collects ₹0 cash and incurs 0 COD float.
+ */
+router.post(['/:id/verify-doorstep-razorpay', '/orders/:id/verify-doorstep-razorpay'], async (req, res) => {
+  try {
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const profile = await getRiderProfile(req.user.userId);
+
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
+    });
+
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found.' });
+
+    const isValid = verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid payment signature from Razorpay.' });
+    }
+
+    // Atomic update: Order paymentStatus to paid, paymentMethod to razorpay
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: delivery.orderId },
+        data: {
+          paymentStatus: 'paid',
+          paymentMethod: 'razorpay',
+          paymentRef: razorpayPaymentId,
+        },
+      });
+
+      await tx.paymentRecord.updateMany({
+        where: { orderId: delivery.orderId },
+        data: {
+          razorpayPaymentId,
+          razorpaySignature,
+          status: 'captured',
+          capturedAt: new Date(),
+        },
+      });
+    });
+
+    res.json({
+      success: true,
+      message: 'Customer payment of ₹' + delivery.order.total + ' captured directly via Razorpay to ShopIndia Admin.',
+      paymentId: razorpayPaymentId,
+    });
+  } catch (err) {
+    console.error('Verify Doorstep Payment Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/rider/orders/:id/complete
  * Stage 4: Customer Handover with 4-digit OTP or Photo Proof.
  * Credits delivery fee to rider wallet and marks order delivered.
@@ -287,7 +417,8 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
     }
 
     const feeToCredit = delivery.deliveryFee || 50;
-    const isCOD = delivery.order?.paymentMethod === 'cod';
+    // Only increment cash float if payment was actually collected as physical COD cash (not paid online via Razorpay)
+    const isCOD = delivery.order?.paymentMethod === 'cod' && delivery.order?.paymentStatus !== 'paid';
     const orderCash = delivery.order?.total || 0;
 
     // Atomic transaction: mark delivery completed, update order, credit rider wallet, write ledger entry

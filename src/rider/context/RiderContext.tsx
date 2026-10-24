@@ -65,6 +65,8 @@ export interface ActiveDeliveryData {
   order?: {
     orderNumber: string;
     total: number;
+    paymentStatus?: string;
+    paymentMethod?: string;
     items?: DeliveryItem[];
     vendor?: { businessName: string; phone?: string; street?: string; city?: string };
   };
