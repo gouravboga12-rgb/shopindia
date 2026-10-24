@@ -19,11 +19,11 @@ interface PricingRule {
 }
 
 interface DeliveryPayRule {
-  id: string;
+  id?: string;
   scope: string;
-  basePayPerOrder: number;
-  payPerKm: number;
-  maxDistanceKm: number;
+  basePayPerOrder: number | string;
+  payPerKm: number | string;
+  maxDistanceKm: number | string;
   isActive: boolean;
   description?: string | null;
 }
@@ -46,7 +46,17 @@ export const PricingSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rules, setRules] = useState<PricingRule[]>([]);
-  const [deliveryRules, setDeliveryRules] = useState<DeliveryPayRule[]>([]);
+  const [deliveryRules, setDeliveryRules] = useState<DeliveryPayRule[]>([
+    {
+      id: '',
+      scope: 'global',
+      basePayPerOrder: '30',
+      payPerKm: '5',
+      maxDistanceKm: '15',
+      isActive: true,
+      description: 'Global Quick Commerce Rider Pay Rule'
+    }
+  ]);
   const [settings, setSettings] = useState<AppSettings>({
     shiprocket_base_fee: '49',
     shiprocket_free_threshold: '499',
@@ -93,7 +103,19 @@ export const PricingSettingsPage: React.FC = () => {
       ]);
 
       if (rRes?.rules) setRules(rRes.rules);
-      if (dRes?.rules) setDeliveryRules(dRes.rules);
+      if (dRes?.rules && dRes.rules.length > 0) {
+        setDeliveryRules(dRes.rules);
+      } else {
+        setDeliveryRules([{
+          id: '',
+          scope: 'global',
+          basePayPerOrder: '30',
+          payPerKm: '5',
+          maxDistanceKm: '15',
+          isActive: true,
+          description: 'Global Quick Commerce Rider Pay Rule'
+        }]);
+      }
       if (sRes?.settings) setSettings(sRes.settings);
     } catch (err: any) {
       console.error('Failed to load pricing data:', err);
@@ -145,9 +167,36 @@ export const PricingSettingsPage: React.FC = () => {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      await api.post('/api/admin/pricing/settings', { settings });
+      const currentRule = deliveryRules[0] || {
+        scope: 'global',
+        basePayPerOrder: 30,
+        payPerKm: 5,
+        maxDistanceKm: 15,
+        isActive: true
+      };
+
+      const parsedBasePay = parseFloat(String(currentRule.basePayPerOrder));
+      const parsedPayPerKm = parseFloat(String(currentRule.payPerKm));
+      const parsedMaxDist = parseFloat(String(currentRule.maxDistanceKm));
+
+      const deliveryRulePayload = {
+        ...currentRule,
+        basePayPerOrder: !isNaN(parsedBasePay) && parsedBasePay >= 0 ? parsedBasePay : 30,
+        payPerKm: !isNaN(parsedPayPerKm) && parsedPayPerKm >= 0 ? parsedPayPerKm : 5,
+        maxDistanceKm: !isNaN(parsedMaxDist) && parsedMaxDist >= 0 ? parsedMaxDist : 15
+      };
+
+      // 1. Save settings and deliveryRule in unified endpoint
+      await api.post('/api/admin/pricing/settings', {
+        settings,
+        deliveryRule: deliveryRulePayload
+      });
+
+      // 2. Also ensure delivery-rules endpoint is explicitly synced
+      await api.post('/api/admin/pricing/delivery-rules', deliveryRulePayload);
+
       alert('Pricing & delivery settings updated successfully!');
-      loadData();
+      await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to save settings');
     } finally {
@@ -426,10 +475,14 @@ export const PricingSettingsPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={deliveryRules[0]?.basePayPerOrder || 30}
+                    step="any"
+                    value={deliveryRules[0]?.basePayPerOrder ?? ''}
                     onChange={e => {
-                      const val = parseFloat(e.target.value) || 30;
-                      setDeliveryRules(prev => [{ ...(prev[0] || {}), basePayPerOrder: val } as any]);
+                      const val = e.target.value;
+                      setDeliveryRules(prev => [{
+                        ...(prev[0] || { scope: 'global', isActive: true, maxDistanceKm: 15 }),
+                        basePayPerOrder: val
+                      } as any]);
                     }}
                     className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700"
                   />
@@ -442,10 +495,14 @@ export const PricingSettingsPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={deliveryRules[0]?.payPerKm || 5}
+                    step="any"
+                    value={deliveryRules[0]?.payPerKm ?? ''}
                     onChange={e => {
-                      const val = parseFloat(e.target.value) || 5;
-                      setDeliveryRules(prev => [{ ...(prev[0] || {}), payPerKm: val } as any]);
+                      const val = e.target.value;
+                      setDeliveryRules(prev => [{
+                        ...(prev[0] || { scope: 'global', isActive: true, maxDistanceKm: 15 }),
+                        payPerKm: val
+                      } as any]);
                     }}
                     className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold text-emerald-700"
                   />

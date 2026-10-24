@@ -190,12 +190,16 @@ router.post('/delivery-rules', async (req, res) => {
       isActive
     } = req.body;
 
-    const basePay = parseFloat(basePayPerOrder || 30);
-    const perKm = parseFloat(payPerKm || 5);
-    const maxDist = parseFloat(maxDistanceKm || 15);
+    const basePay = parseFloat(basePayPerOrder) >= 0 ? parseFloat(basePayPerOrder) : 30;
+    const perKm = parseFloat(payPerKm) >= 0 ? parseFloat(payPerKm) : 5;
+    const maxDist = parseFloat(maxDistanceKm) >= 0 ? parseFloat(maxDistanceKm) : 15;
 
     let saved;
+    let oldVal = null;
     if (id) {
+      const existing = await prisma.deliveryPayRule.findUnique({ where: { id } });
+      if (existing) oldVal = JSON.stringify(existing);
+
       saved = await prisma.deliveryPayRule.update({
         where: { id },
         data: {
@@ -210,19 +214,50 @@ router.post('/delivery-rules', async (req, res) => {
         }
       });
     } else {
-      saved = await prisma.deliveryPayRule.create({
-        data: {
-          scope: scope || 'global',
-          scopeId: scopeId || null,
-          vertical: vertical || null,
-          basePayPerOrder: basePay,
-          payPerKm: perKm,
-          maxDistanceKm: maxDist,
-          description: description || null,
-          isActive: isActive !== false
-        }
+      // Check if a global rule already exists to avoid duplicate rows
+      const existingGlobal = await prisma.deliveryPayRule.findFirst({
+        where: { scope: scope || 'global' }
       });
+
+      if (existingGlobal) {
+        oldVal = JSON.stringify(existingGlobal);
+        saved = await prisma.deliveryPayRule.update({
+          where: { id: existingGlobal.id },
+          data: {
+            scope: scope || 'global',
+            scopeId: scopeId || null,
+            vertical: vertical || null,
+            basePayPerOrder: basePay,
+            payPerKm: perKm,
+            maxDistanceKm: maxDist,
+            description: description || existingGlobal.description,
+            isActive: isActive !== false
+          }
+        });
+      } else {
+        saved = await prisma.deliveryPayRule.create({
+          data: {
+            scope: scope || 'global',
+            scopeId: scopeId || null,
+            vertical: vertical || null,
+            basePayPerOrder: basePay,
+            payPerKm: perKm,
+            maxDistanceKm: maxDist,
+            description: description || 'Global Quick Commerce Rider Pay Rule',
+            isActive: isActive !== false
+          }
+        });
+      }
     }
+
+    await prisma.settingsAuditLog.create({
+      data: {
+        settingKey: `delivery_pay_rule_${saved.id}`,
+        oldValue: oldVal,
+        newValue: JSON.stringify(saved),
+        changedBy: req.user?.id || 'super_admin'
+      }
+    }).catch(e => console.warn('[AdminPricing] Audit log error:', e.message));
 
     invalidatePricingCache();
     res.json({ success: true, rule: saved });
@@ -266,11 +301,11 @@ router.get('/settings', async (req, res) => {
 
 /**
  * POST /api/admin/pricing/settings
- * Update multiple key-value settings with audit logs
+ * Update multiple key-value settings and delivery rules with audit logs
  */
 router.post('/settings', async (req, res) => {
   try {
-    const { settings } = req.body;
+    const { settings, deliveryRule } = req.body;
     if (!settings || typeof settings !== 'object') {
       return res.status(400).json({ error: 'Settings object is required' });
     }
@@ -308,10 +343,59 @@ router.post('/settings', async (req, res) => {
       );
     }
 
-    await prisma.$transaction(updates);
+    let savedRule = null;
+    if (deliveryRule && typeof deliveryRule === 'object') {
+      const basePay = parseFloat(deliveryRule.basePayPerOrder) >= 0 ? parseFloat(deliveryRule.basePayPerOrder) : 30;
+      const perKm = parseFloat(deliveryRule.payPerKm) >= 0 ? parseFloat(deliveryRule.payPerKm) : 5;
+      const maxDist = parseFloat(deliveryRule.maxDistanceKm) >= 0 ? parseFloat(deliveryRule.maxDistanceKm) : 15;
+
+      const existingGlobal = deliveryRule.id
+        ? await prisma.deliveryPayRule.findUnique({ where: { id: deliveryRule.id } })
+        : await prisma.deliveryPayRule.findFirst({ where: { scope: deliveryRule.scope || 'global' } });
+
+      if (existingGlobal) {
+        savedRule = await prisma.deliveryPayRule.update({
+          where: { id: existingGlobal.id },
+          data: {
+            scope: deliveryRule.scope || 'global',
+            basePayPerOrder: basePay,
+            payPerKm: perKm,
+            maxDistanceKm: maxDist,
+            description: deliveryRule.description || existingGlobal.description,
+            isActive: deliveryRule.isActive !== false
+          }
+        });
+      } else {
+        savedRule = await prisma.deliveryPayRule.create({
+          data: {
+            scope: deliveryRule.scope || 'global',
+            basePayPerOrder: basePay,
+            payPerKm: perKm,
+            maxDistanceKm: maxDist,
+            description: deliveryRule.description || 'Global Quick Commerce Rider Pay Rule',
+            isActive: deliveryRule.isActive !== false
+          }
+        });
+      }
+
+      updates.push(
+        prisma.settingsAuditLog.create({
+          data: {
+            settingKey: `delivery_pay_rule_${savedRule.id}`,
+            oldValue: existingGlobal ? JSON.stringify(existingGlobal) : null,
+            newValue: JSON.stringify(savedRule),
+            changedBy: req.user?.id || 'super_admin'
+          }
+        })
+      );
+    }
+
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
+    }
     invalidatePricingCache();
 
-    res.json({ success: true, message: 'Settings saved successfully' });
+    res.json({ success: true, message: 'Settings saved successfully', deliveryRule: savedRule });
   } catch (err) {
     console.error('[AdminPricing] Error saving settings:', err);
     res.status(500).json({ error: 'Failed to update settings' });
