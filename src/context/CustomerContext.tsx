@@ -165,7 +165,20 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setWishlist(prev => Array.from(new Set([...prev, ...(wishRes.value?.wishlist || [])])));
         }
         if (notifRes.status === 'fulfilled' && notifRes.value?.notifications) setNotifications(notifRes.value.notifications);
-        if (profRes.status === 'fulfilled' && profRes.value?.profile) setProfile(profRes.value.profile);
+        if (profRes.status === 'fulfilled') {
+          const val: any = profRes.value;
+          if (val?.user) {
+            setProfile(prev => ({
+              ...prev,
+              name: val.user.name || prev.name,
+              email: val.user.email || prev.email,
+              phone: val.user.phone || prev.phone,
+              avatar: val.user.avatar || prev.avatar,
+            }));
+          } else if (val?.profile) {
+            setProfile(val.profile);
+          }
+        }
         if (revRes.status === 'fulfilled' && revRes.value?.reviews) setReviews(revRes.value.reviews);
       } catch (err) {
         console.error('Failed to fetch customer data', err);
@@ -387,7 +400,21 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateProfile = useCallback(async (p: Partial<CustomerProfile>) => {
     try {
       await api.put('/api/customer/profile', p);
-      setProfile((prev) => ({ ...prev, ...p }));
+      setProfile((prev) => {
+        const next = { ...prev, ...p };
+        try {
+          const raw = localStorage.getItem('shopindia_customer_user');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            localStorage.setItem('shopindia_customer_user', JSON.stringify({
+              ...parsed,
+              name: p.name || parsed.name,
+              avatar: p.avatar !== undefined ? p.avatar : parsed.avatar,
+            }));
+          }
+        } catch {}
+        return next;
+      });
     } catch (err) {
       console.error(err);
       throw err;

@@ -63,7 +63,7 @@ router.post('/change-password', async (req, res) => {
     if (!ok) return res.status(401).json({ error: 'Current password incorrect.' });
     const hashed = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({ where: { id: req.user.userId }, data: { password: hashed } });
-    res.json({ ok: true });
+    res.json({ ok: true, message: 'Password updated successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

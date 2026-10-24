@@ -30,7 +30,7 @@ const Content: React.FC<{ tab: DashboardTab; onNavigate: (t: DashboardTab) => vo
     case 'notifications': return <NotificationsPage />;
     case 'reviews': return <ReviewsPage />;
     case 'coupons': return <CouponsRewardsPage />;
-    case 'profile': return <ProfileSettingsPage />;
+    case 'profile': return <ProfileSettingsPage onNavigate={onNavigate} />;
     case 'security': return <SecurityPage />;
     case 'support': return <SupportCenterPage />;
     default: return <OverviewPage onNavigate={onNavigate} />;

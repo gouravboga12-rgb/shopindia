@@ -139,5 +139,6 @@ export interface CustomerProfile {
   phone: string;
   avatar?: string;
   dob?: string;
+  gender?: string;
   plusMember: boolean;
 }
