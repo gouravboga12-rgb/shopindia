@@ -363,6 +363,5 @@ router.get('/settlements', async (req, res) => {
     res.status(500).json({ error: err.message || 'Failed to fetch settlements.' });
   }
 });
-});
 
 module.exports = router;
