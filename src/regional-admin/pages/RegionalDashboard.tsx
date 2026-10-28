@@ -145,6 +145,8 @@ export const RegionalDashboard: React.FC = () => {
     setSearchResults([]);
     try {
       const addrStr = item.formattedAddress || item.fullAddress || '';
+      const pinMatch = addrStr.match(/\b([1-9][0-9]{5})\b/);
+      const extractedPin = item.pincode || (pinMatch ? pinMatch[1] : undefined);
       const hubName = item.neighborhood || item.colony || item.city || addrStr.split(',')[0];
       const regionTitle = hubName && item.district && hubName !== item.district
         ? `${hubName} Hub (${item.district})`
@@ -155,7 +157,7 @@ export const RegionalDashboard: React.FC = () => {
         address: addrStr,
         district: item.district || item.city,
         state: item.state,
-        pincode: item.pincode,
+        pincode: extractedPin,
         latitude: item.latitude,
         longitude: item.longitude,
       });
@@ -167,9 +169,13 @@ export const RegionalDashboard: React.FC = () => {
           state: item.state,
           assignedPincodes: res.profile?.assignedPincodes || [],
           formattedAddress: addrStr,
-          coords: { lat: item.latitude, lng: item.longitude },
+          coords: (item.latitude && item.longitude) ? { lat: item.latitude, lng: item.longitude } : undefined,
         });
-        setLocFeedback({ type: 'success', text: `Location saved: ${item.latitude.toFixed(5)}°N, ${item.longitude.toFixed(5)}°E` });
+        setLocFeedback({
+          type: 'success',
+          text: `Base station updated to ${regionTitle} (${item.latitude ? item.latitude.toFixed(5) + '°N, ' + item.longitude.toFixed(5) + '°E' : 'GPS recorded'})`,
+        });
+        await fetchHubLocation();
         setTimeout(() => setLocFeedback(null), 6000);
       }
     } catch (err: any) {

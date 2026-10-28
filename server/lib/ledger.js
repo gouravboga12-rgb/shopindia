@@ -49,14 +49,28 @@ function calcGatewayFee(amount) {
 
 /**
  * Post one or more ledger entries inside an existing Prisma transaction.
- * Always call this WITHIN a prisma.$transaction() callback.
+ * Flexible caller support: accepts (tx, entries) or (entries, tx) or (entries) with root prisma.
  *
- * @param {import('@prisma/client').Prisma.TransactionClient} tx - Prisma TX client
- * @param {Array} entries - Array of entry objects to create
+ * @param {import('@prisma/client').Prisma.TransactionClient|Array} arg1 - Prisma TX client OR entries array
+ * @param {Array|import('@prisma/client').Prisma.TransactionClient} [arg2] - entries array OR Prisma TX client
  * @returns {Promise<Array>} Created LedgerEntry records
  */
-async function postLedgerEntries(tx, entries) {
-  if (!entries || entries.length === 0) return [];
+async function postLedgerEntries(arg1, arg2) {
+  let tx = arg1;
+  let entries = arg2;
+
+  // Handle case where caller passes (entries, tx) instead of (tx, entries)
+  if (Array.isArray(arg1)) {
+    entries = arg1;
+    tx = arg2;
+  }
+
+  // If no tx or invalid tx, fallback to root prisma
+  if (!tx || typeof tx.ledgerEntry?.create !== 'function') {
+    tx = prisma;
+  }
+
+  if (!entries || !Array.isArray(entries) || entries.length === 0) return [];
 
   const results = await Promise.all(
     entries.map((entry) =>

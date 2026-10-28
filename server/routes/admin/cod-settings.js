@@ -254,6 +254,7 @@ router.post('/riders/:id/force-clear', async (req, res) => {
 
       // 3. Post immutable Ledger debit
       await postLedgerEntries(
+        tx,
         [
           {
             type: 'DEBIT',
@@ -269,8 +270,7 @@ router.post('/riders/:id/force-clear', async (req, res) => {
             },
             riderProfileId: id,
           },
-        ],
-        tx
+        ]
       );
     });
 
@@ -500,6 +500,7 @@ router.post('/remittances/:id/verify-bank', async (req, res) => {
 
       // Post platform ledger credit
       await postLedgerEntries(
+        tx,
         [
           {
             type: 'CREDIT',
@@ -515,8 +516,7 @@ router.post('/remittances/:id/verify-bank', async (req, res) => {
               timestamp: new Date().toISOString(),
             },
           },
-        ],
-        tx
+        ]
       );
     });
 

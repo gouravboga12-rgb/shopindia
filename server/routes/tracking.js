@@ -130,6 +130,66 @@ router.get('/reverse-geocode', async (req, res) => {
 });
 
 /**
+ * GET /api/tracking/search-address
+ * Forward geocodes a location query (e.g. "Khammam", "Uppal, Hyderabad") using Mapbox Places API
+ * with server-side MAPBOX_ACCESS_TOKEN. Never fails due to missing client environment variables or CORS.
+ */
+router.get('/search-address', async (req, res) => {
+  try {
+    const q = req.query.q || req.query.query;
+    if (!q || String(q).trim().length < 2) {
+      return res.json({ success: true, results: [] });
+    }
+
+    const token = process.env.MAPBOX_ACCESS_TOKEN;
+    if (!token) {
+      console.warn('[Search Address Mapbox] MAPBOX_ACCESS_TOKEN not set on server.');
+      return res.json({ success: true, results: [] });
+    }
+    const mbUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(String(q).trim())}.json?access_token=${token}&country=in&limit=6`;
+
+    const data = await fetchJson(mbUrl);
+    if (!data || !Array.isArray(data.features)) {
+      return res.json({ success: true, results: [] });
+    }
+
+    const results = data.features.map((feat) => {
+      const [lng, lat] = feat.center || [0, 0];
+      const ctx = feat.context || [];
+      const getCtx = (prefix) => ctx.find((c) => c.id && c.id.startsWith(prefix))?.text;
+
+      const pincode = getCtx('postcode') || '';
+      const locality = getCtx('neighborhood') || getCtx('locality') || feat.text || '';
+      const city = getCtx('place') || '';
+      const district = getCtx('district') || city;
+      const state = getCtx('region') || '';
+      const country = getCtx('country') || 'India';
+      const formatted = feat.place_name || feat.text || q;
+
+      return {
+        fullAddress: formatted,
+        formattedAddress: formatted,
+        road: feat.properties?.address || (feat.text !== city && feat.text !== pincode ? feat.text : undefined),
+        neighborhood: locality || undefined,
+        colony: locality || undefined,
+        city: city || undefined,
+        district: district || undefined,
+        state: state || undefined,
+        country,
+        pincode: pincode || undefined,
+        latitude: lat,
+        longitude: lng,
+      };
+    });
+
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error('Search address geocoding error:', err);
+    res.status(500).json({ error: err.message || 'Failed to search address.' });
+  }
+});
+
+/**
  * GET /api/tracking/order/:orderId
  * Fetches real-time delivery status, route coordinates, and assigned rider for a customer/vendor order
  */

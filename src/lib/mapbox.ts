@@ -182,9 +182,22 @@ export async function detectCurrentLocationWithMapbox(): Promise<GeocodedAddress
 export async function searchAddressesMapbox(query: string): Promise<GeocodedAddress[]> {
   if (!query || query.trim().length < 2) return [];
 
+  // 1. Primary: Server-side Mapbox Geocoding Proxy (Avoids CORS and missing frontend env keys)
+  try {
+    const srvRes = await fetch(`/api/tracking/search-address?q=${encodeURIComponent(query.trim())}`);
+    if (srvRes.ok) {
+      const srvData = await srvRes.json();
+      if (srvData && Array.isArray(srvData.results) && srvData.results.length > 0) {
+        return srvData.results;
+      }
+    }
+  } catch (srvErr) {
+    console.warn('Server search-address proxy failed, trying direct Mapbox...', srvErr);
+  }
+
   const mbToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-  // 1. Primary: Mapbox Geocoding API (High accuracy pinpoint coordinates)
+  // 2. Direct Mapbox Places API
   if (mbToken) {
     try {
       const mbUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query.trim())}.json?access_token=${mbToken}&country=in&limit=6`;

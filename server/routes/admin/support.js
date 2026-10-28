@@ -298,7 +298,7 @@ router.post('/tickets/:id/refund', async (req, res) => {
             where: { id: ticket.vendorId },
             data: { walletBalance: { decrement: finalRefundAmt } }
           });
-          await postLedgerEntries([{
+          await postLedgerEntries(tx, [{
             party: 'VENDOR',
             partyId: ticket.vendorId,
             type: 'REFUND_DEBIT',
@@ -306,14 +306,14 @@ router.post('/tickets/:id/refund', async (req, res) => {
             orderId: ticket.orderId,
             description: `Refund debit for Ticket #${ticket.ticketNumber} (Order #${ticket.order?.orderNumber || ticket.orderId})`,
             metadata: { ticketId: ticket.id, atFault: 'vendor', refundAmount: finalRefundAmt }
-          }], tx);
+          }]);
         } else if (refundAtFault === 'rider' && ticket.order?.delivery?.riderProfileId) {
           const riderId = ticket.order.delivery.riderProfileId;
           await tx.riderProfile.update({
             where: { id: riderId },
             data: { walletBalance: { decrement: finalRefundAmt } }
           });
-          await postLedgerEntries([{
+          await postLedgerEntries(tx, [{
             party: 'RIDER',
             partyId: riderId,
             type: 'REFUND_DEBIT',
@@ -321,7 +321,7 @@ router.post('/tickets/:id/refund', async (req, res) => {
             orderId: ticket.orderId,
             description: `Delivery refund deduction for Ticket #${ticket.ticketNumber}`,
             metadata: { ticketId: ticket.id, atFault: 'rider', refundAmount: finalRefundAmt }
-          }], tx);
+          }]);
         }
 
         // 4. Ticket message

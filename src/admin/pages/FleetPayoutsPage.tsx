@@ -482,39 +482,49 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                         </div>
 
                         {/* Dynamic Quick Call / WhatsApp / KYC Inspector Buttons */}
-                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          {user?.phone && (
-                            <>
-                              <a
-                                href={`tel:${user.phone}`}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10.5px] font-bold transition-colors"
-                                title="Call Partner"
+                        {(() => {
+                          const contactPhone = user?.phone || rider?.user?.phone || (rider as any)?.phone;
+                          const cleanDigits = contactPhone ? contactPhone.replace(/\D/g, '').slice(-10) : '';
+                          return (
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              {contactPhone ? (
+                                <>
+                                  <a
+                                    href={`tel:${contactPhone}`}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10.5px] font-bold transition-colors"
+                                    title={`Call Partner (${contactPhone})`}
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                    <span>Call</span>
+                                  </a>
+                                  <a
+                                    href={`https://wa.me/91${cleanDigits}?text=${encodeURIComponent(`Hello ${user?.name || 'Partner'}, regarding your ShopIndia payout request of ₹${req.amount}...`)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold transition-colors"
+                                    title={`Chat on WhatsApp (${contactPhone})`}
+                                  >
+                                    <MessageCircle className="w-3 h-3" />
+                                    <span>WhatsApp</span>
+                                  </a>
+                                </>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 text-slate-400 border border-slate-200 text-[10px] font-medium" title="No phone registered">
+                                  <Phone className="w-2.5 h-2.5" /> No Phone
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setInspectRider(rider)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10.5px] font-bold transition-colors cursor-pointer"
+                                title="Inspect Partner Driving License, RC & Aadhaar"
                               >
-                                <Phone className="w-3 h-3" />
-                                <span>Call</span>
-                              </a>
-                              <a
-                                href={`https://wa.me/91${user.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello ${user.name || 'Partner'}, regarding your ShopIndia payout request of ₹${req.amount}...`)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold transition-colors"
-                                title="Chat on WhatsApp"
-                              >
-                                <MessageCircle className="w-3 h-3" />
-                                <span>WhatsApp</span>
-                              </a>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setInspectRider(rider)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10.5px] font-bold transition-colors cursor-pointer"
-                            title="Inspect Partner Driving License, RC & Aadhaar"
-                          >
-                            <Info className="w-3 h-3 text-slate-500" />
-                            <span>Info</span>
-                          </button>
-                        </div>
+                                <Info className="w-3 h-3 text-slate-500" />
+                                <span>Info</span>
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td className="py-3.5 px-4">

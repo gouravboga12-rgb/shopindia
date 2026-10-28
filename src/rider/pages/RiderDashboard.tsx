@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRider } from '../context/RiderContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
@@ -81,6 +81,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
     }
   };
 
+  useEffect(() => {
+    fetchHubStatus();
+  }, []);
+
   const handleOpenHubModal = async () => {
     setShowHubModal(true);
     await fetchHubStatus();
@@ -159,6 +163,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
 
             if (verifyRes.success) {
               setRemitFeedback({ type: 'success', text: verifyRes.message || 'Payment cleared successfully! Cash float reset.' });
+              await fetchHubStatus();
               if (refreshData) await refreshData();
             }
           } catch (verr: unknown) {
@@ -254,51 +259,44 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
 
       {/* Floating Cash in Hand Alert Banner (Prominent COD Cash Remittance to Super Admin) */}
       {(profile?.codCashFloat ?? 0) > 0 && (
-        <div className={`p-5 rounded-2xl sm:rounded-3xl border-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm ${
+        <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 flex flex-col gap-3 shadow-sm ${
           (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
             ? 'bg-red-50 border-red-300 text-red-900'
             : 'bg-gradient-to-r from-amber-50 to-orange-50 border-orange-300 text-orange-950'
         }`}>
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className={`p-3 rounded-2xl border shadow-xs shrink-0 ${
-              (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-                ? 'bg-red-500 text-white border-red-600'
-                : 'bg-orange-500 text-white border-orange-600'
-            }`}>
-              <Banknote className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm sm:text-base font-black uppercase tracking-tight">
-                  Cash in Hand: ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
-                </span>
-                {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000) ? (
-                  <span className="text-[10px] bg-red-200 text-red-900 font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-red-300">
-                    <ShieldAlert className="w-3 h-3" /> RADAR PAUSED (LIMIT REACHED)
-                  </span>
-                ) : (
-                  <span className="text-[10px] bg-amber-200/90 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300">
-                    Remit to Admin (Limit ₹{(profile?.codFloatLimit || 3000).toLocaleString('en-IN')})
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-600 mt-1">
-                {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-                  ? 'Your cash float reached the threshold. Pay to Admin online or submit to Regional Admin to continue receiving orders.'
-                  : 'Customer COD cash collected. Remit online via UPI/Razorpay or generate cash handover code for your local hub.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 self-start lg:self-auto shrink-0">
-            {remitFeedback && (
-              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
-                remitFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className={`p-3 rounded-2xl border shadow-xs shrink-0 ${
+                (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
+                  ? 'bg-red-500 text-white border-red-600'
+                  : 'bg-orange-500 text-white border-orange-600'
               }`}>
-                {remitFeedback.text}
-              </span>
-            )}
-            <div className="flex items-center gap-2">
+                <Banknote className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm sm:text-base font-black uppercase tracking-tight">
+                    Cash in Hand: ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
+                  </span>
+                  {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000) ? (
+                    <span className="text-[10px] bg-red-200 text-red-900 font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-red-300">
+                      <ShieldAlert className="w-3 h-3" /> RADAR PAUSED (LIMIT REACHED)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-amber-200/90 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                      Remit to Admin (Limit ₹{(profile?.codFloatLimit || 3000).toLocaleString('en-IN')})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 mt-1">
+                  {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
+                    ? 'Your cash float reached the threshold. Pay to Admin online or submit to Regional Admin to continue receiving orders.'
+                    : 'Customer COD cash collected. Remit online via UPI/Razorpay or hand over physical cash to your local hub.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
               <button
                 type="button"
                 disabled={isPayingRazorpay || (profile?.codCashFloat ?? 0) <= 0}
@@ -327,6 +325,33 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
               </button>
             </div>
           </div>
+
+          {/* Persistent Pending Physical Handover Alert Banner */}
+          {hubStatusData?.pendingSubmission && (
+            <div className="p-3 bg-amber-100/90 border border-amber-300 rounded-xl flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-950">
+                <Clock className="w-4 h-4 text-amber-700 animate-pulse shrink-0" />
+                <span>
+                  Physical cash of ₹{hubStatusData.pendingSubmission.amount} submitted to {hubStatusData.regionalAdmin?.name || 'Regional Hub'} — Pending Hub Acceptance
+                </span>
+              </div>
+              <span className="text-[10.5px] bg-amber-200 text-amber-900 font-extrabold px-2.5 py-1 rounded-full border border-amber-300 shrink-0">
+                Awaiting Approval
+              </span>
+            </div>
+          )}
+
+          {/* Transient Remit Feedback (Success/Error) */}
+          {remitFeedback && (
+            <div className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 ${
+              remitFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-800 border border-red-300'
+            }`}>
+              <span>{remitFeedback.text}</span>
+              <button onClick={() => setRemitFeedback(null)} className="opacity-60 hover:opacity-100 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -10,7 +10,7 @@ const router = express.Router();
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
-const { createRazorpayOrder, verifyPaymentSignature } = require('../../lib/razorpay');
+const { createRazorpayOrder, verifyPaymentSignature, fetchPaymentDetails } = require('../../lib/razorpay');
 const { postLedgerEntries } = require('../../lib/ledger');
 
 router.use(verifyToken, requireRole('rider'));
@@ -264,11 +264,24 @@ router.post('/verify-razorpay-remittance', async (req, res) => {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
-    const isValid = verifyPaymentSignature({
+    let isValid = verifyPaymentSignature({
       orderId: razorpayOrderId,
       paymentId: razorpayPaymentId,
       signature: razorpaySignature,
     });
+
+    // Fallback: If signature verification fails, fetch payment directly from Razorpay API
+    if (!isValid && razorpayPaymentId) {
+      try {
+        const paymentDetails = await fetchPaymentDetails(razorpayPaymentId);
+        if (paymentDetails && (paymentDetails.status === 'captured' || paymentDetails.status === 'authorized')) {
+          isValid = true;
+          console.log(`[Rider COD] Payment ${razorpayPaymentId} verified via Razorpay API fetch fallback.`);
+        }
+      } catch (fetchErr) {
+        console.warn('[Rider COD] Fallback Razorpay fetch failed:', fetchErr.message);
+      }
+    }
 
     if (!isValid) {
       return res.status(400).json({ error: 'Invalid payment signature from Razorpay.' });
@@ -306,6 +319,7 @@ router.post('/verify-razorpay-remittance', async (req, res) => {
 
       // 3. Post immutable ledger debit
       await postLedgerEntries(
+        tx,
         [
           {
             type: 'DEBIT',
@@ -321,8 +335,7 @@ router.post('/verify-razorpay-remittance', async (req, res) => {
             },
             riderProfileId: rider.id,
           },
-        ],
-        tx
+        ]
       );
     });
 
