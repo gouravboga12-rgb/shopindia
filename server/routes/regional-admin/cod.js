@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
 
     const regionalAdminId = profile?.id;
 
-    const [pendingSubmissions, collectedPool, pastRemittances] = await Promise.all([
+    const [pendingSubmissions, collectedPool, pastRemittances, acceptedHandovers] = await Promise.all([
       // 1. Pending handovers from territory riders (physical submission not yet verified by admin)
       prisma.cODRemittance.findMany({
         where: {
@@ -74,7 +74,23 @@ router.get('/', async (req, res) => {
           },
         },
         orderBy: { remittedToSuperAt: 'desc' },
-        take: 20,
+        take: 30,
+      }),
+
+      // 4. All physical cash receipts confirmed by this regional admin (Passbook History)
+      prisma.cODRemittance.findMany({
+        where: {
+          clearanceMode: 'physical',
+          receivedByAdminAt: { not: null },
+          ...(regionalAdminId ? { regionalAdminId } : {}),
+        },
+        include: {
+          riderProfile: {
+            include: { user: { select: { name: true, phone: true, email: true } } },
+          },
+        },
+        orderBy: { receivedByAdminAt: 'desc' },
+        take: 50,
       }),
     ]);
 
@@ -88,6 +104,10 @@ router.get('/', async (req, res) => {
       pendingSubmissions: pendingSubmissions.map((r) => ({ ...r, status: 'pending' })),
       collectedPool: collectedPool.map((r) => ({ ...r, status: 'received_by_regional' })),
       pastRemittances: pastRemittances.map((r) => ({ ...r, status: 'remitted_to_super' })),
+      acceptedHandovers: acceptedHandovers.map((r) => ({
+        ...r,
+        isSettledToHQ: !!r.remittedToSuperAt,
+      })),
     });
   } catch (err) {
     console.error('[Regional Admin COD] Fetch error:', err);

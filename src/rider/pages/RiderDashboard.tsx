@@ -28,7 +28,7 @@ interface RiderDashboardProps {
   onNavigateToTab?: (tab: string) => void;
 }
 
-export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
+export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
   const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation, refreshData } = useRider();
   const { user } = useAuth();
   const [locating, setLocating] = useState(false);
@@ -323,6 +323,17 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
                 <Building2 className="w-4 h-4 text-slate-600" />
                 <span>Hub Handover</span>
               </button>
+              {onNavigateToTab && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab('deliveries')}
+                  className="px-3 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                  title="View COD Clearance Passbook & History"
+                >
+                  <Clock className="w-3.5 h-3.5 text-orange-600" />
+                  <span>Passbook</span>
+                </button>
+              )}
             </div>
           </div>
 

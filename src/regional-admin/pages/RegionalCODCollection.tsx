@@ -50,6 +50,7 @@ interface CODResponse {
   pendingSubmissions: RemittanceRecord[];
   collectedPool: RemittanceRecord[];
   pastRemittances: RemittanceRecord[];
+  acceptedHandovers?: (RemittanceRecord & { isSettledToHQ?: boolean })[];
 }
 
 export const RegionalCODCollection: React.FC = () => {
@@ -605,51 +606,130 @@ export const RegionalCODCollection: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: REMITTANCE HISTORY */}
+      {/* TAB 3: COMPLETE AUDIT & REMITTANCE HISTORY */}
       {activeTab === 'history' && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-800">Past Completed Remittances to HQ</h2>
+        <div className="space-y-5">
+          {/* Section A: All Fleet Cash Handovers Accepted by this Hub */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800">Fleet Cash Receipts Confirmed by Hub</h2>
+                <p className="text-[11px] text-slate-500">Every physical cash handover accepted from riders at this hub</p>
+              </div>
+              <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                {data?.acceptedHandovers?.length || 0} Receipts
+              </span>
+            </div>
+
+            {(!data?.acceptedHandovers || data.acceptedHandovers.length === 0) ? (
+              <div className="p-10 text-center text-slate-400">
+                <Banknote className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
+                <p className="text-xs">No physical cash receipts confirmed yet.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {data.acceptedHandovers.map((rcpt) => (
+                  <div key={rcpt.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                          {rcpt.riderProfile?.user?.name || 'Rider'}
+                        </span>
+                        {rcpt.riderProfile?.user?.phone && (
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            ({rcpt.riderProfile.user.phone})
+                          </span>
+                        )}
+                        {rcpt.isSettledToHQ ? (
+                          <span className="text-[9.5px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                            Forwarded to Super Admin
+                          </span>
+                        ) : (
+                          <span className="text-[9.5px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                            In Regional Custody Pool
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-slate-400 font-mono mt-1">
+                        Accepted on:{' '}
+                        {rcpt.receivedByAdminAt
+                          ? new Date(rcpt.receivedByAdminAt).toLocaleString('en-IN')
+                          : new Date(rcpt.createdAt).toLocaleString('en-IN')}
+                      </div>
+
+                      {rcpt.notes && (
+                        <p className="text-[11px] text-slate-600 italic mt-0.5">
+                          Receipt note: {rcpt.notes}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-left sm:text-right shrink-0">
+                      <span className="font-mono font-black text-sm text-slate-900">
+                        ₹{rcpt.amount.toLocaleString('en-IN')}
+                      </span>
+                      <span className="block text-[10px] text-emerald-600 font-bold">
+                        Liability Transferred to Hub
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {data?.pastRemittances.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-              <History className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p className="text-xs">No historical remittances found.</p>
+          {/* Section B: Past Completed Remittances to Super Admin HQ */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800">Settlements Forwarded to Super Admin HQ</h2>
+                <p className="text-[11px] text-slate-500">Bulk remittances deposited via Razorpay or Bank Transfer</p>
+              </div>
+              <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                {data?.pastRemittances.length || 0} Settled
+              </span>
             </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data?.pastRemittances.map((hist) => (
-                <div key={hist.id} className="p-4 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-bold text-slate-900">
-                      Rider: {hist.riderProfile?.user?.name || 'Rider'}
-                    </div>
-                    <div className="text-slate-400 text-[11px] font-mono">
-                      Remitted at:{' '}
-                      {hist.remittedToSuperAt
-                        ? new Date(hist.remittedToSuperAt).toLocaleString('en-IN')
-                        : 'Settled'}
-                    </div>
-                    {hist.superAdminRazorpayId && (
-                      <div className="text-[10px] text-blue-600 font-mono mt-0.5">
-                        Razorpay Payment: {hist.superAdminRazorpayId}
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="text-right">
-                    <span className="font-mono font-black text-sm text-slate-900">
-                      ₹{hist.amount.toLocaleString('en-IN')}
-                    </span>
-                    <span className="block text-[10px] text-emerald-600 font-bold uppercase">
-                      Settled to HQ
-                    </span>
+            {data?.pastRemittances.length === 0 ? (
+              <div className="p-10 text-center text-slate-400">
+                <History className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
+                <p className="text-xs">No bulk remittances settled to Super Admin HQ yet.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {data?.pastRemittances.map((hist) => (
+                  <div key={hist.id} className="p-4 flex items-center justify-between text-xs hover:bg-slate-50/60 transition-colors">
+                    <div>
+                      <div className="font-bold text-slate-900">
+                        Remitted Batch (Rider: {hist.riderProfile?.user?.name || 'Rider'})
+                      </div>
+                      <div className="text-slate-400 text-[11px] font-mono">
+                        Settled at:{' '}
+                        {hist.remittedToSuperAt
+                          ? new Date(hist.remittedToSuperAt).toLocaleString('en-IN')
+                          : 'Settled'}
+                      </div>
+                      {hist.superAdminRazorpayId && (
+                        <div className="text-[10px] text-blue-600 font-mono mt-0.5">
+                          Reference / Payment ID: {hist.superAdminRazorpayId}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right">
+                      <span className="font-mono font-black text-sm text-slate-900">
+                        ₹{hist.amount.toLocaleString('en-IN')}
+                      </span>
+                      <span className="block text-[10px] text-emerald-600 font-bold uppercase">
+                        Settled to HQ
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

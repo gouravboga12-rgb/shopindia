@@ -210,6 +210,82 @@ router.get('/status', async (req, res) => {
 });
 
 /**
+ * GET /api/rider/cod/history
+ * Returns full history of rider COD cash remittances:
+ * both Online Razorpay clearances and Physical Hub Handovers with status, admin info, and receipt notes.
+ */
+router.get('/history', async (req, res) => {
+  try {
+    const rider = await prisma.riderProfile.findUnique({
+      where: { userId: req.user.userId },
+      select: { id: true },
+    });
+
+    if (!rider) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    const remittances = await prisma.cODRemittance.findMany({
+      where: { riderProfileId: rider.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Resolve regional admin details if any physical submissions
+    const adminIds = [...new Set(remittances.map((r) => r.regionalAdminId).filter(Boolean))];
+    const admins = adminIds.length > 0
+      ? await prisma.regionalAdminProfile.findMany({
+          where: { id: { in: adminIds } },
+          include: {
+            user: { select: { name: true, phone: true } },
+            branch: { select: { name: true, city: true } },
+          },
+        })
+      : [];
+
+    const adminMap = {};
+    admins.forEach((a) => {
+      adminMap[a.id] = {
+        name: a.user?.name || 'Regional Hub Admin',
+        phone: a.user?.phone || null,
+        hubName: a.branch?.name || a.regionName || 'Regional Hub',
+      };
+    });
+
+    const history = remittances.map((r) => {
+      const admin = r.regionalAdminId ? adminMap[r.regionalAdminId] : null;
+      let displayStatus = 'Pending Hub Approval';
+      let statusColor = 'amber';
+
+      if (r.clearanceMode === 'online') {
+        displayStatus = 'Paid Online (Razorpay)';
+        statusColor = 'emerald';
+      } else if (r.status === 'verified' || r.receivedByAdminAt) {
+        displayStatus = 'Cash Accepted by Hub';
+        statusColor = 'emerald';
+      }
+
+      return {
+        id: r.id,
+        amount: r.amount,
+        clearanceMode: r.clearanceMode,
+        status: r.status,
+        displayStatus,
+        statusColor,
+        createdAt: r.createdAt,
+        receivedByAdminAt: r.receivedByAdminAt,
+        razorpayPaymentId: r.razorpayPaymentId,
+        notes: r.notes,
+        regionalAdmin: admin,
+      };
+    });
+
+    res.json({ success: true, history });
+  } catch (err) {
+    console.error('[Rider COD History] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/rider/cod/create-razorpay-order
  * Creates a Razorpay order for the rider to remit their COD cash float online.
  */
