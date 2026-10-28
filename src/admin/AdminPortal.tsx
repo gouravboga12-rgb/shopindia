@@ -41,10 +41,12 @@ const AdminContent: React.FC = () => {
   // When a vendor is being managed, render the vendor panel overlay
   if (managedVendor) {
     return (
-      <div className="flex min-h-screen bg-[#FAF9F6]">
+      <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
         <AdminSidebar currentTab={tab} onTabChange={(t) => { setTab(t); setManagedVendor(null); setStatementTarget(null); }} />
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto">
-          <AdminVendorView vendor={managedVendor} onBack={() => setManagedVendor(null)} />
+        <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            <AdminVendorView vendor={managedVendor} onBack={() => setManagedVendor(null)} />
+          </div>
         </main>
       </div>
     );
@@ -93,10 +95,12 @@ const AdminContent: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#FAF9F6]">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
       <AdminSidebar currentTab={tab} onTabChange={setTab} />
-      <main className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto">
-        {renderTab()}
+      <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderTab()}
+        </div>
       </main>
     </div>
   );

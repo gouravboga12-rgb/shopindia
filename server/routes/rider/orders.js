@@ -477,7 +477,7 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
  * GET /api/rider/orders/history
  * Fetch past completed or cancelled deliveries
  */
-router.get('/orders/history', async (req, res) => {
+router.get(['/history', '/orders/history'], async (req, res) => {
   try {
     const profile = await getRiderProfile(req.user.userId);
     if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });

@@ -10,10 +10,37 @@ router.use(verifyToken, requireRole('super_admin'));
 /** GET /api/admin/rbac/roles */
 router.get('/roles', async (_req, res) => {
   try {
-    const roles = await prisma.role.findMany({
+    let roles = await prisma.role.findMany({
       include: { permissions: true },
       orderBy: { name: 'asc' },
     });
+
+    // Ensure core system roles exist
+    const systemRoleNames = roles.map(r => r.name);
+    if (!systemRoleNames.includes('regional_admin')) {
+      try {
+        const regionalPerms = [
+          'view_dashboard', 'manage_vendors', 'view_vendors', 
+          'manage_riders', 'view_riders', 'manage_orders', 
+          'view_orders', 'manage_support', 'view_support', 'manage_cod', 'manage_payouts'
+        ];
+        const newRole = await prisma.role.create({
+          data: {
+            name: 'regional_admin',
+            displayName: 'Regional Admin',
+            isSystem: true,
+            permissions: {
+              create: regionalPerms.map(p => ({ permission: p })),
+            },
+          },
+          include: { permissions: true },
+        });
+        roles.push(newRole);
+      } catch (e) {
+        console.warn('Could not auto-create regional_admin role:', e.message);
+      }
+    }
+
     const formatted = roles.map((r) => ({
       ...r,
       permissions: r.permissions.map((p) => p.permission),
@@ -81,16 +108,17 @@ router.delete('/roles/:id', async (req, res) => {
 /** GET /api/admin/rbac/permissions — list all known permission strings */
 router.get('/permissions', (_req, res) => {
   const PERMISSIONS = [
-    'manage_dashboard', 'view_dashboard',
-    'manage_users',    'view_users',
-    'manage_vendors',  'view_vendors',
-    'manage_products', 'view_products',
-    'manage_orders',   'view_orders',
-    'manage_branches', 'view_branches',
-    'manage_support',  'view_support',
-    'manage_commissions',
-    'manage_service_areas',
-    'view_analytics',
+    'view_dashboard', 'manage_dashboard',
+    'manage_finance', 'manage_payouts', 'manage_commissions', 'manage_cod',
+    'view_vendors', 'manage_vendors',
+    'view_riders', 'manage_riders',
+    'manage_regional_admins',
+    'view_products', 'manage_products', 'manage_services',
+    'view_orders', 'manage_orders',
+    'view_branches', 'manage_branches', 'manage_service_areas',
+    'view_users', 'manage_users', 'manage_rbac',
+    'view_support', 'manage_support',
+    'manage_promotions', 'manage_offers', 'view_reports'
   ];
   res.json(PERMISSIONS);
 });

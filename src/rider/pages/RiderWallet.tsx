@@ -14,7 +14,8 @@ import {
   CreditCard,
   Building2,
   RefreshCw,
-  KeyRound
+  KeyRound,
+  Smartphone
 } from 'lucide-react';
 
 interface PayoutItem {
@@ -56,13 +57,22 @@ export const RiderWallet: React.FC = () => {
   const { profile, refreshData } = useRider();
 
   // Payout states
+  const [method, setMethod] = useState<'bank' | 'upi'>('upi');
   const [amount, setAmount] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
-  const [ifsc, setIfsc] = useState('');
+  const [upiId, setUpiId] = useState(profile?.upiId || '');
+  const [bankAccount, setBankAccount] = useState(profile?.accountNumber || '');
+  const [ifsc, setIfsc] = useState(profile?.ifsc || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [payouts, setPayouts] = useState<PayoutItem[]>([]);
+
+  // Sync profile details
+  useEffect(() => {
+    if (profile?.upiId && !upiId) setUpiId(profile.upiId);
+    if (profile?.accountNumber && !bankAccount) setBankAccount(profile.accountNumber);
+    if (profile?.ifsc && !ifsc) setIfsc(profile.ifsc);
+  }, [profile]);
 
   // COD Clearance states
   const [codStatus, setCodStatus] = useState<CODStatus | null>(null);
@@ -77,13 +87,8 @@ export const RiderWallet: React.FC = () => {
   const fetchWallet = async () => {
     if (!token) return;
     try {
-      const res = await fetch('/api/rider/wallet', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPayouts(data.payouts || []);
-      }
+      const data = await api.get<{ payouts: PayoutItem[] }>('/api/rider/wallet');
+      setPayouts(data.payouts || []);
     } catch (e) {
       console.error('Wallet fetch error', e);
     }
@@ -124,31 +129,32 @@ export const RiderWallet: React.FC = () => {
       setError('Withdrawal amount exceeds your current wallet balance.');
       return;
     }
-    if (!bankAccount || !ifsc) {
-      setError('Bank account and IFSC code are required.');
-      return;
+
+    if (method === 'upi') {
+      if (!upiId || !upiId.trim() || !upiId.includes('@')) {
+        setError('Please enter a valid UPI ID (e.g. mobile@upi or name@okaxis).');
+        return;
+      }
+    } else {
+      if (!bankAccount || !ifsc) {
+        setError('Bank account and IFSC code are required.');
+        return;
+      }
     }
 
     setLoading(true);
     try {
-      const res = await fetch('/api/rider/wallet/payout-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          amount: withdrawAmt,
-          bankAccountNumber: bankAccount,
-          ifscCode: ifsc,
-        }),
+      const res = await api.post<{ success: boolean; message: string }>('/api/rider/wallet/payout-request', {
+        amount: withdrawAmt,
+        method,
+        upiId: method === 'upi' ? upiId.trim() : undefined,
+        bankAccountNumber: method === 'bank' ? bankAccount.trim() : undefined,
+        ifscCode: method === 'bank' ? ifsc.trim().toUpperCase() : undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Payout request failed');
 
-      setSuccess(`Payout request of ₹${withdrawAmt} submitted! Funds will arrive within 24 hours.`);
+      setSuccess(res.message || `Payout request of ₹${withdrawAmt} submitted! Funds will arrive within 24 hours.`);
       setAmount('');
-      await refreshData();
+      if (refreshData) await refreshData();
       await fetchWallet();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -555,28 +561,73 @@ export const RiderWallet: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Bank Account Number</label>
-              <input
-                type="text"
-                placeholder="11-16 digit Account No"
-                value={bankAccount}
-                onChange={(e) => setBankAccount(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">IFSC Code</label>
-              <input
-                type="text"
-                placeholder="HDFC0001234"
-                value={ifsc}
-                onChange={(e) => setIfsc(e.target.value.toUpperCase())}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white uppercase transition-colors"
-              />
+          {/* Payout Destination Method Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Payout Method</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMethod('upi')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  method === 'upi'
+                    ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-2xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>UPI Transfer (Instant)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod('bank')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  method === 'bank'
+                    ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-2xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Building className="w-4 h-4" />
+                <span>Bank Account</span>
+              </button>
             </div>
           </div>
+
+          {method === 'upi' ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">UPI ID (VPA)</label>
+              <input
+                type="text"
+                placeholder="e.g. mobile@upi or username@okhdfcbank"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Funds will be credited directly to your UPI-linked bank account.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Bank Account Number</label>
+                <input
+                  type="text"
+                  placeholder="11-16 digit Account No"
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">IFSC Code</label>
+                <input
+                  type="text"
+                  placeholder="HDFC0001234"
+                  value={ifsc}
+                  onChange={(e) => setIfsc(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white uppercase transition-colors"
+                />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -587,8 +638,8 @@ export const RiderWallet: React.FC = () => {
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <Building className="w-4 h-4" />
-                <span>Submit Withdrawal Request</span>
+                {method === 'upi' ? <Smartphone className="w-4 h-4" /> : <Building className="w-4 h-4" />}
+                <span>Submit {method === 'upi' ? 'UPI' : 'Bank'} Withdrawal Request</span>
               </>
             )}
           </button>
@@ -608,7 +659,11 @@ export const RiderWallet: React.FC = () => {
               <div key={p.id} className="py-3 flex items-center justify-between text-xs">
                 <div>
                   <span className="font-bold text-slate-900 text-sm">₹{p.amount}</span>
-                  <p className="text-slate-500">Account: ••••{p.bankAccountNumber?.slice(-4) || 'Bank'}</p>
+                  <p className="text-slate-500">
+                    {p.bankAccountNumber?.startsWith('UPI:')
+                      ? p.bankAccountNumber
+                      : `Bank A/c: ••••${p.bankAccountNumber?.slice(-4) || 'Bank'}`}
+                  </p>
                   <span className="text-[10px] text-slate-400">
                     {new Date(p.createdAt).toLocaleDateString('en-IN', {
                       month: 'short',

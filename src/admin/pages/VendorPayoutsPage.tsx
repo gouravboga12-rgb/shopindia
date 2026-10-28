@@ -164,18 +164,48 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
 
   const formatINR = (val?: number) => `₹${(val || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, notes?: string) => {
+    const isRegionalVerified = notes?.includes('[Regional Verification');
+    const isRegionalEscalated = notes?.includes('[Regional Escalation');
+
     switch (status) {
       case 'completed':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-[11px] font-bold"><CheckCircle2 className="w-3.5 h-3.5" /> Disbursed</span>;
       case 'approved':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-[11px] font-bold"><ShieldCheck className="w-3.5 h-3.5" /> Approved</span>;
+        return (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-full text-[11px] font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              {isRegionalVerified ? 'Regional Verified' : 'Approved'}
+            </span>
+            {isRegionalVerified && (
+              <span className="text-[9.5px] text-emerald-600 font-semibold">Forwarded by Regional Lead</span>
+            )}
+          </div>
+        );
       case 'under_review':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-full text-[11px] font-bold"><Clock className="w-3.5 h-3.5" /> Regional Verified</span>;
+        return (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-300 rounded-full text-[11px] font-bold">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              {isRegionalEscalated ? 'Regional Escalated' : 'Under Review'}
+            </span>
+            {isRegionalEscalated && (
+              <span className="text-[9.5px] text-amber-700 font-bold">Verification Issue Flagged</span>
+            )}
+          </div>
+        );
       case 'rejected':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200/80 rounded-full text-[11px] font-bold"><XCircle className="w-3.5 h-3.5" /> Rejected</span>;
       default:
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-full text-[11px] font-bold"><Clock className="w-3.5 h-3.5" /> Pending</span>;
+        return (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-[11px] font-bold">
+              <Clock className="w-3.5 h-3.5" /> Direct (Pending)
+            </span>
+            <span className="text-[9.5px] text-slate-400">Awaiting Super Admin</span>
+          </div>
+        );
     }
   };
 
@@ -385,7 +415,12 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
-                        {getStatusBadge(req.status)}
+                        {getStatusBadge(req.status, req.notes)}
+                        {req.notes && (
+                          <div className="mt-1 text-[10px] text-slate-500 max-w-[180px] mx-auto truncate cursor-help" title={req.notes}>
+                            📝 {req.notes.split('\n').pop()}
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 text-right">

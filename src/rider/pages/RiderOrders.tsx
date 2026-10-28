@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
 import { Package, CheckCircle2, Store, MapPin } from 'lucide-react';
@@ -25,13 +26,8 @@ export const RiderOrders: React.FC = () => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/rider/orders/history', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setHistoryOrders(data.history || []);
-        }
+        const data = await api.get<{ history: HistoryOrder[] }>('/api/rider/orders/history');
+        setHistoryOrders(data.history || []);
       } catch (e) {
         console.error('Failed to fetch rider order history', e);
       } finally {

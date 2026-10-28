@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useRider } from '../context/RiderContext';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../lib/api';
 import { ActiveDeliveryView } from './ActiveDeliveryView';
 import {
   Radar,
@@ -14,7 +16,8 @@ import {
   AlertCircle,
   Banknote,
   ArrowUpRight,
-  ShieldAlert
+  ShieldAlert,
+  Loader2
 } from 'lucide-react';
 
 interface RiderDashboardProps {
@@ -22,9 +25,106 @@ interface RiderDashboardProps {
 }
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
-  const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation } = useRider();
+  const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation, refreshData } = useRider();
+  const { user } = useAuth();
   const [locating, setLocating] = useState(false);
   const [locFeedback, setLocFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const [isPayingRazorpay, setIsPayingRazorpay] = useState(false);
+  const [remitFeedback, setRemitFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handlePayCODOnline = async () => {
+    const floatAmt = profile?.codCashFloat || 0;
+    if (floatAmt <= 0) return;
+    setIsPayingRazorpay(true);
+    setRemitFeedback(null);
+
+    try {
+      const orderRes = await api.post<{
+        success: boolean;
+        orderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+        rider: { name: string; email: string; phone: string };
+      }>('/api/rider/cod/create-razorpay-order', {});
+
+      if (!orderRes.success) throw new Error('Could not initiate remittance order');
+
+      const Razorpay = (window as any).Razorpay;
+      if (!Razorpay) {
+        alert('Payment gateway is loading. Please try again in a few moments.');
+        setIsPayingRazorpay(false);
+        return;
+      }
+
+      const options = {
+        key: orderRes.keyId,
+        amount: orderRes.amount,
+        currency: orderRes.currency,
+        name: 'ShopIndia COD Clearance',
+        description: `Clearance of ₹${floatAmt} offline cash float`,
+        order_id: orderRes.orderId,
+        prefill: {
+          name: orderRes.rider?.name || user?.name || 'Rider',
+          email: orderRes.rider?.email || user?.email || '',
+          contact: orderRes.rider?.phone || '',
+        },
+        theme: {
+          color: '#EA580C',
+        },
+        handler: async (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const verifyRes = await api.post<{ success: boolean; message: string; clearedAmount: number }>(
+              '/api/rider/cod/verify-razorpay-remittance',
+              {
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              }
+            );
+
+            if (verifyRes.success) {
+              setRemitFeedback({ type: 'success', text: verifyRes.message || 'Payment cleared successfully! Cash float reset.' });
+              if (refreshData) await refreshData();
+            }
+          } catch (verr: unknown) {
+            setRemitFeedback({
+              type: 'error',
+              text: verr instanceof Error ? verr.message : 'Payment verification failed',
+            });
+          } finally {
+            setIsPayingRazorpay(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsPayingRazorpay(false);
+          },
+        },
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.on('payment.failed', (failResp: any) => {
+        setIsPayingRazorpay(false);
+        setRemitFeedback({
+          type: 'error',
+          text: failResp?.error?.description || 'Payment was cancelled or failed.',
+        });
+      });
+      rzp.open();
+    } catch (err: unknown) {
+      setRemitFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to initiate remittance.',
+      });
+      setIsPayingRazorpay(false);
+    }
+  };
 
   const handleUpdateLocation = async () => {
     setLocating(true);
@@ -121,22 +221,41 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start lg:self-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => onNavigateToTab?.('wallet')}
-              className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-xs rounded-xl shadow-md shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-            >
-              <span>Pay Online via UPI / Razorpay</span>
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateToTab?.('wallet')}
-              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs"
-            >
-              <span>Hub Handover</span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 self-start lg:self-auto shrink-0">
+            {remitFeedback && (
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                remitFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+              }`}>
+                {remitFeedback.text}
+              </span>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isPayingRazorpay || (profile?.codCashFloat ?? 0) <= 0}
+                onClick={handlePayCODOnline}
+                className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              >
+                {isPayingRazorpay ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing Gateway...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Pay Online via UPI / Razorpay</span>
+                    <ArrowUpRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateToTab?.('wallet')}
+                className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs"
+              >
+                <span>Hub Handover</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

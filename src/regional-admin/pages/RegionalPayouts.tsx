@@ -25,7 +25,7 @@ export const RegionalPayouts: React.FC = () => {
 
   // Action state
   const [selectedPayout, setSelectedPayout] = useState<TerritoryPayoutRequest | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
+  const [actionType, setActionType] = useState<'approve' | 'escalate' | 'reject'>('approve');
   const [verificationNote, setVerificationNote] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
   const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
@@ -207,11 +207,23 @@ export const RegionalPayouts: React.FC = () => {
                             onClick={() => {
                               setSelectedPayout(r);
                               setActionType('approve');
-                              setVerificationNote('Order deliveries and store activity verified by Regional Lead.');
+                              setVerificationNote('Partner identity, order deliveries, and store activity verified by Regional Lead.');
                             }}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm transition-all"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer"
                           >
                             Verify & Forward
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedPayout(r);
+                              setActionType('escalate');
+                              setVerificationNote('Discrepancy found or verification failed. Escalating directly to Super Admin for manual intervention.');
+                            }}
+                            className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold text-[11px] transition-all cursor-pointer"
+                            title="Escalate directly to Super Admin if verification fails"
+                          >
+                            Escalate to Super Admin
                           </button>
 
                           <button
@@ -220,9 +232,9 @@ export const RegionalPayouts: React.FC = () => {
                               setActionType('reject');
                               setVerificationNote('');
                             }}
-                            className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] transition-all"
+                            className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] transition-all cursor-pointer"
                           >
-                            Flag / Reject
+                            Reject
                           </button>
                         </div>
                       </td>
@@ -242,13 +254,61 @@ export const RegionalPayouts: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                {actionType === 'approve' ? 'Verify & Forward to Super Admin' : 'Flag / Reject Partner Payout'}
+                {actionType === 'approve'
+                  ? 'Verify & Forward to Super Admin'
+                  : actionType === 'escalate'
+                  ? 'Escalate Directly to Super Admin'
+                  : 'Reject Partner Payout'}
               </h3>
               <button
                 onClick={() => setSelectedPayout(null)}
-                className="text-gray-400 hover:text-gray-600 font-bold"
+                className="text-gray-400 hover:text-gray-600 font-bold p-1 cursor-pointer"
               >
                 ✕
+              </button>
+            </div>
+
+            {/* Action Mode Toggle */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-xl text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setActionType('approve');
+                  if (!verificationNote || verificationNote.includes('Escalating') || verificationNote.includes('failed')) {
+                    setVerificationNote('Partner identity, order deliveries, and store activity verified by Regional Lead.');
+                  }
+                }}
+                className={`py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                  actionType === 'approve' ? 'bg-white text-emerald-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Verify & Forward
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActionType('escalate');
+                  if (!verificationNote || verificationNote.includes('verified')) {
+                    setVerificationNote('Discrepancy found during local verification. Forwarding to Super Admin for manual override.');
+                  }
+                }}
+                className={`py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                  actionType === 'escalate' ? 'bg-white text-amber-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Escalate (Failure)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActionType('reject');
+                  setVerificationNote('');
+                }}
+                className={`py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                  actionType === 'reject' ? 'bg-white text-rose-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Reject
               </button>
             </div>
 
@@ -272,12 +332,22 @@ export const RegionalPayouts: React.FC = () => {
             <form onSubmit={handleVerify} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Regional Inspection Note *
+                  {actionType === 'approve'
+                    ? 'Regional Verification Note *'
+                    : actionType === 'escalate'
+                    ? 'Failure Findings / Reason for Escalation to Super Admin *'
+                    : 'Rejection Reason *'}
                 </label>
                 <textarea
                   rows={3}
                   required
-                  placeholder="e.g. Partner identity verified, deliveries confirmed with zero customer disputes..."
+                  placeholder={
+                    actionType === 'approve'
+                      ? 'e.g. Partner identity verified, deliveries confirmed with zero customer disputes...'
+                      : actionType === 'escalate'
+                      ? 'e.g. Partner phone unreachable or bank mismatch found. Requesting Super Admin manual review...'
+                      : 'e.g. Suspected fraudulent orders or invalid documentation...'
+                  }
                   value={verificationNote}
                   onChange={(e) => setVerificationNote(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
@@ -288,20 +358,28 @@ export const RegionalPayouts: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedPayout(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={processing || !verificationNote.trim()}
-                  className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 ${
+                  className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 cursor-pointer ${
                     actionType === 'approve'
                       ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : actionType === 'escalate'
+                      ? 'bg-amber-600 hover:bg-amber-700'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
-                  {processing ? 'Submitting...' : actionType === 'approve' ? 'Verify & Forward' : 'Reject Payout'}
+                  {processing
+                    ? 'Submitting...'
+                    : actionType === 'approve'
+                    ? 'Verify & Forward'
+                    : actionType === 'escalate'
+                    ? 'Escalate to Super Admin'
+                    : 'Reject Payout'}
                 </button>
               </div>
             </form>

@@ -102,19 +102,34 @@ router.post('/:id/verify', async (req, res) => {
       return res.status(400).json({ error: 'Payout is already completed.' });
     }
 
-    const newStatus = action === 'reject' ? 'rejected' : 'approved';
+    let newStatus = 'approved';
+    let prefix = 'Regional Verification';
+    if (action === 'escalate' || action === 'flag') {
+      newStatus = 'under_review';
+      prefix = 'Regional Escalation to Super Admin';
+    } else if (action === 'reject') {
+      newStatus = 'rejected';
+      prefix = 'Regional Rejection';
+    }
+
     const updated = await prisma.payoutRequest.update({
       where: { id },
       data: {
         status: newStatus,
         reviewedAt: new Date(),
-        notes: `${request.notes ? request.notes + '\n' : ''}[Regional Verification (${new Date().toLocaleDateString('en-IN')})]: ${note || (action === 'approve' ? 'Verified by Regional Lead' : 'Rejected by Regional Lead')}`,
+        notes: `${request.notes ? request.notes + '\n' : ''}[${prefix} (${new Date().toLocaleDateString('en-IN')})]: ${note || (action === 'approve' ? 'Verified by Regional Lead' : action === 'escalate' ? 'Escalated to Super Admin by Regional Lead due to verification issue' : 'Rejected by Regional Lead')}`,
       },
     });
 
+    const statusMsg = action === 'approve'
+      ? 'Payout verified and forwarded to Super Admin for disbursal.'
+      : action === 'escalate'
+      ? 'Payout flagged and escalated directly to Super Admin with failure findings.'
+      : 'Payout rejected.';
+
     res.json({
       success: true,
-      message: `Payout request ${newStatus} and updated for Super Admin.`,
+      message: statusMsg,
       payout: updated,
     });
   } catch (err) {

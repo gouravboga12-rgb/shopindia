@@ -184,7 +184,7 @@ export const VendorOrders: React.FC = () => {
               <th className="px-4 py-3.5 font-bold">Order ID</th>
               <th className="px-4 py-3.5 font-bold">Customer Details</th>
               <th className="px-4 py-3.5 font-bold">Product Details &amp; Link</th>
-              <th className="px-4 py-3.5 font-bold">Total Amount</th>
+              <th className="px-4 py-3.5 font-bold">Item Total (Payout)</th>
               <th className="px-4 py-3.5 font-bold">Status</th>
               <th className="px-4 py-3.5 font-bold">Fulfillment Actions</th>
               <th className="px-4 py-3.5 font-bold text-center text-red-600">Delete Option</th>
@@ -336,9 +336,23 @@ export const VendorOrders: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Total Amount */}
-                    <td className="px-4 py-4 align-top font-numbers font-black text-gray-900 text-xs">
-                      ₹{o.total?.toLocaleString('en-IN')}
+                    {/* Item Total (Vendor Net Payout) */}
+                    <td className="px-4 py-4 align-top font-numbers text-xs">
+                      {(() => {
+                        const vendorItemTotal = o.items && o.items.length > 0
+                          ? o.items.reduce((sum: number, it: any) => sum + ((Number(it.price) || 0) * (Number(it.quantity) || 1)), 0)
+                          : (o.total || 0);
+                        return (
+                          <div>
+                            <span className="font-black text-gray-900 text-sm">
+                              ₹{vendorItemTotal.toLocaleString('en-IN')}
+                            </span>
+                            <span className="block text-[10px] text-gray-400 font-normal mt-0.5">
+                              Item price only
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Status */}
