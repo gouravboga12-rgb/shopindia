@@ -45,7 +45,7 @@ router.get('/overview', async (req, res) => {
 
     const dateFilter = { createdAt: { gte: since, lte: until } };
 
-    // Parallel aggregates across Orders, Ledger, Vendors, Riders, and Refunds
+    // Parallel aggregates across Orders, Ledger, Vendors, Riders, Remittances, Payouts, and Refunds
     const [
       ordersAgg,
       capturedPaymentsAgg,
@@ -53,6 +53,10 @@ router.get('/overview', async (req, res) => {
       vendorWalletsAgg,
       riderWalletsAgg,
       codFloatAgg,
+      codRemittanceAgg,
+      vendorPayoutsDisbursedAgg,
+      riderPayoutsDisbursedAgg,
+      pendingPayoutsAgg,
       refundsAgg,
       settlementsAgg,
       platformLedgerAgg,
@@ -96,12 +100,58 @@ router.get('/overview', async (req, res) => {
         _count: { id: true },
       }),
 
-      // 6. Floating COD cash held by riders
+      // 6. Floating COD cash currently in field with riders
       prisma.riderProfile.aggregate({
         _sum: { codCashFloat: true },
       }),
 
-      // 7. Refunds processed in period
+      // 7. Completed COD cash remittances received in period
+      prisma.cODRemittance.aggregate({
+        where: {
+          OR: [
+            { status: 'paid_online' },
+            { remittedToSuperAt: { not: null } },
+            { status: 'verified' },
+          ],
+          ...dateFilter,
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+
+      // 8. Completed Vendor Payouts disbursed in period
+      prisma.payoutRequest.aggregate({
+        where: {
+          partyType: 'VENDOR',
+          status: { in: ['approved', 'processed'] },
+          ...dateFilter,
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+
+      // 9. Completed Rider Fleet Payouts disbursed in period
+      prisma.payoutRequest.aggregate({
+        where: {
+          partyType: 'RIDER',
+          status: { in: ['approved', 'processed'] },
+          ...dateFilter,
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+
+      // 10. Pending Payout Requests awaiting clearance
+      prisma.payoutRequest.aggregate({
+        where: {
+          status: 'pending',
+          ...dateFilter,
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+
+      // 11. Refunds processed in period
       prisma.ticket.aggregate({
         where: {
           refundStatus: 'approved',
@@ -111,14 +161,14 @@ router.get('/overview', async (req, res) => {
         _count: { id: true },
       }),
 
-      // 8. Gateway settlements summary
+      // 12. Gateway settlements summary
       prisma.gatewaySettlement.aggregate({
         where: dateFilter,
         _sum: { amount: true, fee: true, tax: true },
         _count: { id: true },
       }),
 
-      // 9. Platform fee credits from Ledger
+      // 13. Platform fee credits from Ledger
       prisma.ledgerEntry.aggregate({
         where: {
           party: 'PLATFORM',
@@ -133,11 +183,20 @@ router.get('/overview', async (req, res) => {
     const grossCustomerPaid = ordersAgg._sum.total || 0;
     const actualGatewayFees = gatewayFeesAgg._sum.amount || (capturedPaymentsAgg._sum.gatewayFee || 0) + (capturedPaymentsAgg._sum.gatewayTax || 0);
     const netReceived = Math.max(0, grossCustomerPaid - actualGatewayFees);
+    const totalCodRemitted = codRemittanceAgg._sum.amount || 0;
+    const totalGrossInflow = Math.round((grossCustomerPaid + totalCodRemitted) * 100) / 100;
 
     // Partner balances owed: Vendors + Riders
     const vendorOwed = vendorWalletsAgg._sum.walletBalance || 0;
     const riderOwed = riderWalletsAgg._sum.walletBalance || 0;
     const toBeCleared = Math.round((vendorOwed + riderOwed) * 100) / 100;
+
+    // Disbursed Payouts
+    const vendorPayoutsDisbursed = vendorPayoutsDisbursedAgg._sum.amount || 0;
+    const riderPayoutsDisbursed = riderPayoutsDisbursedAgg._sum.amount || 0;
+    const totalDisbursedToPartners = Math.round((vendorPayoutsDisbursed + riderPayoutsDisbursed) * 100) / 100;
+    const pendingPayoutsCount = pendingPayoutsAgg._count.id || 0;
+    const pendingPayoutsAmount = pendingPayoutsAgg._sum.amount || 0;
 
     // Platform Net Profit = Gross Commission + Platform Fees - Gateway Fees - Platform Coupon Subsidies
     const grossCommission = ordersAgg._sum.commission || 0;
@@ -172,9 +231,16 @@ router.get('/overview', async (req, res) => {
         grossCustomerPaid: Math.round(grossCustomerPaid * 100) / 100,
         actualGatewayFees: Math.round(actualGatewayFees * 100) / 100,
         netReceived: Math.round(netReceived * 100) / 100,
+        totalCodRemitted: Math.round(totalCodRemitted * 100) / 100,
+        totalGrossInflow,
         toBeCleared,
         vendorOwed: Math.round(vendorOwed * 100) / 100,
         riderOwed: Math.round(riderOwed * 100) / 100,
+        vendorPayoutsDisbursed: Math.round(vendorPayoutsDisbursed * 100) / 100,
+        riderPayoutsDisbursed: Math.round(riderPayoutsDisbursed * 100) / 100,
+        totalDisbursedToPartners,
+        pendingPayoutsCount,
+        pendingPayoutsAmount: Math.round(pendingPayoutsAmount * 100) / 100,
         platformNetProfit,
         grossCommission: Math.round(grossCommission * 100) / 100,
         codCashWithRiders,
@@ -195,7 +261,8 @@ router.get('/overview', async (req, res) => {
 
 /**
  * GET /api/admin/finance/settlements
- * Razorpay automated bank settlement ledger
+ * Comprehensive Platform Financial Reconciliation Ledger:
+ * Combines Gateway Settlements, Completed Payout Disbursements, and COD Inflows.
  */
 router.get('/settlements', async (req, res) => {
   try {
@@ -203,26 +270,99 @@ router.get('/settlements', async (req, res) => {
     const pageNum = Number(page);
     const limitNum = Number(limit);
 
-    const [settlements, total] = await Promise.all([
+    // Fetch in parallel: Gateway settlements, completed Payouts, and COD remittances
+    const [settlements, payouts, remittances] = await Promise.all([
       prisma.gatewaySettlement.findMany({
         orderBy: { createdAt: 'desc' },
-        skip: (pageNum - 1) * limitNum,
         take: limitNum,
       }),
-      prisma.gatewaySettlement.count(),
+      prisma.payoutRequest.findMany({
+        where: { status: { in: ['approved', 'processed'] } },
+        include: {
+          vendor: { select: { businessName: true } },
+          riderProfile: { include: { user: { select: { name: true } } } },
+        },
+        orderBy: { requestedAt: 'desc' },
+        take: limitNum,
+      }),
+      prisma.cODRemittance.findMany({
+        where: {
+          OR: [{ status: 'paid_online' }, { remittedToSuperAt: { not: null } }, { status: 'verified' }],
+        },
+        include: {
+          riderProfile: { include: { user: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limitNum,
+      }),
     ]);
+
+    // Map into unified financial records
+    const unified = [];
+
+    settlements.forEach((s) => {
+      unified.push({
+        id: s.id,
+        category: 'GATEWAY_SETTLEMENT',
+        direction: 'INFLOW',
+        settlementId: s.settlementId,
+        partyName: 'Razorpay Nodal Account',
+        utr: s.utr || '—',
+        amount: s.amount,
+        fees: (s.fees || 0) + (s.tax || 0),
+        netAmount: s.amount - ((s.fees || 0) + (s.tax || 0)),
+        status: s.status || 'settled',
+        date: s.createdAt,
+      });
+    });
+
+    remittances.forEach((r) => {
+      unified.push({
+        id: r.id,
+        category: 'COD_REMITTANCE',
+        direction: 'INFLOW',
+        settlementId: r.razorpayPaymentId || r.superAdminRazorpayId || `COD-${r.id.slice(0, 8)}`,
+        partyName: `${r.riderProfile?.user?.name || 'Rider'} (COD Remit)`,
+        utr: r.superAdminRazorpayId || r.razorpayPaymentId || '—',
+        amount: r.amount,
+        fees: 0,
+        netAmount: r.amount,
+        status: r.status || 'received',
+        date: r.remittedToSuperAt || r.receivedByAdminAt || r.createdAt,
+      });
+    });
+
+    payouts.forEach((p) => {
+      const recipient = p.partyType === 'VENDOR' ? p.vendor?.businessName || 'Merchant' : p.riderProfile?.user?.name || 'Rider';
+      unified.push({
+        id: p.id,
+        category: p.partyType === 'VENDOR' ? 'VENDOR_PAYOUT' : 'RIDER_PAYOUT',
+        direction: 'OUTFLOW',
+        settlementId: p.razorpayPayoutId || `PAY-${p.id.slice(0, 8)}`,
+        partyName: `${recipient} (${p.partyType})`,
+        utr: p.razorpayPayoutId || (p.bankSnapshot && p.bankSnapshot.utr) || 'Direct Clearance',
+        amount: p.amount,
+        fees: 0,
+        netAmount: p.amount,
+        status: p.status,
+        date: p.processedAt || p.reviewedAt || p.requestedAt,
+      });
+    });
+
+    unified.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     res.json({
       success: true,
-      settlements,
-      total,
+      settlements: unified.slice(0, limitNum),
+      total: unified.length,
       page: pageNum,
-      pages: Math.ceil(total / limitNum),
+      pages: Math.ceil(unified.length / limitNum),
     });
   } catch (err) {
     console.error('[AdminFinance] Settlements error:', err);
     res.status(500).json({ error: err.message || 'Failed to fetch settlements.' });
   }
+});
 });
 
 module.exports = router;

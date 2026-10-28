@@ -284,4 +284,250 @@ router.post('/riders/:id/force-clear', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/cod-settings/super-bank-details
+ * Returns Super Admin bank details for Regional Hub cash remittance.
+ */
+router.get('/super-bank-details', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'super_admin_cod_bank_details' },
+    });
+
+    let details = {
+      bankName: 'HDFC Bank Ltd',
+      accountNumber: '50200088921456',
+      ifsc: 'HDFC0001234',
+      accountHolder: 'ShopIndia Technologies Pvt Ltd',
+      upiId: 'shopindia.hq@okhdfcbank',
+    };
+
+    if (setting?.value) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        details = { ...details, ...parsed };
+      } catch (e) {
+        console.warn('Failed to parse bank details json:', e);
+      }
+    }
+
+    res.json({ success: true, bankDetails: details });
+  } catch (err) {
+    console.error('[Admin COD Bank Details GET] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/cod-settings/super-bank-details
+ * Updates Super Admin bank details for Regional Hub cash remittance.
+ */
+router.post('/super-bank-details', async (req, res) => {
+  try {
+    const { bankName, accountNumber, ifsc, accountHolder, upiId } = req.body;
+
+    const dataToSave = {
+      bankName: String(bankName || '').trim(),
+      accountNumber: String(accountNumber || '').trim(),
+      ifsc: String(ifsc || '').trim().toUpperCase(),
+      accountHolder: String(accountHolder || '').trim(),
+      upiId: String(upiId || '').trim(),
+    };
+
+    const adminId = req.user?.userId || req.user?.id || 'super_admin';
+
+    await prisma.appSetting.upsert({
+      where: { key: 'super_admin_cod_bank_details' },
+      update: {
+        value: JSON.stringify(dataToSave),
+        description: 'Super Admin official bank details for Regional Hub cash deposits',
+        updatedBy: adminId,
+      },
+      create: {
+        key: 'super_admin_cod_bank_details',
+        value: JSON.stringify(dataToSave),
+        description: 'Super Admin official bank details for Regional Hub cash deposits',
+        updatedBy: adminId,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Super Admin official bank remittance details updated successfully.',
+      bankDetails: dataToSave,
+    });
+  } catch (err) {
+    console.error('[Admin COD Bank Details POST] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/cod-settings/remittances
+ * Date-wise collections & remittance ledger across riders and regional hubs.
+ */
+router.get('/remittances', async (req, res) => {
+  try {
+    const { startDate, endDate, status, search, limit = 50, page = 1 } = req.query;
+
+    const where = {};
+
+    // Date range filter
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    // Status filter
+    if (status && status !== 'all') {
+      if (status === 'pending_bank_verification') {
+        where.clearanceMode = 'bank_transfer';
+        where.remittedToSuperAt = null;
+        where.superAdminRazorpayId = { not: null };
+      } else if (status === 'paid_online') {
+        where.status = { in: ['paid_online', 'verified'] };
+        where.clearanceMode = 'online';
+      } else if (status === 'verified_bank') {
+        where.clearanceMode = 'bank_transfer';
+        where.remittedToSuperAt = { not: null };
+      }
+    }
+
+    // Search filter
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { superAdminRazorpayId: { contains: q, mode: 'insensitive' } },
+        { razorpayPaymentId: { contains: q, mode: 'insensitive' } },
+        { notes: { contains: q, mode: 'insensitive' } },
+        { riderProfile: { user: { name: { contains: q, mode: 'insensitive' } } } },
+        { riderProfile: { user: { phone: { contains: q, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(5, parseInt(limit, 10) || 50));
+
+    const [records, totalCount, aggregateStats] = await Promise.all([
+      prisma.cODRemittance.findMany({
+        where,
+        include: {
+          riderProfile: {
+            include: {
+              user: { select: { id: true, name: true, phone: true, email: true } },
+              branch: { select: { name: true, city: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+      }),
+      prisma.cODRemittance.count({ where }),
+      prisma.cODRemittance.aggregate({
+        where,
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    // Platform-wide metrics for the active filter
+    const totalCollected = aggregateStats._sum.amount || 0;
+
+    // Count pending offline bank transfers needing super admin verification
+    const pendingBankCount = await prisma.cODRemittance.count({
+      where: {
+        clearanceMode: 'bank_transfer',
+        remittedToSuperAt: null,
+        superAdminRazorpayId: { not: null },
+      },
+    });
+
+    res.json({
+      success: true,
+      totalCount,
+      totalCollected,
+      pendingBankCount,
+      page: pageNum,
+      limit: limitNum,
+      pages: Math.ceil(totalCount / limitNum),
+      remittances: records,
+    });
+  } catch (err) {
+    console.error('[Admin COD Remittances GET] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/cod-settings/remittances/:id/verify-bank
+ * Super Admin verifies an offline bank transfer (UTR) submitted by Regional Admin.
+ */
+router.post('/remittances/:id/verify-bank', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const remittance = await prisma.cODRemittance.findUnique({
+      where: { id },
+      include: {
+        riderProfile: {
+          include: { user: { select: { name: true } } },
+        },
+      },
+    });
+
+    if (!remittance) return res.status(404).json({ error: 'Remittance record not found.' });
+
+    const adminId = req.user?.userId || req.user?.id || 'super_admin';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.cODRemittance.update({
+        where: { id },
+        data: {
+          status: 'verified',
+          remittedToSuperAt: new Date(),
+          notes: `${remittance.notes || ''} | Super Admin Verified (UTR: ${remittance.superAdminRazorpayId}) by ${adminId}. ${notes ? 'Note: ' + notes : ''}`,
+        },
+      });
+
+      // Post platform ledger credit
+      await postLedgerEntries(
+        [
+          {
+            type: 'CREDIT',
+            party: 'PLATFORM',
+            partyId: 'SUPER_ADMIN',
+            amount: remittance.amount,
+            entryType: 'COD_REMITTANCE',
+            description: `Offline bank remittance of ₹${remittance.amount} verified by Super Admin (UTR: ${remittance.superAdminRazorpayId || 'N/A'})`,
+            metadata: {
+              remittanceId: id,
+              utr: remittance.superAdminRazorpayId,
+              verifiedBy: adminId,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        ],
+        tx
+      );
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully verified bank transfer for ₹${remittance.amount}. Added to company ledger.`,
+    });
+  } catch (err) {
+    console.error('[Admin COD Verify Bank] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

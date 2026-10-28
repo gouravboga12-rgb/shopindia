@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
-  ShieldCheck, RefreshCw, Zap
+  ShieldCheck, RefreshCw, Zap, Phone, MessageCircle, Info,
+  UserX, UserCheck, ExternalLink, Store, Bike
 } from 'lucide-react';
 
 interface TerritoryPayoutRequest {
@@ -29,6 +30,11 @@ export const RegionalPayouts: React.FC = () => {
   const [verificationNote, setVerificationNote] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
   const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  // Inspector & Account Suspension State
+  const [inspectPartner, setInspectPartner] = useState<any | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<{ id: string; name: string; partyType: 'VENDOR' | 'RIDER'; isSuspended: boolean } | null>(null);
+  const [suspending, setSuspending] = useState<boolean>(false);
 
   const loadTerritoryPayouts = async () => {
     setLoading(true);
@@ -69,6 +75,26 @@ export const RegionalPayouts: React.FC = () => {
       setMessage({ text: err.message || 'Verification failed.', isError: true });
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleToggleSuspend = async () => {
+    if (!suspendTarget) return;
+    setSuspending(true);
+    try {
+      const res: any = await api.post('/api/regional-admin/payouts/partner/toggle-suspend', {
+        partyType: suspendTarget.partyType,
+        partyId: suspendTarget.id,
+      });
+      if (res?.success) {
+        setMessage({ text: res.message || 'Partner status updated in your territory.' });
+        loadTerritoryPayouts();
+      }
+    } catch (err: any) {
+      setMessage({ text: err.message || 'Failed to update partner status.', isError: true });
+    } finally {
+      setSuspending(false);
+      setSuspendTarget(null);
     }
   };
 
@@ -172,6 +198,12 @@ export const RegionalPayouts: React.FC = () => {
                   const upiId = snapshot.upiId || (r.partyType === 'VENDOR' ? r.vendor?.upiId : r.riderProfile?.upiId);
                   const bankAcc = snapshot.accountNumber || (r.partyType === 'VENDOR' ? r.vendor?.accountNumber : r.riderProfile?.accountNumber);
 
+                  const isVendor = r.partyType === 'VENDOR';
+                  const partnerPhone = isVendor ? r.vendor?.phone : r.riderProfile?.user?.phone;
+                  const isSuspended = isVendor
+                    ? (r.vendor?.user?.status === 'suspended' || r.vendor?.isActive === false)
+                    : (r.riderProfile?.user?.status === 'suspended' || r.riderProfile?.isActive === false);
+
                   return (
                     <tr key={r.id} className="hover:bg-gray-50/50">
                       <td className="py-3 px-4">
@@ -180,12 +212,56 @@ export const RegionalPayouts: React.FC = () => {
                           <span className="px-1.5 py-0.2 rounded font-bold text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Territory
                           </span>
+                          {isSuspended ? (
+                            <span className="px-1.5 py-0.2 rounded font-bold text-[9px] bg-rose-100 text-rose-800 border border-rose-200">
+                              Suspended
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded font-bold text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Active
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-gray-400 mt-0.5 truncate max-w-sm">
                           <span className="uppercase text-[9px] px-1.5 py-0.2 rounded font-extrabold bg-gray-100 text-gray-600">
                             {r.partyType}
                           </span>{' '}
                           • {city || 'Territory Partner'}
+                        </div>
+
+                        {/* Quick Call / WhatsApp / Inspector Buttons */}
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {partnerPhone && (
+                            <>
+                              <a
+                                href={`tel:${partnerPhone}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition-colors"
+                                title="Call Partner"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>Call</span>
+                              </a>
+                              <a
+                                href={`https://wa.me/91${partnerPhone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello ${partnerName}, regarding your territory payout request of ₹${r.amount}...`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition-colors"
+                                title="Chat on WhatsApp"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setInspectPartner(isVendor ? { ...r.vendor, partyType: 'VENDOR' } : { ...r.riderProfile, partyType: 'RIDER' })}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 text-[10px] font-bold transition-colors cursor-pointer"
+                            title="Inspect Partner KYC Documents"
+                          >
+                            <Info className="w-3 h-3 text-gray-500" />
+                            <span>Info</span>
+                          </button>
                         </div>
                       </td>
 
@@ -256,6 +332,24 @@ export const RegionalPayouts: React.FC = () => {
                             className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] transition-all cursor-pointer"
                           >
                             Reject
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSuspendTarget({
+                              id: isVendor ? r.vendor.id : r.riderProfile.id,
+                              name: partnerName,
+                              partyType: r.partyType,
+                              isSuspended,
+                            })}
+                            className={`px-2 py-1 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer ${
+                              isSuspended
+                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                            }`}
+                            title={isSuspended ? 'Reactivate Partner' : 'Suspend Partner in Territory'}
+                          >
+                            {isSuspended ? 'Reactivate' : 'Suspend'}
                           </button>
                         </div>
                       </td>
@@ -404,6 +498,162 @@ export const RegionalPayouts: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Territory KYC Inspector */}
+      {inspectPartner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-2xl">
+                  {inspectPartner.partyType === 'VENDOR' ? <Store className="w-5 h-5 text-emerald-600" /> : <Bike className="w-5 h-5 text-emerald-600" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-gray-900">
+                    {inspectPartner.partyType === 'VENDOR' ? inspectPartner.businessName : inspectPartner.user?.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Territory {inspectPartner.partyType === 'VENDOR' ? 'Store KYC' : 'Rider Profile & License'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setInspectPartner(null)} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+            </div>
+
+            {inspectPartner.partyType === 'VENDOR' ? (
+              <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Contact Person</span>
+                    <span className="font-bold text-gray-800">{inspectPartner.contactName || '—'}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Registered Phone</span>
+                    <span className="font-bold text-gray-800 font-mono">{inspectPartner.phone || '—'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl">
+                  <span className="text-gray-400 font-semibold block text-[10px] uppercase">Store Address</span>
+                  <p className="font-medium text-gray-800 mt-0.5">
+                    {[inspectPartner.street, inspectPartner.city, inspectPartner.state, inspectPartner.pincode].filter(Boolean).join(', ') || 'No store address recorded'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">GSTIN</span>
+                    <span className="font-bold font-mono text-gray-800">{inspectPartner.gstNumber || 'Not Registered'}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">PAN</span>
+                    <span className="font-bold font-mono text-gray-800">{inspectPartner.panNumber || 'Not Registered'}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Partner Phone</span>
+                    <span className="font-bold text-gray-800 font-mono">{inspectPartner.user?.phone || '—'}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Vehicle</span>
+                    <span className="font-bold text-gray-800">{inspectPartner.vehicleType?.toUpperCase() || 'BIKE'} {inspectPartner.vehicleNumber || ''}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl">
+                  <span className="text-gray-400 font-semibold block text-[10px] uppercase">Base Station / Address</span>
+                  <p className="font-medium text-gray-800 mt-0.5">{inspectPartner.address || 'No location recorded'}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 bg-gray-50 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold block">License</span>
+                      <strong className="font-mono text-gray-900">{inspectPartner.licenseNumber || 'On file'}</strong>
+                    </div>
+                    {inspectPartner.licenseUrl && (
+                      <a href={inspectPartner.licenseUrl} target="_blank" rel="noreferrer" className="text-emerald-700 font-bold flex items-center gap-1">
+                        View <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="p-2.5 bg-gray-50 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold block">RC</span>
+                      <strong className="font-mono text-gray-900">{inspectPartner.vehicleNumber || 'On file'}</strong>
+                    </div>
+                    {inspectPartner.rcUrl && (
+                      <a href={inspectPartner.rcUrl} target="_blank" rel="noreferrer" className="text-emerald-700 font-bold flex items-center gap-1">
+                        View <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInspectPartner(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Territory Suspension Confirmation */}
+      {suspendTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className={`p-2.5 rounded-2xl flex items-center gap-2 ${
+                suspendTarget.isSuspended ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+              }`}>
+                {suspendTarget.isSuspended ? <UserCheck className="w-5 h-5 text-emerald-600" /> : <UserX className="w-5 h-5 text-rose-600" />}
+                <span className="font-bold text-sm">
+                  {suspendTarget.isSuspended ? 'Reactivate Partner' : 'Suspend Partner in Territory'}
+                </span>
+              </div>
+              <button onClick={() => setSuspendTarget(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {suspendTarget.isSuspended ? (
+                <>Are you sure you want to <strong>reactivate</strong> <strong>"{suspendTarget.name}"</strong> in your territory? They will be allowed to resume operations and receive orders immediately.</>
+              ) : (
+                <>Are you sure you want to <strong>suspend</strong> <strong>"{suspendTarget.name}"</strong>? As a Regional Lead, suspending this partner will halt their ability to take orders or withdraw funds within your assigned region.</>
+              )}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSuspendTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleSuspend}
+                disabled={suspending}
+                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-colors cursor-pointer ${
+                  suspendTarget.isSuspended ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {suspending ? 'Updating...' : suspendTarget.isSuspended ? 'Confirm Reactivation' : 'Confirm Suspension'}
+              </button>
+            </div>
           </div>
         </div>
       )}

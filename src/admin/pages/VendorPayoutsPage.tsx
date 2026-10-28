@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   Wallet, CheckCircle2, XCircle, Clock, AlertTriangle,
-  RefreshCw, ShieldCheck, Zap, Calendar, Store
+  RefreshCw, ShieldCheck, Zap, Calendar, Store,
+  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText
 } from 'lucide-react';
 
 interface PayoutRequestItem {
@@ -44,6 +45,11 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
   const [activePayoutForReject, setActivePayoutForReject] = useState<PayoutRequestItem | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [actionMessage, setActionMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  // Inspector & Account Suspension State
+  const [inspectVendor, setInspectVendor] = useState<any | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<{ id: string; name: string; isSuspended: boolean } | null>(null);
+  const [suspending, setSuspending] = useState<boolean>(false);
 
   const getDateRangeParams = () => {
     const now = new Date();
@@ -159,6 +165,26 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
       setActionMessage({ text: err.message || 'Failed to reject payout.', isError: true });
     } finally {
       setProcessingAction(false);
+    }
+  };
+
+  const handleToggleSuspend = async () => {
+    if (!suspendTarget) return;
+    setSuspending(true);
+    try {
+      const res: any = await api.post('/api/admin/payouts/partner/toggle-suspend', {
+        partyType: 'VENDOR',
+        partyId: suspendTarget.id,
+      });
+      if (res?.success) {
+        setActionMessage({ text: res.message || 'Merchant account status updated.' });
+        loadPayouts();
+      }
+    } catch (err: any) {
+      setActionMessage({ text: err.message || 'Failed to toggle merchant suspension.', isError: true });
+    } finally {
+      setSuspending(false);
+      setSuspendTarget(null);
     }
   };
 
@@ -374,12 +400,61 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                   return (
                     <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                          <Store className="w-4 h-4 text-blue-600 shrink-0" />
-                          <span>{vendor?.businessName || 'Merchant'}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                            <Store className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>{vendor?.businessName || 'Merchant'}</span>
+                          </div>
+                          {vendor?.user?.status === 'suspended' || vendor?.isActive === false ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              Suspended
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Active
+                            </span>
+                          )}
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          {vendor?.contactName || vendor?.email} • {vendor?.city || 'India'}
+
+                        {/* Location Details */}
+                        <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
+                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{vendor?.city || 'Location'}{vendor?.state ? `, ${vendor.state}` : ''} {vendor?.pincode ? `(${vendor.pincode})` : ''}</span>
+                        </div>
+
+                        {/* Dynamic Quick Call / WhatsApp / KYC Inspector Buttons */}
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          {vendor?.phone && (
+                            <>
+                              <a
+                                href={`tel:${vendor.phone}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10.5px] font-bold transition-colors"
+                                title="Call Merchant"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>Call</span>
+                              </a>
+                              <a
+                                href={`https://wa.me/91${vendor.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello ${vendor.businessName || 'Merchant'}, regarding your ShopIndia payout request of ₹${req.amount}...`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold transition-colors"
+                                title="Chat on WhatsApp"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setInspectVendor(vendor)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10.5px] font-bold transition-colors cursor-pointer"
+                            title="Inspect Merchant KYC & Bank Documents"
+                          >
+                            <Info className="w-3 h-3 text-slate-500" />
+                            <span>Info</span>
+                          </button>
                         </div>
                       </td>
 
@@ -474,6 +549,25 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                             <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                               UTR: {req.razorpayPayoutId}
                             </span>
+                          )}
+
+                          {vendor?.id && (
+                            <button
+                              type="button"
+                              onClick={() => setSuspendTarget({
+                                id: vendor.id,
+                                name: vendor.businessName,
+                                isSuspended: vendor?.user?.status === 'suspended' || vendor?.isActive === false,
+                              })}
+                              className={`px-2 py-1 rounded-lg text-[10.5px] font-bold transition-colors cursor-pointer ${
+                                vendor?.user?.status === 'suspended' || vendor?.isActive === false
+                                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                              }`}
+                              title={vendor?.user?.status === 'suspended' || vendor?.isActive === false ? 'Reactivate Store' : 'Suspend Store Account'}
+                            >
+                              {vendor?.user?.status === 'suspended' || vendor?.isActive === false ? 'Reactivate' : 'Suspend'}
+                            </button>
                           )}
                         </div>
                       </td>
@@ -595,6 +689,183 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: KYC & Identity Inspector Drawer */}
+      {inspectVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-2xl">
+                  <Store className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">{inspectVendor.businessName}</h3>
+                  <p className="text-xs text-slate-500">Merchant KYC & Verification Dossier</p>
+                </div>
+              </div>
+              <button onClick={() => setInspectVendor(null)} className="text-slate-400 hover:text-slate-600 p-1">✕</button>
+            </div>
+
+            {/* Account Status Banner */}
+            <div className={`p-3 rounded-2xl border text-xs flex items-center justify-between ${
+              inspectVendor?.user?.status === 'suspended' || inspectVendor?.isActive === false
+                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            }`}>
+              <span className="font-bold">
+                Account Status: {inspectVendor?.user?.status === 'suspended' || inspectVendor?.isActive === false ? 'SUSPENDED' : 'ACTIVE & VERIFIED'}
+              </span>
+              <span className="text-[11px] font-mono">ID: {inspectVendor.id.slice(0, 10)}...</span>
+            </div>
+
+            {/* Profile Grid */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl">
+                <span className="text-slate-400 font-semibold block text-[10px] uppercase">Contact Person</span>
+                <span className="font-bold text-slate-800">{inspectVendor.contactName || '—'}</span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl">
+                <span className="text-slate-400 font-semibold block text-[10px] uppercase">Registered Phone</span>
+                <span className="font-bold text-slate-800 font-mono">{inspectVendor.phone || '—'}</span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl">
+                <span className="text-slate-400 font-semibold block text-[10px] uppercase">Email</span>
+                <span className="font-bold text-slate-800 truncate block">{inspectVendor.email || '—'}</span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl">
+                <span className="text-slate-400 font-semibold block text-[10px] uppercase">Store Wallet Balance</span>
+                <span className="font-black text-emerald-700 text-sm">{formatINR(inspectVendor.walletBalance)}</span>
+              </div>
+            </div>
+
+            {/* Tax & Legal Documents */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
+              <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-slate-600" /> Statutory & Tax Identifiers
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 text-[11px] block">GSTIN Number:</span>
+                  <strong className="font-mono text-slate-900">{inspectVendor.gstNumber || 'Not Registered'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">PAN Number:</span>
+                  <strong className="font-mono text-slate-900">{inspectVendor.panNumber || 'Not Registered'}</strong>
+                </div>
+              </div>
+              <div className="pt-1">
+                <span className="text-slate-500 text-[11px] block">Physical Store Address:</span>
+                <p className="text-slate-800 font-medium">
+                  {[inspectVendor.street, inspectVendor.city, inspectVendor.state, inspectVendor.pincode].filter(Boolean).join(', ') || 'No physical address recorded'}
+                </p>
+              </div>
+            </div>
+
+            {/* Bank Coordinates */}
+            <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-2 text-xs">
+              <h4 className="font-bold text-emerald-900 flex items-center gap-1.5">
+                <Wallet className="w-4 h-4 text-emerald-600" /> Settlement Bank Details
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-emerald-700 text-[11px] block">Bank Name:</span>
+                  <strong className="font-mono text-slate-900">{inspectVendor.bankName || '—'}</strong>
+                </div>
+                <div>
+                  <span className="text-emerald-700 text-[11px] block">Account Number:</span>
+                  <strong className="font-mono text-slate-900">{inspectVendor.accountNumber || '—'}</strong>
+                </div>
+                <div>
+                  <span className="text-emerald-700 text-[11px] block">IFSC Code:</span>
+                  <strong className="font-mono text-slate-900">{inspectVendor.ifsc || '—'}</strong>
+                </div>
+                <div>
+                  <span className="text-emerald-700 text-[11px] block">Fast UPI VPA:</span>
+                  <strong className="font-mono text-emerald-800">{inspectVendor.upiId || '—'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Uploaded Documents */}
+            {inspectVendor.documents && inspectVendor.documents.length > 0 && (
+              <div className="space-y-2 text-xs">
+                <h4 className="font-bold text-slate-800">Uploaded KYC Proofs</h4>
+                <div className="space-y-1.5">
+                  {inspectVendor.documents.map((doc: any) => (
+                    <a
+                      key={doc.id}
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors text-blue-700 font-semibold"
+                    >
+                      <span className="truncate">{doc.name || 'KYC Document'}</span>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInspectVendor(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Close Dossier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Account Suspension Confirmation */}
+      {suspendTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className={`p-2.5 rounded-2xl flex items-center gap-2 ${
+                suspendTarget.isSuspended ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+              }`}>
+                {suspendTarget.isSuspended ? <UserCheck className="w-5 h-5 text-emerald-600" /> : <UserX className="w-5 h-5 text-rose-600" />}
+                <span className="font-bold text-sm">
+                  {suspendTarget.isSuspended ? 'Reactivate Store Account' : 'Suspend Store Account'}
+                </span>
+              </div>
+              <button onClick={() => setSuspendTarget(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {suspendTarget.isSuspended ? (
+                <>Are you sure you want to <strong>reactivate</strong> store account <strong>"{suspendTarget.name}"</strong>? The merchant will be allowed to receive orders, log into their dashboard, and request payouts.</>
+              ) : (
+                <>Are you sure you want to <strong>suspend</strong> store account <strong>"{suspendTarget.name}"</strong>? All active orders will halt, products will be hidden from customer search, and login will be blocked until reactivated.</>
+              )}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSuspendTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleSuspend}
+                disabled={suspending}
+                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-colors cursor-pointer ${
+                  suspendTarget.isSuspended ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {suspending ? 'Updating...' : suspendTarget.isSuspended ? 'Confirm Reactivation' : 'Confirm Suspension'}
+              </button>
+            </div>
           </div>
         </div>
       )}

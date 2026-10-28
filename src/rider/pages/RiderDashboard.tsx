@@ -17,14 +17,18 @@ import {
   Banknote,
   ArrowUpRight,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Phone,
+  MessageSquare,
+  X,
+  Building2
 } from 'lucide-react';
 
 interface RiderDashboardProps {
   onNavigateToTab?: (tab: string) => void;
 }
 
-export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
+export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
   const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation, refreshData } = useRider();
   const { user } = useAuth();
   const [locating, setLocating] = useState(false);
@@ -32,6 +36,69 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
 
   const [isPayingRazorpay, setIsPayingRazorpay] = useState(false);
   const [remitFeedback, setRemitFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Hub Handover State
+  const [showHubModal, setShowHubModal] = useState(false);
+  const [loadingHubStatus, setLoadingHubStatus] = useState(false);
+  const [isSubmittingToHub, setIsSubmittingToHub] = useState(false);
+  const [hubStatusData, setHubStatusData] = useState<{
+    regionalAdminAvailable: boolean;
+    regionalAdmin?: {
+      id: string;
+      name: string;
+      phone?: string;
+      hubName?: string;
+      address?: string;
+      district?: string;
+      state?: string;
+    } | null;
+    pendingSubmission?: { id: string; amount: number; createdAt: string } | null;
+    riderPincode?: string;
+    deadlineRule?: string;
+    floatLimit?: number;
+  } | null>(null);
+
+  const fetchHubStatus = async () => {
+    try {
+      setLoadingHubStatus(true);
+      const res: any = await api.get('/api/rider/cod/status');
+      if (res?.success) {
+        setHubStatusData({
+          regionalAdminAvailable: res.regionalAdminAvailable,
+          regionalAdmin: res.regionalAdmin,
+          pendingSubmission: res.pendingSubmission,
+          riderPincode: res.riderPincode,
+          deadlineRule: res.deadlineRule,
+          floatLimit: res.floatLimit,
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to load rider COD hub status:', e);
+    } finally {
+      setLoadingHubStatus(false);
+    }
+  };
+
+  const handleOpenHubModal = async () => {
+    setShowHubModal(true);
+    await fetchHubStatus();
+  };
+
+  const handleSubmitCashToHub = async () => {
+    try {
+      setIsSubmittingToHub(true);
+      const res: any = await api.post('/api/rider/cod/submit-cash-to-hub', {});
+      if (res?.success) {
+        setRemitFeedback({ type: 'success', text: res.message || 'Submitted cash to Regional Admin! Awaiting verification.' });
+        await fetchHubStatus();
+        if (refreshData) await refreshData();
+      }
+    } catch (err: any) {
+      setRemitFeedback({ type: 'error', text: err.message || 'Failed to submit cash.' });
+    } finally {
+      setIsSubmittingToHub(false);
+    }
+  };
 
   const handlePayCODOnline = async () => {
     const floatAmt = profile?.codCashFloat || 0;
@@ -250,9 +317,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
               </button>
               <button
                 type="button"
-                onClick={() => onNavigateToTab?.('wallet')}
-                className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs"
+                onClick={handleOpenHubModal}
+                className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
               >
+                <Building2 className="w-4 h-4 text-slate-600" />
                 <span>Hub Handover</span>
               </button>
             </div>
@@ -406,6 +474,187 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
           </div>
         )}
       </div>
+
+      {/* Hub Handover Modal */}
+      {showHubModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-orange-100 text-orange-600 rounded-xl">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Regional Hub Cash Handover</h3>
+                  <p className="text-xs text-slate-500">Submit collected customer COD cash to your regional base station</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHubModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              {loadingHubStatus ? (
+                <div className="py-12 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="w-6 h-6 animate-spin text-orange-500" />
+                  <span>Checking territory hub availability...</span>
+                </div>
+              ) : hubStatusData?.regionalAdminAvailable && hubStatusData?.regionalAdmin ? (
+                <>
+                  {/* Amount to Hand Over */}
+                  <div className="p-4 bg-orange-50/80 rounded-2xl border border-orange-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-orange-900 uppercase">Cash in Hand to Handover</span>
+                      <p className="text-2xl font-black text-orange-600 font-mono mt-0.5">
+                        ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-200 text-orange-900">
+                      Physical Cash
+                    </span>
+                  </div>
+
+                  {/* Regional Admin & Hub Card */}
+                  <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Assigned Regional Hub</span>
+                        <h4 className="text-sm font-bold text-slate-900 mt-0.5">{hubStatusData.regionalAdmin.hubName}</h4>
+                        <p className="text-xs text-slate-600 mt-0.5">Manager: <strong className="text-slate-800">{hubStatusData.regionalAdmin.name}</strong></p>
+                        {hubStatusData.regionalAdmin.address && (
+                          <p className="text-[11px] text-slate-500 mt-1 flex items-start gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                            <span>{hubStatusData.regionalAdmin.address}</span>
+                          </p>
+                        )}
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                        Hub Online
+                      </span>
+                    </div>
+
+                    {/* Communication and Navigation Pills */}
+                    <div className="pt-2 border-t border-slate-200/60 flex flex-wrap gap-2">
+                      {hubStatusData.regionalAdmin.phone && (
+                        <>
+                          <a
+                            href={`tel:${hubStatusData.regionalAdmin.phone}`}
+                            className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs flex items-center gap-1.5 transition-all"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Call Admin</span>
+                          </a>
+
+                          <a
+                            href={`https://wa.me/91${hubStatusData.regionalAdmin.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(
+                              `Hello ${hubStatusData.regionalAdmin.name}, I am delivery rider ${user?.name || ''} arriving at ${hubStatusData.regionalAdmin.hubName} to hand over COD cash of ₹${profile?.codCashFloat || 0}.`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 shadow-2xs flex items-center gap-1.5 transition-all"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>WhatsApp</span>
+                          </a>
+                        </>
+                      )}
+
+                      {hubStatusData.regionalAdmin.address && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hubStatusData.regionalAdmin.address)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold text-blue-800 shadow-2xs flex items-center gap-1.5 transition-all"
+                        >
+                          <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Turn-by-Turn Maps</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pending Submission Banner or Direct Submit Button */}
+                  {hubStatusData.pendingSubmission ? (
+                    <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold">Pending Hub Approval</p>
+                        <p className="text-[11px] text-amber-700 mt-0.5">
+                          You submitted ₹{hubStatusData.pendingSubmission.amount} cash to this hub. Please hand over the physical currency to the manager upon arrival to clear your balance.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isSubmittingToHub || (profile?.codCashFloat ?? 0) <= 0}
+                      onClick={handleSubmitCashToHub}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                    >
+                      {isSubmittingToHub ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Submitting Cash...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Confirm & Submit ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')} Cash to Hub</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </>
+              ) : (
+                /* No Regional Admin Available in Territory */
+                <div className="space-y-4">
+                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-red-950 space-y-2">
+                    <div className="flex items-center gap-2 text-red-700">
+                      <ShieldAlert className="w-5 h-5 shrink-0" />
+                      <h4 className="font-bold text-sm">No Regional Hub in Your Territory</h4>
+                    </div>
+                    <p className="text-xs text-red-800 leading-relaxed">
+                      There is currently no physical Regional Admin assigned to your registered area (Pincode: <strong>{hubStatusData?.riderPincode || 'Unassigned'}</strong>). Offline cash handover is unavailable.
+                    </p>
+                  </div>
+
+                  {/* Mandatory Suspension Notice */}
+                  <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-900 space-y-1.5 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <span>Platform Compliance & Account Suspension Notice</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      As per platform policy set by Super Admin, all collected cash must be remitted before the deadline (by End of the Day or within consecutive orders). <strong>Failure to clear your balance within the allowed window will result in automatic account suspension</strong>, preventing you from receiving any delivery dispatches.
+                    </p>
+                  </div>
+
+                  {/* Direct Online Payment Button */}
+                  <button
+                    type="button"
+                    disabled={isPayingRazorpay || (profile?.codCashFloat ?? 0) <= 0}
+                    onClick={() => {
+                      setShowHubModal(false);
+                      handlePayCODOnline();
+                    }}
+                    className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                  >
+                    <span>Pay ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')} Online via UPI / Razorpay Now</span>
+                    <ArrowUpRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

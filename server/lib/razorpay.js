@@ -56,19 +56,34 @@ async function createRazorpayOrder(arg1, arg2, arg3) {
 
 /**
  * Verify Razorpay payment signature (HMAC SHA-256).
- * @param {string} razorpayOrderId
- * @param {string} razorpayPaymentId
- * @param {string} razorpaySignature
+ * Accepts either 3 positional parameters or a single options object.
+ * @param {string|object} arg1 - razorpayOrderId OR { orderId, paymentId, signature }
+ * @param {string} [arg2] - razorpayPaymentId
+ * @param {string} [arg3] - razorpaySignature
  * @returns {boolean}
  */
-function verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature) {
+function verifyPaymentSignature(arg1, arg2, arg3) {
+  let orderId = arg1;
+  let paymentId = arg2;
+  let signature = arg3;
+
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    orderId = arg1.orderId || arg1.razorpayOrderId || arg1.razorpay_order_id;
+    paymentId = arg1.paymentId || arg1.razorpayPaymentId || arg1.razorpay_payment_id;
+    signature = arg1.signature || arg1.razorpaySignature || arg1.razorpay_signature;
+  }
+
+  if (!orderId || !paymentId || !signature) {
+    return false;
+  }
+
   const secret = process.env.RAZORPAY_KEY_SECRET || 'Qo9u5rOfjFo6ov36FQCe2P8i';
-  const body = `${razorpayOrderId}|${razorpayPaymentId}`;
+  const body = `${orderId}|${paymentId}`;
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(body)
     .digest('hex');
-  return expectedSignature === razorpaySignature;
+  return expectedSignature === signature;
 }
 
 /**

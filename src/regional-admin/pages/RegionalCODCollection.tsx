@@ -12,7 +12,10 @@ import {
   Bike,
   Building2,
   CreditCard,
-  History
+  History,
+  Copy,
+  Check,
+  X
 } from 'lucide-react';
 
 interface RiderUser {
@@ -64,6 +67,22 @@ export const RegionalCODCollection: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isRemitting, setIsRemitting] = useState<boolean>(false);
 
+  // Dual Remittance Modal State (Razorpay vs Bank Transfer)
+  const [showRemitModal, setShowRemitModal] = useState<boolean>(false);
+  const [remitMode, setRemitMode] = useState<'razorpay' | 'bank'>('razorpay');
+  const [superBankDetails, setSuperBankDetails] = useState<{
+    bankName: string;
+    accountNumber: string;
+    ifsc: string;
+    accountHolder: string;
+    upiId: string;
+  } | null>(null);
+  const [loadingBankDetails, setLoadingBankDetails] = useState<boolean>(false);
+  const [utrInput, setUtrInput] = useState<string>('');
+  const [bankSenderInput, setBankSenderInput] = useState<string>('');
+  const [isSubmittingBank, setIsSubmittingBank] = useState<boolean>(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
   // Notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -83,6 +102,63 @@ export const RegionalCODCollection: React.FC = () => {
       setErrorMessage(err instanceof Error ? err.message : 'Error loading COD data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenRemitModal = async () => {
+    if (selectedIds.length === 0) {
+      alert('Please select at least one cash batch to remit.');
+      return;
+    }
+    setShowRemitModal(true);
+    setUtrInput('');
+    setBankSenderInput('');
+    if (!superBankDetails) {
+      setLoadingBankDetails(true);
+      try {
+        const res: any = await api.get('/api/regional-admin/cod/super-bank-details');
+        if (res?.bankDetails) {
+          setSuperBankDetails(res.bankDetails);
+        }
+      } catch (e) {
+        console.warn('Failed to load super bank details:', e);
+      } finally {
+        setLoadingBankDetails(false);
+      }
+    }
+  };
+
+  const handleCopyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  const handleSubmitBankTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!utrInput.trim()) {
+      alert('Please enter the Bank UTR / Transaction Reference number.');
+      return;
+    }
+    setIsSubmittingBank(true);
+    setErrorMessage(null);
+    try {
+      const res: any = await api.post('/api/regional-admin/cod/remit-bank-transfer', {
+        remittanceIds: selectedIds,
+        utrNumber: utrInput.trim(),
+        bankName: bankSenderInput.trim(),
+      });
+      if (res?.success) {
+        setSuccessMessage(res.message || 'Offline bank transfer submitted for Super Admin verification!');
+        setShowRemitModal(false);
+        setUtrInput('');
+        setTimeout(() => setSuccessMessage(null), 5000);
+        await fetchCODData();
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to submit bank transfer');
+    } finally {
+      setIsSubmittingBank(false);
     }
   };
 
@@ -457,15 +533,11 @@ export const RegionalCODCollection: React.FC = () => {
                 <button
                   type="button"
                   disabled={selectedIds.length === 0 || isRemitting}
-                  onClick={handleRemitToSuperAdmin}
+                  onClick={handleOpenRemitModal}
                   className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  {isRemitting ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <CreditCard className="w-3.5 h-3.5" />
-                  )}
-                  <span>Remit Selected (₹{selectedTotal.toLocaleString('en-IN')}) via Razorpay</span>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Remit Selected (₹{selectedTotal.toLocaleString('en-IN')}) to Super Admin</span>
                 </button>
               </div>
             )}
@@ -658,6 +730,214 @@ export const RegionalCODCollection: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Dual Remittance to Super Admin Modal */}
+      {showRemitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl space-y-5 border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <Banknote className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Remit Custody Cash to Super Admin</h3>
+                  <p className="text-xs text-slate-500">Total batch selected: <strong>₹{selectedTotal.toLocaleString('en-IN')}</strong> ({selectedIds.length} batches)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRemitModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setRemitMode('razorpay')}
+                className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  remitMode === 'razorpay'
+                    ? 'bg-white text-blue-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Pay via Razorpay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRemitMode('bank')}
+                className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  remitMode === 'bank'
+                    ? 'bg-white text-blue-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Super Admin Bank Transfer</span>
+              </button>
+            </div>
+
+            {/* TAB A: RAZORPAY ONLINE */}
+            {remitMode === 'razorpay' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl text-xs text-blue-950 space-y-1">
+                  <p className="font-bold">Instant Automated Clearance</p>
+                  <p className="text-[11px] text-blue-700 leading-relaxed">
+                    Paying via Razorpay gateway will automatically verify your payment signature, immediately debit custody liability from your account, and settle the funds directly into the Super Admin bank account.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600">Total Net Remittance:</span>
+                  <span className="text-xl font-black text-slate-900 font-mono">₹{selectedTotal.toLocaleString('en-IN')}</span>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isRemitting}
+                  onClick={() => {
+                    setShowRemitModal(false);
+                    handleRemitToSuperAdmin();
+                  }}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Launch Razorpay Checkout (₹{selectedTotal.toLocaleString('en-IN')})</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB B: SUPER ADMIN BANK DETAILS */}
+            {remitMode === 'bank' && (
+              <form onSubmit={handleSubmitBankTransfer} className="space-y-4">
+                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl text-xs text-amber-950 space-y-1">
+                  <p className="font-bold">Official Super Admin Bank Coordinates</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Transfer <strong>₹{selectedTotal.toLocaleString('en-IN')}</strong> directly to the company bank account or UPI ID below, then enter your Bank UTR number to submit for Super Admin verification.
+                  </p>
+                </div>
+
+                {loadingBankDetails ? (
+                  <div className="py-6 text-center text-xs text-slate-400">Loading bank details...</div>
+                ) : superBankDetails ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2 text-xs">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                      <span className="text-slate-500 font-medium">Bank Name</span>
+                      <strong className="text-slate-900">{superBankDetails.bankName}</strong>
+                    </div>
+
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                      <span className="text-slate-500 font-medium">Account Number</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-900">{superBankDetails.accountNumber}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(superBankDetails.accountNumber, 'acc')}
+                          className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
+                          title="Copy Account Number"
+                        >
+                          {copiedKey === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                      <span className="text-slate-500 font-medium">IFSC Code</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-900">{superBankDetails.ifsc}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(superBankDetails.ifsc, 'ifsc')}
+                          className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
+                          title="Copy IFSC"
+                        >
+                          {copiedKey === 'ifsc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                      <span className="text-slate-500 font-medium">Account Holder</span>
+                      <strong className="text-slate-900">{superBankDetails.accountHolder}</strong>
+                    </div>
+
+                    {superBankDetails.upiId && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Company UPI ID</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-emerald-700">{superBankDetails.upiId}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(superBankDetails.upiId, 'upi')}
+                            className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
+                            title="Copy UPI ID"
+                          >
+                            {copiedKey === 'upi' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* UTR Input Form */}
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">
+                      Bank UTR / Transaction Reference Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 249104812901 or SBIN2491048"
+                      value={utrInput}
+                      onChange={(e) => setUtrInput(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Your Bank / Payment Mode (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. SBI NEFT / PhonePe UPI / HDFC IMPS"
+                      value={bankSenderInput}
+                      onChange={(e) => setBankSenderInput(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRemitModal(false)}
+                    className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBank || !utrInput.trim()}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isSubmittingBank && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Submit UTR for Verification</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

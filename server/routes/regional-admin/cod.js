@@ -290,4 +290,108 @@ router.post('/verify-super-remittance', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/regional-admin/cod/super-bank-details
+ * Returns Super Admin bank details strictly to authenticated Regional Admins for offline cash remittance.
+ * Securely isolated from public, vendor, or customer endpoints.
+ */
+router.get('/super-bank-details', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'super_admin_cod_bank_details' },
+    });
+
+    let details = {
+      bankName: 'HDFC Bank Ltd',
+      accountNumber: '50200088921456',
+      ifsc: 'HDFC0001234',
+      accountHolder: 'ShopIndia Technologies Pvt Ltd',
+      upiId: 'shopindia.hq@okhdfcbank',
+    };
+
+    if (setting?.value) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        details = { ...details, ...parsed };
+      } catch (e) {
+        console.warn('Failed to parse bank details json:', e);
+      }
+    }
+
+    res.json({
+      success: true,
+      bankDetails: details,
+    });
+  } catch (err) {
+    console.error('[Regional COD Super Bank Details] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/regional-admin/cod/remit-bank-transfer
+ * Regional Admin submits an offline NEFT/IMPS bank transfer to Super Admin with UTR number for verification.
+ */
+router.post('/remit-bank-transfer', async (req, res) => {
+  try {
+    const { remittanceIds, utrNumber, bankName, transferDate, notes } = req.body;
+
+    if (!remittanceIds || !Array.isArray(remittanceIds) || remittanceIds.length === 0) {
+      return res.status(400).json({ error: 'Please select at least one collected cash batch to remit.' });
+    }
+
+    const cleanUtr = String(utrNumber || '').trim();
+    if (!cleanUtr || cleanUtr.length < 6) {
+      return res.status(400).json({ error: 'A valid Bank Transaction ID or UTR Number (minimum 6 characters) is required.' });
+    }
+
+    // Check if this UTR has already been submitted
+    const duplicate = await prisma.cODRemittance.findFirst({
+      where: {
+        superAdminRazorpayId: cleanUtr,
+        remittedToSuperAt: { not: null },
+      },
+    });
+
+    if (duplicate) {
+      return res.status(400).json({ error: 'This UTR Number has already been submitted and processed.' });
+    }
+
+    const remittances = await prisma.cODRemittance.findMany({
+      where: {
+        id: { in: remittanceIds },
+        receivedByAdminAt: { not: null },
+      },
+    });
+
+    if (remittances.length === 0) {
+      return res.status(400).json({ error: 'No valid verified cash batches found to remit.' });
+    }
+
+    const totalToRemit = remittances.reduce((acc, r) => acc + (r.amount || 0), 0);
+    const adminUser = req.user?.name || req.user?.email || 'Regional Admin';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.cODRemittance.updateMany({
+        where: { id: { in: remittanceIds } },
+        data: {
+          superAdminRazorpayId: cleanUtr,
+          clearanceMode: 'bank_transfer',
+          notes: `Offline Bank Transfer (UTR: ${cleanUtr}, Bank: ${bankName || 'Direct Transfer'}) submitted by ${adminUser}. Awaiting Super Admin verification. ${notes ? 'Note: ' + notes : ''}`,
+        },
+      });
+    });
+
+    res.json({
+      success: true,
+      message: `Offline bank transfer of ₹${totalToRemit} (UTR: ${cleanUtr}) submitted successfully! Super Admin has been notified for verification.`,
+      totalRemitted: totalToRemit,
+      utr: cleanUtr,
+    });
+  } catch (err) {
+    console.error('[Regional Remit Bank Transfer] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

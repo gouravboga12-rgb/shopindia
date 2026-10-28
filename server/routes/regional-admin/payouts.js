@@ -70,19 +70,30 @@ router.get('/', async (req, res) => {
             businessName: true,
             contactName: true,
             phone: true,
+            email: true,
+            street: true,
             city: true,
+            state: true,
             pincode: true,
+            gstNumber: true,
+            panNumber: true,
             walletBalance: true,
             accountHolder: true,
             accountNumber: true,
             ifsc: true,
             bankName: true,
             upiId: true,
+            approvalStatus: true,
+            isActive: true,
+            documents: { select: { id: true, name: true, url: true } },
+            user: {
+              select: { id: true, status: true, phone: true, email: true },
+            },
           },
         },
         riderProfile: {
           include: {
-            user: { select: { name: true, phone: true } },
+            user: { select: { id: true, name: true, phone: true, email: true, status: true } },
           },
         },
       },
@@ -150,6 +161,103 @@ router.post('/:id/verify', async (req, res) => {
     });
   } catch (err) {
     console.error('[RegionalPayouts] Verify error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/regional-admin/payouts/partner/toggle-suspend
+ * Regional Admin suspends or reactivates a partner in their assigned territory
+ */
+router.post('/partner/toggle-suspend', async (req, res) => {
+  try {
+    const { partyType, partyId, reason } = req.body;
+    const normalizedParty = String(partyType).toUpperCase();
+    const userId = req.user?.userId || req.user?.id;
+
+    const profile = await prisma.regionalAdminProfile.findUnique({
+      where: { userId },
+      include: { branch: true },
+    });
+
+    const assignedPincodes = profile?.assignedPincodes || [];
+    const branchId = profile?.branchId;
+
+    let targetUserId = null;
+    let partnerName = 'Partner';
+    let isInsideTerritory = false;
+
+    if (normalizedParty === 'VENDOR') {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: partyId },
+        include: { user: true },
+      });
+      if (!vendor) return res.status(404).json({ error: 'Vendor not found.' });
+
+      if (branchId && vendor.branchId === branchId) isInsideTerritory = true;
+      if (vendor.pincode && assignedPincodes.includes(vendor.pincode)) isInsideTerritory = true;
+
+      targetUserId = vendor.userId;
+      partnerName = vendor.businessName;
+    } else {
+      const rider = await prisma.riderProfile.findUnique({
+        where: { id: partyId },
+        include: { user: true },
+      });
+      if (!rider) return res.status(404).json({ error: 'Rider not found.' });
+
+      if (branchId && rider.branchId === branchId) isInsideTerritory = true;
+      if (assignedPincodes.some(p => (rider.address || '').includes(p))) isInsideTerritory = true;
+
+      targetUserId = rider.userId;
+      partnerName = rider.user?.name || 'Rider';
+    }
+
+    if (!isInsideTerritory && req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'You can only suspend partners registered inside your assigned territory.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) return res.status(404).json({ error: 'Associated user record not found.' });
+
+    const newStatus = user.status === 'suspended' ? 'active' : 'suspended';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: targetUserId },
+        data: { status: newStatus },
+      });
+
+      if (normalizedParty === 'RIDER') {
+        await tx.riderProfile.update({
+          where: { id: partyId },
+          data: {
+            isActive: newStatus === 'active',
+            isOnline: newStatus === 'active' ? undefined : false,
+          },
+        });
+      } else if (normalizedParty === 'VENDOR') {
+        if (newStatus === 'suspended') {
+          await tx.vendor.update({
+            where: { id: partyId },
+            data: { approvalStatus: 'rejected', approvalNote: reason || 'Suspended by Regional Admin' },
+          });
+        } else {
+          await tx.vendor.update({
+            where: { id: partyId },
+            data: { approvalStatus: 'approved', approvalNote: 'Reactivated by Regional Admin' },
+          });
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `${partnerName} account has been ${newStatus === 'suspended' ? 'suspended' : 'reactivated'}.`,
+      status: newStatus,
+    });
+  } catch (err) {
+    console.error('[Regional Partner Suspend] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

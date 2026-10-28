@@ -97,20 +97,67 @@ router.get('/status', async (req, res) => {
     const floatAmount = rider.codCashFloat || 0;
     const floatLimit = rider.codFloatLimit || settings.maxFloatLimit;
 
+    // Check for any pending physical submission awaiting Regional Admin approval
+    const pendingSubmission = await prisma.cODRemittance.findFirst({
+      where: {
+        riderProfileId: rider.id,
+        status: 'pending',
+        clearanceMode: 'physical',
+        receivedByAdminAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Extract rider's pincode from address
+    const pinMatch = (rider.address || '').match(/\b([1-9][0-9]{5})\b/);
+    const riderPincode = pinMatch ? pinMatch[1] : null;
+
     // Determine regional admin availability
     let regionalAdminAvailable = false;
     let regionalAdminInfo = null;
 
-    if (settings.allowRegionalCash && rider.branch?.regionalAdmins?.length > 0) {
-      const activeAdmin = rider.branch.regionalAdmins[0];
-      regionalAdminAvailable = true;
-      regionalAdminInfo = {
-        id: activeAdmin.id,
-        name: activeAdmin.user?.name || 'Regional Hub Manager',
-        phone: activeAdmin.user?.phone,
-        email: activeAdmin.user?.email,
-        hubName: rider.branch.name || rider.branch.city,
-      };
+    if (settings.allowRegionalCash) {
+      // 1. Try branch assignment
+      if (rider.branch?.regionalAdmins?.length > 0) {
+        const activeAdmin = rider.branch.regionalAdmins[0];
+        regionalAdminAvailable = true;
+        regionalAdminInfo = {
+          id: activeAdmin.id,
+          name: activeAdmin.user?.name || 'Regional Hub Manager',
+          phone: activeAdmin.user?.phone || null,
+          email: activeAdmin.user?.email || null,
+          hubName: rider.branch.name || rider.branch.city || activeAdmin.regionName,
+          address: rider.branch.street ? `${rider.branch.street}, ${rider.branch.city}` : activeAdmin.regionName,
+          district: activeAdmin.district || rider.branch.city,
+          state: activeAdmin.state || rider.branch.state,
+        };
+      } else if (riderPincode) {
+        // 2. Try pincode match across approved Regional Admins
+        const matchedAdmin = await prisma.regionalAdminProfile.findFirst({
+          where: {
+            status: 'approved',
+            assignedPincodes: { has: riderPincode },
+          },
+          include: {
+            user: { select: { id: true, name: true, phone: true, email: true } },
+            branch: true,
+          },
+        });
+
+        if (matchedAdmin) {
+          regionalAdminAvailable = true;
+          regionalAdminInfo = {
+            id: matchedAdmin.id,
+            name: matchedAdmin.user?.name || 'Regional Hub Manager',
+            phone: matchedAdmin.user?.phone || null,
+            email: matchedAdmin.user?.email || null,
+            hubName: matchedAdmin.regionName || matchedAdmin.branch?.name || 'Regional Hub',
+            address: matchedAdmin.district ? `${matchedAdmin.regionName}, ${matchedAdmin.district}, ${matchedAdmin.state || ''}` : matchedAdmin.regionName,
+            district: matchedAdmin.district,
+            state: matchedAdmin.state,
+          };
+        }
+      }
     }
 
     // Determine compliance and dispatch block
@@ -132,10 +179,19 @@ router.get('/status', async (req, res) => {
       floatAmount,
       floatLimit,
       unremittedCount,
+      riderPincode,
       deadlineRule: settings.deadlineRule,
       orderCountThreshold: settings.orderCountThreshold,
       regionalAdminAvailable,
       regionalAdmin: regionalAdminInfo,
+      pendingSubmission: pendingSubmission
+        ? {
+            id: pendingSubmission.id,
+            amount: pendingSubmission.amount,
+            createdAt: pendingSubmission.createdAt,
+            status: pendingSubmission.status,
+          }
+        : null,
       clearanceNotice: !regionalAdminAvailable
         ? 'No Regional Admin available in your area. Please pay and remit offline cash through Razorpay.'
         : 'You can submit offline cash physically to your Regional Admin or pay instantly via Razorpay.',
@@ -278,14 +334,16 @@ router.post('/verify-razorpay-remittance', async (req, res) => {
 });
 
 /**
- * POST /api/rider/cod/request-physical-handover
- * Generates a physical cash handover request with a 4-digit verification OTP for the Regional Admin.
+ * POST /api/rider/cod/submit-cash-to-hub
+ * Rider submits collected offline cash directly to the Regional Admin (No OTP required).
+ * Creates a pending remittance record awaiting Regional Admin confirmation.
  */
-router.post('/request-physical-handover', async (req, res) => {
+router.post('/submit-cash-to-hub', async (req, res) => {
   try {
     const rider = await prisma.riderProfile.findUnique({
       where: { userId: req.user.userId },
       include: {
+        user: { select: { name: true, phone: true } },
         branch: {
           include: {
             regionalAdmins: { where: { status: 'approved' } },
@@ -296,47 +354,90 @@ router.post('/request-physical-handover', async (req, res) => {
 
     if (!rider) return res.status(404).json({ error: 'Rider not found.' });
 
-    const regionalAdmin = rider.branch?.regionalAdmins?.[0];
+    const floatToHandover = rider.codCashFloat || 0;
+    if (floatToHandover <= 0) {
+      return res.status(400).json({ error: 'You have zero floating cash to hand over.' });
+    }
+
+    // Determine regional admin (by branch or by pincode)
+    let regionalAdmin = rider.branch?.regionalAdmins?.[0] || null;
+    if (!regionalAdmin) {
+      const pinMatch = (rider.address || '').match(/\b([1-9][0-9]{5})\b/);
+      if (pinMatch) {
+        regionalAdmin = await prisma.regionalAdminProfile.findFirst({
+          where: {
+            status: 'approved',
+            assignedPincodes: { has: pinMatch[1] },
+          },
+          include: { user: { select: { name: true, phone: true } } },
+        });
+      }
+    }
+
     if (!regionalAdmin) {
       return res.status(400).json({
-        error: 'No Regional Admin available in your area. Please pay through Razorpay.',
+        error: 'No Regional Admin is available in your territory. Please remit your cash float online via Razorpay / UPI.',
       });
     }
 
-    const floatToHandover = rider.codCashFloat || 0;
-    if (floatToHandover <= 0) {
-      return res.status(400).json({ error: 'Zero cash in hand to submit.' });
-    }
-
-    // Generate 4-digit verification OTP
-    const handoverOtp = String(Math.floor(1000 + Math.random() * 9000));
-
-    const remittance = await prisma.cODRemittance.create({
-      data: {
+    // Check if an existing pending submission exists, update it or create new
+    const existing = await prisma.cODRemittance.findFirst({
+      where: {
         riderProfileId: rider.id,
-        amount: floatToHandover,
         status: 'pending',
         clearanceMode: 'physical',
-        regionalAdminId: regionalAdmin.id,
-        notes: `Physical submission requested. Handover OTP: ${handoverOtp}`,
+        receivedByAdminAt: null,
       },
     });
+
+    let remittance;
+    if (existing) {
+      remittance = await prisma.cODRemittance.update({
+        where: { id: existing.id },
+        data: {
+          amount: floatToHandover,
+          regionalAdminId: regionalAdmin.id,
+          notes: `Direct cash submission of ₹${floatToHandover} by ${rider.user.name} submitted for Regional Hub verification.`,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      remittance = await prisma.cODRemittance.create({
+        data: {
+          riderProfileId: rider.id,
+          amount: floatToHandover,
+          status: 'pending',
+          clearanceMode: 'physical',
+          regionalAdminId: regionalAdmin.id,
+          notes: `Direct cash submission of ₹${floatToHandover} by ${rider.user.name} submitted for Regional Hub verification.`,
+        },
+      });
+    }
 
     res.json({
       success: true,
-      message: 'Physical cash submission initiated. Please share the handover OTP with your Regional Admin.',
-      handoverOtp,
+      message: `Cash submission of ₹${floatToHandover} recorded! Please hand over physical cash to ${regionalAdmin.user?.name || 'Regional Hub Admin'}.`,
       remittanceId: remittance.id,
       amount: floatToHandover,
       regionalAdmin: {
-        name: regionalAdmin.user?.name || 'Regional Lead',
-        hubName: rider.branch?.name,
+        id: regionalAdmin.id,
+        name: regionalAdmin.user?.name || 'Regional Hub Manager',
+        phone: regionalAdmin.user?.phone,
+        hubName: regionalAdmin.regionName || rider.branch?.name,
       },
     });
   } catch (err) {
-    console.error('[Rider Physical Handover] Error:', err);
+    console.error('[Rider Submit Cash to Hub] Error:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * POST /api/rider/cod/request-physical-handover
+ * Legacy alias for submit-cash-to-hub (backward compatibility)
+ */
+router.post('/request-physical-handover', async (req, res) => {
+  return res.redirect(307, '/api/rider/cod/submit-cash-to-hub');
 });
 
 module.exports = router;

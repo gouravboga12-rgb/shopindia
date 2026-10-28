@@ -36,13 +36,20 @@ const AdminContent: React.FC = () => {
   const [managedVendor, setManagedVendor] = useState<ManagedVendor | null>(null);
   const [statementTarget, setStatementTarget] = useState<{ partyType: string; partyId: string; name?: string } | null>(null);
 
+  const handleTabChange = (newTab: string) => {
+    setStatementTarget(null);
+    setManagedVendor(null);
+    setTab(newTab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (!isAuthenticated) return <AdminLogin />;
 
   // When a vendor is being managed, render the vendor panel overlay
   if (managedVendor) {
     return (
       <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
-        <AdminSidebar currentTab={tab} onTabChange={(t) => { setTab(t); setManagedVendor(null); setStatementTarget(null); }} />
+        <AdminSidebar currentTab={tab} onTabChange={handleTabChange} />
         <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             <AdminVendorView vendor={managedVendor} onBack={() => setManagedVendor(null)} />
@@ -56,6 +63,7 @@ const AdminContent: React.FC = () => {
     if (statementTarget) {
       return (
         <AccountStatementPage
+          key={`statement-${statementTarget.partyType}-${statementTarget.partyId}`}
           partyType={statementTarget.partyType}
           partyId={statementTarget.partyId}
           initialAccountName={statementTarget.name}
@@ -96,8 +104,8 @@ const AdminContent: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
-      <AdminSidebar currentTab={tab} onTabChange={(t) => { setTab(t); setStatementTarget(null); setManagedVendor(null); }} />
-      <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8">
+      <AdminSidebar currentTab={statementTarget ? '' : tab} onTabChange={handleTabChange} />
+      <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8" key={statementTarget ? `stmt-${statementTarget.partyId}` : tab}>
         <div className="max-w-7xl mx-auto">
           {renderTab()}
         </div>

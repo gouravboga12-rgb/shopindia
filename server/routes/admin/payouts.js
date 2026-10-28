@@ -56,18 +56,29 @@ router.get('/', async (req, res) => {
               contactName: true,
               phone: true,
               email: true,
+              street: true,
               city: true,
+              state: true,
+              pincode: true,
+              gstNumber: true,
+              panNumber: true,
               walletBalance: true,
               accountHolder: true,
               accountNumber: true,
               ifsc: true,
               bankName: true,
               upiId: true,
+              approvalStatus: true,
+              isActive: true,
+              documents: { select: { id: true, name: true, url: true } },
+              user: {
+                select: { id: true, status: true, phone: true, email: true },
+              },
             },
           },
           riderProfile: {
             include: {
-              user: { select: { name: true, phone: true, email: true } },
+              user: { select: { id: true, name: true, phone: true, email: true, status: true } },
             },
           },
         },
@@ -501,15 +512,18 @@ router.get('/statement/:partyType/:partyId', async (req, res) => {
         itemsSummary = order.items.map(it => `${it.name || 'Item'} (${it.quantity}x)`).join(', ');
       }
 
-      if (e.entryType === 'VENDOR_CREDIT' && orderNum) {
-        cleanDesc = `Vendor Earning — Order #${orderNum}`;
-      } else if (e.entryType === 'RIDER_CREDIT' && orderNum) {
-        cleanDesc = `Delivery Trip Earning — Order #${orderNum}`;
+      if (e.entryType === 'VENDOR_CREDIT') {
+        cleanDesc = orderNum ? `Vendor Earning — Order #${orderNum}` : `Vendor Earning Credit`;
+      } else if (e.entryType === 'RIDER_CREDIT') {
+        cleanDesc = orderNum ? `Delivery Trip Earning — Order #${orderNum}` : `Delivery Trip Earning Credit`;
       } else if (e.entryType === 'PAYOUT') {
         cleanDesc = e.description && !e.description.includes('order #') ? e.description : `Withdrawal Payout (Cleared)`;
-      } else if (e.entryType === 'PLATFORM_FEE' && orderNum) {
-        cleanDesc = `Platform Commission — Order #${orderNum}`;
+      } else if (e.entryType === 'PLATFORM_FEE') {
+        cleanDesc = orderNum ? `Platform Commission — Order #${orderNum}` : `Platform Commission Fee`;
       }
+
+      // Sanitize any remaining raw UUID strings into clean readable short-codes
+      cleanDesc = cleanDesc.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, (uuid) => orderNum || `#${uuid.slice(0, 8).toUpperCase()}`);
 
       return {
         id: e.id,
@@ -628,6 +642,81 @@ router.post('/manual-adjustment', async (req, res) => {
     });
   } catch (err) {
     console.error('[AdminPayouts] Manual Adjustment error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/payouts/partner/toggle-suspend
+ * Super Admin toggles partner account suspension (Vendor or Rider)
+ */
+router.post('/partner/toggle-suspend', async (req, res) => {
+  try {
+    const { partyType, partyId, reason } = req.body;
+    const normalizedParty = String(partyType).toUpperCase();
+
+    let targetUserId = null;
+    let partnerName = 'Partner';
+
+    if (normalizedParty === 'VENDOR') {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: partyId },
+        include: { user: true },
+      });
+      if (!vendor) return res.status(404).json({ error: 'Vendor not found.' });
+      targetUserId = vendor.userId;
+      partnerName = vendor.businessName;
+    } else {
+      const rider = await prisma.riderProfile.findUnique({
+        where: { id: partyId },
+        include: { user: true },
+      });
+      if (!rider) return res.status(404).json({ error: 'Rider not found.' });
+      targetUserId = rider.userId;
+      partnerName = rider.user?.name || 'Rider';
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) return res.status(404).json({ error: 'Associated user record not found.' });
+
+    const newStatus = user.status === 'suspended' ? 'active' : 'suspended';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: targetUserId },
+        data: { status: newStatus },
+      });
+
+      if (normalizedParty === 'RIDER') {
+        await tx.riderProfile.update({
+          where: { id: partyId },
+          data: {
+            isActive: newStatus === 'active',
+            isOnline: newStatus === 'active' ? undefined : false,
+          },
+        });
+      } else if (normalizedParty === 'VENDOR') {
+        if (newStatus === 'suspended') {
+          await tx.vendor.update({
+            where: { id: partyId },
+            data: { approvalStatus: 'rejected', approvalNote: reason || 'Suspended by Super Admin' },
+          });
+        } else {
+          await tx.vendor.update({
+            where: { id: partyId },
+            data: { approvalStatus: 'approved', approvalNote: 'Reactivated by Super Admin' },
+          });
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `${partnerName} account has been ${newStatus === 'suspended' ? 'suspended' : 'reactivated'}.`,
+      status: newStatus,
+    });
+  } catch (err) {
+    console.error('[Admin Partner Suspend] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

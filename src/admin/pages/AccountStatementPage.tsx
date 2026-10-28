@@ -276,36 +276,46 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
                     </td>
 
                     <td className="py-3 px-4">
-                      <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
-                        <span>{entry.description || 'Ledger Entry'}</span>
-                        {entry.orderNumber && (
-                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono font-bold">
-                            #{entry.orderNumber}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Human-readable order details */}
-                      {(entry.itemsSummary || entry.customerName || entry.vendorName) && (
-                        <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
-                          {entry.itemsSummary && (
-                            <div className="truncate max-w-md text-gray-700">
-                              <span className="font-semibold text-gray-600">Items:</span> {entry.itemsSummary}
+                      {(() => {
+                        const cleanDescription = (entry.description || 'Ledger Entry').replace(
+                          /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+                          (uuid) => entry.orderNumber ? `#${entry.orderNumber}` : `#ORD-${uuid.slice(0, 8).toUpperCase()}`
+                        );
+                        return (
+                          <>
+                            <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                              <span>{cleanDescription}</span>
+                              {entry.orderNumber && (
+                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono font-bold">
+                                  #{entry.orderNumber}
+                                </span>
+                              )}
                             </div>
-                          )}
-                          <div className="flex items-center gap-3 text-[10.5px] text-gray-400">
-                            {entry.vendorName && <span>Store: <strong className="text-gray-600">{entry.vendorName}</strong></span>}
-                            {entry.customerName && <span>Customer: <strong className="text-gray-600">{entry.customerName}</strong></span>}
-                            {entry.orderTotal && <span>Order Value: ₹{entry.orderTotal}</span>}
-                          </div>
-                        </div>
-                      )}
+                            
+                            {/* Human-readable order details */}
+                            {(entry.itemsSummary || entry.customerName || entry.vendorName) && (
+                              <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
+                                {entry.itemsSummary && (
+                                  <div className="truncate max-w-md text-gray-700">
+                                    <span className="font-semibold text-gray-600">Items:</span> {entry.itemsSummary}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-3 text-[10.5px] text-gray-400">
+                                  {entry.vendorName && <span>Store: <strong className="text-gray-600">{entry.vendorName}</strong></span>}
+                                  {entry.customerName && <span>Customer: <strong className="text-gray-600">{entry.customerName}</strong></span>}
+                                  {entry.orderTotal && <span>Order Value: ₹{entry.orderTotal}</span>}
+                                </div>
+                              </div>
+                            )}
 
-                      {entry.orderId && !entry.orderNumber && (
-                        <div className="text-[10px] text-gray-400 font-mono mt-0.5" title={entry.orderId}>
-                          Ref: {entry.orderId.slice(0, 12)}...
-                        </div>
-                      )}
+                            {entry.orderId && !entry.orderNumber && (
+                              <div className="text-[10px] text-slate-500 font-mono mt-0.5" title={entry.orderId}>
+                                Ref: ORD-{entry.orderId.slice(0, 8).toUpperCase()}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </td>
 
                     <td className="py-3 px-4">
