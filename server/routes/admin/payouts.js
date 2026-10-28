@@ -172,11 +172,8 @@ router.post('/:id/approve', async (req, res) => {
 router.post('/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
-    const { utr, notes } = req.body;
-
-    if (!utr || !utr.trim()) {
-      return res.status(400).json({ error: 'Unique Transaction Reference (UTR) is required.' });
-    }
+    const { utr, razorpayPayoutId, utrNumber, notes } = req.body;
+    const finalUtr = (utr || razorpayPayoutId || utrNumber || '').trim();
 
     const request = await prisma.payoutRequest.findUnique({ where: { id } });
     if (!request) return res.status(404).json({ error: 'Payout request not found.' });
@@ -186,7 +183,7 @@ router.post('/:id/complete', async (req, res) => {
     }
 
     // Execute in database transaction:
-    // 1. Mark request completed with UTR
+    // 1. Mark request completed (UTR is optional)
     // 2. Decrement partner walletBalance
     // 3. Post immutable LedgerEntry (PAYOUT DEBIT)
     const result = await prisma.$transaction(async (tx) => {
@@ -195,8 +192,10 @@ router.post('/:id/complete', async (req, res) => {
         data: {
           status: 'completed',
           processedAt: new Date(),
-          razorpayPayoutId: utr.trim(),
-          notes: notes ? `${request.notes || ''}\n[Completed UTR ${utr.trim()}]: ${notes}`.trim() : `UTR: ${utr.trim()}`,
+          razorpayPayoutId: finalUtr || null,
+          notes: notes
+            ? `${request.notes || ''}\n[Completed${finalUtr ? ` UTR: ${finalUtr}` : ''}]: ${notes}`.trim()
+            : (finalUtr ? `UTR: ${finalUtr}` : 'Disbursed via Super Admin Portal'),
         },
       });
 
@@ -215,10 +214,10 @@ router.post('/:id/complete', async (req, res) => {
             vendorId: request.vendorId,
             amount: request.amount,
             entryType: 'PAYOUT',
-            description: `Bank/UPI Payout Disbursed — UTR: ${utr.trim()}`,
+            description: finalUtr ? `Bank/UPI Payout Disbursed — UTR: ${finalUtr}` : 'Bank/UPI Payout Disbursed — Super Admin Clearance',
             metadata: {
               payoutRequestId: id,
-              utr: utr.trim(),
+              utr: finalUtr || 'N/A',
               processedBy: req.user.id || 'super_admin',
             },
           },
@@ -237,10 +236,10 @@ router.post('/:id/complete', async (req, res) => {
             riderProfileId: request.riderProfileId,
             amount: request.amount,
             entryType: 'PAYOUT',
-            description: `Rider/Technician Payout Disbursed — UTR: ${utr.trim()}`,
+            description: finalUtr ? `Rider/Technician Payout Disbursed — UTR: ${finalUtr}` : 'Rider/Technician Payout Disbursed — Super Admin Clearance',
             metadata: {
               payoutRequestId: id,
-              utr: utr.trim(),
+              utr: finalUtr || 'N/A',
               processedBy: req.user.id || 'super_admin',
             },
           },
@@ -252,7 +251,7 @@ router.post('/:id/complete', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Payout of ₹${request.amount} marked paid successfully with UTR ${utr.trim()}.`,
+      message: `Payout of ₹${request.amount} marked paid successfully${finalUtr ? ` with UTR ${finalUtr}` : ''}.`,
       payout: result,
     });
   } catch (err) {

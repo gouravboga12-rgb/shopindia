@@ -122,11 +122,12 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
 
   const handleDisburseWithUTR = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activePayoutForComplete || !utrNumber.trim()) return;
+    if (!activePayoutForComplete) return;
 
     try {
       setProcessingAction(true);
       const res: any = await api.post(`/api/admin/payouts/${activePayoutForComplete.id}/complete`, {
+        utr: utrNumber.trim(),
         razorpayPayoutId: utrNumber.trim(),
         notes: payoutNotes.trim() || 'Disbursed via Super Admin Portal',
       });
@@ -610,11 +611,12 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
 
             <form onSubmit={handleDisburseWithUTR} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Bank / Razorpay UTR Reference Number *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Bank / Razorpay UTR Reference Number <span className="text-slate-400 font-normal">(Optional)</span>
+                </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. CMS182947192 or UTR-20261023-01"
+                  placeholder="e.g. CMS182947192, UTR-20261023-01, or leave empty for direct clearance"
                   value={utrNumber}
                   onChange={e => setUtrNumber(e.target.value)}
                   className="w-full text-xs font-mono px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -625,7 +627,7 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                 <label className="block text-xs font-bold text-slate-700 mb-1">Optional Payout Notes</label>
                 <input
                   type="text"
-                  placeholder="e.g. Net banking IMPS transfer completed"
+                  placeholder="e.g. Net banking IMPS transfer completed or Cash disbursed"
                   value={payoutNotes}
                   onChange={e => setPayoutNotes(e.target.value)}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -633,7 +635,7 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
               </div>
 
               <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-800">
-                ⚠️ Recording this UTR will immediately mark the payout as completed, decrement the merchant's wallet balance, and post an immutable <strong>DEBIT</strong> to the Ledger.
+                ⚠️ Confirming this disbursement will mark the payout as completed, decrement the merchant's wallet balance, and post an immutable <strong>DEBIT</strong> to the Ledger.
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
