@@ -176,3 +176,59 @@ export async function detectCurrentLocationWithMapbox(): Promise<GeocodedAddress
   return await reverseGeocodeMapbox(coords.longitude, coords.latitude);
 }
 
+/**
+ * Search/forward geocode addresses using OpenStreetMap Nominatim with India bias
+ */
+export async function searchAddressesMapbox(query: string): Promise<GeocodedAddress[]> {
+  if (!query || query.trim().length < 2) return [];
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&countrycodes=in&addressdetails=1&limit=5`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((item: any) => {
+      const addr = item.address || {};
+      const lat = parseFloat(item.lat) || 0;
+      const lng = parseFloat(item.lon) || 0;
+      const pincode = addr.postcode || '';
+      const rawRoad = [addr.house_number, addr.road].filter(Boolean).join(' ');
+      const road = rawRoad === pincode ? '' : rawRoad;
+      const colony = addr.suburb || addr.neighbourhood || addr.village || addr.residential || '';
+      const village = addr.village || '';
+      const mandal = addr.county || addr.subdistrict || addr.tehsil || '';
+      const city = addr.city || addr.town || addr.municipality || '';
+      const district = addr.state_district || addr.district || city || '';
+      const state = addr.state || '';
+      const country = addr.country || 'India';
+      const formatted = item.display_name || [road, colony, city, state, pincode].filter(Boolean).join(', ');
+
+      return {
+        fullAddress: formatted,
+        formattedAddress: formatted,
+        road: road || undefined,
+        neighborhood: colony || undefined,
+        colony: colony || undefined,
+        village: village || undefined,
+        mandal: mandal || undefined,
+        city: city || undefined,
+        district: district || undefined,
+        state: state || undefined,
+        country,
+        pincode: pincode || undefined,
+        latitude: lat,
+        longitude: lng,
+      };
+    });
+  } catch (err) {
+    console.error('Failed to forward geocode query:', err);
+    return [];
+  }
+}
+
+

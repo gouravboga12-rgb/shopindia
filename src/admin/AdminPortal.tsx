@@ -96,7 +96,7 @@ const AdminContent: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
-      <AdminSidebar currentTab={tab} onTabChange={setTab} />
+      <AdminSidebar currentTab={tab} onTabChange={(t) => { setTab(t); setStatementTarget(null); setManagedVendor(null); }} />
       <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
           {renderTab()}

@@ -324,5 +324,68 @@ router.get('/demand-leads', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/regional-admin/location
+ * Returns current regional admin base station location and assigned territory
+ */
+router.get('/location', async (req, res) => {
+  try {
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
+    if (!profile) return res.status(404).json({ error: 'Regional admin profile not found.' });
+    res.json({
+      success: true,
+      regionName: profile.regionName,
+      district: profile.district,
+      state: profile.state,
+      assignedPincodes: profile.assignedPincodes || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/regional-admin/location
+ * Updates regional admin base station location, address, geocoded coordinates, and assigned pincodes
+ */
+router.patch('/location', async (req, res) => {
+  try {
+    const { regionName, address, district, state, pincode, pincodes } = req.body;
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
+    if (!profile) return res.status(404).json({ error: 'Regional admin profile not found.' });
+
+    let newPincodes = Array.isArray(pincodes) ? [...pincodes] : [...(profile.assignedPincodes || [])];
+    if (pincode && !newPincodes.includes(String(pincode).trim())) {
+      newPincodes.push(String(pincode).trim());
+    }
+
+    if (address) {
+      const matchPin = address.match(/\b([1-9][0-9]{5})\b/);
+      if (matchPin && !newPincodes.includes(matchPin[1])) {
+        newPincodes.push(matchPin[1]);
+      }
+    }
+
+    const updated = await prisma.regionalAdminProfile.update({
+      where: { id: profile.id },
+      data: {
+        regionName: regionName ? regionName.trim() : (address ? address.split(',')[0].trim() : profile.regionName),
+        district: district || profile.district,
+        state: state || profile.state,
+        assignedPincodes: newPincodes,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Regional hub base station location updated successfully.',
+      profile: updated,
+    });
+  } catch (err) {
+    console.error('Update regional admin location error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 

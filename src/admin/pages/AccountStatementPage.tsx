@@ -10,9 +10,16 @@ interface StatementEntry {
   type: 'CREDIT' | 'DEBIT';
   entryType: string;
   description: string;
+  originalDescription?: string;
   amount: number;
   runningBalance: number;
   orderId?: string;
+  orderNumber?: string;
+  customerName?: string;
+  vendorName?: string;
+  dropoffAddress?: string;
+  itemsSummary?: string;
+  orderTotal?: number;
   metadata?: any;
 }
 
@@ -269,10 +276,34 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
                     </td>
 
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-gray-900">{entry.description || 'Ledger Entry'}</div>
-                      {entry.orderId && (
-                        <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                          Order ID: {entry.orderId}
+                      <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                        <span>{entry.description || 'Ledger Entry'}</span>
+                        {entry.orderNumber && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono font-bold">
+                            #{entry.orderNumber}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Human-readable order details */}
+                      {(entry.itemsSummary || entry.customerName || entry.vendorName) && (
+                        <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
+                          {entry.itemsSummary && (
+                            <div className="truncate max-w-md text-gray-700">
+                              <span className="font-semibold text-gray-600">Items:</span> {entry.itemsSummary}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 text-[10.5px] text-gray-400">
+                            {entry.vendorName && <span>Store: <strong className="text-gray-600">{entry.vendorName}</strong></span>}
+                            {entry.customerName && <span>Customer: <strong className="text-gray-600">{entry.customerName}</strong></span>}
+                            {entry.orderTotal && <span>Order Value: ₹{entry.orderTotal}</span>}
+                          </div>
+                        </div>
+                      )}
+
+                      {entry.orderId && !entry.orderNumber && (
+                        <div className="text-[10px] text-gray-400 font-mono mt-0.5" title={entry.orderId}>
+                          Ref: {entry.orderId.slice(0, 12)}...
                         </div>
                       )}
                     </td>

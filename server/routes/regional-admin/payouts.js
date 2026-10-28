@@ -14,11 +14,14 @@ router.use(verifyToken, requireRole('regional_admin', 'super_admin'));
 
 /**
  * GET /api/regional-admin/payouts
- * Returns pending payout requests from merchants and riders in this regional admin's territory.
+ * Returns pending payout requests from merchants and riders in this regional admin's territory,
+ * with support for scope=all to review unassigned platform-wide requests.
  */
 router.get('/', async (req, res) => {
   try {
     const userId = req.user?.userId || req.user?.id;
+    const { scope = 'territory' } = req.query;
+
     const profile = await prisma.regionalAdminProfile.findUnique({
       where: { userId },
       include: { branch: true },
@@ -26,59 +29,100 @@ router.get('/', async (req, res) => {
 
     const assignedPincodes = profile?.assignedPincodes || [];
     const branchId = profile?.branchId;
+    const regionName = profile?.regionName || '';
 
-    // Filter requests where vendor or rider resides in assigned pincodes or branch
+    // Base query for pending/review/approved requests
     const where = {
       status: { in: ['pending', 'under_review', 'approved'] },
     };
 
-    const orConditions = [];
-    if (branchId) {
-      orConditions.push({ vendor: { branchId } });
-      orConditions.push({ riderProfile: { branchId } });
-    }
-    if (assignedPincodes.length > 0) {
-      orConditions.push({ vendor: { pincode: { in: assignedPincodes } } });
-      orConditions.push({ riderProfile: { address: { in: assignedPincodes } } });
+    if (scope === 'territory') {
+      const orConditions = [];
+      if (branchId) {
+        orConditions.push({ vendor: { branchId } });
+        orConditions.push({ riderProfile: { branchId } });
+      }
+      if (assignedPincodes.length > 0) {
+        orConditions.push({ vendor: { pincode: { in: assignedPincodes } } });
+        // Use contains so full addresses with pincode are matched
+        assignedPincodes.forEach((pin) => {
+          if (pin && pin.trim()) {
+            orConditions.push({ riderProfile: { address: { contains: pin.trim() } } });
+          }
+        });
+      }
+
+      // If territory has a region/city keyword (e.g. Hyderabad, Uppal, Bangalore)
+      const cleanRegionKeywords = regionName
+        .replace(/hub|mandal|zone|central|north|south|east|west|\(|\)/gi, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 4);
+
+      cleanRegionKeywords.forEach((kw) => {
+        orConditions.push({ vendor: { city: { contains: kw, mode: 'insensitive' } } });
+        orConditions.push({ riderProfile: { address: { contains: kw, mode: 'insensitive' } } });
+      });
+
+      if (orConditions.length > 0) {
+        where.OR = orConditions;
+      }
     }
 
-    if (orConditions.length > 0) {
-      where.OR = orConditions;
-    }
+    const [requests, totalInScope, totalPlatformPending] = await Promise.all([
+      prisma.payoutRequest.findMany({
+        where,
+        include: {
+          vendor: {
+            select: {
+              id: true,
+              businessName: true,
+              contactName: true,
+              phone: true,
+              city: true,
+              pincode: true,
+              walletBalance: true,
+              accountHolder: true,
+              accountNumber: true,
+              ifsc: true,
+              bankName: true,
+              upiId: true,
+            },
+          },
+          riderProfile: {
+            include: {
+              user: { select: { name: true, phone: true } },
+            },
+          },
+        },
+        orderBy: { requestedAt: 'desc' },
+      }),
+      prisma.payoutRequest.count({ where }),
+      prisma.payoutRequest.count({ where: { status: { in: ['pending', 'under_review', 'approved'] } } }),
+    ]);
 
-    const requests = await prisma.payoutRequest.findMany({
-      where,
-      include: {
-        vendor: {
-          select: {
-            id: true,
-            businessName: true,
-            contactName: true,
-            phone: true,
-            city: true,
-            pincode: true,
-            walletBalance: true,
-            accountHolder: true,
-            accountNumber: true,
-            ifsc: true,
-            bankName: true,
-            upiId: true,
-          },
-        },
-        riderProfile: {
-          include: {
-            user: { select: { name: true, phone: true } },
-          },
-        },
-      },
-      orderBy: { requestedAt: 'desc' },
+    // Annotate whether each request is in this territory
+    const annotated = requests.map((r) => {
+      let isTerritory = false;
+      const vPin = r.vendor?.pincode;
+      const rAddr = r.riderProfile?.address || '';
+      if (assignedPincodes.includes(vPin)) isTerritory = true;
+      if (assignedPincodes.some((pin) => rAddr.includes(pin))) isTerritory = true;
+      if (branchId && (r.vendor?.branchId === branchId || r.riderProfile?.branchId === branchId)) isTerritory = true;
+
+      return {
+        ...r,
+        inTerritory: isTerritory,
+      };
     });
 
     res.json({
       success: true,
       territory: profile?.regionName || 'My Region',
       assignedPincodes,
-      requests,
+      scope,
+      totalInScope,
+      totalPlatformPending,
+      requests: annotated,
     });
   } catch (err) {
     console.error('[RegionalPayouts] GET error:', err);

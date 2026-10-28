@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../lib/api';
+import { detectCurrentLocationWithMapbox, searchAddressesMapbox, type GeocodedAddress } from '../../lib/mapbox';
 import {
   Globe2,
   Bike,
@@ -9,6 +11,11 @@ import {
   Truck,
   Bell,
   CheckCircle2,
+  MapPin,
+  Search,
+  Navigation,
+  X,
+  Compass
 } from 'lucide-react';
 
 interface RegionalMetrics {
@@ -33,6 +40,133 @@ export const RegionalDashboard: React.FC = () => {
   const [recentDeliveries, setRecentDeliveries] = useState<any[]>([]);
   const [demandLeads, setDemandLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Regional Hub Station Mapbox Location State
+  const [hubLocation, setHubLocation] = useState<{
+    regionName: string;
+    district?: string;
+    state?: string;
+    assignedPincodes: string[];
+    formattedAddress?: string;
+    coords?: { lat: number; lng: number };
+  }>({
+    regionName: '',
+    assignedPincodes: [],
+  });
+  const [locating, setLocating] = useState(false);
+  const [locFeedback, setLocFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Manual type / search state
+  const [showSearchBox, setShowSearchBox] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<GeocodedAddress[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const fetchHubLocation = async () => {
+    try {
+      const res: any = await api.get('/api/regional-admin/location');
+      if (res?.success) {
+        setHubLocation({
+          regionName: res.regionName || '',
+          district: res.district || '',
+          state: res.state || '',
+          assignedPincodes: res.assignedPincodes || [],
+          formattedAddress: `${res.regionName || ''}${res.district ? ', ' + res.district : ''}${res.state ? ', ' + res.state : ''}`,
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to fetch hub location:', e);
+    }
+  };
+
+  const handleUpdateLocationGPS = async () => {
+    setLocating(true);
+    setLocFeedback(null);
+    try {
+      const geo = await detectCurrentLocationWithMapbox();
+      const addrStr = geo.formattedAddress || geo.fullAddress || '';
+      const res: any = await api.patch('/api/regional-admin/location', {
+        regionName: geo.district || addrStr.split(',')[0],
+        address: addrStr,
+        district: geo.district,
+        state: geo.state,
+        pincode: geo.pincode,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+      });
+
+      if (res?.success) {
+        setHubLocation({
+          regionName: res.profile?.regionName || addrStr.split(',')[0],
+          district: geo.district,
+          state: geo.state,
+          assignedPincodes: res.profile?.assignedPincodes || [],
+          formattedAddress: addrStr,
+          coords: { lat: geo.latitude, lng: geo.longitude },
+        });
+        setLocFeedback({ type: 'success', text: 'Regional Hub GPS location synchronized via Mapbox' });
+        setTimeout(() => setLocFeedback(null), 5000);
+      }
+    } catch (err: any) {
+      setLocFeedback({ type: 'error', text: err.message || 'Failed to detect location' });
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleSearchAddress = async (q: string) => {
+    setSearchQuery(q);
+    if (!q || q.length < 3) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await searchAddressesMapbox(q);
+      setSearchResults(results);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectSearchResult = async (item: GeocodedAddress) => {
+    setLocating(true);
+    setLocFeedback(null);
+    setShowSearchBox(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    try {
+      const addrStr = item.formattedAddress || item.fullAddress || '';
+      const res: any = await api.patch('/api/regional-admin/location', {
+        regionName: item.district || addrStr.split(',')[0],
+        address: addrStr,
+        district: item.district,
+        state: item.state,
+        pincode: item.pincode,
+        latitude: item.latitude,
+        longitude: item.longitude,
+      });
+
+      if (res?.success) {
+        setHubLocation({
+          regionName: res.profile?.regionName || addrStr.split(',')[0],
+          district: item.district,
+          state: item.state,
+          assignedPincodes: res.profile?.assignedPincodes || [],
+          formattedAddress: addrStr,
+          coords: { lat: item.latitude, lng: item.longitude },
+        });
+        setLocFeedback({ type: 'success', text: `Regional Hub location updated to ${addrStr.split(',')[0]}` });
+        setTimeout(() => setLocFeedback(null), 5000);
+      }
+    } catch (err: any) {
+      setLocFeedback({ type: 'error', text: err.message || 'Failed to save selected location' });
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const fetchDashboard = async () => {
     if (!token) return;
@@ -63,6 +197,7 @@ export const RegionalDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboard();
+    fetchHubLocation();
   }, [token]);
 
   return (
@@ -91,6 +226,113 @@ export const RegionalDashboard: React.FC = () => {
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           <span>Refresh Live Pulse</span>
         </button>
+      </div>
+
+      {/* Regional Base Station Location (Mapbox Geocoding & Manual GPS) */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-800">Regional Hub Location (Mapbox Base Station)</span>
+                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono font-bold border border-blue-200">
+                  Manual On-Demand
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 font-semibold mt-0.5">
+                {hubLocation.regionName || 'Hub Location Not Calibrated'}
+                {hubLocation.assignedPincodes.length > 0 && (
+                  <span className="text-slate-400 font-normal ml-1">
+                    (Covered Pincodes: {hubLocation.assignedPincodes.join(', ')})
+                  </span>
+                )}
+              </p>
+              {hubLocation.formattedAddress && (
+                <p className="text-[11px] text-slate-400 mt-0.5 max-w-xl truncate">
+                  {hubLocation.formattedAddress}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={handleUpdateLocationGPS}
+              disabled={locating}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
+              <span>{locating ? 'Calibrating...' : 'Detect GPS Location'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowSearchBox(!showSearchBox)}
+              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Type / Search Exact Location</span>
+            </button>
+          </div>
+        </div>
+
+        {locFeedback && (
+          <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+            locFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{locFeedback.text}</span>
+          </div>
+        )}
+
+        {/* Mapbox Address Autocomplete Search Dropdown */}
+        {showSearchBox && (
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700">Search Location via Mapbox</span>
+              <button onClick={() => setShowSearchBox(false)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Type territory area, hub name, or pincode (e.g. Uppal, Hyderabad or BTM Layout, Bangalore)..."
+                value={searchQuery}
+                onChange={(e) => handleSearchAddress(e.target.value)}
+                className="w-full px-3.5 py-2 pl-9 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            </div>
+
+            {isSearching && (
+              <p className="text-xs text-slate-400 py-2">Searching Mapbox places...</p>
+            )}
+
+            {searchResults.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-48 overflow-y-auto shadow-sm">
+                {searchResults.map((res, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelectSearchResult(res)}
+                    className="w-full text-left p-2.5 hover:bg-blue-50/60 transition-colors flex items-start gap-2 cursor-pointer"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">{(res.formattedAddress || res.fullAddress || '').split(',')[0]}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{res.formattedAddress || res.fullAddress}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* KPI Cards Grid - 1 Col on narrow mobile, 2 Col on tablet, 4 Col on desktop */}

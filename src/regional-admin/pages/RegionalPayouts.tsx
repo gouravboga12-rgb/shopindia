@@ -22,6 +22,8 @@ export const RegionalPayouts: React.FC = () => {
   const [requests, setRequests] = useState<TerritoryPayoutRequest[]>([]);
   const [territory, setTerritory] = useState<string>('');
   const [assignedPincodes, setAssignedPincodes] = useState<string[]>([]);
+  const [scope, setScope] = useState<'territory' | 'all'>('territory');
+  const [totalPlatformPending, setTotalPlatformPending] = useState<number>(0);
 
   // Action state
   const [selectedPayout, setSelectedPayout] = useState<TerritoryPayoutRequest | null>(null);
@@ -33,10 +35,11 @@ export const RegionalPayouts: React.FC = () => {
   const loadTerritoryPayouts = async () => {
     setLoading(true);
     try {
-      const res: any = await api.get('/api/regional-admin/payouts');
+      const res: any = await api.get(`/api/regional-admin/payouts?scope=${scope}`);
       if (res?.requests) setRequests(res.requests);
       if (res?.territory) setTerritory(res.territory);
       if (res?.assignedPincodes) setAssignedPincodes(res.assignedPincodes);
+      if (res?.totalPlatformPending !== undefined) setTotalPlatformPending(res.totalPlatformPending);
     } catch (err: any) {
       console.error('Failed to load regional payouts:', err);
       setMessage({ text: err.message || 'Failed to fetch territory payouts.', isError: true });
@@ -47,7 +50,7 @@ export const RegionalPayouts: React.FC = () => {
 
   useEffect(() => {
     loadTerritoryPayouts();
-  }, []);
+  }, [scope]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,14 +94,58 @@ export const RegionalPayouts: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={loadTerritoryPayouts}
-          disabled={loading}
-          className="p-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm transition-all flex items-center gap-2 text-xs font-semibold"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Scope Selector Tabs */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              onClick={() => setScope('territory')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                scope === 'territory'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📍 My Territory
+            </button>
+            <button
+              onClick={() => setScope('all')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                scope === 'all'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>🌐 All Platform Queues</span>
+              {totalPlatformPending > 0 && (
+                <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full text-[10px]">
+                  {totalPlatformPending}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <button
+            onClick={loadTerritoryPayouts}
+            disabled={loading}
+            className="p-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Info notice explaining territory filtering */}
+      <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl text-xs text-blue-900 flex items-start gap-2.5">
+        <span className="text-base">ℹ️</span>
+        <div>
+          <p className="font-bold">Territory Scope Filter</p>
+          <p className="text-[11px] text-blue-700 mt-0.5">
+            {scope === 'territory'
+              ? `Currently filtering for partners inside your registered territory (${territory || 'Uppal Hub'}). If a partner is operating in another city (e.g. Bengaluru), switch to "All Platform Queues" to verify and forward their payout.`
+              : 'Showing all platform payout requests across all territories. You can review, verify, or escalate any request to Super Admin.'}
+          </p>
+        </div>
       </div>
 
       {message && (
@@ -124,8 +171,20 @@ export const RegionalPayouts: React.FC = () => {
             Loading territory partner payouts...
           </div>
         ) : requests.length === 0 ? (
-          <div className="py-16 text-center text-gray-400 text-xs">
-            No pending partner payout requests in your assigned territory.
+          <div className="py-16 text-center text-gray-400 text-xs space-y-2">
+            <p className="text-gray-500 font-semibold">
+              {scope === 'territory'
+                ? `No pending partner payout requests inside ${territory || 'your assigned territory'}.`
+                : 'No pending payout requests on the platform.'}
+            </p>
+            {scope === 'territory' && totalPlatformPending > 0 && (
+              <button
+                onClick={() => setScope('all')}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer"
+              >
+                View {totalPlatformPending} Platform Pending Requests
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -141,7 +200,7 @@ export const RegionalPayouts: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {requests.map((r) => {
+                {requests.map((r: any) => {
                   const partnerName =
                     r.partyType === 'VENDOR'
                       ? r.vendor?.businessName || 'Merchant'
@@ -159,12 +218,23 @@ export const RegionalPayouts: React.FC = () => {
                   return (
                     <tr key={r.id} className="hover:bg-gray-50/50">
                       <td className="py-3 px-4">
-                        <div className="font-bold text-gray-900">{partnerName}</div>
-                        <div className="text-[11px] text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-900 text-sm">{partnerName}</span>
+                          {r.inTerritory ? (
+                            <span className="px-1.5 py-0.2 rounded font-bold text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Territory
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded font-bold text-[9.5px] bg-amber-50 text-amber-700 border border-amber-200">
+                              External Territory
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-gray-400 mt-0.5 truncate max-w-sm">
                           <span className="uppercase text-[9px] px-1.5 py-0.2 rounded font-extrabold bg-gray-100 text-gray-600">
                             {r.partyType}
                           </span>{' '}
-                          • {city || 'Territory'}
+                          • {city || 'Territory Partner'}
                         </div>
                       </td>
 

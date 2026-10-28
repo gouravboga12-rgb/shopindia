@@ -456,6 +456,34 @@ router.get('/statement/:partyType/:partyId', async (req, res) => {
 
     const entries = await prisma.ledgerEntry.findMany({
       where,
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            type: true,
+            customer: { select: { name: true, phone: true } },
+            items: {
+              select: {
+                id: true,
+                name: true,
+                quantity: true,
+                price: true,
+              },
+            },
+            vendor: { select: { businessName: true } },
+            delivery: {
+              select: {
+                pickupName: true,
+                dropoffName: true,
+                dropoffAddress: true,
+                deliveryFee: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -463,15 +491,42 @@ router.get('/statement/:partyType/:partyId', async (req, res) => {
     const statementRows = entries.map(e => {
       const change = e.type === 'CREDIT' ? e.amount : -e.amount;
       runningBalance += change;
+
+      const order = e.order;
+      const orderNum = order?.orderNumber || (e.orderId ? `ORD-${e.orderId.slice(0, 8).toUpperCase()}` : null);
+
+      let cleanDesc = e.description || 'Ledger Transaction';
+      let itemsSummary = '';
+      if (order?.items && order.items.length > 0) {
+        itemsSummary = order.items.map(it => `${it.name || 'Item'} (${it.quantity}x)`).join(', ');
+      }
+
+      if (e.entryType === 'VENDOR_CREDIT' && orderNum) {
+        cleanDesc = `Vendor Earning — Order #${orderNum}`;
+      } else if (e.entryType === 'RIDER_CREDIT' && orderNum) {
+        cleanDesc = `Delivery Trip Earning — Order #${orderNum}`;
+      } else if (e.entryType === 'PAYOUT') {
+        cleanDesc = e.description && !e.description.includes('order #') ? e.description : `Withdrawal Payout (Cleared)`;
+      } else if (e.entryType === 'PLATFORM_FEE' && orderNum) {
+        cleanDesc = `Platform Commission — Order #${orderNum}`;
+      }
+
       return {
         id: e.id,
         date: e.createdAt,
         type: e.type, // CREDIT or DEBIT
         entryType: e.entryType,
-        description: e.description,
+        description: cleanDesc,
+        originalDescription: e.description,
         amount: e.amount,
         runningBalance: Math.round(runningBalance * 100) / 100,
         orderId: e.orderId,
+        orderNumber: orderNum,
+        customerName: order?.customer?.name || null,
+        vendorName: order?.vendor?.businessName || order?.delivery?.pickupName || null,
+        dropoffAddress: order?.delivery?.dropoffAddress || null,
+        itemsSummary: itemsSummary || null,
+        orderTotal: order?.total || null,
         metadata: e.metadata,
       };
     });
