@@ -406,7 +406,7 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                             <Store className="w-4 h-4 text-blue-600 shrink-0" />
                             <span>{vendor?.businessName || 'Merchant'}</span>
                           </div>
-                          {vendor?.user?.status === 'suspended' || vendor?.isActive === false ? (
+                          {vendor?.user?.status === 'suspended' ? (
                             <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                               Suspended
                             </span>
@@ -568,16 +568,16 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                               onClick={() => setSuspendTarget({
                                 id: vendor.id,
                                 name: vendor.businessName,
-                                isSuspended: vendor?.user?.status === 'suspended' || vendor?.isActive === false,
+                                isSuspended: vendor?.user?.status === 'suspended',
                               })}
                               className={`px-2 py-1 rounded-lg text-[10.5px] font-bold transition-colors cursor-pointer ${
-                                vendor?.user?.status === 'suspended' || vendor?.isActive === false
+                                vendor?.user?.status === 'suspended'
                                   ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                                   : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
                               }`}
-                              title={vendor?.user?.status === 'suspended' || vendor?.isActive === false ? 'Reactivate Store' : 'Suspend Store Account'}
+                              title={vendor?.user?.status === 'suspended' ? 'Reactivate Store' : 'Suspend Store Account'}
                             >
-                              {vendor?.user?.status === 'suspended' || vendor?.isActive === false ? 'Reactivate' : 'Suspend'}
+                              {vendor?.user?.status === 'suspended' ? 'Reactivate' : 'Suspend'}
                             </button>
                           )}
                         </div>
@@ -648,8 +648,8 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                 </button>
                 <button
                   type="submit"
-                  disabled={processingAction || !utrNumber.trim()}
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+                  disabled={processingAction}
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {processingAction ? 'Disbursing...' : 'Confirm Disbursement'}
                 </button>

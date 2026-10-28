@@ -463,7 +463,7 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                             <Bike className="w-4 h-4 text-indigo-600 shrink-0" />
                             <span>{user?.name || 'Partner'}</span>
                           </div>
-                          {user?.status === 'suspended' || rider?.isActive === false ? (
+                          {user?.status === 'suspended' ? (
                             <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                               Suspended
                             </span>
@@ -637,16 +637,16 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                               onClick={() => setSuspendTarget({
                                 id: rider.id,
                                 name: user?.name || 'Rider',
-                                isSuspended: user?.status === 'suspended' || rider?.isActive === false,
+                                isSuspended: user?.status === 'suspended',
                               })}
                               className={`px-2 py-1 rounded-lg text-[10.5px] font-bold transition-colors cursor-pointer ${
-                                user?.status === 'suspended' || rider?.isActive === false
+                                user?.status === 'suspended'
                                   ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                                   : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
                               }`}
-                              title={user?.status === 'suspended' || rider?.isActive === false ? 'Reactivate Partner' : 'Suspend Partner Account'}
+                              title={user?.status === 'suspended' ? 'Reactivate Partner' : 'Suspend Partner Account'}
                             >
-                              {user?.status === 'suspended' || rider?.isActive === false ? 'Reactivate' : 'Suspend'}
+                              {user?.status === 'suspended' ? 'Reactivate' : 'Suspend'}
                             </button>
                           )}
                         </div>
@@ -717,8 +717,8 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                 </button>
                 <button
                   type="submit"
-                  disabled={processingAction || !utrNumber.trim()}
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+                  disabled={processingAction}
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {processingAction ? 'Disbursing...' : 'Confirm Disbursement'}
                 </button>

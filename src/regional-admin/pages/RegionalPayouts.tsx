@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   ShieldCheck, RefreshCw, Zap, Phone, MessageCircle, Info,
-  UserX, UserCheck, ExternalLink, Store, Bike
+  UserX, UserCheck, ExternalLink, Store, Bike, CheckCircle2, Clock
 } from 'lucide-react';
 
 interface TerritoryPayoutRequest {
@@ -201,8 +201,8 @@ export const RegionalPayouts: React.FC = () => {
                   const isVendor = r.partyType === 'VENDOR';
                   const partnerPhone = isVendor ? r.vendor?.phone : r.riderProfile?.user?.phone;
                   const isSuspended = isVendor
-                    ? (r.vendor?.user?.status === 'suspended' || r.vendor?.isActive === false)
-                    : (r.riderProfile?.user?.status === 'suspended' || r.riderProfile?.isActive === false);
+                    ? r.vendor?.user?.status === 'suspended'
+                    : r.riderProfile?.user?.status === 'suspended';
 
                   return (
                     <tr key={r.id} className="hover:bg-gray-50/50">
@@ -299,40 +299,58 @@ export const RegionalPayouts: React.FC = () => {
                       </td>
 
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setSelectedPayout(r);
-                              setActionType('approve');
-                              setVerificationNote('Partner identity, order deliveries, and store activity verified by Regional Lead.');
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer"
-                          >
-                            Verify & Forward
-                          </button>
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {r.status === 'approved' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10.5px]">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Forwarded to Super Admin</span>
+                            </span>
+                          ) : r.status === 'under_review' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[10.5px]">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Escalated to HQ</span>
+                            </span>
+                          ) : r.status === 'rejected' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[10.5px]">
+                              <span>Rejected</span>
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedPayout(r);
+                                  setActionType('approve');
+                                  setVerificationNote('Partner identity, order deliveries, and store activity verified by Regional Lead.');
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer"
+                              >
+                                Verify & Forward
+                              </button>
 
-                          <button
-                            onClick={() => {
-                              setSelectedPayout(r);
-                              setActionType('escalate');
-                              setVerificationNote('Discrepancy found or verification failed. Escalating directly to Super Admin for manual intervention.');
-                            }}
-                            className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold text-[11px] transition-all cursor-pointer"
-                            title="Escalate directly to Super Admin if verification fails"
-                          >
-                            Escalate to Super Admin
-                          </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedPayout(r);
+                                  setActionType('escalate');
+                                  setVerificationNote('Discrepancy found or verification failed. Escalating directly to Super Admin for manual intervention.');
+                                }}
+                                className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold text-[11px] transition-all cursor-pointer"
+                                title="Escalate directly to Super Admin if verification fails"
+                              >
+                                Escalate to Super Admin
+                              </button>
 
-                          <button
-                            onClick={() => {
-                              setSelectedPayout(r);
-                              setActionType('reject');
-                              setVerificationNote('');
-                            }}
-                            className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] transition-all cursor-pointer"
-                          >
-                            Reject
-                          </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedPayout(r);
+                                  setActionType('reject');
+                                  setVerificationNote('');
+                                }}
+                                className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] transition-all cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
 
                           <button
                             type="button"
