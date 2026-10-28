@@ -337,6 +337,9 @@ router.get('/location', async (req, res) => {
       regionName: profile.regionName,
       district: profile.district,
       state: profile.state,
+      address: profile.address || null,
+      currentLat: profile.currentLat ?? null,
+      currentLng: profile.currentLng ?? null,
       assignedPincodes: profile.assignedPincodes || [],
     });
   } catch (err) {
@@ -350,7 +353,7 @@ router.get('/location', async (req, res) => {
  */
 router.patch('/location', async (req, res) => {
   try {
-    const { regionName, address, district, state, pincode, pincodes } = req.body;
+    const { regionName, address, district, state, pincode, pincodes, latitude, longitude } = req.body;
     const profile = await getAdminProfile(req.user?.userId || req.user?.id);
     if (!profile) return res.status(404).json({ error: 'Regional admin profile not found.' });
 
@@ -366,10 +369,20 @@ router.patch('/location', async (req, res) => {
       }
     }
 
+    const latNum = (latitude !== undefined && latitude !== null && !isNaN(Number(latitude)))
+      ? Number(latitude)
+      : profile.currentLat;
+    const lngNum = (longitude !== undefined && longitude !== null && !isNaN(Number(longitude)))
+      ? Number(longitude)
+      : profile.currentLng;
+
     const updated = await prisma.regionalAdminProfile.update({
       where: { id: profile.id },
       data: {
-        regionName: regionName ? regionName.trim() : (address ? address.split(',')[0].trim() : profile.regionName),
+        regionName: regionName ? regionName.trim() : profile.regionName,
+        address: address ? address.trim() : profile.address,
+        currentLat: latNum,
+        currentLng: lngNum,
         district: district || profile.district,
         state: state || profile.state,
         assignedPincodes: newPincodes,

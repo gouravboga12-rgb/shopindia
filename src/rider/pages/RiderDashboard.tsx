@@ -49,6 +49,8 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
       phone?: string;
       hubName?: string;
       address?: string;
+      currentLat?: number;
+      currentLng?: number;
       district?: string;
       state?: string;
     } | null;
@@ -566,9 +568,13 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = () => {
                         </>
                       )}
 
-                      {hubStatusData.regionalAdmin.address && (
+                      {(hubStatusData.regionalAdmin.address || hubStatusData.regionalAdmin.currentLat) && (
                         <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hubStatusData.regionalAdmin.address)}`}
+                          href={
+                            hubStatusData.regionalAdmin.currentLat && hubStatusData.regionalAdmin.currentLng
+                              ? `https://www.google.com/maps/dir/?api=1&destination=${hubStatusData.regionalAdmin.currentLat},${hubStatusData.regionalAdmin.currentLng}`
+                              : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hubStatusData.regionalAdmin.address || 'Regional Hub')}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold text-blue-800 shadow-2xs flex items-center gap-1.5 transition-all"

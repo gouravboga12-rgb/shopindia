@@ -71,7 +71,8 @@ export const RegionalDashboard: React.FC = () => {
           district: res.district || '',
           state: res.state || '',
           assignedPincodes: res.assignedPincodes || [],
-          formattedAddress: `${res.regionName || ''}${res.district ? ', ' + res.district : ''}${res.state ? ', ' + res.state : ''}`,
+          formattedAddress: res.address || `${res.regionName || ''}${res.district ? ', ' + res.district : ''}${res.state ? ', ' + res.state : ''}`,
+          coords: (res.currentLat && res.currentLng) ? { lat: res.currentLat, lng: res.currentLng } : undefined,
         });
       }
     } catch (e) {
@@ -85,10 +86,15 @@ export const RegionalDashboard: React.FC = () => {
     try {
       const geo = await detectCurrentLocationWithMapbox();
       const addrStr = geo.formattedAddress || geo.fullAddress || '';
+      const hubName = geo.mandal || geo.neighborhood || geo.city || addrStr.split(',')[0];
+      const regionTitle = hubName && geo.district && hubName !== geo.district
+        ? `${hubName} Hub (${geo.district})`
+        : `${hubName || 'Regional'} Hub`;
+
       const res: any = await api.patch('/api/regional-admin/location', {
-        regionName: geo.district || addrStr.split(',')[0],
+        regionName: regionTitle,
         address: addrStr,
-        district: geo.district,
+        district: geo.district || geo.city,
         state: geo.state,
         pincode: geo.pincode,
         latitude: geo.latitude,
@@ -97,15 +103,15 @@ export const RegionalDashboard: React.FC = () => {
 
       if (res?.success) {
         setHubLocation({
-          regionName: res.profile?.regionName || addrStr.split(',')[0],
-          district: geo.district,
+          regionName: res.profile?.regionName || regionTitle,
+          district: geo.district || geo.city,
           state: geo.state,
           assignedPincodes: res.profile?.assignedPincodes || [],
           formattedAddress: addrStr,
           coords: { lat: geo.latitude, lng: geo.longitude },
         });
-        setLocFeedback({ type: 'success', text: 'Regional Hub GPS location synchronized via Mapbox' });
-        setTimeout(() => setLocFeedback(null), 5000);
+        setLocFeedback({ type: 'success', text: `Hub GPS Calibrated: ${geo.latitude.toFixed(5)}°N, ${geo.longitude.toFixed(5)}°E via Mapbox` });
+        setTimeout(() => setLocFeedback(null), 6000);
       }
     } catch (err: any) {
       setLocFeedback({ type: 'error', text: err.message || 'Failed to detect location' });
@@ -116,7 +122,7 @@ export const RegionalDashboard: React.FC = () => {
 
   const handleSearchAddress = async (q: string) => {
     setSearchQuery(q);
-    if (!q || q.length < 3) {
+    if (!q || q.length < 2) {
       setSearchResults([]);
       return;
     }
@@ -139,10 +145,15 @@ export const RegionalDashboard: React.FC = () => {
     setSearchResults([]);
     try {
       const addrStr = item.formattedAddress || item.fullAddress || '';
+      const hubName = item.neighborhood || item.colony || item.city || addrStr.split(',')[0];
+      const regionTitle = hubName && item.district && hubName !== item.district
+        ? `${hubName} Hub (${item.district})`
+        : `${hubName || 'Regional'} Hub`;
+
       const res: any = await api.patch('/api/regional-admin/location', {
-        regionName: item.district || addrStr.split(',')[0],
+        regionName: regionTitle,
         address: addrStr,
-        district: item.district,
+        district: item.district || item.city,
         state: item.state,
         pincode: item.pincode,
         latitude: item.latitude,
@@ -151,18 +162,18 @@ export const RegionalDashboard: React.FC = () => {
 
       if (res?.success) {
         setHubLocation({
-          regionName: res.profile?.regionName || addrStr.split(',')[0],
-          district: item.district,
+          regionName: res.profile?.regionName || regionTitle,
+          district: item.district || item.city,
           state: item.state,
           assignedPincodes: res.profile?.assignedPincodes || [],
           formattedAddress: addrStr,
           coords: { lat: item.latitude, lng: item.longitude },
         });
-        setLocFeedback({ type: 'success', text: `Regional Hub location updated to ${addrStr.split(',')[0]}` });
-        setTimeout(() => setLocFeedback(null), 5000);
+        setLocFeedback({ type: 'success', text: `Location saved: ${item.latitude.toFixed(5)}°N, ${item.longitude.toFixed(5)}°E` });
+        setTimeout(() => setLocFeedback(null), 6000);
       }
     } catch (err: any) {
-      setLocFeedback({ type: 'error', text: err.message || 'Failed to save selected location' });
+      setLocFeedback({ type: 'error', text: err.message || 'Failed to update location' });
     } finally {
       setLocating(false);
     }
@@ -251,8 +262,13 @@ export const RegionalDashboard: React.FC = () => {
                 )}
               </p>
               {hubLocation.formattedAddress && (
-                <p className="text-[11px] text-slate-400 mt-0.5 max-w-xl truncate">
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 max-w-xl truncate">
                   {hubLocation.formattedAddress}
+                </p>
+              )}
+              {hubLocation.coords && (
+                <p className="text-[10.5px] font-mono font-bold text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded-lg border border-blue-200 inline-flex items-center gap-1 mt-1">
+                  <span>📍 GPS: {hubLocation.coords.lat.toFixed(5)}°N, {hubLocation.coords.lng.toFixed(5)}°E</span>
                 </p>
               )}
             </div>

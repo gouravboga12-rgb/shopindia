@@ -177,10 +177,57 @@ export async function detectCurrentLocationWithMapbox(): Promise<GeocodedAddress
 }
 
 /**
- * Search/forward geocode addresses using OpenStreetMap Nominatim with India bias
+ * Search/forward geocode addresses using Mapbox Places API with Nominatim fallback
  */
 export async function searchAddressesMapbox(query: string): Promise<GeocodedAddress[]> {
   if (!query || query.trim().length < 2) return [];
+
+  const mbToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+  // 1. Primary: Mapbox Geocoding API (High accuracy pinpoint coordinates)
+  if (mbToken) {
+    try {
+      const mbUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query.trim())}.json?access_token=${mbToken}&country=in&limit=6`;
+      const mbRes = await fetch(mbUrl);
+      if (mbRes.ok) {
+        const mbData = await mbRes.json();
+        if (Array.isArray(mbData.features) && mbData.features.length > 0) {
+          return mbData.features.map((feat: any) => {
+            const [lng, lat] = feat.center || [0, 0];
+            const ctx = feat.context || [];
+            const getCtx = (prefix: string) => ctx.find((c: any) => c.id && c.id.startsWith(prefix))?.text;
+
+            const pincode = getCtx('postcode') || '';
+            const locality = getCtx('neighborhood') || getCtx('locality') || feat.text || '';
+            const city = getCtx('place') || '';
+            const district = getCtx('district') || city;
+            const state = getCtx('region') || '';
+            const country = getCtx('country') || 'India';
+            const formatted = feat.place_name || feat.text || query;
+
+            return {
+              fullAddress: formatted,
+              formattedAddress: formatted,
+              road: feat.properties?.address || (feat.text !== city && feat.text !== pincode ? feat.text : undefined),
+              neighborhood: locality || undefined,
+              colony: locality || undefined,
+              city: city || undefined,
+              district: district || undefined,
+              state: state || undefined,
+              country,
+              pincode: pincode || undefined,
+              latitude: lat,
+              longitude: lng,
+            };
+          });
+        }
+      }
+    } catch (mbErr) {
+      console.warn('Mapbox Places search failed, falling back to Nominatim...', mbErr);
+    }
+  }
+
+  // 2. Fallback: OpenStreetMap Nominatim
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&countrycodes=in&addressdetails=1&limit=5`;
     const res = await fetch(url, {

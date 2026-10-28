@@ -127,7 +127,9 @@ router.get('/status', async (req, res) => {
           phone: activeAdmin.user?.phone || null,
           email: activeAdmin.user?.email || null,
           hubName: rider.branch.name || rider.branch.city || activeAdmin.regionName,
-          address: rider.branch.street ? `${rider.branch.street}, ${rider.branch.city}` : activeAdmin.regionName,
+          address: activeAdmin.address || (rider.branch.street ? `${rider.branch.street}, ${rider.branch.city}` : activeAdmin.regionName),
+          currentLat: activeAdmin.currentLat || null,
+          currentLng: activeAdmin.currentLng || null,
           district: activeAdmin.district || rider.branch.city,
           state: activeAdmin.state || rider.branch.state,
         };
@@ -152,7 +154,9 @@ router.get('/status', async (req, res) => {
             phone: matchedAdmin.user?.phone || null,
             email: matchedAdmin.user?.email || null,
             hubName: matchedAdmin.regionName || matchedAdmin.branch?.name || 'Regional Hub',
-            address: matchedAdmin.district ? `${matchedAdmin.regionName}, ${matchedAdmin.district}, ${matchedAdmin.state || ''}` : matchedAdmin.regionName,
+            address: matchedAdmin.address || (matchedAdmin.district ? `${matchedAdmin.regionName}, ${matchedAdmin.district}, ${matchedAdmin.state || ''}` : matchedAdmin.regionName),
+            currentLat: matchedAdmin.currentLat || null,
+            currentLng: matchedAdmin.currentLng || null,
             district: matchedAdmin.district,
             state: matchedAdmin.state,
           };

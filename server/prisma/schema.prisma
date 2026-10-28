@@ -577,6 +577,10 @@ model RegionalAdminProfile {
   state            String?
   assignedPincodes String[]            @default([])
 
+  address          String?
+  currentLat       Float?
+  currentLng       Float?
+
   idProofUrl       String?
   status           RegionalAdminStatus @default(pending_approval)
   approvedAt       DateTime?
