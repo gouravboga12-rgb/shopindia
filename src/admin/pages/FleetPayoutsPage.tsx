@@ -792,12 +792,12 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
 
             {/* Account Status Banner */}
             <div className={`p-3 rounded-2xl border text-xs flex items-center justify-between ${
-              inspectRider?.user?.status === 'suspended' || inspectRider?.isActive === false
+              inspectRider?.user?.status === 'suspended'
                 ? 'bg-rose-50 text-rose-800 border-rose-200'
                 : 'bg-emerald-50 text-emerald-800 border-emerald-200'
             }`}>
               <span className="font-bold">
-                Account Status: {inspectRider?.user?.status === 'suspended' || inspectRider?.isActive === false ? 'SUSPENDED' : 'ACTIVE & VERIFIED'}
+                Account Status: {inspectRider?.user?.status === 'suspended' ? 'SUSPENDED' : 'ACTIVE & VERIFIED'}
               </span>
               <span className="text-[11px] font-mono">Role: {inspectRider.partnerType?.toUpperCase() || 'DELIVERY'}</span>
             </div>

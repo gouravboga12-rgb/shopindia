@@ -82,6 +82,10 @@ router.post('/payout-request', async (req, res) => {
       });
     }
 
+    // NOTE: We do NOT decrement walletBalance here on request submission.
+    // The wallet is only decremented when the Super Admin actually disburses (marks paid).
+    // This prevents a double-decrement: request creates a "pending" hold tracked by
+    // the payoutRequest record; the real debit happens in /api/admin/payouts/:id/complete.
     const [payout, payoutReq] = await prisma.$transaction([
       prisma.riderPayout.create({
         data: {
@@ -109,10 +113,10 @@ router.post('/payout-request', async (req, res) => {
           },
         },
       }),
+      // Save updated UPI/bank details to profile (but do NOT touch walletBalance here)
       prisma.riderProfile.update({
         where: { id: profile.id },
         data: {
-          walletBalance: { decrement: withdrawAmount },
           ...(method === 'upi' && upiId ? { upiId: upiId.trim() } : {}),
           ...(method === 'bank' && bankAccountNumber ? { accountNumber: bankAccountNumber.trim() } : {}),
           ...(method === 'bank' && ifscCode ? { ifsc: ifscCode.trim().toUpperCase() } : {}),
