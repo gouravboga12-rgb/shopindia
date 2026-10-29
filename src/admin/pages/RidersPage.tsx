@@ -10,6 +10,9 @@ export const RidersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [riderToDelete, setRiderToDelete] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Suspend / Reactivate confirmation modal state
+  const [suspendTarget, setSuspendTarget] = useState<{ id: string; name: string; currentStatus: string } | null>(null);
+  const [suspending, setSuspending] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -20,6 +23,20 @@ export const RidersPage: React.FC = () => {
   };
 
   useEffect(load, []);
+
+  const handleToggleSuspend = async () => {
+    if (!suspendTarget) return;
+    setSuspending(true);
+    try {
+      await api.patch(`/api/admin/riders/${suspendTarget.id}`, {
+        status: suspendTarget.currentStatus === 'suspended' ? 'active' : 'suspended',
+      });
+      load();
+    } catch (err: any) { alert(err.message); } finally {
+      setSuspending(false);
+      setSuspendTarget(null);
+    }
+  };
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
@@ -279,7 +296,7 @@ export const RidersPage: React.FC = () => {
                         </button>
                       )}
                       {r.status !== 'suspended' && (
-                        <button title="Suspend Rider" onClick={() => updateStatus(r.id, 'suspended')} className="p-1.5 text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer">
+                        <button title="Suspend Rider" onClick={() => setSuspendTarget({ id: r.id, name: r.name, currentStatus: r.status })} className="p-1.5 text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer">
                           <Ban className="w-4 h-4"/>
                         </button>
                       )}
@@ -298,6 +315,59 @@ export const RidersPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+
+      {/* Suspend / Reactivate Rider Confirmation Modal */}
+      {suspendTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className={`p-2.5 rounded-2xl flex items-center gap-2 ${suspendTarget.currentStatus === 'suspended' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                {suspendTarget.currentStatus === 'suspended'
+                  ? <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  : <Ban className="w-5 h-5 text-amber-600" />}
+                <span className="font-bold text-sm">
+                  {suspendTarget.currentStatus === 'suspended' ? 'Reactivate Rider Account' : 'Suspend Rider Account'}
+                </span>
+              </div>
+              <button onClick={() => setSuspendTarget(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {suspendTarget.currentStatus === 'suspended' ? (
+                <>Are you sure you want to <strong>reactivate</strong> rider <strong>"{suspendTarget.name}"</strong>? They will immediately appear on dispatch radar and can receive order assignments.</>
+              ) : (
+                <>Are you sure you want to <strong>suspend</strong> rider <strong>"{suspendTarget.name}"</strong>? They will be blocked from receiving orders and their app login will be restricted until reactivated.</>
+              )}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={suspending}
+                onClick={() => setSuspendTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={suspending}
+                onClick={handleToggleSuspend}
+                className={`px-5 py-2 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer shadow-sm ${
+                  suspendTarget.currentStatus === 'suspended'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                {suspending ? 'Updating...' : suspendTarget.currentStatus === 'suspended' ? 'Confirm Reactivation' : 'Confirm Suspension'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Rider Confirmation Modal */}
       {riderToDelete && (

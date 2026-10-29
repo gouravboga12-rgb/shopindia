@@ -244,6 +244,17 @@ router.post('/:id/complete', async (req, res) => {
             },
           },
         });
+
+        // Also sync the legacy RiderPayout record status so the Rider Wallet history
+        // shows "Completed" instead of "Pending" after admin disbursal.
+        await tx.riderPayout.updateMany({
+          where: {
+            riderProfileId: request.riderProfileId,
+            amount: request.amount,
+            status: 'pending',
+          },
+          data: { status: 'completed' },
+        });
       }
 
       return completedRequest;

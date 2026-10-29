@@ -123,7 +123,7 @@ router.get('/overview', async (req, res) => {
       prisma.payoutRequest.aggregate({
         where: {
           partyType: 'VENDOR',
-          status: { in: ['approved', 'processed'] },
+          status: { in: ['approved', 'processed', 'completed'] },
           ...dateFilter,
         },
         _sum: { amount: true },
@@ -134,7 +134,7 @@ router.get('/overview', async (req, res) => {
       prisma.payoutRequest.aggregate({
         where: {
           partyType: 'RIDER',
-          status: { in: ['approved', 'processed'] },
+          status: { in: ['approved', 'processed', 'completed'] },
           ...dateFilter,
         },
         _sum: { amount: true },
@@ -206,6 +206,12 @@ router.get('/overview', async (req, res) => {
     const codCashWithRiders = Math.round((codFloatAgg._sum.codCashFloat || 0) * 100) / 100;
     const totalRefunds = Math.round((refundsAgg._sum.refundAmount || 0) * 100) / 100;
 
+    // Count active vendors and riders (not just all profiles)
+    const [activeVendors, activeRiders] = await Promise.all([
+      prisma.vendor.count({ where: { isActive: true } }),
+      prisma.riderProfile.count({ where: { isActive: true } }),
+    ]);
+
     // Detailed refund breakdown by atFault
     const refundsByAtFault = await prisma.ticket.groupBy({
       by: ['refundAtFault'],
@@ -247,8 +253,8 @@ router.get('/overview', async (req, res) => {
         totalRefunds,
         refundBreakdown,
         paidOrdersCount: ordersAgg._count.id || 0,
-        activeVendorsCount: vendorWalletsAgg._count.id || 0,
-        activeRidersCount: riderWalletsAgg._count.id || 0,
+        activeVendorsCount: activeVendors,
+        activeRidersCount: activeRiders,
         settlementsCount: settlementsAgg._count.id || 0,
         settledAmount: Math.round((settlementsAgg._sum.amount || 0) * 100) / 100,
       },
@@ -277,7 +283,7 @@ router.get('/settlements', async (req, res) => {
         take: limitNum,
       }),
       prisma.payoutRequest.findMany({
-        where: { status: { in: ['approved', 'processed'] } },
+        where: { status: { in: ['approved', 'processed', 'completed'] } },
         include: {
           vendor: { select: { businessName: true } },
           riderProfile: { include: { user: { select: { name: true } } } },
