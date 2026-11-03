@@ -128,11 +128,11 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
       <AnimatePresence>
         {drawer && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDrawer(false)} className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDrawer(false)} className="lg:hidden fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm" />
             <motion.aside
               initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-              className="lg:hidden fixed inset-y-0 left-0 w-72 bg-[#0F2C59] text-white z-50 flex flex-col shadow-elevated"
+              className="lg:hidden fixed inset-y-0 left-0 w-72 bg-[#0F2C59] text-white z-[70] flex flex-col shadow-elevated"
             >
               <div className="p-5 border-b border-white/10 flex items-center justify-between">
                 <div>

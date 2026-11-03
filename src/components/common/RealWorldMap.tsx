@@ -355,7 +355,7 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
 
   return (
     <div
-      className="relative w-full rounded-2xl overflow-hidden border border-slate-700/60 shadow-lg group"
+      className="relative isolate z-0 w-full rounded-2xl overflow-hidden border border-slate-700/60 shadow-lg group"
       style={{ height }}
     >
       {/* Leaflet Map Div */}

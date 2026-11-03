@@ -280,7 +280,7 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
       </div>
 
       {/* Embedded Swiggy / Zomato Style RealWorldMap */}
-      <div className="rounded-2xl overflow-hidden border border-brand-border shadow-sm">
+      <div className="relative isolate z-0 rounded-2xl overflow-hidden border border-brand-border shadow-sm">
         <RealWorldMap
           pickup={{
             name: data.pickup.name,
