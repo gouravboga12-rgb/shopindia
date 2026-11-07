@@ -30,26 +30,55 @@ router.post('/preview-price', async (req, res) => {
 /** GET /api/vendor/products — FR-02.2: Vendor's own products */
 router.get('/', async (req, res) => {
   try {
-    const { status, page = 1, limit = 20, q } = req.query;
+    const { status, page = 1, limit = 100, q, channel } = req.query;
     const where = { vendorId: req.user.vendorId };
     if (status) where.status = status;
     else where.status = { not: 'deleted' };
     if (q) where.name = { contains: q, mode: 'insensitive' };
 
+    // Strict filter: vendor goods catalog ONLY allows 'traditional' and 'quick_commerce'
+    // Doorstep services ('hvac_service', etc.) are excluded from vendor retail catalog
+    if (channel === 'traditional' || channel === 'quick_commerce') {
+      where.fulfillmentType = channel;
+    } else {
+      where.fulfillmentType = { in: ['traditional', 'quick_commerce'] };
+    }
+
     const pageNum = Number(page);
     const limitNum = Number(limit);
 
-    const [products, total] = await Promise.all([
+    const [products, total, traditionalCount, quickCount] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { variants: true, images: true },
+        include: { variants: true, images: true, category: true },
         orderBy: { createdAt: 'desc' },
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
       }),
       prisma.product.count({ where }),
+      prisma.product.count({
+        where: {
+          vendorId: req.user.vendorId,
+          status: { not: 'deleted' },
+          fulfillmentType: 'traditional',
+        },
+      }),
+      prisma.product.count({
+        where: {
+          vendorId: req.user.vendorId,
+          status: { not: 'deleted' },
+          fulfillmentType: 'quick_commerce',
+        },
+      }),
     ]);
-    res.json({ products, total, page: pageNum, pages: Math.ceil(total / limitNum) });
+    res.json({
+      products,
+      total,
+      traditionalCount,
+      quickCount,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -69,6 +98,9 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { variants, images, ...data } = req.body;
+    if (data.fulfillmentType && !['traditional', 'quick_commerce'].includes(data.fulfillmentType)) {
+      data.fulfillmentType = 'traditional';
+    }
 
     // Apply central pricing engine calculation
     if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
@@ -130,6 +162,9 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { variants: _v, images: _i, ...data } = req.body;
+    if (data.fulfillmentType && !['traditional', 'quick_commerce'].includes(data.fulfillmentType)) {
+      data.fulfillmentType = 'traditional';
+    }
     const existing = await prisma.product.findFirst({
       where: { id: req.params.id, vendorId: req.user.vendorId },
     });

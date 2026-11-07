@@ -129,7 +129,7 @@ router.get('/', async (req, res) => {
           continue;
         }
 
-        const maxRadius = p.vendor?.deliveryRadiusKm || 25;
+        const maxRadius = Math.min(10, Math.max(5, p.vendor?.deliveryRadiusKm || 10));
 
         if (customerLat !== null && customerLng !== null) {
           if (p.vendor?.lat != null && p.vendor?.lng != null) {
@@ -256,7 +256,7 @@ router.get('/', async (req, res) => {
           pincode: p.vendor?.pincode,
           lat: p.vendor?.lat,
           lng: p.vendor?.lng,
-          deliveryRadiusKm: p.vendor?.deliveryRadiusKm || 25,
+          deliveryRadiusKm: p.vendor?.deliveryRadiusKm || 10,
           distanceKm: distanceKm != null ? distanceKm : undefined,
         },
         distanceKm: distanceKm != null ? distanceKm : undefined,

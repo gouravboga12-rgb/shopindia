@@ -125,6 +125,48 @@ export const ProductsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Channel Switcher Tabs */}
+      <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-premium flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setFulfillmentFilter('all')}
+          className={`flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            fulfillmentFilter === 'all'
+              ? 'bg-[#0F2C59] text-white shadow-md'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          <span>All SKUs ({products.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFulfillmentFilter('traditional')}
+          className={`flex-1 min-w-[180px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            fulfillmentFilter === 'traditional'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <Truck className="w-4 h-4" />
+          <span>🛍️ Shop India ({products.filter(p => p.fulfillmentType === 'traditional').length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFulfillmentFilter('quick_commerce')}
+          className={`flex-1 min-w-[180px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            fulfillmentFilter === 'quick_commerce'
+              ? 'bg-amber-500 text-white shadow-md'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <Zap className="w-4 h-4" />
+          <span>⚡ Quick Shopping ({quickCount})</span>
+        </button>
+      </div>
+
       {/* Filter and Search Bar */}
       <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-2xl border border-gray-100 shadow-premium">
         <div className="relative flex-1 min-w-[220px]">
