@@ -67,7 +67,21 @@ router.get('/tickets', async (req, res) => {
       prisma.ticket.count({ where }),
     ]);
 
-    // Attach computed SLA status
+    // Fetch vendor details for any ticket having vendorId
+    const vendorIds = [...new Set(tickets.map(t => t.vendorId).filter(Boolean))];
+    const vendors = vendorIds.length > 0 ? await prisma.vendor.findMany({
+      where: { id: { in: vendorIds } },
+      select: {
+        id: true,
+        businessName: true,
+        city: true,
+        phone: true,
+        user: { select: { name: true, email: true, phone: true } }
+      }
+    }) : [];
+    const vendorMap = new Map(vendors.map(v => [v.id, v]));
+
+    // Attach computed SLA status and vendor details
     const enriched = tickets.map(t => {
       let slaRemainingMinutes = null;
       let isBreached = false;
@@ -78,6 +92,7 @@ router.get('/tickets', async (req, res) => {
       }
       return {
         ...t,
+        vendor: t.vendorId ? vendorMap.get(t.vendorId) || null : null,
         slaRemainingMinutes,
         isBreached
       };
@@ -121,7 +136,21 @@ router.get('/tickets/:id', async (req, res) => {
       isBreached = slaRemainingMinutes <= 0 && ticket.status !== 'resolved' && ticket.status !== 'closed';
     }
 
-    res.json({ ...ticket, slaRemainingMinutes, isBreached });
+    let vendor = null;
+    if (ticket.vendorId) {
+      vendor = await prisma.vendor.findUnique({
+        where: { id: ticket.vendorId },
+        select: {
+          id: true,
+          businessName: true,
+          city: true,
+          phone: true,
+          user: { select: { name: true, email: true, phone: true } }
+        }
+      });
+    }
+
+    res.json({ ...ticket, vendor, slaRemainingMinutes, isBreached });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

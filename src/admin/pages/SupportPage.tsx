@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
-  Send, X, Filter, AlertTriangle,
-  DollarSign, Check, XCircle
+  Send, X, AlertTriangle,
+  DollarSign, Store, User, Clock,
+  ShieldCheck, RefreshCw, MessageSquare
 } from 'lucide-react';
 
 export const SupportPage: React.FC = () => {
@@ -12,11 +13,6 @@ export const SupportPage: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [replying, setReplying] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'sla_breached' | 'escalated' | 'refund_requests'>('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-
-  // Internal Note state
-  const [noteText, setNoteText] = useState('');
-  const [addingNote, setAddingNote] = useState(false);
 
   // Refund Modal state
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -95,88 +91,90 @@ export const SupportPage: React.FC = () => {
     }
   };
 
-  const handleAddInternalNote = async () => {
-    if (!noteText.trim() || !selectedTicket) return;
-    setAddingNote(true);
-    try {
-      const ticketId = selectedTicket.id || selectedTicket._id;
-      const res: any = await api.post(`/api/admin/support/tickets/${ticketId}/internal-note`, {
-        note: noteText.trim()
-      });
-      if (res?.internalNotes) {
-        setSelectedTicket((prev: any) => ({ ...prev, internalNotes: res.internalNotes }));
-      }
-      setNoteText('');
-      load();
-    } catch (err: any) {
-      alert(err.message || 'Failed to add note');
-    } finally {
-      setAddingNote(false);
-    }
-  };
-
-  const handleProcessRefund = async (status: 'approved' | 'rejected') => {
-    if (!selectedTicket) return;
+  const handleApproveRefund = async () => {
+    if (!selectedTicket || refundAmount <= 0) return;
     const ticketId = selectedTicket.id || selectedTicket._id;
     setProcessingRefund(true);
-
     try {
-      const res: any = await api.post(`/api/admin/support/tickets/${ticketId}/refund`, {
-        refundStatus: status,
-        refundAmount: status === 'approved' ? refundAmount : undefined,
-        refundAtFault,
-        adminNotes: refundAdminNotes
+      await api.post(`/api/admin/support/tickets/${ticketId}/approve-refund`, {
+        refundAmount,
+        atFault: refundAtFault,
+        adminNotes: refundAdminNotes.trim() || undefined
       });
-      alert(res?.message || `Refund ${status} successfully!`);
       setShowRefundModal(false);
       setRefundAdminNotes('');
-      if (res?.ticket) setSelectedTicket(res.ticket);
+      const updated = await api.get<any>(`/api/admin/support/tickets/${ticketId}`);
+      if (updated) setSelectedTicket(updated);
       load();
     } catch (err: any) {
-      alert(err.message || 'Failed to process refund');
+      alert(err.message);
     } finally {
       setProcessingRefund(false);
     }
   };
 
-  const filteredTickets = filterStatus === 'all' 
-    ? tickets 
-    : tickets.filter(t => t.status === filterStatus);
+  const handleRejectRefund = async () => {
+    if (!selectedTicket) return;
+    const ticketId = selectedTicket.id || selectedTicket._id;
+    const reason = prompt('Please provide reason for rejecting refund:');
+    if (!reason) return;
+    try {
+      await api.post(`/api/admin/support/tickets/${ticketId}/reject-refund`, { reason });
+      setShowRefundModal(false);
+      const updated = await api.get<any>(`/api/admin/support/tickets/${ticketId}`);
+      if (updated) setSelectedTicket(updated);
+      load();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const filteredTickets = tickets;
 
   const breachedCount = tickets.filter(t => t.isBreached).length;
-  const refundReqCount = tickets.filter(t => t.refundRequested && t.refundStatus !== 'approved').length;
+  const refundReqCount = tickets.filter(t => t.refundRequested && t.refundStatus === 'requested').length;
 
   return (
-    <div className="space-y-6 text-left font-sans">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 font-heading">Support & Dispute Governance</h1>
-          <p className="text-xs text-gray-500 font-medium mt-1">
-            3-Tier Escalation Hub: Vendor ➔ Regional Operations ➔ Super Admin Executive Queue
+          <h1 className="text-2xl font-bold text-gray-900 font-heading flex items-center gap-2">
+            <MessageSquare className="w-6 h-6 text-[#0F2C59]" />
+            <span>Support &amp; Partner Help Desk Queue</span>
+          </h1>
+          <p className="text-sm text-gray-500">
+            Unified support queue for Customer and Store Merchant inquiries with live chat and refund approvals
           </p>
         </div>
 
-        {/* Status Filter Pills */}
-        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-xs">
-          <Filter size={14} className="text-gray-400 ml-2" />
-          {['all', 'open', 'in_progress', 'resolved'].map(st => (
-            <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1 text-xs font-bold rounded-lg uppercase tracking-wider transition-all ${
-                filterStatus === st 
-                  ? 'bg-blue-600 text-white shadow-xs' 
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              {st.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={load}
+          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh Queue</span>
+        </button>
       </div>
 
-      {/* Queue Tabs Bar */}
+      {/* Filter Tabs */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1">
         {[
           { id: 'all', label: 'All Tickets', count: tickets.length },
@@ -189,7 +187,7 @@ export const SupportPage: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setFilterTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 active
                   ? 'bg-[#0F2C59] text-white shadow-sm'
                   : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
@@ -215,10 +213,11 @@ export const SupportPage: React.FC = () => {
         <table className="w-full text-xs text-left">
           <thead className="bg-gray-50/80 border-b border-gray-100 text-gray-500 uppercase tracking-wider font-semibold">
             <tr>
-              <th className="px-5 py-3.5">Ticket # & Tier</th>
-              <th className="px-5 py-3.5">Customer & Contact</th>
-              <th className="px-5 py-3.5">Subject & Order</th>
-              <th className="px-5 py-3.5">Priority & SLA</th>
+              <th className="px-5 py-3.5">Ticket # &amp; Tier</th>
+              <th className="px-5 py-3.5">Created Date &amp; Time</th>
+              <th className="px-5 py-3.5">Requester / Merchant Info</th>
+              <th className="px-5 py-3.5">Subject &amp; Order</th>
+              <th className="px-5 py-3.5">Priority &amp; SLA</th>
               <th className="px-5 py-3.5">Refund Status</th>
               <th className="px-5 py-3.5">Status</th>
               <th className="px-5 py-3.5 text-right">Action</th>
@@ -227,18 +226,20 @@ export const SupportPage: React.FC = () => {
           <tbody className="divide-y divide-gray-50">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 animate-pulse rounded" /></td></tr>
+                <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 animate-pulse rounded" /></td></tr>
               ))
             ) : filteredTickets.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-400 font-medium">No tickets found for this queue.</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-gray-400 font-medium">No tickets found for this queue.</td></tr>
             ) : (
               filteredTickets.map(t => {
                 const id = t.id || t._id;
-                const customerName = t.customer?.name || t.customerId?.name || 'Customer';
+                const isVendorTicket = Boolean(t.vendor || t.vendorId);
+                const customerName = t.customer?.name || t.customerId?.name || 'User';
                 const customerContact = t.customer?.phone || t.customer?.email || '';
-                
+
                 return (
                   <tr key={id} className="hover:bg-gray-50/60 transition-colors">
+                    {/* Ticket # & Tier */}
                     <td className="px-5 py-4">
                       <span className="font-mono font-bold text-blue-600 block">#{t.ticketNumber}</span>
                       <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold mt-1 ${
@@ -249,10 +250,46 @@ export const SupportPage: React.FC = () => {
                         Tier {t.tier} ({t.tier === 1 ? 'Vendor' : t.tier === 2 ? 'Regional' : 'Executive'})
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="font-bold text-gray-900">{customerName}</div>
-                      {customerContact && <div className="text-[11px] text-gray-400">{customerContact}</div>}
+
+                    {/* Created Date & Time */}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span>{formatDateTime(t.createdAt)}</span>
+                      </div>
                     </td>
+
+                    {/* Requester / Merchant Info */}
+                    <td className="px-5 py-4">
+                      {isVendorTicket ? (
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="font-bold text-gray-900">{t.vendor?.businessName || 'Store Merchant'}</span>
+                          </div>
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            {t.vendor?.city && <span className="font-medium text-gray-700">{t.vendor.city} • </span>}
+                            <span>{t.vendor?.phone || t.vendor?.user?.email || customerContact}</span>
+                          </div>
+                          <span className="inline-block mt-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            Merchant Partner
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="font-bold text-gray-900">{customerName}</span>
+                          </div>
+                          {customerContact && <div className="text-[11px] text-gray-400 mt-0.5">{customerContact}</div>}
+                          <span className="inline-block mt-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
+                            Customer
+                          </span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Subject & Order */}
                     <td className="px-5 py-4 max-w-xs">
                       <div className="font-semibold text-gray-800 line-clamp-1">{t.subject}</div>
                       {t.order?.orderNumber && (
@@ -261,6 +298,8 @@ export const SupportPage: React.FC = () => {
                         </span>
                       )}
                     </td>
+
+                    {/* Priority & SLA */}
                     <td className="px-5 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                         t.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -281,6 +320,8 @@ export const SupportPage: React.FC = () => {
                         </span>
                       ) : null}
                     </td>
+
+                    {/* Refund Status */}
                     <td className="px-5 py-4">
                       {t.refundRequested ? (
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
@@ -294,6 +335,8 @@ export const SupportPage: React.FC = () => {
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
+
+                    {/* Status */}
                     <td className="px-5 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                         t.status === 'open' ? 'bg-amber-100 text-amber-800' :
@@ -303,6 +346,8 @@ export const SupportPage: React.FC = () => {
                         {t.status.replace('_', ' ')}
                       </span>
                     </td>
+
+                    {/* Action */}
                     <td className="px-5 py-4 text-right">
                       <button
                         onClick={() => {
@@ -311,7 +356,7 @@ export const SupportPage: React.FC = () => {
                             setRefundAmount(t.refundAmount || t.order.total);
                           }
                         }}
-                        className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 text-blue-600 border border-gray-200 hover:border-blue-200 rounded-lg font-bold text-xs transition-all"
+                        className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-xs transition-all cursor-pointer"
                       >
                         Open Thread
                       </button>
@@ -324,19 +369,22 @@ export const SupportPage: React.FC = () => {
         </table>
       </div>
 
-      {/* Ticket Details & Action Modal */}
+      {/* Ticket Details & Action Modal (Clean, Professional Chat Interface) */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/80">
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-blue-600">
+                  <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                     #{selectedTicket.ticketNumber}
                   </span>
                   <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
                     Tier {selectedTicket.tier}
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    {formatDateTime(selectedTicket.createdAt)}
                   </span>
                   {selectedTicket.refundRequested && (
                     <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded">
@@ -344,14 +392,29 @@ export const SupportPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <h3 className="font-bold text-base text-gray-900 font-heading">{selectedTicket.subject}</h3>
+
+                <h3 className="font-bold text-base text-gray-900 leading-tight">{selectedTicket.subject}</h3>
+
+                <div className="text-xs text-gray-600 flex flex-wrap items-center gap-2 pt-0.5">
+                  {selectedTicket.vendor ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200">
+                      <Store className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Store Merchant: {selectedTicket.vendor.businessName} ({selectedTicket.vendor.city || 'India'}) • {selectedTicket.vendor.phone || selectedTicket.vendor.user?.email || ''}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-800 font-semibold border border-blue-200">
+                      <User className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Customer: {selectedTicket.customer?.name} • {selectedTicket.customer?.phone || selectedTicket.customer?.email}</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 {selectedTicket.refundRequested && selectedTicket.refundStatus !== 'approved' && (
                   <button
                     onClick={() => setShowRefundModal(true)}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <DollarSign className="w-4 h-4" />
                     <span>Review Refund</span>
@@ -359,147 +422,116 @@ export const SupportPage: React.FC = () => {
                 )}
                 <button
                   onClick={() => setSelectedTicket(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Modal Content Scrollable Area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Customer & Order Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Customer Information</span>
-                  <p className="font-bold text-gray-900 mt-1">{selectedTicket.customer?.name}</p>
-                  <p className="text-gray-500">{selectedTicket.customer?.email} • {selectedTicket.customer?.phone}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Order Details</span>
-                  {selectedTicket.order ? (
-                    <div className="mt-1">
-                      <p className="font-bold text-indigo-700 font-mono">#{selectedTicket.order.orderNumber}</p>
-                      <p className="text-gray-600">Total: ₹{selectedTicket.order.total} • Status: {selectedTicket.order.status}</p>
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 mt-1 italic">No order linked</p>
-                  )}
-                </div>
-              </div>
+            {/* Modal Content: Scrollable Message Thread */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/40 min-h-[350px]">
+              {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
+                selectedTicket.messages.map((m: any, idx: number) => {
+                  const isStaff = m.senderRole === 'support' || m.senderRole === 'admin';
+                  const isSystem = m.senderRole === 'system';
+                  const isVendor = m.senderRole === 'vendor';
 
-              {/* Message Thread */}
-              <div className="space-y-3">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
-                  Communication History
-                </span>
-                <div className="space-y-3 max-h-[300px] overflow-y-auto p-4 bg-gray-50/50 rounded-2xl border border-gray-100">
-                  {selectedTicket.messages?.map((m: any, idx: number) => {
-                    const isStaff = m.senderRole === 'support' || m.senderRole === 'admin';
-                    const isSystem = m.senderRole === 'system';
-                    const isVendor = m.senderRole === 'vendor';
-
-                    if (isSystem) {
-                      return (
-                        <div key={m.id || idx} className="text-center my-2">
-                          <span className="inline-block px-3 py-1 rounded-full text-[10px] bg-amber-50 text-amber-900 border border-amber-200 font-medium">
-                            {m.text}
-                          </span>
-                        </div>
-                      );
-                    }
-
+                  if (isSystem) {
                     return (
-                      <div
-                        key={m.id || idx}
-                        className={`flex flex-col ${isStaff ? 'items-end' : 'items-start'}`}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1 text-[10px] text-gray-400">
-                          <span className="font-bold capitalize">{isStaff ? 'Super Admin Support' : isVendor ? 'Store Merchant' : 'Customer'}</span>
-                          <span>•</span>
-                          <span>{new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <div
-                          className={`max-w-md p-3.5 rounded-2xl text-xs leading-relaxed ${
-                            isStaff
-                              ? 'bg-blue-600 text-white rounded-tr-none shadow-sm'
-                              : isVendor
-                              ? 'bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-tl-none'
-                              : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-xs'
-                          }`}
-                        >
+                      <div key={m.id || idx} className="text-center my-2">
+                        <span className="inline-block px-3 py-1 rounded-full text-[10px] bg-gray-100 text-gray-700 border border-gray-200 font-medium">
                           {m.text}
-                        </div>
+                        </span>
                       </div>
                     );
-                  })}
-                </div>
-              </div>
+                  }
 
-              {/* Internal Notes Section */}
-              <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200 text-xs space-y-2">
-                <span className="font-bold text-amber-900 block flex items-center gap-1">
-                  🔒 Internal Notes & Dispute Audit Trail:
-                </span>
-                {selectedTicket.internalNotes ? (
-                  <pre className="whitespace-pre-wrap font-sans text-xs bg-white/70 p-3 rounded-xl border border-amber-200">
-                    {selectedTicket.internalNotes}
-                  </pre>
-                ) : (
-                  <p className="text-gray-400 italic">No internal notes added yet.</p>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <input
-                    value={noteText}
-                    onChange={e => setNoteText(e.target.value)}
-                    placeholder="Add an internal note visible only to admins..."
-                    className="flex-1 px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs"
-                  />
-                  <button
-                    onClick={handleAddInternalNote}
-                    disabled={addingNote || !noteText.trim()}
-                    className="px-4 py-2 bg-amber-800 hover:bg-amber-900 text-white font-bold rounded-xl text-xs"
-                  >
-                    Add Note
-                  </button>
+                  return (
+                    <div
+                      key={m.id || idx}
+                      className={`flex flex-col ${isStaff ? 'items-end' : 'items-start'}`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1 text-[10px] text-gray-400">
+                        {isStaff ? (
+                          <>
+                            <ShieldCheck className="w-3 h-3 text-indigo-600" />
+                            <span className="font-bold text-indigo-700">Super Admin Official Support</span>
+                          </>
+                        ) : isVendor ? (
+                          <>
+                            <Store className="w-3 h-3 text-emerald-600" />
+                            <span className="font-bold text-emerald-700">Store Merchant ({selectedTicket.vendor?.businessName || 'Merchant'})</span>
+                          </>
+                        ) : (
+                          <>
+                            <User className="w-3 h-3 text-blue-600" />
+                            <span className="font-bold text-blue-700">Customer ({selectedTicket.customer?.name || 'Customer'})</span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>{new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div
+                        className={`max-w-md p-3.5 rounded-2xl text-xs leading-relaxed ${
+                          isStaff
+                            ? 'bg-[#0F2C59] text-white rounded-tr-none shadow-sm'
+                            : isVendor
+                            ? 'bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-tl-none shadow-xs'
+                            : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-xs'
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 text-gray-400 text-xs">
+                  No conversation messages recorded.
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Modal Footer: Reply & Status */}
+            {/* Modal Footer: Reply & Quick Status Bar */}
             <div className="p-4 border-t border-gray-100 bg-white space-y-3">
               <form onSubmit={sendReply} className="flex gap-2">
                 <input
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
-                  placeholder="Send official response to customer..."
-                  className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
+                  placeholder={`Send official reply to ${selectedTicket.vendor ? 'Store Merchant' : 'Customer'}...`}
+                  className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
                 <button
                   type="submit"
                   disabled={replying || !replyText.trim()}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Send</span>
+                  <span>{replying ? 'Sending...' : 'Send'}</span>
                 </button>
               </form>
 
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-gray-500 font-medium">Quick Status Change:</span>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-100">
+                <span className="text-gray-500 font-medium">Ticket Status:</span>
                 <div className="flex gap-1.5">
-                  {['open', 'in_progress', 'resolved'].map(st => (
+                  {[
+                    { id: 'open', label: 'Open' },
+                    { id: 'in_progress', label: 'In Progress' },
+                    { id: 'resolved', label: 'Resolved' },
+                    { id: 'closed', label: 'Closed' }
+                  ].map(st => (
                     <button
-                      key={st}
-                      onClick={() => updateStatus(selectedTicket.id || selectedTicket._id, st)}
-                      className={`px-3 py-1 rounded-lg font-bold text-[11px] uppercase ${
-                        selectedTicket.status === st
-                          ? 'bg-gray-900 text-white'
+                      key={st.id}
+                      type="button"
+                      onClick={() => updateStatus(selectedTicket.id || selectedTicket._id, st.id)}
+                      className={`px-3 py-1 rounded-lg font-bold text-[11px] uppercase transition-all cursor-pointer ${
+                        selectedTicket.status === st.id
+                          ? 'bg-[#0F2C59] text-white shadow-xs'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      {st.replace('_', ' ')}
+                      {st.label}
                     </button>
                   ))}
                 </div>
@@ -511,90 +543,65 @@ export const SupportPage: React.FC = () => {
 
       {/* Refund Approval Modal */}
       {showRefundModal && selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base text-gray-900">Review & Execute Customer Refund</h3>
+              <h3 className="font-bold text-base text-gray-900">Review &amp; Execute Customer Refund</h3>
               <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-
-            <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-950 space-y-1">
-              <span className="font-bold block">⚖️ Ledger & Financial Liability Notice:</span>
-              <p className="leading-relaxed">
-                Approving this refund will immediately update the order and <strong>post an immutable REFUND_DEBIT to the selected at-fault party's ledger</strong>, automatically deducting the amount from their pending wallet balance.
-              </p>
             </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Approved Refund Amount (₹)</label>
+                <label className="block font-bold text-gray-700 mb-1">Refund Amount (₹)</label>
                 <input
                   type="number"
-                  step="1"
-                  min="1"
-                  max={selectedTicket.order?.total || 10000}
                   value={refundAmount}
-                  onChange={e => setRefundAmount(Number(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-xl font-numbers font-bold text-base text-emerald-700"
-                  required
+                  onChange={e => setRefundAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border rounded-xl font-bold font-numbers text-gray-900"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">At-Fault Party (Who bears this deduction?)</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'vendor', label: 'Merchant' },
-                    { id: 'rider', label: 'Delivery Rider' },
-                    { id: 'platform', label: 'Platform Loss' },
-                  ].map(p => (
-                    <button
-                      type="button"
-                      key={p.id}
-                      onClick={() => setRefundAtFault(p.id as any)}
-                      className={`p-2.5 rounded-xl border text-center font-bold text-xs transition-all ${
-                        refundAtFault === p.id
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
+                <label className="block font-bold text-gray-700 mb-1">Party at Fault (Expense Liability)</label>
+                <select
+                  value={refundAtFault}
+                  onChange={e => setRefundAtFault(e.target.value as any)}
+                  className="w-full px-3 py-2 border rounded-xl font-bold bg-gray-50"
+                >
+                  <option value="vendor">Vendor Fault (Deducted from Merchant Wallet)</option>
+                  <option value="platform">Platform Fault (Absorbed by Shop India)</option>
+                  <option value="rider">Rider / Delivery Partner Fault</option>
+                </select>
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Resolution Note / Reason</label>
+                <label className="block font-bold text-gray-700 mb-1">Admin Audit Notes</label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={refundAdminNotes}
                   onChange={e => setRefundAdminNotes(e.target.value)}
-                  placeholder="e.g. Package damaged during transit / merchant agreed to refund"
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
+                  placeholder="Reason for approving this refund claim..."
+                  className="w-full px-3 py-2 border rounded-xl"
                 />
               </div>
+            </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleProcessRefund('rejected')}
-                  disabled={processingRefund}
-                  className="flex-1 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1"
-                >
-                  <XCircle className="w-4 h-4" />
-                  <span>Reject Claim</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProcessRefund('approved')}
-                  disabled={processingRefund || refundAmount <= 0}
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 shadow-md"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>{processingRefund ? 'Posting...' : 'Approve & Debit'}</span>
-                </button>
-              </div>
+            <div className="flex gap-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={handleRejectRefund}
+                className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs"
+              >
+                Reject Claim
+              </button>
+              <button
+                type="button"
+                onClick={handleApproveRefund}
+                disabled={processingRefund}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs"
+              >
+                {processingRefund ? 'Executing...' : 'Approve Refund'}
+              </button>
             </div>
           </div>
         </div>

@@ -255,6 +255,57 @@ router.post('/tickets/:id/internal-note', async (req, res) => {
 });
 
 /**
+ * PATCH /api/vendor/support/tickets/:id/close
+ * Vendor marks ticket as closed
+ */
+router.patch('/tickets/:id/close', async (req, res) => {
+  try {
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: req.params.id, vendorId: req.user.vendorId }
+    });
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { status: 'closed' }
+    });
+
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        senderRole: 'system',
+        text: '🔒 Ticket marked as closed by Store Merchant.',
+        sentAt: new Date()
+      }
+    });
+
+    res.json({ success: true, ticket: updated, message: 'Ticket closed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to close ticket' });
+  }
+});
+
+/**
+ * DELETE /api/vendor/support/tickets/:id
+ * Vendor deletes ticket
+ */
+router.delete('/tickets/:id', async (req, res) => {
+  try {
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: req.params.id, vendorId: req.user.vendorId }
+    });
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    await prisma.ticketMessage.deleteMany({ where: { ticketId: ticket.id } });
+    await prisma.ticket.delete({ where: { id: ticket.id } });
+
+    res.json({ success: true, message: 'Ticket deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete ticket' });
+  }
+});
+
+/**
  * POST /api/vendor/support/inquiry
  * Merchant submits an inquiry directly into the unified support queue (evaluated by Regional Admin or Super Admin)
  */
