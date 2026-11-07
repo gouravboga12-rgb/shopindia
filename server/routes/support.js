@@ -4,6 +4,20 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
+// Helper to calculate Haversine distance in km
+function getHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // Helper to extract and VERIFY authenticated user ID from JWT
 const getVerifiedUserId = (req) => {
   try {
@@ -174,28 +188,78 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
     let resolvedVendorId = req.body.vendorId || null;
     let resolvedRegionId = null;
     let initialTier = 1;
+    let orderRecord = null;
 
     if (req.body.orderId) {
-      const order = await prisma.order.findUnique({
+      orderRecord = await prisma.order.findUnique({
         where: { id: req.body.orderId },
-        select: { vendorId: true, deliveryPincode: true }
+        include: { vendor: true }
       });
-      if (order) {
-        if (!resolvedVendorId && order.vendorId) {
-          resolvedVendorId = order.vendorId;
+      if (orderRecord) {
+        if (!resolvedVendorId && orderRecord.vendorId) {
+          resolvedVendorId = orderRecord.vendorId;
         }
-        if (order.deliveryPincode) {
+
+        // 1. Direct delivery pincode match
+        if (orderRecord.deliveryPincode) {
           const regAdmin = await prisma.regionalAdminProfile.findFirst({
-            where: { assignedPincodes: { has: order.deliveryPincode }, status: 'approved' }
+            where: { assignedPincodes: { has: orderRecord.deliveryPincode }, status: 'approved' }
           });
           if (regAdmin) resolvedRegionId = regAdmin.id;
+        }
+
+        // 2. Fallback: vendor pincode match
+        if (!resolvedRegionId && orderRecord.vendor?.pincode) {
+          const regAdmin = await prisma.regionalAdminProfile.findFirst({
+            where: { assignedPincodes: { has: orderRecord.vendor.pincode }, status: 'approved' }
+          });
+          if (regAdmin) resolvedRegionId = regAdmin.id;
+        }
+
+        // 3. Fallback: GPS radius distance match (within 25 km)
+        if (!resolvedRegionId) {
+          const targetLat = orderRecord.deliveryLat || orderRecord.vendor?.lat;
+          const targetLng = orderRecord.deliveryLng || orderRecord.vendor?.lng;
+          if (targetLat && targetLng) {
+            const approvedAdmins = await prisma.regionalAdminProfile.findMany({
+              where: { status: 'approved', currentLat: { not: null }, currentLng: { not: null } }
+            });
+            for (const adm of approvedAdmins) {
+              if (getHaversineDistanceKm(targetLat, targetLng, adm.currentLat, adm.currentLng) <= 25) {
+                resolvedRegionId = adm.id;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If still no region, check vendor directly if provided
+    if (!resolvedRegionId && resolvedVendorId) {
+      const v = await prisma.vendor.findUnique({ where: { id: resolvedVendorId } });
+      if (v?.pincode) {
+        const regAdmin = await prisma.regionalAdminProfile.findFirst({
+          where: { assignedPincodes: { has: v.pincode }, status: 'approved' }
+        });
+        if (regAdmin) resolvedRegionId = regAdmin.id;
+      }
+      if (!resolvedRegionId && v?.lat && v?.lng) {
+        const approvedAdmins = await prisma.regionalAdminProfile.findMany({
+          where: { status: 'approved', currentLat: { not: null }, currentLng: { not: null } }
+        });
+        for (const adm of approvedAdmins) {
+          if (getHaversineDistanceKm(v.lat, v.lng, adm.currentLat, adm.currentLng) <= 25) {
+            resolvedRegionId = adm.id;
+            break;
+          }
         }
       }
     }
 
     // Determine initial handling tier:
     // Tier 1: Vendor (if product/vendor order issue)
-    // Tier 2: Regional Admin (if delivery/fleet issue or no vendor)
+    // Tier 2: Regional Admin (if delivery/fleet issue or regional manager assigned)
     // Tier 3: Super Admin (if payment issue or no regional manager)
     if (formattedCategory === 'payment') {
       initialTier = 3;
@@ -210,7 +274,10 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
     }
 
     const ticketNumber = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
-    const isRefundReq = req.body.refundRequested === true || formattedCategory === 'refund';
+    const isOrderAlreadyRefunded = orderRecord?.status === 'refunded' || orderRecord?.paymentStatus === 'refunded';
+    const isRefundReq = req.body.refundRequested === true || formattedCategory === 'refund' || isOrderAlreadyRefunded;
+    const finalRefundStatus = isOrderAlreadyRefunded ? 'approved' : isRefundReq ? 'pending' : 'none';
+    const finalRefundAmt = isOrderAlreadyRefunded ? (orderRecord.refundAmount || orderRecord.total) : (req.body.refundAmount ? parseFloat(req.body.refundAmount) : null);
 
     const ticket = await prisma.ticket.create({
       data: {
@@ -226,8 +293,8 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
         priority: formattedPriority,
         status: 'open',
         refundRequested: isRefundReq,
-        refundAmount: isRefundReq && req.body.refundAmount ? parseFloat(req.body.refundAmount) : null,
-        refundStatus: isRefundReq ? 'pending' : 'none',
+        refundAmount: finalRefundAmt,
+        refundStatus: finalRefundStatus,
         messages: {
           create: [
             {

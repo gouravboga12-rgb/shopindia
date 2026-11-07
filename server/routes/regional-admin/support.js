@@ -6,6 +6,19 @@ const { requireRole } = require('../../middleware/rbac');
 
 router.use(verifyToken, requireRole('regional_admin', 'branch_manager', 'super_admin'));
 
+function getHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
  * Helper to fetch regional admin profile for logged-in user
  */
@@ -30,17 +43,42 @@ router.get('/tickets', async (req, res) => {
 
     const { status, tier, priority, page = 1, limit = 25 } = req.query;
     
-    // Find tickets assigned directly to this region OR matching assigned pincodes
+    // Find tickets assigned directly to this region OR matching assigned pincodes OR nearby vendors
     const where = {};
     if (profile) {
-      where.OR = [
+      const orConditions = [
         { regionId: profile.id },
         {
           order: {
             deliveryPincode: { in: profile.assignedPincodes || [] }
           }
+        },
+        {
+          order: {
+            vendor: {
+              pincode: { in: profile.assignedPincodes || [] }
+            }
+          }
         }
       ];
+
+      // Also check vendors within regional admin's radius
+      if (profile.currentLat && profile.currentLng) {
+        const allVendors = await prisma.vendor.findMany({
+          where: { lat: { not: null }, lng: { not: null } },
+          select: { id: true, lat: true, lng: true }
+        });
+        const nearbyVendorIds = allVendors
+          .filter(v => getHaversineDistanceKm(profile.currentLat, profile.currentLng, v.lat, v.lng) <= 25)
+          .map(v => v.id);
+
+        if (nearbyVendorIds.length > 0) {
+          orConditions.push({ vendorId: { in: nearbyVendorIds } });
+          orConditions.push({ order: { vendorId: { in: nearbyVendorIds } } });
+        }
+      }
+
+      where.OR = orConditions;
     }
 
     if (status) where.status = status;
@@ -54,13 +92,49 @@ router.get('/tickets', async (req, res) => {
       prisma.ticket.findMany({
         where,
         include: {
-          customer: { select: { name: true, email: true, phone: true } },
+          customer: { select: { id: true, name: true, email: true, phone: true } },
           order: {
             select: {
+              id: true,
               orderNumber: true,
               total: true,
+              subtotal: true,
+              discount: true,
               status: true,
+              paymentMethod: true,
+              paymentStatus: true,
+              refundAmount: true,
+              refundReason: true,
+              refundedAt: true,
+              deliveryLine1: true,
+              deliveryLine2: true,
+              deliveryCity: true,
+              deliveryState: true,
               deliveryPincode: true,
+              vendor: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  phone: true,
+                  city: true,
+                  street: true,
+                }
+              },
+              items: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  quantity: true,
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      images: { select: { url: true }, take: 1 }
+                    }
+                  }
+                }
+              },
               delivery: {
                 select: {
                   status: true,
@@ -83,6 +157,20 @@ router.get('/tickets', async (req, res) => {
       prisma.ticket.count({ where })
     ]);
 
+    // Fetch vendor details for any ticket having vendorId
+    const vendorIds = [...new Set(tickets.map(t => t.vendorId).filter(Boolean))];
+    const vendors = vendorIds.length > 0 ? await prisma.vendor.findMany({
+      where: { id: { in: vendorIds } },
+      select: {
+        id: true,
+        businessName: true,
+        city: true,
+        phone: true,
+        user: { select: { name: true, email: true, phone: true } }
+      }
+    }) : [];
+    const vendorMap = new Map(vendors.map(v => [v.id, v]));
+
     const now = new Date();
     const enriched = tickets.map(t => {
       let slaRemainingMinutes = null;
@@ -94,6 +182,7 @@ router.get('/tickets', async (req, res) => {
       }
       return {
         ...t,
+        vendor: t.vendorId ? vendorMap.get(t.vendorId) || null : null,
         slaRemainingMinutes,
         isBreached
       };
@@ -121,14 +210,57 @@ router.get('/tickets/:id', async (req, res) => {
     const ticket = await prisma.ticket.findUnique({
       where: { id: req.params.id },
       include: {
-        customer: { select: { name: true, email: true, phone: true } },
+        customer: { select: { id: true, name: true, email: true, phone: true } },
         order: {
-          include: {
-            items: true,
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            subtotal: true,
+            discount: true,
+            status: true,
+            paymentMethod: true,
+            paymentStatus: true,
+            refundAmount: true,
+            refundReason: true,
+            refundedAt: true,
+            deliveryLine1: true,
+            deliveryLine2: true,
+            deliveryCity: true,
+            deliveryState: true,
+            deliveryPincode: true,
+            vendor: {
+              select: {
+                id: true,
+                businessName: true,
+                phone: true,
+                city: true,
+                street: true,
+              }
+            },
+            items: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                quantity: true,
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    images: { select: { url: true }, take: 1 }
+                  }
+                }
+              }
+            },
             delivery: {
-              include: {
+              select: {
+                status: true,
+                distanceKm: true,
                 riderProfile: {
-                  include: { user: { select: { name: true, phone: true } } }
+                  select: {
+                    user: { select: { name: true, phone: true } }
+                  }
                 }
               }
             }
@@ -139,7 +271,14 @@ router.get('/tickets/:id', async (req, res) => {
     });
 
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
-    res.json({ success: true, ticket });
+    let vendor = null;
+    if (ticket.vendorId) {
+      vendor = await prisma.vendor.findUnique({
+        where: { id: ticket.vendorId },
+        select: { id: true, businessName: true, phone: true, city: true, user: { select: { name: true, email: true, phone: true } } }
+      });
+    }
+    res.json({ success: true, ticket: { ...ticket, vendor } });
   } catch (err) {
     console.error('[RegionalSupport] Error loading ticket:', err);
     res.status(500).json({ error: 'Failed to load ticket' });

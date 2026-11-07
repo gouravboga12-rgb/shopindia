@@ -4,7 +4,8 @@ import {
   Send, X, AlertTriangle,
   DollarSign, Store, User, Clock,
   ShieldCheck, RefreshCw, MessageSquare,
-  Edit2, Trash2, Calendar, Check, Search
+  Edit2, Trash2, Calendar, Check, Search,
+  Package, MapPin, CheckCircle2
 } from 'lucide-react';
 
 type FilterTabType = 'all' | 'pending' | 'active' | 'sla_breached' | 'escalated' | 'refund_requests' | 'closed';
@@ -50,7 +51,7 @@ export const SupportPage: React.FC = () => {
   // Refund Modal state
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number>(0);
-  const [refundAtFault, setRefundAtFault] = useState<'vendor' | 'rider' | 'platform'>('vendor');
+  const refundAtFault: 'vendor' | 'rider' | 'platform' = 'vendor';
   const [refundAdminNotes, setRefundAdminNotes] = useState('');
   const [processingRefund, setProcessingRefund] = useState(false);
 
@@ -554,11 +555,16 @@ export const SupportPage: React.FC = () => {
                   <span className="text-[11px] text-gray-400 font-medium">
                     {formatDateTime(selectedTicket.createdAt)}
                   </span>
-                  {selectedTicket.refundRequested && (
-                    <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded">
-                      Refund Claim: ₹{selectedTicket.refundAmount}
+                  {selectedTicket.order?.status === 'refunded' || selectedTicket.order?.paymentStatus === 'refunded' || selectedTicket.refundStatus === 'approved' ? (
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Refund Completed: ₹{selectedTicket.order?.refundAmount || selectedTicket.refundAmount || selectedTicket.order?.total || 0}
                     </span>
-                  )}
+                  ) : selectedTicket.refundRequested ? (
+                    <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded">
+                      Refund Claim: ₹{selectedTicket.refundAmount || selectedTicket.order?.total || 0}
+                    </span>
+                  ) : null}
                 </div>
 
                 <h3 className="font-bold text-base text-gray-900 leading-tight">{selectedTicket.subject}</h3>
@@ -575,19 +581,33 @@ export const SupportPage: React.FC = () => {
                       <span>Customer: {selectedTicket.customer?.name} • {selectedTicket.customer?.phone || selectedTicket.customer?.email}</span>
                     </span>
                   )}
+                  {selectedTicket.region && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 font-semibold border border-amber-200">
+                      <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Territory Hub: {selectedTicket.region.regionName}</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedTicket.refundRequested && selectedTicket.refundStatus !== 'approved' && (
+                {selectedTicket.order?.status === 'refunded' || selectedTicket.order?.paymentStatus === 'refunded' || selectedTicket.refundStatus === 'approved' ? (
+                  <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Refund Processed</span>
+                  </span>
+                ) : selectedTicket.refundRequested && selectedTicket.refundStatus !== 'approved' ? (
                   <button
-                    onClick={() => setShowRefundModal(true)}
+                    onClick={() => {
+                      setRefundAmount(selectedTicket.refundAmount || selectedTicket.order?.total || 0);
+                      setShowRefundModal(true);
+                    }}
                     className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <DollarSign className="w-4 h-4" />
-                    <span>Review Refund</span>
+                    <span>Approve Refund</span>
                   </button>
-                )}
+                ) : null}
                 <button
                   onClick={() => setSelectedTicket(null)}
                   className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 cursor-pointer"
@@ -597,11 +617,81 @@ export const SupportPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Rich Order & Product Details Context Card */}
+            {selectedTicket.order && (
+              <div className="mx-6 mt-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <span className="font-mono font-bold text-slate-800">Order #{selectedTicket.order.orderNumber}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-blue-100 text-blue-800">
+                      {selectedTicket.order.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-slate-500 font-medium">Payment: <strong className="text-slate-800 uppercase font-numbers">{selectedTicket.order.paymentMethod || 'Prepaid'}</strong> ({selectedTicket.order.paymentStatus || 'Paid'})</span>
+                    <span className="font-black text-slate-900 font-numbers text-sm">₹{selectedTicket.order.total?.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                {/* Products in this Order */}
+                {selectedTicket.order.items && selectedTicket.order.items.length > 0 && (
+                  <div className="pt-2.5 space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Products in this Order ({selectedTicket.order.items.length})</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {selectedTicket.order.items.map((it: any, i: number) => {
+                        const img = it.product?.images?.[0]?.url;
+                        return (
+                          <div key={it.id || i} className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60 shadow-2xs">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 border overflow-hidden flex-shrink-0 flex items-center justify-center">
+                              {img ? (
+                                <img src={img} alt={it.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Package className="w-4 h-4 text-slate-400" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-800 truncate">{it.name || it.product?.name}</p>
+                              <p className="text-[11px] text-slate-500 font-numbers">Qty: {it.quantity} × ₹{it.price?.toLocaleString('en-IN')}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Customer, Merchant & Regional Hub Details */}
+                <div className="pt-2.5 mt-2.5 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 font-medium block">👤 Customer Details</span>
+                    <span className="font-bold text-slate-700">{selectedTicket.customer?.name} ({selectedTicket.customer?.phone || selectedTicket.customer?.email || 'N/A'})</span>
+                    {selectedTicket.order.deliveryLine1 && (
+                      <span className="text-slate-500 block truncate">{selectedTicket.order.deliveryLine1}, {selectedTicket.order.deliveryCity || ''} {selectedTicket.order.deliveryPincode || ''}</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium block">🏬 Merchant Store</span>
+                    <span className="font-bold text-slate-700">{selectedTicket.order.vendor?.businessName || selectedTicket.vendor?.businessName || 'N/A'}</span>
+                    <span className="text-slate-500 block">{selectedTicket.order.vendor?.phone || selectedTicket.vendor?.phone || ''}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium block">📍 Territory Regional Hub</span>
+                    <span className="font-bold text-amber-700">{selectedTicket.region?.regionName || 'Medchal-Malkajgiri Hub'}</span>
+                    {selectedTicket.region?.user?.name && (
+                      <span className="text-slate-500 block">Manager: {selectedTicket.region.user.name}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Modal Content: Scrollable Message Thread with Message Edit & Delete */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/40 min-h-[350px]">
               {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
                 selectedTicket.messages.map((m: any, idx: number) => {
                   const isStaff = m.senderRole === 'support' || m.senderRole === 'admin';
+                  const isRegional = m.senderRole === 'regional_admin';
                   const isSystem = m.senderRole === 'system';
                   const isVendor = m.senderRole === 'vendor';
                   const isEditingThis = editingMsgId === m.id;
@@ -622,11 +712,16 @@ export const SupportPage: React.FC = () => {
                       className={`flex flex-col group ${isStaff ? 'items-end' : 'items-start'}`}
                     >
                       {/* Message Meta Info Header */}
-                      <div className="flex items-center gap-2 mb-1 text-[10px] text-gray-400">
+                      <div className="flex items-center gap-2 mb-1 text-[10px]">
                         {isStaff ? (
                           <>
                             <ShieldCheck className="w-3 h-3 text-indigo-600" />
                             <span className="font-bold text-indigo-700">Super Admin Official Support</span>
+                          </>
+                        ) : isRegional ? (
+                          <>
+                            <MapPin className="w-3 h-3 text-amber-600" />
+                            <span className="font-bold text-amber-700">Regional Manager ({selectedTicket.region?.regionName || 'Territory Hub'})</span>
                           </>
                         ) : isVendor ? (
                           <>
@@ -768,42 +863,39 @@ export const SupportPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base text-gray-900">Review &amp; Execute Customer Refund</h3>
+              <div>
+                <h3 className="font-bold text-base text-gray-900">Approve Customer Refund</h3>
+                <p className="text-xs text-gray-500">Order #{selectedTicket.order?.orderNumber || selectedTicket.ticketNumber}</p>
+              </div>
               <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3.5 text-xs">
+              <div className="p-3 bg-blue-50 border border-blue-200/80 rounded-xl text-blue-900 space-y-1">
+                <p className="font-bold">Refund Execution Notice</p>
+                <p className="text-slate-600 leading-relaxed text-[11px]">
+                  Approving will process the customer refund, mark the ticket and order as refunded, and notify the customer.
+                </p>
+              </div>
+
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Refund Amount (₹)</label>
                 <input
                   type="number"
                   value={refundAmount}
                   onChange={e => setRefundAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border rounded-xl font-bold font-numbers text-gray-900"
+                  className="w-full px-3.5 py-2.5 border rounded-xl font-bold font-numbers text-gray-900 text-sm focus:ring-2 focus:ring-emerald-500/20"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Party at Fault (Expense Liability)</label>
-                <select
-                  value={refundAtFault}
-                  onChange={e => setRefundAtFault(e.target.value as any)}
-                  className="w-full px-3 py-2 border rounded-xl font-bold bg-gray-50"
-                >
-                  <option value="vendor">Vendor Fault (Deducted from Merchant Wallet)</option>
-                  <option value="platform">Platform Fault (Absorbed by Shop India)</option>
-                  <option value="rider">Rider / Delivery Partner Fault</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">Admin Audit Notes</label>
+                <label className="block font-bold text-gray-700 mb-1">Resolution Note for Customer (Optional)</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={refundAdminNotes}
                   onChange={e => setRefundAdminNotes(e.target.value)}
-                  placeholder="Reason for approving this refund claim..."
-                  className="w-full px-3 py-2 border rounded-xl"
+                  placeholder="e.g. Approved customer dispute for damaged goods..."
+                  className="w-full px-3 py-2 border rounded-xl bg-gray-50 focus:bg-white text-gray-800 text-xs"
                 />
               </div>
             </div>
@@ -819,10 +911,10 @@ export const SupportPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleApproveRefund}
-                disabled={processingRefund}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs cursor-pointer"
+                disabled={processingRefund || refundAmount <= 0}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs cursor-pointer disabled:opacity-50"
               >
-                {processingRefund ? 'Executing...' : 'Approve Refund'}
+                {processingRefund ? 'Executing...' : `Approve & Refund ₹${refundAmount.toLocaleString('en-IN')}`}
               </button>
             </div>
           </div>

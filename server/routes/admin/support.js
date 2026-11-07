@@ -83,12 +83,50 @@ router.get('/tickets', async (req, res) => {
           assignedTo: { select: { name: true, email: true } },
           order: {
             select: {
+              id: true,
               orderNumber: true,
               total: true,
+              subtotal: true,
+              discount: true,
               status: true,
+              paymentMethod: true,
+              paymentStatus: true,
+              refundAmount: true,
+              refundReason: true,
+              refundedAt: true,
+              deliveryLine1: true,
+              deliveryLine2: true,
+              deliveryCity: true,
+              deliveryState: true,
+              deliveryPincode: true,
+              vendor: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  phone: true,
+                  city: true,
+                  street: true,
+                }
+              },
+              items: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  quantity: true,
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      images: { select: { url: true }, take: 1 }
+                    }
+                  }
+                }
+              },
               delivery: {
                 select: {
                   status: true,
+                  distanceKm: true,
                   riderProfile: {
                     select: {
                       id: true,
@@ -129,7 +167,21 @@ router.get('/tickets', async (req, res) => {
     }) : [];
     const vendorMap = new Map(vendors.map(v => [v.id, v]));
 
-    // Attach computed SLA status and vendor details
+    // Fetch regional admin profiles for tickets assigned to regions
+    const regionIds = [...new Set(tickets.map(t => t.regionId).filter(Boolean))];
+    const regions = regionIds.length > 0 ? await prisma.regionalAdminProfile.findMany({
+      where: { id: { in: regionIds } },
+      select: {
+        id: true,
+        regionName: true,
+        district: true,
+        state: true,
+        user: { select: { name: true, phone: true, email: true } }
+      }
+    }) : [];
+    const regionMap = new Map(regions.map(r => [r.id, r]));
+
+    // Attach computed SLA status, vendor details, and regional hub
     const enriched = tickets.map(t => {
       let slaRemainingMinutes = null;
       let isBreached = false;
@@ -141,6 +193,7 @@ router.get('/tickets', async (req, res) => {
       return {
         ...t,
         vendor: t.vendorId ? vendorMap.get(t.vendorId) || null : null,
+        region: t.regionId ? regionMap.get(t.regionId) || null : null,
         slaRemainingMinutes,
         isBreached
       };
@@ -174,7 +227,24 @@ router.get('/tickets/:id', async (req, res) => {
         assignedTo: { select: { name: true, email: true } },
         order: {
           include: {
-            items: true,
+            items: {
+              include: {
+                product: {
+                  include: {
+                    images: { take: 1 }
+                  }
+                }
+              }
+            },
+            vendor: {
+              select: {
+                id: true,
+                businessName: true,
+                phone: true,
+                city: true,
+                street: true,
+              }
+            },
             delivery: {
               include: {
                 riderProfile: {
@@ -188,6 +258,14 @@ router.get('/tickets/:id', async (req, res) => {
       },
     });
     if (!ticket) return res.status(404).json({ error: 'Ticket not found.' });
+
+    let region = null;
+    if (ticket.regionId) {
+      region = await prisma.regionalAdminProfile.findUnique({
+        where: { id: ticket.regionId },
+        select: { id: true, regionName: true, district: true, state: true, user: { select: { name: true, phone: true } } }
+      });
+    }
 
     const now = new Date();
     let slaRemainingMinutes = null;
@@ -212,7 +290,7 @@ router.get('/tickets/:id', async (req, res) => {
       });
     }
 
-    res.json({ ...ticket, vendor, slaRemainingMinutes, isBreached });
+    res.json({ ...ticket, vendor, region, slaRemainingMinutes, isBreached });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

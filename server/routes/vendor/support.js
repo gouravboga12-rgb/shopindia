@@ -6,6 +6,19 @@ const { requireRole } = require('../../middleware/rbac');
 
 router.use(verifyToken, requireRole('vendor'));
 
+function getHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
  * GET /api/vendor/support/tickets
  * Lists tickets associated with the logged-in vendor
@@ -321,7 +334,7 @@ router.post('/inquiry', async (req, res) => {
     // Look up vendor to find location/pincode and assign region if available
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { id: true, userId: true, pincode: true, city: true }
+      select: { id: true, userId: true, pincode: true, city: true, lat: true, lng: true }
     });
 
     let regionId = null;
@@ -334,6 +347,18 @@ router.post('/inquiry', async (req, res) => {
       });
       if (regionalAdmin) {
         regionId = regionalAdmin.id;
+      }
+    }
+    // Fallback: GPS radius distance match (within 25 km)
+    if (!regionId && vendor?.lat && vendor?.lng) {
+      const approvedAdmins = await prisma.regionalAdminProfile.findMany({
+        where: { status: 'approved', currentLat: { not: null }, currentLng: { not: null } }
+      });
+      for (const adm of approvedAdmins) {
+        if (getHaversineDistanceKm(vendor.lat, vendor.lng, adm.currentLat, adm.currentLng) <= 25) {
+          regionId = adm.id;
+          break;
+        }
       }
     }
 
