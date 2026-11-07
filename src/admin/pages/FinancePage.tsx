@@ -24,6 +24,8 @@ interface FinanceSummary {
   totalRazorpayFee: number;
   totalAdminNetProfit: number;
   totalOrdersCount: number;
+  totalRefundedAmount?: number;
+  totalRefundedOrdersCount?: number;
   marginPercent: number;
 }
 
@@ -33,6 +35,7 @@ interface ProfitOrder {
   channel: 'shop_india' | 'quick_shopping' | 'glacons';
   channelLabel: string;
   customerPaid: number;
+  effectiveCustomerPaid?: number;
   vendorPayout: number;
   razorpayFee: number;
   adminNetProfit: number;
@@ -40,6 +43,10 @@ interface ProfitOrder {
   paymentMethod: string;
   paymentStatus: string;
   status: string;
+  isRefunded?: boolean;
+  isCancelled?: boolean;
+  refundAmount?: number;
+  refundReason?: string | null;
   customerName: string;
   partnerName: string;
   createdAt: string;
@@ -387,6 +394,19 @@ export const FinancePage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Refunded Claims Notice if any refunded orders in selected timeline */}
+            {Boolean(summary.totalRefundedOrdersCount && summary.totalRefundedOrdersCount > 0) && (
+              <div className="relative z-10 mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between text-xs text-rose-300 gap-2">
+                <span className="flex items-center gap-2 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                  Refunded Claims Excluded: <strong className="text-white font-mono">{formatINR(summary.totalRefundedAmount)}</strong> across {summary.totalRefundedOrdersCount} order(s).
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Zero profit is counted for refunded or cancelled goods.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ─── 2. THE THREE VERTICAL CARDS (Side-by-Side) ─────────── */}
@@ -633,73 +653,113 @@ export const FinancePage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredOrders.map((o) => (
-                      <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-mono font-bold text-gray-900 text-xs">
-                            {o.orderNumber}
-                          </div>
-                          <div className="text-[11px] text-gray-500">
-                            {o.customerName} • <span className="text-gray-400">{o.partnerName}</span>
-                          </div>
-                        </td>
+                    {filteredOrders.map((o) => {
+                      const isRefundedOrCancelled = o.isRefunded || o.isCancelled || o.status === 'refunded' || o.status === 'cancelled';
+                      return (
+                        <tr key={o.id} className={`hover:bg-gray-50/60 transition-colors ${isRefundedOrCancelled ? 'bg-rose-50/20' : ''}`}>
+                          <td className="py-3.5 px-4">
+                            <div className="font-mono font-bold text-gray-900 text-xs">
+                              {o.orderNumber}
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                              {o.customerName} • <span className="text-gray-400">{o.partnerName}</span>
+                            </div>
+                          </td>
 
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase inline-flex items-center gap-1 ${
-                              o.channel === 'shop_india'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                : o.channel === 'quick_shopping'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-purple-50 text-purple-700 border border-purple-200'
-                            }`}
-                          >
-                            <span>{o.channel === 'shop_india' ? '🛍️' : o.channel === 'quick_shopping' ? '⚡' : '🛠️'}</span>
-                            {o.channelLabel}
-                          </span>
-                        </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase inline-flex items-center gap-1 ${
+                                o.channel === 'shop_india'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : o.channel === 'quick_shopping'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
+                              }`}
+                            >
+                              <span>{o.channel === 'shop_india' ? '🛍️' : o.channel === 'quick_shopping' ? '⚡' : '🛠️'}</span>
+                              {o.channelLabel}
+                            </span>
+                          </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-gray-900">
-                          {formatINR(o.customerPaid)}
-                        </td>
+                          <td className="py-3.5 px-4 text-right font-mono">
+                            {isRefundedOrCancelled ? (
+                              <div>
+                                <span className="line-through text-gray-400 font-bold">{formatINR(o.customerPaid)}</span>
+                                <div className="text-[10px] text-rose-600 font-bold">
+                                  Refunded: -{formatINR(o.refundAmount || o.customerPaid)}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="font-bold text-gray-900">{formatINR(o.customerPaid)}</span>
+                            )}
+                          </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono font-medium text-rose-600">
-                          - {formatINR(o.vendorPayout)}
-                        </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-medium">
+                            {isRefundedOrCancelled ? (
+                              <span className="text-gray-400 font-medium">₹0.00</span>
+                            ) : (
+                              <span className="text-rose-600">- {formatINR(o.vendorPayout)}</span>
+                            )}
+                          </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono font-medium text-amber-600">
-                          - {formatINR(o.razorpayFee)}
-                        </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-medium">
+                            {isRefundedOrCancelled ? (
+                              <span className="text-gray-400 font-medium">₹0.00</span>
+                            ) : (
+                              <span className="text-amber-600">- {formatINR(o.razorpayFee)}</span>
+                            )}
+                          </td>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <span className="font-mono font-bold text-sm text-emerald-600">
-                            + {formatINR(o.adminNetProfit)}
-                          </span>
-                          <div className="text-[10px] font-bold text-emerald-700">
-                            {o.marginPercent}% margin
-                          </div>
-                        </td>
+                          <td className="py-3.5 px-4 text-right">
+                            {isRefundedOrCancelled ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                ₹0.00 (REFUNDED)
+                              </span>
+                            ) : (
+                              <>
+                                <span className="font-mono font-bold text-sm text-emerald-600">
+                                  + {formatINR(o.adminNetProfit)}
+                                </span>
+                                <div className="text-[10px] font-bold text-emerald-700">
+                                  {o.marginPercent}% margin
+                                </div>
+                              </>
+                            )}
+                          </td>
 
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 uppercase">
-                            {o.status || 'Delivered'}
-                          </span>
-                          <div className="text-[9px] text-gray-400 mt-0.5">
-                            {o.paymentMethod}
-                          </div>
-                        </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                isRefundedOrCancelled
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {o.status || 'Delivered'}
+                            </span>
+                            {o.refundReason ? (
+                              <div className="text-[9px] text-rose-600 font-medium mt-0.5 max-w-[130px] truncate mx-auto" title={o.refundReason}>
+                                {o.refundReason}
+                              </div>
+                            ) : (
+                              <div className="text-[9px] text-gray-400 mt-0.5">
+                                {o.paymentMethod}
+                              </div>
+                            )}
+                          </td>
 
-                        <td className="py-3.5 px-4 text-right text-gray-500 whitespace-nowrap">
-                          {new Date(o.createdAt).toLocaleString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="py-3.5 px-4 text-right text-gray-500 whitespace-nowrap">
+                            {new Date(o.createdAt).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

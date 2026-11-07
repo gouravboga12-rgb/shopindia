@@ -151,6 +151,8 @@ router.get('/overview', async (req, res) => {
       totalRazorpayFee: 0,
       totalAdminNetProfit: 0,
       totalOrdersCount: 0,
+      totalRefundedAmount: 0,
+      totalRefundedOrdersCount: 0,
       marginPercent: 0,
     };
 
@@ -167,65 +169,114 @@ router.get('/overview', async (req, res) => {
         channelLabel = 'Glacons Services';
       }
 
-      const customerPaid = Number(order.total || order.subtotal || 0);
+      const rawTotal = Number(order.total || order.subtotal || 0);
+      const isCancelled = order.status === 'cancelled';
+      const isRefunded =
+        order.status === 'refunded' ||
+        order.paymentStatus === 'refunded' ||
+        Boolean(order.refundedAt) ||
+        (order.refundAmount != null && Number(order.refundAmount) >= rawTotal);
 
-      // Razorpay gateway fee: 3% standard (or from paymentRecord if captured)
-      let razorpayFee = 0;
-      if (order.paymentRecord && (order.paymentRecord.gatewayFee || order.paymentRecord.gatewayTax)) {
-        razorpayFee = Number(order.paymentRecord.gatewayFee || 0) + Number(order.paymentRecord.gatewayTax || 0);
-      } else {
-        razorpayFee = Math.round(customerPaid * 0.03 * 100) / 100;
-      }
+      // Check for partial refund
+      const refundAmt = Number(order.refundAmount || (isRefunded ? rawTotal : 0));
+      const isPartialRefund = !isRefunded && refundAmt > 0 && refundAmt < rawTotal;
 
-      // Vendor / Technician Payout calculation
-      let vendorPayout = 0;
+      // Base vendor payout calculation from items
+      let baseVendorPayout = 0;
       if (order.items && order.items.length > 0) {
         for (const item of order.items) {
           const qty = item.quantity || 1;
           if (item.vendorPrice != null && item.vendorPrice > 0) {
-            vendorPayout += Number(item.vendorPrice) * qty;
+            baseVendorPayout += Number(item.vendorPrice) * qty;
           } else if (item.platformFee != null && item.platformFee > 0) {
-            vendorPayout += Math.max(0, (Number(item.price) - Number(item.platformFee)) * qty);
+            baseVendorPayout += Math.max(0, (Number(item.price) - Number(item.platformFee)) * qty);
           } else {
-            // Default: 85% vendor share, 15% platform commission
-            vendorPayout += Number(item.price) * qty * 0.85;
+            baseVendorPayout += Number(item.price) * qty * 0.85;
           }
         }
       } else {
-        vendorPayout = order.commission ? Math.max(0, customerPaid - Number(order.commission)) : customerPaid * 0.85;
+        baseVendorPayout = order.commission ? Math.max(0, rawTotal - Number(order.commission)) : rawTotal * 0.85;
       }
-      vendorPayout = Math.round(vendorPayout * 100) / 100;
+      baseVendorPayout = Math.round(baseVendorPayout * 100) / 100;
 
-      // Super Admin Net Profit = Customer Paid - Vendor Payout - Razorpay 3%
-      const adminNetProfit = Math.round((customerPaid - vendorPayout - razorpayFee) * 100) / 100;
+      let effectiveCustomerPaid = 0;
+      let effectiveVendorPayout = 0;
+      let effectiveRazorpayFee = 0;
+      let adminNetProfit = 0;
 
-      // Accumulate to channel
-      channels[channel].customerPaid += customerPaid;
-      channels[channel].vendorPayout += vendorPayout;
-      channels[channel].razorpayFee += razorpayFee;
-      channels[channel].adminNetProfit += adminNetProfit;
-      channels[channel].ordersCount += 1;
+      if (isCancelled || isRefunded) {
+        // Fully cancelled or refunded: Platform profit is ZERO. No vendor payout, no gateway fee retention.
+        effectiveCustomerPaid = 0;
+        effectiveVendorPayout = 0;
+        effectiveRazorpayFee = 0;
+        adminNetProfit = 0;
 
-      // Accumulate to grand total summary
-      summary.totalCustomerPaid += customerPaid;
-      summary.totalVendorPayout += vendorPayout;
-      summary.totalRazorpayFee += razorpayFee;
-      summary.totalAdminNetProfit += adminNetProfit;
-      summary.totalOrdersCount += 1;
+        summary.totalRefundedAmount += refundAmt || rawTotal;
+        summary.totalRefundedOrdersCount += 1;
+      } else if (isPartialRefund) {
+        // Partial refund: Only remaining non-refunded amount yields profit
+        effectiveCustomerPaid = Math.max(0, rawTotal - refundAmt);
+        effectiveRazorpayFee = Math.round(effectiveCustomerPaid * 0.03 * 100) / 100;
+        effectiveVendorPayout = Math.round(baseVendorPayout * (effectiveCustomerPaid / rawTotal) * 100) / 100;
+        adminNetProfit = Math.round((effectiveCustomerPaid - effectiveVendorPayout - effectiveRazorpayFee) * 100) / 100;
+
+        summary.totalRefundedAmount += refundAmt;
+
+        // Accumulate active partial order
+        channels[channel].customerPaid += effectiveCustomerPaid;
+        channels[channel].vendorPayout += effectiveVendorPayout;
+        channels[channel].razorpayFee += effectiveRazorpayFee;
+        channels[channel].adminNetProfit += adminNetProfit;
+        channels[channel].ordersCount += 1;
+
+        summary.totalCustomerPaid += effectiveCustomerPaid;
+        summary.totalVendorPayout += effectiveVendorPayout;
+        summary.totalRazorpayFee += effectiveRazorpayFee;
+        summary.totalAdminNetProfit += adminNetProfit;
+        summary.totalOrdersCount += 1;
+      } else {
+        // Normal active / completed order
+        effectiveCustomerPaid = rawTotal;
+        if (order.paymentRecord && (order.paymentRecord.gatewayFee || order.paymentRecord.gatewayTax)) {
+          effectiveRazorpayFee = Number(order.paymentRecord.gatewayFee || 0) + Number(order.paymentRecord.gatewayTax || 0);
+        } else {
+          effectiveRazorpayFee = Math.round(effectiveCustomerPaid * 0.03 * 100) / 100;
+        }
+        effectiveVendorPayout = baseVendorPayout;
+        adminNetProfit = Math.round((effectiveCustomerPaid - effectiveVendorPayout - effectiveRazorpayFee) * 100) / 100;
+
+        // Accumulate active completed order
+        channels[channel].customerPaid += effectiveCustomerPaid;
+        channels[channel].vendorPayout += effectiveVendorPayout;
+        channels[channel].razorpayFee += effectiveRazorpayFee;
+        channels[channel].adminNetProfit += adminNetProfit;
+        channels[channel].ordersCount += 1;
+
+        summary.totalCustomerPaid += effectiveCustomerPaid;
+        summary.totalVendorPayout += effectiveVendorPayout;
+        summary.totalRazorpayFee += effectiveRazorpayFee;
+        summary.totalAdminNetProfit += adminNetProfit;
+        summary.totalOrdersCount += 1;
+      }
 
       return {
         id: order.id,
         orderNumber: order.orderNumber || `OD-${order.id.slice(0, 8).toUpperCase()}`,
         channel,
         channelLabel,
-        customerPaid: Math.round(customerPaid * 100) / 100,
-        vendorPayout: Math.round(vendorPayout * 100) / 100,
-        razorpayFee: Math.round(razorpayFee * 100) / 100,
+        customerPaid: Math.round(rawTotal * 100) / 100,
+        effectiveCustomerPaid: Math.round(effectiveCustomerPaid * 100) / 100,
+        vendorPayout: Math.round(effectiveVendorPayout * 100) / 100,
+        razorpayFee: Math.round(effectiveRazorpayFee * 100) / 100,
         adminNetProfit: Math.round(adminNetProfit * 100) / 100,
-        marginPercent: customerPaid > 0 ? Math.round(((adminNetProfit / customerPaid) * 100) * 10) / 10 : 0,
+        marginPercent: effectiveCustomerPaid > 0 ? Math.round(((adminNetProfit / effectiveCustomerPaid) * 100) * 10) / 10 : 0,
         paymentMethod: order.paymentMethod || 'Razorpay Online',
         paymentStatus: order.paymentStatus || 'paid',
         status: order.status,
+        isRefunded: Boolean(isRefunded || isPartialRefund),
+        isCancelled: Boolean(isCancelled),
+        refundAmount: Math.round(refundAmt * 100) / 100,
+        refundReason: order.refundReason || (isRefunded ? 'Refunded through admin panel' : null),
         customerName: order.customer?.name || 'Customer',
         partnerName: order.vendor?.businessName || (channel === 'glacons' ? 'Glacons Technician' : 'Store Partner'),
         createdAt: order.createdAt,
