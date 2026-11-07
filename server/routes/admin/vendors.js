@@ -11,13 +11,29 @@ const restrictManage = requirePermission('manage_vendors');
 // Middleware for routes that only require view_vendors (manage_vendors is also fine)
 const restrictView = requirePermission('view_vendors', 'manage_vendors');
 
-/** GET /api/admin/vendors?status=&page= — FR-05.2 */
+/** GET /api/admin/vendors?status=&service=&page=&q= — FR-05.2 */
 router.get('/', restrictView, async (req, res) => {
   try {
-    const { status, page = 1, limit = 20, q } = req.query;
+    const { status, service, page = 1, limit = 50, q } = req.query;
     const where = {};
-    if (status) where.approvalStatus = status;
-    if (q)      where.businessName   = { contains: q, mode: 'insensitive' };
+    if (status && status !== 'all') where.approvalStatus = status;
+    if (service === 'quick') {
+      where.supportsQuick = true;
+    } else if (service === 'traditional') {
+      where.supportsQuick = false;
+    }
+
+    if (q) {
+      where.OR = [
+        { businessName: { contains: q, mode: 'insensitive' } },
+        { contactName:  { contains: q, mode: 'insensitive' } },
+        { email:        { contains: q, mode: 'insensitive' } },
+        { phone:        { contains: q, mode: 'insensitive' } },
+        { city:         { contains: q, mode: 'insensitive' } },
+        { state:        { contains: q, mode: 'insensitive' } },
+        { pincode:      { contains: q, mode: 'insensitive' } },
+      ];
+    }
 
     const pageNum  = Number(page);
     const limitNum = Number(limit);
@@ -26,8 +42,15 @@ router.get('/', restrictView, async (req, res) => {
       prisma.vendor.findMany({
         where,
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, email: true, phone: true } },
           documents: true,
+          products: {
+            select: { fulfillmentType: true },
+            distinct: ['fulfillmentType'],
+          },
+          _count: {
+            select: { products: true, orders: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (pageNum - 1) * limitNum,
@@ -35,7 +58,31 @@ router.get('/', restrictView, async (req, res) => {
       }),
       prisma.vendor.count({ where }),
     ]);
-    res.json({ vendors, total, page: pageNum, pages: Math.ceil(total / limitNum) });
+
+    // Enhance vendors with computed service type
+    const enhanced = vendors.map((v) => {
+      const types = (v.products || []).map((p) => p.fulfillmentType);
+      const hasTraditional = types.includes('traditional');
+      const hasQuick = Boolean(v.supportsQuick || types.includes('quick_commerce'));
+
+      let serviceType = 'traditional_only';
+      let serviceLabel = 'Shop India Only';
+      if (hasTraditional && hasQuick) {
+        serviceType = 'both';
+        serviceLabel = 'Shop India & Quick Shopping';
+      } else if (hasQuick) {
+        serviceType = 'quick_only';
+        serviceLabel = 'Quick Shopping Only';
+      }
+
+      return {
+        ...v,
+        serviceType,
+        serviceLabel,
+      };
+    });
+
+    res.json({ vendors: enhanced, total, page: pageNum, pages: Math.ceil(total / limitNum) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
