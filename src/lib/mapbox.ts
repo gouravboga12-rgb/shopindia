@@ -5,11 +5,27 @@
  * Road Number / Street, Colony / Village, Mandal, District / City, State, Pincode, and Country.
  */
 
+export interface AddressHierarchy {
+  houseNumber: string | null;
+  roadNumber: string | null;
+  colonyName: string | null;
+  areaName: string | null;
+  villageName: string | null;
+  mandal: string | null;
+  district: string | null;
+  city: string | null;
+  pincode: string | null;
+  state: string | null;
+  country: string;
+}
+
 export interface GeocodedAddress {
   fullAddress: string;
   road?: string;
+  houseNumber?: string;
   neighborhood?: string;
   colony?: string;
+  area?: string;
   village?: string;
   mandal?: string;
   city?: string;
@@ -17,9 +33,13 @@ export interface GeocodedAddress {
   state?: string;
   country?: string;
   pincode?: string;
+  line1?: string;
+  line2?: string;
+  landmark?: string;
   latitude: number;
   longitude: number;
   formattedAddress?: string;
+  hierarchy?: AddressHierarchy;
 }
 
 /**
@@ -77,9 +97,11 @@ export async function reverseGeocodeMapbox(
         return {
           fullAddress: data.formattedAddress || data.fullAddress,
           formattedAddress: data.formattedAddress || data.fullAddress,
+          houseNumber: data.houseNumber || undefined,
           road: data.road || undefined,
           neighborhood: data.colony || data.village || undefined,
           colony: data.colony || undefined,
+          area: data.area || undefined,
           village: data.village || undefined,
           mandal: data.mandal || undefined,
           city: data.city || undefined,
@@ -87,6 +109,10 @@ export async function reverseGeocodeMapbox(
           state: data.state || undefined,
           country: data.country || 'India',
           pincode: data.pincode || undefined,
+          line1: data.line1 || undefined,
+          line2: data.line2 || undefined,
+          landmark: data.landmark || undefined,
+          hierarchy: data.hierarchy || undefined,
           latitude,
           longitude,
         };

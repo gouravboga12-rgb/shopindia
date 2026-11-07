@@ -72,56 +72,93 @@ router.get('/reverse-geocode', async (req, res) => {
     const mbCtx = mbFeat.context || [];
     const getMb = (prefix) => mbCtx.find((c) => c.id.startsWith(prefix))?.text;
 
-    const pincode = nomAddr.postcode || getMb('postcode') || '';
-    const rawRoad = [nomAddr.house_number, nomAddr.road].filter(Boolean).join(' ') || (mbFeat.text && mbFeat.text !== pincode ? mbFeat.text : '');
-    const road = (rawRoad === pincode) ? '' : rawRoad;
+    // 1. Precise extraction of all hierarchical Indian address components
+    const houseNumber = mbFeat.address || nomAddr.house_number || '';
+    const rawRoad = nomAddr.road || (mbFeat.text && mbFeat.text !== nomAddr.postcode && mbFeat.text !== houseNumber ? mbFeat.text : '');
+    const road = rawRoad.replace(/\b\d{6}\b/g, '').trim();
 
-    const colony = nomAddr.suburb || nomAddr.neighbourhood || nomAddr.village || nomAddr.hamlet || nomAddr.residential || getMb('neighborhood') || getMb('locality') || '';
+    const colony = nomAddr.neighbourhood || nomAddr.residential || getMb('neighborhood') || '';
+    const area = nomAddr.suburb || getMb('locality') || colony || '';
     const village = nomAddr.village || nomAddr.hamlet || '';
     const mandal = nomAddr.county || nomAddr.subdistrict || nomAddr.tehsil || nomAddr.municipality || getMb('locality') || '';
     const city = nomAddr.city || nomAddr.town || nomAddr.municipality || getMb('place') || '';
-    const district = nomAddr.state_district || nomAddr.district || getMb('district') || city;
-    const state = nomAddr.state || getMb('region') || '';
+    const district = nomAddr.state_district || nomAddr.district || getMb('district') || city || 'Hyderabad';
+    const state = nomAddr.state || getMb('region') || 'Telangana';
+    const pincode = nomAddr.postcode || getMb('postcode') || '';
     const country = nomAddr.country || getMb('country') || 'India';
 
-    // Build structured formatted string: Road, Colony/Village, Mandal, District/City, State - Pincode, Country
-    const parts = [];
-    if (road) parts.push(road);
-    if (colony && !parts.includes(colony)) parts.push(colony);
-    if (mandal && !parts.includes(mandal) && mandal !== colony) parts.push(mandal);
-    if (district && !parts.includes(district) && district !== city) {
-      if (city && !parts.includes(city)) {
-        parts.push(`${district}, ${city}`);
-      } else {
-        parts.push(district);
-      }
-    } else if (city && !parts.includes(city)) {
-      parts.push(city);
-    }
-    if (state) {
-      parts.push(pincode ? `${state} - ${pincode}` : state);
-    } else if (pincode) {
-      parts.push(pincode);
-    }
-    if (country && !parts.includes(country)) parts.push(country);
+    // 2. Synthesize clean Address Line 1 (House No, Flat No, Road Number / Street)
+    const line1Parts = [];
+    if (houseNumber) line1Parts.push(`H.No ${houseNumber}`);
+    if (road && !line1Parts.includes(road)) line1Parts.push(road);
+    const line1 = line1Parts.length > 0 ? line1Parts.join(', ') : (road || colony || area || 'Main Road');
 
-    const fullAddress = parts.length > 0 ? parts.join(', ') : (mbFeat?.place_name || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+    // 3. Synthesize clean Address Line 2 (Colony, Area, Village, Mandal)
+    const line2Parts = [];
+    if (colony && colony !== road && !line2Parts.includes(colony)) line2Parts.push(colony);
+    if (area && !line2Parts.includes(area) && area !== colony && area !== road) line2Parts.push(area);
+    if (village && !line2Parts.includes(village) && village !== area && village !== colony) line2Parts.push(village);
+    if (mandal && !line2Parts.includes(mandal) && mandal !== city) {
+      line2Parts.push(mandal.toLowerCase().includes('mandal') ? mandal : `${mandal} Mandal`);
+    }
+    const line2 = line2Parts.join(', ');
+
+    // 4. Synthesize Landmark
+    const landmark = mandal ? (mandal.toLowerCase().includes('mandal') ? mandal : `${mandal} Mandal`) : colony || area || '';
+
+    // 5. Build full hierarchical formatted string:
+    // House No, Road, Colony, Area, Village, Mandal, District, City, State - PIN, Country
+    const fullParts = [];
+    if (line1) fullParts.push(line1);
+    if (line2) fullParts.push(line2);
+    if (district && district !== city && !fullParts.includes(district)) {
+      fullParts.push(district.toLowerCase().includes('district') ? district : `${district} District`);
+    }
+    if (city && !fullParts.includes(city)) fullParts.push(city);
+    if (state) {
+      fullParts.push(pincode ? `${state} - ${pincode}` : state);
+    } else if (pincode) {
+      fullParts.push(pincode);
+    }
+    if (country && !fullParts.includes(country)) fullParts.push(country);
+
+    const fullAddress = fullParts.length > 0 ? fullParts.join(', ') : (mbFeat?.place_name || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+
+    const hierarchy = {
+      houseNumber: houseNumber || null,
+      roadNumber: road || null,
+      colonyName: colony || null,
+      areaName: area || null,
+      villageName: village || null,
+      mandal: mandal || null,
+      district: district || null,
+      city: city || district || 'Hyderabad',
+      pincode: pincode || null,
+      state: state || 'Telangana',
+      country: country || 'India',
+    };
 
     res.json({
       success: true,
       latitude: lat,
       longitude: lng,
+      houseNumber,
       road,
       colony,
+      area,
       village,
       mandal,
-      city,
       district,
+      city: city || district || 'Hyderabad',
       state,
       pincode,
       country,
+      line1,
+      line2,
+      landmark,
       fullAddress,
       formattedAddress: fullAddress,
+      hierarchy,
     });
   } catch (err) {
     console.error('Reverse geocode error:', err);
@@ -165,20 +202,43 @@ router.get('/search-address', async (req, res) => {
       const state = getCtx('region') || '';
       const country = getCtx('country') || 'India';
       const formatted = feat.place_name || feat.text || q;
+      const houseNumber = feat.properties?.address || '';
+      const road = (feat.text !== city && feat.text !== pincode && feat.text !== locality ? feat.text : '') || locality;
+
+      const line1 = [houseNumber ? `H.No ${houseNumber}` : '', road].filter(Boolean).join(', ') || formatted.split(',')[0];
+      const line2 = [locality, district].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i && !line1.includes(v)).join(', ');
 
       return {
         fullAddress: formatted,
         formattedAddress: formatted,
-        road: feat.properties?.address || (feat.text !== city && feat.text !== pincode ? feat.text : undefined),
+        houseNumber: houseNumber || undefined,
+        road: road || undefined,
         neighborhood: locality || undefined,
         colony: locality || undefined,
+        area: locality || undefined,
         city: city || undefined,
         district: district || undefined,
         state: state || undefined,
         country,
         pincode: pincode || undefined,
+        line1,
+        line2,
+        landmark: locality || district || '',
         latitude: lat,
         longitude: lng,
+        hierarchy: {
+          houseNumber: houseNumber || null,
+          roadNumber: road || null,
+          colonyName: locality || null,
+          areaName: locality || null,
+          villageName: null,
+          mandal: district || null,
+          district: district || null,
+          city: city || district || '',
+          pincode: pincode || null,
+          state: state || null,
+          country: country || 'India',
+        },
       };
     });
 
