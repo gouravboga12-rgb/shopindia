@@ -336,7 +336,6 @@ router.post('/', async (req, res) => {
     const productMap = new Map(products.map((p) => [p.id, p]));
 
     const resolved = [];
-    let totalCommission = 0;
 
     for (const it of items) {
       const product = productMap.get(it.productId);
@@ -360,7 +359,6 @@ router.post('/', async (req, res) => {
       });
 
       const qty = Number(it.quantity) || 1;
-      totalCommission += (itemPricing.commissionAmount * qty);
 
       resolved.push({
         productId: product.id,
@@ -423,34 +421,6 @@ router.post('/', async (req, res) => {
 
     const customerId = resolveCustomerId(req) || (await getGuestCustomer()).id;
 
-    // Resolve distanceKm for Quick Commerce using actual vendor store & customer GPS
-    let orderDistKm = 3.5;
-    if (resolved.length && resolved[0].vendorId && orderLat && orderLng) {
-      const vRec = await prisma.vendor.findUnique({
-        where: { id: resolved[0].vendorId },
-        select: { lat: true, lng: true }
-      });
-      if (vRec?.lat && vRec?.lng) {
-        orderDistKm = calculateHaversineDistanceKm(vRec.lat, vRec.lng, orderLat, orderLng);
-      }
-    }
-
-    const fulfillmentType = mapType(resolvedVertical);
-    const cartTotals = await calculateCartTotals({
-      items: resolved,
-      fulfillmentType,
-      distanceKm: orderDistKm,
-      zoneId: branchId
-    });
-
-    const subtotal = cartTotals.subtotal;
-    const discount = cartTotals.discount || 0;
-    const deliveryFee = cartTotals.deliveryFee;
-    const totalCommission = cartTotals.totalAdminCommission;
-    const total = cartTotals.finalCustomerTotal;
-    const riderFee = cartTotals.totalRiderPayout;
-    const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
-
     // Geographic Routing based on Pincode
     let branchId = null;
     let deliveryPincode = null;
@@ -479,7 +449,34 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Resolve distanceKm for Quick Commerce using actual vendor store & customer GPS
+    let orderDistKm = 3.5;
+    if (resolved.length && resolved[0].vendorId && orderLat && orderLng) {
+      const vRec = await prisma.vendor.findUnique({
+        where: { id: resolved[0].vendorId },
+        select: { lat: true, lng: true }
+      });
+      if (vRec?.lat && vRec?.lng) {
+        orderDistKm = calculateHaversineDistanceKm(vRec.lat, vRec.lng, orderLat, orderLng);
+      }
+    }
+
     const fulfillmentType = mapType(resolvedVertical);
+    const cartTotals = await calculateCartTotals({
+      items: resolved,
+      fulfillmentType,
+      distanceKm: orderDistKm,
+      zoneId: branchId
+    });
+
+    const subtotal = cartTotals.subtotal;
+    const discount = cartTotals.discount || 0;
+    const deliveryFee = cartTotals.deliveryFee;
+    const totalCommission = cartTotals.totalAdminCommission;
+    const total = cartTotals.finalCustomerTotal;
+    const riderFee = cartTotals.totalRiderPayout;
+    const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
+
     const isQuickOrder = fulfillmentType === 'quick_commerce';
 
     const order = await prisma.order.create({
