@@ -28,7 +28,7 @@ export const VendorSupport: React.FC = () => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Form State
-  const [category, setCategory] = useState('payout');
+  const [category, setCategory] = useState('payment');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
@@ -217,10 +217,10 @@ export const VendorSupport: React.FC = () => {
                   onChange={e => setCategory(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 >
-                  <option value="payout">💰 Payouts, Wallet & Bank Sync</option>
-                  <option value="logistics">🚚 Store Pickup & Delivery Partner Coordination</option>
-                  <option value="catalog">📦 Product Catalog, Pricing & Stock Approvals</option>
-                  <option value="account">🔐 Store Verification & Bank / UPI Update</option>
+                  <option value="payment">💰 Payouts, Wallet & Bank Sync</option>
+                  <option value="delivery">🚚 Store Pickup & Delivery Partner Coordination</option>
+                  <option value="product">📦 Product Catalog, Pricing & Stock Approvals</option>
+                  <option value="order_issue">📦 Order Issue & Customer Queries</option>
                   <option value="other">💬 General Merchant Policy & Inquiry</option>
                 </select>
               </div>

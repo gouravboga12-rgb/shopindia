@@ -286,6 +286,21 @@ router.post('/inquiry', async (req, res) => {
       }
     }
 
+    const categoryMap = {
+      payout: 'payment',
+      payment: 'payment',
+      refund: 'refund',
+      logistics: 'delivery',
+      delivery: 'delivery',
+      catalog: 'product',
+      product: 'product',
+      order_issue: 'order_issue',
+      order: 'order_issue',
+      account: 'other',
+      other: 'other',
+    };
+    const safeCategory = categoryMap[category] || 'other';
+
     const ticketNumber = 'TKT-' + Date.now().toString(36).toUpperCase();
     const ticket = await prisma.ticket.create({
       data: {
@@ -294,7 +309,7 @@ router.post('/inquiry', async (req, res) => {
         vendorId,
         regionId,
         subject,
-        category: category || 'other',
+        category: safeCategory,
         priority: 'high',
         status: 'open',
         tier: 2, // Visible to both Regional Admin and Super Admin
