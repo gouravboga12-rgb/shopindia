@@ -97,51 +97,69 @@ export const RegionalLiveMap: React.FC = () => {
           <div className="p-1.5 bg-blue-600 text-white rounded-xl shadow-xs">
             <Navigation className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-blue-900">Regional Operations Hub</span>
+          <div>
+            <span className="text-xs font-bold text-blue-900 block">Regional Operations Hub</span>
+            <span className="text-[10px] text-slate-500 font-medium">
+              {onlineRiders.length} Online Rider{onlineRiders.length === 1 ? '' : 's'} Active
+            </span>
+          </div>
         </div>
 
         {/* Overlay Online Riders Nodes */}
-        {onlineRiders.slice(0, 6).map((rider, idx) => {
-          const positions = [
-            'top-10 left-16',
-            'top-14 right-20',
-            'bottom-16 left-24',
-            'bottom-12 right-28',
-            'top-28 left-40',
-            'bottom-24 right-48',
-          ];
-          return (
-            <div
-              key={rider.id}
-              className={`absolute ${positions[idx % positions.length]} z-20 flex flex-col items-center group cursor-pointer`}
-            >
-              <div className="p-2 rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30 ring-4 ring-emerald-100 animate-bounce">
-                <Bike className="w-4 h-4" />
+        {onlineRiders.length === 0 ? (
+          <div className="absolute top-10 z-20 text-[11px] font-semibold text-slate-500 bg-white/90 px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
+            No verified fleet online in this territory
+          </div>
+        ) : (
+          onlineRiders.slice(0, 6).map((rider, idx) => {
+            const positions = [
+              'top-10 left-16',
+              'top-14 right-20',
+              'bottom-16 left-24',
+              'bottom-12 right-28',
+              'top-28 left-40',
+              'bottom-24 right-48',
+            ];
+            return (
+              <div
+                key={rider.id || idx}
+                className={`absolute ${positions[idx % positions.length]} z-20 flex flex-col items-center group cursor-pointer`}
+              >
+                <div className="p-2 rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30 ring-4 ring-emerald-100 animate-bounce">
+                  <Bike className="w-4 h-4" />
+                </div>
+                <span className="mt-1 text-[10px] font-bold text-slate-800 bg-white/95 px-2 py-0.5 rounded-full border border-emerald-200 shadow-xs">
+                  {rider.user?.name || 'Rider'}
+                </span>
               </div>
-              <span className="mt-1 text-[10px] font-bold text-slate-800 bg-white/95 px-2 py-0.5 rounded-full border border-emerald-200 shadow-xs">
-                {rider.user?.name || 'Rider'}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
 
         {/* Overlay Active Deliveries Nodes */}
-        {deliveries.slice(0, 4).map((del, idx) => {
-          const positions = ['top-20 left-1/3', 'bottom-20 right-1/3', 'top-1/3 right-16', 'bottom-1/3 left-16'];
-          return (
-            <div
-              key={del.id}
-              className={`absolute ${positions[idx % positions.length]} z-20 flex flex-col items-center group cursor-pointer`}
-            >
-              <div className="p-2 rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-4 ring-orange-100 animate-pulse">
-                <Package className="w-4 h-4" />
+        {deliveries
+          .filter(
+            (del) =>
+              !['cancelled', 'refunded'].includes(del.status) &&
+              !['cancelled', 'refunded'].includes(del.order?.status)
+          )
+          .slice(0, 4)
+          .map((del, idx) => {
+            const positions = ['top-20 left-1/3', 'bottom-20 right-1/3', 'top-1/3 right-16', 'bottom-1/3 left-16'];
+            return (
+              <div
+                key={del.id}
+                className={`absolute ${positions[idx % positions.length]} z-20 flex flex-col items-center group cursor-pointer`}
+              >
+                <div className="p-2 rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-4 ring-orange-100 animate-pulse">
+                  <Package className="w-4 h-4" />
+                </div>
+                <span className="mt-1 text-[10px] font-bold text-orange-700 bg-white/95 px-2 py-0.5 rounded-full border border-orange-200 shadow-xs">
+                  #{del.order?.orderNumber || del.id.slice(0, 6)}
+                </span>
               </div>
-              <span className="mt-1 text-[10px] font-bold text-orange-700 bg-white/95 px-2 py-0.5 rounded-full border border-orange-200 shadow-xs">
-                #{del.order?.orderNumber || del.id.slice(0, 6)}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
 
         {/* Legend Overlay */}
         <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 bg-white/95 border border-slate-200 rounded-xl p-2 sm:p-2.5 backdrop-blur-md flex items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] text-slate-700 shadow-xs">

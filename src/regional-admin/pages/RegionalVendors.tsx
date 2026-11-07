@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Store, Phone, Package, MapPin } from 'lucide-react';
+import { Store, Phone, Package, MapPin, MessageCircle, ExternalLink, Zap, ShoppingBag } from 'lucide-react';
 
 interface VendorItem {
   id: string;
   businessName: string;
   contactName: string;
   phone: string;
+  email?: string;
   street?: string;
   city?: string;
   state?: string;
   pincode?: string;
+  lat?: number;
+  lng?: number;
+  supportsQuick?: boolean;
+  deliveryRadiusKm?: number;
   category?: string;
   approvalStatus: string;
   orders?: {
@@ -50,31 +55,34 @@ export const RegionalVendors: React.FC = () => {
 
   return (
     <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">
-      
       {/* Header */}
       <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900">Territory Merchants & Stores</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Monitor merchant packing speed, pending dispatch queues, and store contacts
+            Verified local merchants mapped within your regional hub radius and assigned pincodes
           </p>
         </div>
         <span className="text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80 px-3 py-1.5 rounded-full self-start shadow-2xs">
-          {vendors.length} Active Stores
+          {vendors.length} Territory Store{vendors.length === 1 ? '' : 's'} Active
         </span>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-slate-400 text-xs">Loading local merchants...</div>
+        <div className="py-12 text-center text-slate-400 text-xs">Loading territory merchants...</div>
       ) : vendors.length === 0 ? (
         <div className="py-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-8">
           <Store className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-          <p className="text-sm text-slate-500 font-medium">No vendors registered under this region yet.</p>
+          <p className="text-sm text-slate-500 font-medium">No vendors registered in your territory radius yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vendors.map((vendor) => {
             const pendingOrders = vendor.orders || [];
+            const cleanPhone = (vendor.phone || '').replace(/[^0-9]/g, '');
+            const phoneWith91 = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+            const hasGps = vendor.lat != null && vendor.lng != null;
+
             return (
               <div
                 key={vendor.id}
@@ -88,27 +96,72 @@ export const RegionalVendors: React.FC = () => {
                       </div>
                       <div>
                         <h3 className="text-base font-bold text-slate-900">{vendor.businessName}</h3>
-                        <p className="text-xs text-slate-500">{vendor.contactName}</p>
+                        <p className="text-xs text-slate-500">Contact: {vendor.contactName || 'Store Manager'}</p>
                       </div>
                     </div>
 
-                    {vendor.phone && (
-                      <a
-                        href={`tel:${vendor.phone}`}
-                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-colors border border-emerald-200"
-                        title="Call Store Manager"
-                      >
-                        <Phone className="w-4 h-4" />
-                      </a>
-                    )}
+                    {/* 1-Click Action Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      {cleanPhone && (
+                        <>
+                          <a
+                            href={`tel:${cleanPhone}`}
+                            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl transition-colors border border-blue-200 shadow-2xs"
+                            title={`Call ${vendor.businessName}`}
+                          >
+                            <Phone className="w-3.5 h-3.5 text-blue-600" />
+                          </a>
+                          <a
+                            href={`https://wa.me/${phoneWith91}?text=Hello%20${encodeURIComponent(
+                              vendor.contactName || vendor.businessName
+                            )},%20this%20is%20Shop%20India%20Regional%20Hub%20Dispatch.`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors shadow-2xs"
+                            title="Chat on WhatsApp"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-100" />
+                          </a>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-500 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">
-                      {vendor.street ? `${vendor.street}, ${vendor.city || ''} ${vendor.pincode || ''}` : 'Location unmapped'}
-                    </span>
-                  </p>
+                  {/* Address & GPS */}
+                  <div className="mt-3 space-y-1">
+                    <p className="text-xs text-slate-600 flex items-start gap-1.5 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                      <span>{vendor.street || 'Area not specified'}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500 pl-5">
+                      {vendor.city || '—'}, {vendor.state || '—'} {vendor.pincode && `(PIN: ${vendor.pincode})`}
+                    </p>
+
+                    <div className="pl-5 pt-0.5 flex flex-wrap items-center gap-2">
+                      {hasGps && vendor.lat && vendor.lng && (
+                        <a
+                          href={`https://www.google.com/maps?q=${vendor.lat},${vendor.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
+                        >
+                          GPS Pin <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                      {vendor.supportsQuick && (
+                        <span className="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded inline-flex items-center gap-1">
+                          <Zap className="w-2.5 h-2.5 text-amber-600" />
+                          {vendor.deliveryRadiusKm || 5} km Quick Commerce
+                        </span>
+                      )}
+                      {!vendor.supportsQuick && (
+                        <span className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded inline-flex items-center gap-1">
+                          <ShoppingBag className="w-2.5 h-2.5 text-blue-600" />
+                          Shop India Courier
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Pending Orders Alert */}
@@ -132,7 +185,6 @@ export const RegionalVendors: React.FC = () => {
           })}
         </div>
       )}
-
     </div>
   );
 };

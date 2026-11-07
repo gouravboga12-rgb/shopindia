@@ -112,16 +112,38 @@ router.get('/dashboard', async (req, res) => {
 });
 
 /**
+ * Haversine formula to compute great-circle distance between two GPS coordinates in kilometers
+ */
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 999999;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371; // Earth's radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
  * GET /api/regional-admin/vendors
- * List vendors within this region/branch with their live dispatch status
+ * List vendors strictly within this Regional Admin's territory radius / assigned pincodes
  */
 router.get('/vendors', async (req, res) => {
   try {
     const profile = await getAdminProfile(req.user?.userId || req.user?.id);
-    const branchFilter = profile?.branchId ? { branchId: profile.branchId } : {};
+    const assignedPins = Array.isArray(profile?.assignedPincodes) ? profile.assignedPincodes : [];
+    const hubLat = profile?.currentLat;
+    const hubLng = profile?.currentLng;
+    const district = (profile?.district || '').toLowerCase().trim();
+    const regionName = (profile?.regionName || '').toLowerCase().trim();
 
-    const vendors = await prisma.vendor.findMany({
-      where: branchFilter,
+    const allVendors = await prisma.vendor.findMany({
+      where: {
+        isActive: true,
+      },
       include: {
         orders: {
           where: {
@@ -139,7 +161,29 @@ router.get('/vendors', async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ vendors });
+    // Strictly scope vendors to the regional territory
+    const scopedVendors = allVendors.filter((v) => {
+      // 1. If assigned pincodes exist, check if vendor's pincode matches
+      if (v.pincode && assignedPins.length > 0 && assignedPins.includes(v.pincode)) {
+        return true;
+      }
+      // 2. If both hub and vendor have GPS coordinates, check if within 15 km coverage radius
+      if (hubLat && hubLng && v.lat && v.lng) {
+        const dist = haversineDistanceKm(hubLat, hubLng, v.lat, v.lng);
+        if (dist <= 15) return true;
+      }
+      // 3. If vendor's city/state matches the hub territory name or district
+      if (v.city && district && (district.includes(v.city.toLowerCase()) || v.city.toLowerCase().includes(district))) {
+        return true;
+      }
+      if (v.city && regionName && regionName.includes(v.city.toLowerCase())) {
+        return true;
+      }
+      // Unmapped vendors or out-of-territory vendors are excluded
+      return false;
+    });
+
+    res.json({ vendors: scopedVendors, total: scopedVendors.length });
   } catch (err) {
     console.error('Regional admin vendors error:', err);
     res.status(500).json({ error: err.message });
@@ -216,10 +260,18 @@ router.patch('/riders/:id/verify', async (req, res) => {
  */
 router.get('/deliveries/live', async (req, res) => {
   try {
-    const [quickCommerceDeliveries, onlineRiders, shiprocketShipments] = await Promise.all([
+    const profile = await getAdminProfile(req.user?.userId || req.user?.id);
+    const hubLat = profile?.currentLat;
+    const hubLng = profile?.currentLng;
+
+    const [quickCommerceDeliveries, rawOnlineRiders, shiprocketShipments] = await Promise.all([
+      // Only active, non-cancelled, non-refunded deliveries
       prisma.delivery.findMany({
         where: {
           status: { in: ['broadcasted', 'assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'] },
+          order: {
+            status: { notIn: ['cancelled', 'refunded', 'returned'] },
+          },
         },
         include: {
           order: {
@@ -228,6 +280,7 @@ router.get('/deliveries/live', async (req, res) => {
               orderNumber: true,
               total: true,
               type: true,
+              status: true,
               vendor: { select: { businessName: true, phone: true } },
             },
           },
@@ -243,16 +296,23 @@ router.get('/deliveries/live', async (req, res) => {
           },
         },
       }),
+      // Query strictly approved, active, online riders only
       prisma.riderProfile.findMany({
-        where: { isOnline: true },
+        where: {
+          isOnline: true,
+          isApproved: true,
+          isActive: true,
+        },
         select: {
           id: true,
+          userId: true,
           currentLat: true,
           currentLng: true,
           vehicleType: true,
           vehicleNumber: true,
           serviceRadiusKm: true,
-          user: { select: { name: true, phone: true, avatar: true } },
+          updatedAt: true,
+          user: { select: { id: true, name: true, phone: true, avatar: true } },
         },
       }),
       prisma.shiprocketShipment.findMany({
@@ -264,6 +324,28 @@ router.get('/deliveries/live', async (req, res) => {
         },
       }),
     ]);
+
+    // Deduplicate riders by phone number or userId so the same rider never appears multiple times
+    const seenRiders = new Set();
+    const onlineRiders = [];
+
+    for (const r of rawOnlineRiders) {
+      const phoneKey = (r.user?.phone || '').replace(/[^0-9]/g, '');
+      const uniqueKey = phoneKey || r.userId || r.id;
+
+      if (!seenRiders.has(uniqueKey)) {
+        seenRiders.add(uniqueKey);
+
+        // If hub has coordinates and rider has coordinates, check if within regional radius (30km)
+        if (hubLat && hubLng && r.currentLat && r.currentLng) {
+          const dist = haversineDistanceKm(hubLat, hubLng, r.currentLat, r.currentLng);
+          if (dist > (r.serviceRadiusKm || 30)) {
+            continue; // Skip out-of-territory rider
+          }
+        }
+        onlineRiders.push(r);
+      }
+    }
 
     res.json({
       deliveries: quickCommerceDeliveries,
