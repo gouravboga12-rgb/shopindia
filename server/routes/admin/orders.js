@@ -171,7 +171,7 @@ router.post('/:id/refund', async (req, res) => {
         where: { id: req.params.id },
         data: {
           refundAmount: amt,
-          refundReason: refundReason || existing.refundReason || 'Refund processed by Admin',
+          refundReason: `Razorpay Ref: ${rzpRefundId} • ${refundReason || existing.refundReason || 'Order cancelled'}`,
           refundedAt: new Date(),
           paymentStatus: 'refunded',
           status: 'refunded',

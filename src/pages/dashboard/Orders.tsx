@@ -255,7 +255,15 @@ export const OrdersPage: React.FC = () => {
                         {vertBadge.label}
                       </span>
                       <Badge tone={statusTone(o.status)}>
-                        {v === 'services' && ((o.status as string) === 'placed' || (o.status as string) === 'pending') ? 'Service Booked' : o.status === 'placed' ? 'Order Placed' : o.status}
+                        {v === 'services' && ((o.status as string) === 'placed' || (o.status as string) === 'pending')
+                          ? 'Service Booked'
+                          : o.status === 'placed'
+                          ? 'Order Placed'
+                          : (o.status === 'refunded' || ((o as any).refundAmount > 0))
+                          ? 'Refund Initiated 💳'
+                          : o.status === 'cancelled'
+                          ? 'Cancelled'
+                          : o.status}
                       </Badge>
                     </div>
 
@@ -348,28 +356,97 @@ export const OrdersPage: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Right: Interactive Street Map (Swiggy / Zomato / Uber Style) */}
-                            <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-sm">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate">
-                                    {orderVert === 'services' ? 'Live Technician Radar' : 'Live Partner Dispatch Radar'}
-                                  </h4>
+                            {/* Right: Live Refund Tracking (if refunded/cancelled) OR Interactive Street Map */}
+                            {((openOrder as any).status === 'refunded' || (openOrder as any).paymentStatus === 'refunded' || ((openOrder as any).refundAmount > 0)) ? (
+                              <div className="bg-gradient-to-br from-emerald-50/90 via-white to-blue-50/50 border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">
+                                      <CreditCard className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                      <h4 className="text-sm font-black text-gray-900 font-heading">Refund Initiated Successfully</h4>
+                                      <p className="text-[11px] text-gray-500 font-medium">Transferred back to your original payment method</p>
+                                    </div>
+                                  </div>
+                                  <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider border border-emerald-200">
+                                    Refund Initiated
+                                  </span>
                                 </div>
-                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                                  GPS Live Telemetry
-                                </span>
+
+                                <div className="p-3.5 bg-white border border-emerald-100/80 rounded-xl space-y-2 text-xs">
+                                  <div className="flex items-center justify-between font-bold">
+                                    <span className="text-gray-600">Total Refund Amount:</span>
+                                    <span className="text-emerald-700 text-base font-mono font-black">
+                                      ₹{Number((openOrder as any).refundAmount || openOrder.total || 0).toLocaleString('en-IN')}
+                                    </span>
+                                  </div>
+                                  {(openOrder as any).refundReason && (
+                                    <div className="text-[11px] text-gray-600 font-mono pt-2 border-t border-gray-100 break-all">
+                                      <span className="font-bold text-gray-400 block text-[9.5px] uppercase tracking-wider mb-0.5">Payment Gateway Ref</span>
+                                      {(openOrder as any).refundReason}
+                                    </div>
+                                  )}
+                                  {(openOrder as any).refundedAt && (
+                                    <div className="text-[10px] text-gray-400 font-mono">
+                                      Initiated on: {new Date((openOrder as any).refundedAt).toLocaleDateString('en-IN', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl space-y-1 text-xs text-blue-950">
+                                  <p className="font-bold flex items-center gap-1.5 text-blue-900">
+                                    <span>⏱️ Expected Bank Reflection: 1 to 5 Working Days</span>
+                                  </p>
+                                  <p className="text-[11px] text-blue-800 leading-relaxed">
+                                    The funds have been released by Shop India via Razorpay. Depending on your bank's clearing time (UPI takes 2–24 hours, Netbanking/Cards take 3–5 working days), the money will credit directly into your source account.
+                                  </p>
+                                </div>
                               </div>
-                              <InlineOrderTracking
-                                orderId={openOrder.id}
-                                orderNumber={openOrder.orderNumber}
-                                orderStatus={openOrder.status}
-                                vertical={orderVert}
-                                initialOtp={activeOtp}
-                                onOtpLoaded={(code) => setOrderOtps((prev) => ({ ...prev, [openOrder.id]: code }))}
-                              />
-                            </div>
+                            ) : openOrder.status === 'cancelled' ? (
+                              <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-5 shadow-sm space-y-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shadow-sm">
+                                    <X className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <h4 className="text-sm font-black text-rose-950">Order Cancelled</h4>
+                                    <p className="text-[11px] text-rose-700">This order was cancelled before dispatch.</p>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-rose-800 leading-relaxed bg-white p-3 rounded-xl border border-rose-100">
+                                  No payment was deducted or the order was registered under Cash on Delivery (Zero amount due).
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-slate">
+                                      {orderVert === 'services' ? 'Live Technician Radar' : 'Live Partner Dispatch Radar'}
+                                    </h4>
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                    GPS Live Telemetry
+                                  </span>
+                                </div>
+                                <InlineOrderTracking
+                                  orderId={openOrder.id}
+                                  orderNumber={openOrder.orderNumber}
+                                  orderStatus={openOrder.status}
+                                  vertical={orderVert}
+                                  initialOtp={activeOtp}
+                                  onOtpLoaded={(code) => setOrderOtps((prev) => ({ ...prev, [openOrder.id]: code }))}
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {/* BOTTOM SECTION: Items + OTP on Left, Order Summary & Actions on Right */}

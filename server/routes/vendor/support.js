@@ -256,7 +256,7 @@ router.post('/tickets/:id/internal-note', async (req, res) => {
 
 /**
  * POST /api/vendor/support/inquiry
- * Merchant submits an inquiry directly to Super Admin / Finance Desk
+ * Merchant submits an inquiry directly into the unified support queue (evaluated by Regional Admin or Super Admin)
  */
 router.post('/inquiry', async (req, res) => {
   try {
@@ -265,16 +265,39 @@ router.post('/inquiry', async (req, res) => {
       return res.status(400).json({ error: 'Subject and message are required' });
     }
     const vendorId = req.user.vendorId;
-    const ticketNumber = 'ADM-' + Date.now().toString(36).toUpperCase();
+    const userId = req.user.userId || req.user.id;
+
+    // Look up vendor to find location/pincode and assign region if available
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { id: true, userId: true, pincode: true, city: true }
+    });
+
+    let regionId = null;
+    if (vendor?.pincode) {
+      const regionalAdmin = await prisma.regionalAdminProfile.findFirst({
+        where: {
+          status: 'approved',
+          assignedPincodes: { has: vendor.pincode }
+        }
+      });
+      if (regionalAdmin) {
+        regionId = regionalAdmin.id;
+      }
+    }
+
+    const ticketNumber = 'TKT-' + Date.now().toString(36).toUpperCase();
     const ticket = await prisma.ticket.create({
       data: {
         ticketNumber,
+        customerId: vendor?.userId || userId,
         vendorId,
+        regionId,
         subject,
-        category: category || 'payout',
+        category: category || 'other',
         priority: 'high',
         status: 'open',
-        tier: 3, // Directly to Super Admin Desk
+        tier: 2, // Visible to both Regional Admin and Super Admin
         messages: {
           create: {
             senderRole: 'vendor',
@@ -287,7 +310,8 @@ router.post('/inquiry', async (req, res) => {
         messages: true
       }
     });
-    res.json({ success: true, ticket, message: 'Inquiry submitted successfully to Admin Desk.' });
+
+    res.json({ success: true, ticket, message: 'Ticket submitted successfully to Shop India Support.' });
   } catch (err) {
     console.error('[VendorSupport] Inquiry error:', err);
     res.status(500).json({ error: 'Failed to submit inquiry' });

@@ -400,8 +400,9 @@ export const CanceledOrdersPage: React.FC = () => {
                         </div>
                         <div className="mt-1">
                           {isRefunded ? (
-                            <span className="text-[9.5px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                              Refund Settled
+                            <span className="text-[9.5px] font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span>Refund Initiated</span>
                             </span>
                           ) : isPrepaid ? (
                             <span className="text-[9.5px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
@@ -427,13 +428,21 @@ export const CanceledOrdersPage: React.FC = () => {
                             <span>⚡ Process Razorpay Refund</span>
                           </button>
                         ) : isRefunded ? (
-                          <div className="text-right">
+                          <div className="text-right space-y-0.5">
                             <span className="text-[11px] font-black text-emerald-700 flex items-center justify-end gap-1">
                               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Refunded via Razorpay</span>
+                              <span>Refund Initiated via Razorpay</span>
                             </span>
+                            {order.refundReason && (
+                              <div className="text-[10px] text-gray-600 font-mono font-medium max-w-[200px] ml-auto truncate" title={order.refundReason}>
+                                {order.refundReason}
+                              </div>
+                            )}
+                            <div className="text-[9px] text-emerald-600 font-semibold">
+                              Transferred to user bank (1–5 days)
+                            </div>
                             {order.refundedAt && (
-                              <div className="text-[9.5px] text-gray-400 font-mono mt-0.5">
+                              <div className="text-[9.5px] text-gray-400 font-mono">
                                 {new Date(order.refundedAt).toLocaleDateString('en-IN', {
                                   day: 'numeric',
                                   month: 'short',
