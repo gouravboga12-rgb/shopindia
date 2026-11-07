@@ -46,6 +46,25 @@ function getServiceSkillTag(category, tags, name) {
   return 'general_service';
 }
 
+/**
+ * Helper to separate clean description text from vendor showcase reviews metadata
+ */
+function parseProductDescription(raw) {
+  if (!raw) return { description: '', showcaseReviews: [] };
+  const marker = '<!--SHOWCASE_REVIEWS:';
+  const idx = raw.indexOf(marker);
+  if (idx !== -1) {
+    const desc = raw.substring(0, idx).trim();
+    try {
+      const jsonStr = raw.substring(idx + marker.length).replace(/-->$/, '').trim();
+      return { description: desc, showcaseReviews: JSON.parse(jsonStr) };
+    } catch {
+      return { description: desc, showcaseReviews: [] };
+    }
+  }
+  return { description: raw, showcaseReviews: [] };
+}
+
 /** GET /api/products — public storefront catalog */
 router.get('/', async (req, res) => {
   try {
@@ -232,10 +251,13 @@ router.get('/', async (req, res) => {
         prepTime = '2-4 days';
       }
 
+      const { description: cleanDesc, showcaseReviews } = parseProductDescription(p.description);
+
       mapped.push({
         id: p.id,
         title: p.name,
-        description: p.description || '',
+        description: cleanDesc,
+        showcaseReviews: showcaseReviews || [],
         price: p.basePrice,
         originalPrice: p.mrp || p.basePrice,
         rating: p.ratingAvg,

@@ -33,14 +33,27 @@ export const VerticalShop: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHoveringCarousel, setIsHoveringCarousel] = useState(false);
   const [banners, setBanners] = useState<any[]>([]);
+  const [spotlightPromo, setSpotlightPromo] = useState<any>({
+    badge: 'Partnership',
+    title: 'Active Jordan series',
+    subtitle: 'Claim premium cashbacks instantly.',
+    actionText: 'Shop Now',
+    actionLink: 'shoes',
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format',
+    partnerTitle: 'Plus Guaranteed Partner',
+    partnerSub: '1-day fast delivery',
+    partnerNote: 'Enjoy 1-day delivery and special discount prices on items displaying the ShopIndia Assured badge.',
+    isActive: true
+  });
 
   const CURATED_DEFAULT_BRANDS = ['Apple', 'Samsung', 'boAt', 'OnePlus', 'Levi’s', 'Nike', 'Sony', 'Puma'];
 
   useEffect(() => {
+    // 1. Fetch active banners (all active promotions for the carousel)
     api.get<{ banners: any[] }>('/api/banners')
       .then(d => {
-        const filtered = (d.banners || []).filter((b: any) => b.vertical === 'shop');
-        if (filtered.length > 0) setBanners(filtered);
+        const activeBanners = d.banners || [];
+        if (activeBanners.length > 0) setBanners(activeBanners);
         else {
           setBanners([
             {
@@ -71,6 +84,13 @@ export const VerticalShop: React.FC = () => {
           }
         ]);
       });
+
+    // 2. Fetch dynamic spotlight brand promo
+    api.get<{ spotlight: any }>('/api/banners/spotlight')
+      .then(d => {
+        if (d.spotlight) setSpotlightPromo(d.spotlight);
+      })
+      .catch(() => {});
   }, []);
 
   // Filter products for this vertical
@@ -757,30 +777,48 @@ export const VerticalShop: React.FC = () => {
 
           {/* Right Column: Promotional Sidebar / Advertisements (Span 1) */}
           <div className="col-span-1 flex flex-col gap-6 lg:sticky lg:top-[140px] h-fit">
-            <div className="w-full bg-brand-card p-6 rounded-card shadow-premium flex flex-col gap-4 border border-brand-border">
-              <span className="font-bold text-xs tracking-widest text-brand-slate uppercase font-heading">Spotlight Brand</span>
-              <div className="relative aspect-[3/4] rounded-card overflow-hidden shadow-inner group cursor-pointer bg-neutral-900">
-                <img
-                  src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format"
-                  alt="Ad"
-                  className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700 ease-out"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-graphite via-transparent to-transparent flex flex-col justify-end p-5 text-white">
-                  <span className="text-xs font-bold uppercase tracking-wider text-brand-orange bg-orange-50/15 border border-brand-orange/20 px-2 py-0.5 rounded w-max mb-1.5 font-heading">
-                    Partnership
-                  </span>
-                  <h4 className="text-base font-bold leading-tight mb-1 font-heading">Active Jordan series</h4>
-                  <p className="text-[10.5px] text-zinc-300 leading-normal mb-4 font-medium">Claim premium cashbacks instantly.</p>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => navigateTo('search')}
-                    className="px-5 py-2 bg-brand-blue text-white rounded-button font-bold text-xs tracking-wide w-max shadow hover:bg-blue-650 transition-colors uppercase font-heading"
-                  >
-                    Shop Now
-                  </motion.button>
+            {spotlightPromo && spotlightPromo.isActive !== false && (
+              <div className="w-full bg-brand-card p-6 rounded-card shadow-premium flex flex-col gap-4 border border-brand-border">
+                <span className="font-bold text-xs tracking-widest text-brand-slate uppercase font-heading">Spotlight Brand</span>
+                <div 
+                  className="relative aspect-[3/4] rounded-card overflow-hidden shadow-inner group cursor-pointer bg-neutral-900"
+                  onClick={() => {
+                    if (spotlightPromo.actionLink) {
+                      setSearchQuery(spotlightPromo.actionLink);
+                    }
+                    navigateTo('search');
+                  }}
+                >
+                  <img
+                    src={spotlightPromo.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format"}
+                    alt={spotlightPromo.title || "Ad"}
+                    className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-graphite via-transparent to-transparent flex flex-col justify-end p-5 text-white">
+                    <span className="text-xs font-bold uppercase tracking-wider text-brand-orange bg-orange-50/15 border border-brand-orange/20 px-2 py-0.5 rounded w-max mb-1.5 font-heading">
+                      {spotlightPromo.badge || 'Partnership'}
+                    </span>
+                    <h4 className="text-base font-bold leading-tight mb-1 font-heading">{spotlightPromo.title || 'Active Jordan series'}</h4>
+                    <p className="text-[10.5px] text-zinc-300 leading-normal mb-4 font-medium">
+                      {spotlightPromo.subtitle || 'Claim premium cashbacks instantly.'}
+                    </p>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (spotlightPromo.actionLink) {
+                          setSearchQuery(spotlightPromo.actionLink);
+                        }
+                        navigateTo('search');
+                      }}
+                      className="px-5 py-2 bg-brand-blue text-white rounded-button font-bold text-xs tracking-wide w-max shadow hover:bg-blue-650 transition-colors uppercase font-heading"
+                    >
+                      {spotlightPromo.actionText || 'Shop Now'}
+                    </motion.button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="w-full bg-brand-card p-6 rounded-card shadow-premium flex flex-col gap-3.5 border border-brand-border text-left">
               <div className="flex gap-3 items-center">
@@ -788,12 +826,18 @@ export const VerticalShop: React.FC = () => {
                   <Award size={16} />
                 </div>
                 <div className="flex flex-col leading-tight">
-                  <span className="font-semibold text-xs text-brand-graphite font-heading">Plus Guaranteed Partner</span>
-                  <span className="text-xs text-brand-slate font-bold">1-day fast delivery</span>
+                  <span className="font-semibold text-xs text-brand-graphite font-heading">
+                    {spotlightPromo?.partnerTitle || 'Plus Guaranteed Partner'}
+                  </span>
+                  <span className="text-xs text-brand-slate font-bold">
+                    {spotlightPromo?.partnerSub || '1-day fast delivery'}
+                  </span>
                 </div>
               </div>
               <p className="text-xs text-brand-slate leading-relaxed border-t border-brand-border pt-3.5 font-semibold">
-                Enjoy 1-day delivery and special discount prices on items displaying the <strong>ShopIndia Assured</strong> badge.
+                {spotlightPromo?.partnerNote || (
+                  <>Enjoy 1-day delivery and special discount prices on items displaying the <strong>ShopIndia Assured</strong> badge.</>
+                )}
               </p>
             </div>
           </div>

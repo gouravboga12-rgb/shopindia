@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useProducts } from '../hooks/useProducts';
 import { useCustomer } from '../context/CustomerContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, BadgePercent, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2, Bell } from 'lucide-react';
+import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2, Bell } from 'lucide-react';
 import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
 
@@ -12,8 +12,6 @@ export const ProductDetailPage: React.FC = () => {
   const { reviews, wishlist, toggleWishlist } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
-  const [pincode, setPincode] = useState('');
-  const [pincodeCheckResult, setPincodeCheckResult] = useState<string | null>(null);
   const [isNotified, setIsNotified] = useState(false);
 
   const cartItemCount = (cart || []).reduce((acc, item) => acc + item.quantity, 0);
@@ -30,19 +28,6 @@ export const ProductDetailPage: React.FC = () => {
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [selectedProductId]);
-
-  const handlePincodeCheck = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pincode.length === 6 && /^\d+$/.test(pincode)) {
-      if (isServices) {
-        setPincodeCheckResult(`Certified professional available at pincode ${pincode} tomorrow.`);
-      } else {
-        setPincodeCheckResult(`Standard delivery by tomorrow, 11:00 AM. Free shipping.`);
-      }
-    } else {
-      setPincodeCheckResult('Invalid pincode. Please enter a 6-digit postal code.');
-    }
-  };
 
   const handleAddToCart = () => {
     if (!requireCustomerAuth('add this item to your cart')) return;
@@ -112,17 +97,43 @@ export const ProductDetailPage: React.FC = () => {
     (product?.title && r.productName && r.productName.toLowerCase() === product.title.toLowerCase())
   );
 
-  const displayReviews = liveReviews.map(r => ({
-    name: 'Verified Customer',
-    rating: r.rating,
-    date: new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-    title: r.title,
-    comment: r.body,
-    images: r.images || [],
-    isVerified: true
-  }));
+  // Combine vendor-curated showcase reviews with live customer reviews
+  const displayReviews = [
+    ...(product?.showcaseReviews || []).map((sr: any) => ({
+      name: sr.name || 'Verified Customer',
+      rating: Number(sr.rating || 5),
+      date: sr.date || 'Verified Buyer',
+      title: sr.title || 'Verified Customer Review',
+      comment: sr.comment || '',
+      images: [],
+      isVerified: true
+    })),
+    ...liveReviews.map(r => ({
+      name: 'Verified Customer',
+      rating: r.rating,
+      date: new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      title: r.title,
+      comment: r.body,
+      images: r.images || [],
+      isVerified: true
+    }))
+  ];
 
-  const similarProducts = product ? products.filter(p => p.id !== product.id && p.vertical === product.vertical).slice(0, 5) : [];
+  // Relevant recommendations: prioritize matching category, then fill with vertical
+  const similarProducts = product ? (() => {
+    const sameCat = products.filter(p => 
+      p.id !== product.id && (
+        (p.categoryId && product.categoryId && p.categoryId === product.categoryId) ||
+        (p.category && product.category && p.category.toLowerCase() === product.category.toLowerCase())
+      )
+    );
+    const otherInVertical = products.filter(p => 
+      p.id !== product.id && 
+      p.vertical === product.vertical && 
+      !sameCat.some(sc => sc.id === p.id)
+    );
+    return [...sameCat, ...otherInVertical].slice(0, 5);
+  })() : [];
 
   // Desktop Page Layout
   const renderDesktop = () => {
@@ -273,54 +284,19 @@ export const ProductDetailPage: React.FC = () => {
               )}
             </div>
 
-            {/* Bank offers */}
-            <div className="flex flex-col gap-3">
-              <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">Available Offers & Discounts</span>
-              <div className="flex flex-col gap-2 text-xs text-brand-slate font-semibold">
-                <div className="flex gap-2.5 items-start leading-relaxed text-left">
-                  <BadgePercent size={15} className="text-brand-green shrink-0 mt-0.5" />
-                  <span><strong>Bank Offer:</strong> Get 10% instant discount on Credit Cards, up to ₹1,500.</span>
-                </div>
-                <div className="flex gap-2.5 items-start leading-relaxed text-left">
-                  <BadgePercent size={15} className="text-brand-green shrink-0 mt-0.5" />
-                  <span><strong>Bank Offer:</strong> Flat ₹100 instant cashback on Wallet transactions above ₹999.</span>
+            {/* Product Description */}
+            {product.description && (
+              <div className="py-4 border-t border-brand-border/20 flex flex-col gap-2.5 text-left">
+                <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">
+                  About this {isServices ? 'Service' : 'Item'}
+                </span>
+                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/60 shadow-2xs">
+                  <p className="text-xs text-brand-slate font-medium leading-relaxed whitespace-pre-line">
+                    {product.description}
+                  </p>
                 </div>
               </div>
-            </div>
-
-            {/* Pincode checker (16px curves) */}
-            <div className="py-5 border-t border-b border-brand-border/10 flex flex-col gap-3">
-              <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">
-                {isServices ? 'Service Availability & Slot Estimates' : 'Delivery & Slot Estimates'}
-              </span>
-              <form onSubmit={handlePincodeCheck} className="flex gap-2.5 max-w-sm">
-                <div className="flex border border-brand-border rounded-input overflow-hidden w-full bg-white shadow-soft">
-                  <span className="p-2 text-brand-slate"><MapPin size={15} /></span>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder={isServices ? "Enter 6-digit service pincode" : "Enter 6-digit delivery pincode"}
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    className="w-full py-1.5 text-xs font-bold focus:outline-none text-brand-graphite"
-                  />
-                </div>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  type="submit"
-                  className={`px-5 text-white font-extrabold text-xs rounded-button uppercase tracking-wider transition-colors ${
-                    isServices ? 'bg-amber-600 hover:bg-amber-700' : 'bg-brand-blue hover:bg-blue-650'
-                  }`}
-                >
-                  Check
-                </motion.button>
-              </form>
-              {pincodeCheckResult && (
-                <span className={`text-xs font-bold ${pincodeCheckResult.includes('Invalid') ? 'text-brand-red' : 'text-brand-green'}`}>
-                  {pincodeCheckResult}
-                </span>
-              )}
-            </div>
+            )}
 
             {/* Specs tables (20px curves) */}
             {product.specs && Object.keys(product.specs).length > 0 && (
@@ -582,32 +558,17 @@ export const ProductDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* Service/Delivery Availability checker */}
-          <div className="flex flex-col gap-3 py-1">
-            <span className="text-xs uppercase font-black tracking-widest text-slate-400 font-heading">
-              {isServices ? 'Service Availability' : 'Delivery to'}
-            </span>
-            <form onSubmit={handlePincodeCheck} className="flex gap-2 w-full max-w-sm relative">
-              <input
-                type="text"
-                maxLength={6}
-                placeholder={isServices ? "Enter 6-digit service pincode" : "Enter 6-digit code"}
-                value={pincode}
-                onChange={(e) => setPincode(e.target.value)}
-                className="w-full pl-5 pr-24 py-3.5 bg-slate-100/80 border-transparent rounded-full text-[13px] font-bold focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue/30 transition-all placeholder:text-slate-400"
-              />
-              <button type="submit" className={`absolute right-1.5 top-1.5 bottom-1.5 px-5 text-white rounded-full text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm ${
-                isServices ? 'bg-amber-600 hover:bg-amber-700' : 'bg-zinc-900 hover:bg-zinc-800'
-              }`}>
-                Check
-              </button>
-            </form>
-            {pincodeCheckResult && (
-              <span className={`text-xs font-bold pl-1 ${pincodeCheckResult.includes('Invalid') ? 'text-brand-red' : 'text-[#17B169]'}`}>
-                {pincodeCheckResult}
+          {/* Product Description */}
+          {product.description && (
+            <div className="flex flex-col gap-2 py-2 text-left">
+              <span className="text-xs uppercase font-black tracking-widest text-slate-400 font-heading">
+                About this {isServices ? 'Service' : 'Item'}
               </span>
-            )}
-          </div>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200/50 whitespace-pre-line">
+                {product.description}
+              </p>
+            </div>
+          )}
 
           {/* Key Specs / Service Inclusions */}
           {product.specs && Object.keys(product.specs).length > 0 && (

@@ -1,6 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search, X, Package, Zap, ShoppingBag, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Package, Zap, ShoppingBag, CheckCircle, AlertCircle, RefreshCw, Star } from 'lucide-react';
+
+const parseDescriptionAndReviews = (raw: string) => {
+  if (!raw) return { desc: '', reviews: [] };
+  const marker = '<!--SHOWCASE_REVIEWS:';
+  const idx = raw.indexOf(marker);
+  if (idx !== -1) {
+    const desc = raw.substring(0, idx).trim();
+    try {
+      const jsonStr = raw.substring(idx + marker.length).replace(/-->$/, '').trim();
+      return { desc, reviews: JSON.parse(jsonStr) };
+    } catch {
+      return { desc, reviews: [] };
+    }
+  }
+  return { desc: raw, reviews: [] };
+};
 
 export const VendorProducts: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -18,6 +34,7 @@ export const VendorProducts: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
+  const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number>(0);
   const [stock, setStock] = useState<number>(10);
   const [fulfillmentType, setFulfillmentType] = useState<'traditional' | 'quick_commerce'>('traditional');
@@ -29,6 +46,14 @@ export const VendorProducts: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [existingImage, setExistingImage] = useState<string>('');
   const [uploading, setUploading] = useState(false);
+
+  // Showcase Reviews State (Option 3)
+  const [showcaseReviews, setShowcaseReviews] = useState<Array<{ name: string; rating: number; title: string; comment: string }>>([]);
+  const [newReviewAuthor, setNewReviewAuthor] = useState('');
+  const [newReviewRating, setNewReviewRating] = useState<number>(5);
+  const [newReviewTitle, setNewReviewTitle] = useState('');
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [showAddReview, setShowAddReview] = useState(false);
 
   // Dynamic Pricing Engine Fields
   const [vendorPrice, setVendorPrice] = useState<number>(0);
@@ -96,8 +121,14 @@ export const VendorProducts: React.FC = () => {
 
   const resetForm = () => {
     setEditingId(null);
-    setName(''); setBrand(''); setPrice(0); setStock(10);
+    setName(''); setBrand(''); setDescription(''); setPrice(0); setStock(10);
     setVendorPrice(0); setMrp(0); setPricePreview(null);
+    setShowcaseReviews([]);
+    setNewReviewAuthor('');
+    setNewReviewRating(5);
+    setNewReviewTitle('');
+    setNewReviewComment('');
+    setShowAddReview(false);
     // Default modal channel matches active section tab if specific
     const initialChannel = activeTab === 'quick_commerce' ? 'quick_commerce' : 'traditional';
     setFulfillmentType(initialChannel);
@@ -112,6 +143,15 @@ export const VendorProducts: React.FC = () => {
     setEditingId(p.id || p._id);
     setName(p.name || '');
     setBrand(p.brand || '');
+    const { desc, reviews } = parseDescriptionAndReviews(p.description || '');
+    setDescription(desc);
+    setShowcaseReviews(reviews || []);
+    setNewReviewAuthor('');
+    setNewReviewRating(5);
+    setNewReviewTitle('');
+    setNewReviewComment('');
+    setShowAddReview(false);
+
     setPrice(Number(p.basePrice || 0));
     setVendorPrice(Number(p.vendorPrice || p.basePrice || 0));
     setMrp(Number(p.mrp || 0));
@@ -179,9 +219,15 @@ export const VendorProducts: React.FC = () => {
         tags.push('rx');
       }
 
+      let finalDescription = (description || '').trim();
+      if (showcaseReviews && showcaseReviews.length > 0) {
+        finalDescription += `\n<!--SHOWCASE_REVIEWS:${JSON.stringify(showcaseReviews)}-->`;
+      }
+
       const payload: any = {
         name,
         brand: brand || undefined,
+        description: finalDescription || undefined,
         basePrice: price,
         vendorPrice: vendorPrice > 0 ? vendorPrice : price,
         mrp: mrp > 0 ? mrp : undefined,
@@ -631,6 +677,21 @@ export const VendorProducts: React.FC = () => {
               />
             </div>
 
+            {/* Product Description */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-700">Product Description & Highlights</label>
+                <span className="text-[10px] text-gray-400">Shown prominently on product detail page</span>
+              </div>
+              <textarea
+                rows={3}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Detailed product specifications, key features, materials, warranty, usage or cooking instructions..."
+                className="w-full px-3.5 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 resize-y"
+              />
+            </div>
+
             {/* Category Dropdown (Dynamically Loaded from Admin categories) */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -747,6 +808,148 @@ export const VendorProducts: React.FC = () => {
                 onChange={e => setImageFile(e.target.files?.[0] || null)}
                 className="w-full px-3 py-2 border rounded-xl text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
               />
+            </div>
+
+            {/* Showcase Reviews & Testimonials Section (Option 3) */}
+            <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Star size={15} className="fill-amber-400 text-amber-500" />
+                  <span className="text-xs font-bold text-gray-800">Showcase Reviews &amp; Testimonials</span>
+                </div>
+                <span className="text-[10px] text-amber-800 bg-amber-100/70 font-semibold px-2 py-0.5 rounded-full">
+                  {showcaseReviews.length} added
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 leading-normal">
+                Add authentic verified customer feedback to display on your product detail page. Customers cannot tamper with or delete these.
+              </p>
+
+              {/* List of currently added showcase reviews */}
+              {showcaseReviews.length > 0 && (
+                <div className="space-y-2">
+                  {showcaseReviews.map((rev, idx) => (
+                    <div key={idx} className="p-2.5 bg-white rounded-xl border border-amber-200/60 flex items-start justify-between gap-2 shadow-2xs">
+                      <div className="flex flex-col text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-gray-900">{rev.name}</span>
+                          <div className="flex text-amber-400">
+                            {Array.from({ length: rev.rating }).map((_, i) => (
+                              <Star key={i} size={10} className="fill-amber-400 text-amber-400" />
+                            ))}
+                          </div>
+                          {rev.title && <span className="text-[11px] font-semibold text-gray-700">· {rev.title}</span>}
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5 leading-snug">{rev.comment}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowcaseReviews(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-red-400 hover:text-red-600 p-1 shrink-0"
+                        title="Remove review"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New Review Sub-form */}
+              {showAddReview ? (
+                <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-800">Add Customer Review</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddReview(false)}
+                      className="text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Customer Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Rahul S. / Verified Customer"
+                        value={newReviewAuthor}
+                        onChange={e => setNewReviewAuthor(e.target.value)}
+                        className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Rating (1 to 5 Stars)</label>
+                      <select
+                        value={newReviewRating}
+                        onChange={e => setNewReviewRating(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white"
+                      >
+                        <option value={5}>★★★★★ (5 Stars)</option>
+                        <option value={4}>★★★★☆ (4 Stars)</option>
+                        <option value={3}>★★★☆☆ (3 Stars)</option>
+                        <option value={2}>★★☆☆☆ (2 Stars)</option>
+                        <option value={1}>★☆☆☆☆ (1 Star)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Review Headline (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Excellent quality and fast shipping"
+                      value={newReviewTitle}
+                      onChange={e => setNewReviewTitle(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Customer Feedback / Comment</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Product was delivered in perfect condition. Value for money!"
+                      value={newReviewComment}
+                      onChange={e => setNewReviewComment(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newReviewComment.trim()) {
+                        alert('Please enter review comment.');
+                        return;
+                      }
+                      setShowcaseReviews(prev => [
+                        ...prev,
+                        {
+                          name: newReviewAuthor.trim() || 'Verified Buyer',
+                          rating: newReviewRating || 5,
+                          title: newReviewTitle.trim() || 'Verified Customer Review',
+                          comment: newReviewComment.trim()
+                        }
+                      ]);
+                      setNewReviewAuthor('');
+                      setNewReviewRating(5);
+                      setNewReviewTitle('');
+                      setNewReviewComment('');
+                      setShowAddReview(false);
+                    }}
+                    className="w-full py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs"
+                  >
+                    + Add to Product Reviews
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowAddReview(true)}
+                  className="w-full py-2 bg-white hover:bg-amber-50 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus size={14} /> Add Showcase Review / Testimonial
+                </button>
+              )}
             </div>
 
             {/* Buttons */}

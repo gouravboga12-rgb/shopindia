@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Gift, HelpCircle, Briefcase, Award, CreditCard, Smartphone, Wallet } from 'lucide-react';
+import { CreditCard, Smartphone, Wallet } from 'lucide-react';
 
 export const DesktopFooter: React.FC = () => {
   const { currentVertical } = useApp();
@@ -66,27 +66,8 @@ export const DesktopFooter: React.FC = () => {
 
       {/* Lower footer info links */}
       <div className="max-w-7xl mx-auto px-12 py-6 flex flex-wrap justify-between items-center gap-4">
-        <div className="flex items-center gap-6 text-sm font-semibold text-slate-200">
-          <a href="/vendor/register" className="flex items-center gap-2 hover:text-white transition-colors">
-            <Briefcase size={14} className="text-brand-orange" />
-            <span>Become a Seller</span>
-          </a>
-          <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
-            <Award size={14} className="text-brand-orange" />
-            <span>Advertise</span>
-          </a>
-          <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
-            <Gift size={14} className="text-brand-orange" />
-            <span>Gift Cards</span>
-          </a>
-          <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
-            <HelpCircle size={14} className="text-brand-orange" />
-            <span>Help Center</span>
-          </a>
-        </div>
-
         <div className="text-gray-400">
-          <span>© 2026 ShopIndia.com. Created with React & Tailwind.</span>
+          <span>© 2026 ShopIndia.com. All rights reserved.</span>
         </div>
 
         <div className="flex items-center gap-3 text-zinc-400">

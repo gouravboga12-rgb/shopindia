@@ -126,7 +126,7 @@ export const VerticalShopMobile: React.FC = () => {
 
   useEffect(() => {
     api.get<{ banners: any[] }>('/api/banners')
-      .then(d => setBanners(d.banners.filter((b: any) => b.vertical === 'shop')))
+      .then(d => setBanners(d.banners || []))
       .catch(console.error);
   }, []);
 

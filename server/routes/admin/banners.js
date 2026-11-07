@@ -103,4 +103,50 @@ router.patch('/:id/toggle', async (req, res) => {
   }
 });
 
+// GET /api/admin/banners/spotlight
+router.get('/spotlight', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'spotlight_brand_promo' }
+    });
+    let spotlight = null;
+    if (setting && setting.value) {
+      try { spotlight = JSON.parse(setting.value); } catch (e) {}
+    }
+    if (!spotlight) {
+      spotlight = {
+        badge: 'Partnership',
+        title: 'Active Jordan series',
+        subtitle: 'Claim premium cashbacks instantly.',
+        actionText: 'Shop Now',
+        actionLink: 'shoes',
+        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format',
+        partnerTitle: 'Plus Guaranteed Partner',
+        partnerSub: '1-day fast delivery',
+        partnerNote: 'Enjoy 1-day delivery and special discount prices on items displaying the ShopIndia Assured badge.',
+        isActive: true
+      };
+    }
+    res.json({ spotlight });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/banners/spotlight
+router.post('/spotlight', async (req, res) => {
+  try {
+    const data = req.body;
+    const value = JSON.stringify(data);
+    await prisma.appSetting.upsert({
+      where: { key: 'spotlight_brand_promo' },
+      update: { value, updatedAt: new Date(), updatedBy: req.user?.id || req.user?.userId },
+      create: { key: 'spotlight_brand_promo', value, description: 'Storefront right sidebar spotlight brand promotion', updatedBy: req.user?.id || req.user?.userId }
+    });
+    res.json({ success: true, spotlight: data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

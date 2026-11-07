@@ -30,7 +30,6 @@ export const DesktopHeader: React.FC = () => {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
-  const [logoLoaded, setLogoLoaded] = useState(true);
   const suggestionRef = useRef<HTMLDivElement>(null);
   const { products } = useProducts();
   const unreadNotificationsCount = notifications.filter(n => !n.read).length;
@@ -209,38 +208,9 @@ export const DesktopHeader: React.FC = () => {
 
       {/* Main Header Container */}
       <div className="w-full flex items-center justify-between px-12 py-3.5 transition-colors duration-300 bg-transparent text-brand-graphite">
-        <div className="flex items-center gap-10 w-full max-w-5xl">
-          {/* Logo Container */}
-          <div onClick={() => navigateTo('home')} className="flex flex-col cursor-pointer shrink-0">
-            {currentVertical === 'services' ? (
-              <img
-                src={servicesImg}
-                alt="Glacons Services"
-                className="h-12 object-contain transition-all"
-              />
-            ) : logoLoaded ? (
-              <img
-                src="/logo.png"
-                alt="ShopIndia"
-                className="h-14 object-contain transition-all"
-                onError={() => setLogoLoaded(false)}
-              />
-            ) : (
-              <span className="text-xl font-extrabold tracking-tight italic flex items-center gap-1 text-brand-graphite">
-                ShopIndia
-                {currentVertical === 'quick' && <span className="text-xs uppercase font-black tracking-widest px-1.5 py-0.5 rounded bg-brand-green/10 text-brand-green not-italic">10M</span>}
-              </span>
-            )}
-            {currentVertical === 'shop' && (
-              <span className="text-xs tracking-wider uppercase font-black text-brand-orange hover:underline flex items-center gap-0.5 leading-none mt-0.5">
-                Explore <span className="text-brand-blue">Plus</span>
-                <Sparkles size={8} className="fill-brand-blue text-brand-blue animate-pulse" />
-              </span>
-            )}
-          </div>
-
+        <div className="flex items-center gap-6 w-full max-w-5xl">
           {/* Highlighted Prominent Search Bar */}
-          <div ref={suggestionRef} className="relative w-full max-w-xl">
+          <div ref={suggestionRef} className="relative w-full max-w-2xl">
             <div className={`flex w-full rounded-2xl items-center border-2 transition-all duration-200 bg-[#F1F3F6] hover:bg-white focus-within:bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] focus-within:shadow-[0_4px_20px_rgba(40,116,240,0.15)] overflow-hidden pl-3.5 pr-1.5 py-1 ${
               currentVertical === 'quick'
                 ? 'border-orange-300 hover:border-orange-500 focus-within:border-brand-orange focus-within:ring-4 focus-within:ring-orange-500/15'

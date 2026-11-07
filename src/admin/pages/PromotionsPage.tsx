@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Image as ImageIcon, Plus, Trash2, Power, Eye } from 'lucide-react';
+import { Image as ImageIcon, Plus, Trash2, Power, Eye, Check, Save, Sparkles, Award } from 'lucide-react';
 
 export const PromotionsPage: React.FC = () => {
   const [banners, setBanners] = useState<any[]>([]);
@@ -9,15 +9,73 @@ export const PromotionsPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({ title: '', subtitle: '', image: '', vertical: 'shop', isActive: true });
 
+  // Spotlight Brand Promo State
+  const [spotlightForm, setSpotlightForm] = useState({
+    badge: 'Partnership',
+    title: 'Active Jordan series',
+    subtitle: 'Claim premium cashbacks instantly.',
+    actionText: 'Shop Now',
+    actionLink: 'shoes',
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format',
+    partnerTitle: 'Plus Guaranteed Partner',
+    partnerSub: '1-day fast delivery',
+    partnerNote: 'Enjoy 1-day delivery and special discount prices on items displaying the ShopIndia Assured badge.',
+    isActive: true
+  });
+  const [spotlightUploading, setSpotlightUploading] = useState(false);
+  const [spotlightSaving, setSpotlightSaving] = useState(false);
+  const [spotlightSavedSuccess, setSpotlightSavedSuccess] = useState(false);
+
   const load = () => {
     setLoading(true);
-    api.get<{ banners: any[] }>('/api/admin/banners')
-      .then(d => setBanners(d.banners))
+    Promise.all([
+      api.get<{ banners: any[] }>('/api/admin/banners').catch(() => ({ banners: [] })),
+      api.get<{ spotlight: any }>('/api/admin/banners/spotlight').catch(() => ({ spotlight: null }))
+    ])
+      .then(([bannersRes, spotlightRes]) => {
+        setBanners(bannersRes.banners || []);
+        if (spotlightRes.spotlight) {
+          setSpotlightForm(prev => ({ ...prev, ...spotlightRes.spotlight }));
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
+
+  const handleSaveSpotlight = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSpotlightSaving(true);
+    setSpotlightSavedSuccess(false);
+    try {
+      await api.post('/api/admin/banners/spotlight', spotlightForm);
+      setSpotlightSavedSuccess(true);
+      setTimeout(() => setSpotlightSavedSuccess(false), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save spotlight promo');
+    } finally {
+      setSpotlightSaving(false);
+    }
+  };
+
+  const handleSpotlightImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSpotlightUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await api.post<{ imageUrl: string }>('/api/admin/banners/upload-image', formData);
+      setSpotlightForm(prev => ({ ...prev, image: res.imageUrl }));
+    } catch (error: any) {
+      alert(`Upload failed: ${error.message}`);
+    } finally {
+      setSpotlightUploading(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,6 +239,187 @@ export const PromotionsPage: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Dynamic Spotlight Brand Promotion Section */}
+      <div className="pt-8 border-t border-gray-200">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles size={20} className="text-amber-500" />
+              <h2 className="text-xl font-bold text-gray-900">Spotlight Brand Promotion</h2>
+            </div>
+            <p className="text-sm text-gray-500">
+              Manage the dedicated right-sidebar promotional card (like the Jordan card) shown on the main storefront
+            </p>
+          </div>
+          <button
+            onClick={handleSaveSpotlight}
+            disabled={spotlightSaving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow font-bold text-sm transition-all"
+          >
+            {spotlightSavedSuccess ? (
+              <>
+                <Check size={16} className="text-emerald-300" /> Saved to Storefront!
+              </>
+            ) : spotlightSaving ? (
+              'Saving...'
+            ) : (
+              <>
+                <Save size={16} /> Save Spotlight Promo
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Edit Form */}
+          <form onSubmit={handleSaveSpotlight} className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Badge Tag</label>
+                <input
+                  type="text"
+                  value={spotlightForm.badge}
+                  onChange={e => setSpotlightForm({ ...spotlightForm, badge: e.target.value })}
+                  placeholder="e.g. Partnership, New Arrival, Hot Deal"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Action Button Text</label>
+                <input
+                  type="text"
+                  value={spotlightForm.actionText}
+                  onChange={e => setSpotlightForm({ ...spotlightForm, actionText: e.target.value })}
+                  placeholder="e.g. Shop Now, Explore, View Deals"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-700 mb-1">Spotlight Title</label>
+                <input
+                  type="text"
+                  required
+                  value={spotlightForm.title}
+                  onChange={e => setSpotlightForm({ ...spotlightForm, title: e.target.value })}
+                  placeholder="e.g. Active Jordan series"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-700 mb-1">Subtitle / Cashback Callout</label>
+                <input
+                  type="text"
+                  value={spotlightForm.subtitle}
+                  onChange={e => setSpotlightForm({ ...spotlightForm, subtitle: e.target.value })}
+                  placeholder="e.g. Claim premium cashbacks instantly."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-700 mb-1">Action Link / Search Query</label>
+                <input
+                  type="text"
+                  value={spotlightForm.actionLink}
+                  onChange={e => setSpotlightForm({ ...spotlightForm, actionLink: e.target.value })}
+                  placeholder="e.g. shoes, electronics, or /search"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-3">
+                <label className="block text-xs font-bold text-gray-700 mb-1">Spotlight Promo Image</label>
+                <div className="flex items-center gap-4">
+                  {spotlightForm.image && (
+                    <div className="w-20 h-24 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-neutral-900">
+                      <img src={spotlightForm.image} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSpotlightImageUpload}
+                      disabled={spotlightUploading}
+                      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    {spotlightUploading && <p className="text-xs text-blue-600 mt-1 animate-pulse">Uploading to S3...</p>}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <hr className="flex-1 border-gray-100" />
+                  <span className="text-[10px] text-gray-400 font-bold uppercase">OR PASTE URL</span>
+                  <hr className="flex-1 border-gray-100" />
+                </div>
+                <input
+                  type="url"
+                  value={spotlightForm.image}
+                  onChange={e => setSpotlightForm({ ...spotlightForm, image: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div className="md:col-span-2 flex items-center justify-between pt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={spotlightForm.isActive}
+                    onChange={e => setSpotlightForm({ ...spotlightForm, isActive: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Display card on storefront sidebar</span>
+                </label>
+              </div>
+            </div>
+          </form>
+
+          {/* Live Preview Column */}
+          <div className="flex flex-col gap-4">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Live Storefront Preview</span>
+            <div className="w-full max-w-sm bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col gap-3">
+              <span className="font-bold text-xs tracking-widest text-gray-400 uppercase">Spotlight Brand</span>
+              <div className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-inner group cursor-pointer bg-neutral-900">
+                <img
+                  src={spotlightForm.image || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format'}
+                  alt="Spotlight Ad"
+                  className="w-full h-full object-cover opacity-75"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent flex flex-col justify-end p-5 text-white">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400 bg-orange-50/15 border border-amber-400/20 px-2 py-0.5 rounded w-max mb-1.5">
+                    {spotlightForm.badge || 'Partnership'}
+                  </span>
+                  <h4 className="text-base font-bold leading-tight mb-1">{spotlightForm.title || 'Active Jordan series'}</h4>
+                  <p className="text-[10.5px] text-zinc-300 leading-normal mb-4 font-medium">
+                    {spotlightForm.subtitle || 'Claim premium cashbacks instantly.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="px-5 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs tracking-wide w-max shadow uppercase"
+                  >
+                    {spotlightForm.actionText || 'Shop Now'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full max-w-sm bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                <Award size={16} />
+              </div>
+              <div className="flex flex-col text-xs leading-tight">
+                <span className="font-bold text-gray-800">ShopIndia Guaranteed Partner</span>
+                <span className="text-gray-500">1-day fast delivery</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
