@@ -37,8 +37,9 @@ const OverviewTab: React.FC<{ vendorId: string }> = ({ vendorId }) => {
 
   if (loading) return <div className="h-32 skeleton-shimmer rounded-2xl" />;
 
+  const nonPendingStatuses = ['delivered', 'cancelled', 'refunded', 'returned', 'failed'];
   const pending = data?.ordersByStatus
-    ?.filter((s: any) => !['delivered', 'cancelled'].includes(s._id))
+    ?.filter((s: any) => !nonPendingStatuses.includes(s._id))
     ?.reduce((sum: number, s: any) => sum + s.count, 0) || 0;
 
   return (

@@ -146,7 +146,7 @@ router.get('/:id/overview', restrictView, async (req, res) => {
     const [orders, vendor] = await Promise.all([
       prisma.order.findMany({
         where: { vendorId },
-        select: { total: true, status: true, paymentStatus: true, createdAt: true },
+        select: { total: true, status: true, paymentStatus: true, createdAt: true, refundAmount: true },
       }),
       prisma.vendor.findUnique({
         where: { id: vendorId },
@@ -154,9 +154,21 @@ router.get('/:id/overview', restrictView, async (req, res) => {
       }),
     ]);
 
-    const activeOrders = orders.filter(o => o.status !== 'cancelled');
-    const allTime = activeOrders.reduce(
-      (acc, o) => ({ total: acc.total + (o.total || 0), count: acc.count + 1 }),
+    // Strictly exclude cancelled, refunded, returned, and failed orders from revenue and total order counts
+    const terminalExcludedStatuses = ['cancelled', 'refunded', 'returned', 'failed'];
+    const deliveredOrders = orders.filter(
+      (o) =>
+        (o.status === 'delivered' || o.status === 'confirmed' || o.status === 'processing' || o.status === 'shipped') &&
+        !terminalExcludedStatuses.includes(o.status) &&
+        o.paymentStatus !== 'refunded' &&
+        o.paymentStatus !== 'failed'
+    );
+
+    const allTime = deliveredOrders.reduce(
+      (acc, o) => ({
+        total: Math.round((acc.total + (o.total || 0)) * 100) / 100,
+        count: acc.count + 1,
+      }),
       { total: 0, count: 0 }
     );
 
@@ -251,7 +263,11 @@ router.get('/:id/wallet', restrictView, async (req, res) => {
     if (!vendor) return res.status(404).json({ error: 'Vendor not found.' });
 
     const paidOrders = await prisma.order.findMany({
-      where: { vendorId, paymentStatus: 'paid' },
+      where: {
+        vendorId,
+        paymentStatus: 'paid',
+        status: { notIn: ['cancelled', 'refunded', 'returned'] },
+      },
       select: {
         id: true,
         orderNumber: true,

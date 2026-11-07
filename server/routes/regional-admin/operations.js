@@ -60,8 +60,11 @@ router.get('/dashboard', async (req, res) => {
           ...branchFilter,
         },
       }),
-      // Recent deliveries list
+      // Recent deliveries list - exclude cancelled deliveries from active dispatch pulse
       prisma.delivery.findMany({
+        where: {
+          status: { notIn: ['cancelled'] },
+        },
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -76,15 +79,19 @@ router.get('/dashboard', async (req, res) => {
           },
         },
       }),
-      // Regional orders for GMV calculation
+      // Regional orders for GMV calculation - strictly exclude cancelled and refunded orders
       prisma.order.findMany({
-        where: branchFilter,
+        where: {
+          ...branchFilter,
+          status: { notIn: ['cancelled', 'refunded', 'returned'] },
+          paymentStatus: { in: ['paid', 'completed'] },
+        },
         select: { total: true, createdAt: true, status: true },
         take: 100,
       }),
     ]);
 
-    const regionalGmv = regionalOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const regionalGmv = Math.round(regionalOrders.reduce((sum, o) => sum + (o.total || 0), 0) * 100) / 100;
 
     res.json({
       profile,

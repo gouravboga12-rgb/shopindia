@@ -44,7 +44,10 @@ router.patch('/:vendorId', async (req, res) => {
 router.get('/summary', async (_req, res) => {
   try {
     const orders = await prisma.order.findMany({
-      where: { paymentStatus: 'paid' },
+      where: {
+        paymentStatus: 'paid',
+        status: { notIn: ['cancelled', 'refunded', 'returned'] },
+      },
       include: { vendor: { select: { businessName: true } } },
     });
 

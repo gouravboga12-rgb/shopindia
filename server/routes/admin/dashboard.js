@@ -22,18 +22,33 @@ router.get('/', async (req, res) => {
       prisma.user.count({ where: { role: 'customer', ...branchFilter } }),
       prisma.user.count({ where: { role: 'vendor' } }),
       prisma.user.count({ where: { role: 'rider', ...branchFilter } }),
-      prisma.order.count({ where: branchFilter }),
+      prisma.order.count({
+        where: {
+          status: { notIn: ['cancelled', 'refunded', 'returned'] },
+          paymentStatus: { notIn: ['refunded', 'failed'] },
+          ...branchFilter,
+        },
+      }),
       prisma.vendor.count({ where: { approvalStatus: 'pending' } }),
       prisma.ticket.count({ where: { status: { in: ['open', 'in_progress'] } } }), // Not filtered by branch yet for simplicity
       prisma.order.aggregate({
         _sum: { total: true },
-        where: { paymentStatus: 'paid', ...branchFilter },
+        where: {
+          paymentStatus: 'paid',
+          status: { notIn: ['cancelled', 'refunded', 'returned'] },
+          ...branchFilter,
+        },
       }),
     ]);
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const recentOrders = await prisma.order.findMany({
-      where: { createdAt: { gte: sevenDaysAgo }, ...branchFilter },
+      where: {
+        createdAt: { gte: sevenDaysAgo },
+        status: { notIn: ['cancelled', 'refunded', 'returned'] },
+        paymentStatus: { notIn: ['refunded', 'failed'] },
+        ...branchFilter,
+      },
       select: { createdAt: true, total: true },
     });
 
@@ -107,7 +122,12 @@ router.get('/revenue-chart', async (req, res) => {
       : {};
 
     const orders = await prisma.order.findMany({
-      where: { createdAt: { gte: startDate, lte: endDate }, ...branchFilter },
+      where: {
+        createdAt: { gte: startDate, lte: endDate },
+        status: { notIn: ['cancelled', 'refunded', 'returned'] },
+        paymentStatus: { notIn: ['refunded', 'failed'] },
+        ...branchFilter,
+      },
       select: { createdAt: true, total: true },
     });
 

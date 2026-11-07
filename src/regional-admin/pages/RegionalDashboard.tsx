@@ -469,6 +469,8 @@ export const RegionalDashboard: React.FC = () => {
                         className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] inline-block ${
                           del.status === 'delivered'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : del.status === 'cancelled' || del.order?.status === 'cancelled'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
                             : del.status === 'broadcasted'
                             ? 'bg-orange-50 text-orange-600 border border-orange-200 animate-pulse'
                             : 'bg-blue-50 text-blue-700 border border-blue-200'
