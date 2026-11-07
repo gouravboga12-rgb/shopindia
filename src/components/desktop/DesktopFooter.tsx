@@ -66,20 +66,20 @@ export const DesktopFooter: React.FC = () => {
 
       {/* Lower footer info links */}
       <div className="max-w-7xl mx-auto px-12 py-6 flex flex-wrap justify-between items-center gap-4">
-        <div className="flex items-center gap-6 text-sm font-semibold text-brand-graphite">
-          <a href="/vendor/register" className="flex items-center gap-2 hover:text-brand-blue transition-colors">
+        <div className="flex items-center gap-6 text-sm font-semibold text-slate-200">
+          <a href="/vendor/register" className="flex items-center gap-2 hover:text-white transition-colors">
             <Briefcase size={14} className="text-brand-orange" />
             <span>Become a Seller</span>
           </a>
-          <a href="#" className="flex items-center gap-2 hover:text-brand-blue transition-colors">
+          <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
             <Award size={14} className="text-brand-orange" />
             <span>Advertise</span>
           </a>
-          <a href="#" className="flex items-center gap-2 hover:text-brand-blue transition-colors">
+          <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
             <Gift size={14} className="text-brand-orange" />
             <span>Gift Cards</span>
           </a>
-          <a href="#" className="flex items-center gap-2 hover:text-brand-blue transition-colors">
+          <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
             <HelpCircle size={14} className="text-brand-orange" />
             <span>Help Center</span>
           </a>

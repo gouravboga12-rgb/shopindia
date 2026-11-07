@@ -212,7 +212,13 @@ export const DesktopHeader: React.FC = () => {
         <div className="flex items-center gap-10 w-full max-w-5xl">
           {/* Logo Container */}
           <div onClick={() => navigateTo('home')} className="flex flex-col cursor-pointer shrink-0">
-            {logoLoaded ? (
+            {currentVertical === 'services' ? (
+              <img
+                src={servicesImg}
+                alt="Glacons Services"
+                className="h-12 object-contain transition-all"
+              />
+            ) : logoLoaded ? (
               <img
                 src="/logo.png"
                 alt="ShopIndia"
@@ -223,7 +229,6 @@ export const DesktopHeader: React.FC = () => {
               <span className="text-xl font-extrabold tracking-tight italic flex items-center gap-1 text-brand-graphite">
                 ShopIndia
                 {currentVertical === 'quick' && <span className="text-xs uppercase font-black tracking-widest px-1.5 py-0.5 rounded bg-brand-green/10 text-brand-green not-italic">10M</span>}
-                {currentVertical === 'services' && <span className="text-xs uppercase font-black tracking-widest px-1.5 py-0.5 rounded bg-services-gold/15 text-services-gold not-italic">PRO</span>}
               </span>
             )}
             {currentVertical === 'shop' && (
@@ -307,7 +312,7 @@ export const DesktopHeader: React.FC = () => {
           {/* Notifications Button */}
           <button 
             onClick={() => navigateTo('notifications')}
-            className={`flex items-center gap-2 py-2 px-3 rounded-button transition-all hover:bg-slate-100 ${theme.buttonBg.replace('bg-', 'hover:bg-').replace('text-white', 'text-brand-graphite')}`}
+            className="flex items-center gap-2 py-2 px-3 rounded-button transition-all hover:bg-slate-100 text-brand-graphite cursor-pointer"
           >
             <div className="relative">
               <Bell size={18} />
@@ -317,13 +322,13 @@ export const DesktopHeader: React.FC = () => {
                 </span>
               )}
             </div>
-            <span className={currentVertical === 'services' ? 'text-white' : ''}>Alerts</span>
+            <span>Alerts</span>
           </button>
 
           {/* Wishlist Button */}
           <button 
             onClick={() => navigateTo('wishlist')}
-            className={`flex items-center gap-2 py-2 px-3 rounded-button transition-all hover:bg-slate-100 cursor-pointer ${theme.buttonBg.replace('bg-', 'hover:bg-').replace('text-white', 'text-brand-graphite')}`}
+            className="flex items-center gap-2 py-2 px-3 rounded-button transition-all hover:bg-slate-100 text-brand-graphite cursor-pointer"
             title="My Wishlist"
           >
             <div className="relative">
@@ -334,7 +339,7 @@ export const DesktopHeader: React.FC = () => {
                 </span>
               )}
             </div>
-            <span className={currentVertical === 'services' ? 'text-white' : ''}>Wishlist</span>
+            <span>Wishlist</span>
           </button>
 
           {/* Profile Dropdown */}

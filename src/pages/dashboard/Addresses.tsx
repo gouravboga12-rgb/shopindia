@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useCustomer } from '../../context/CustomerContext';
 import { PageHeader, EmptyState, Badge, PrimaryButton, fieldCls } from '../../components/dashboard/DashboardUI';
-import { MapPin, Pencil, Trash2, Home, Briefcase, Map as MapIcon, Check, X } from 'lucide-react';
+import { MapPin, Pencil, Trash2, Home, Briefcase, Map as MapIcon, Check, X, Navigation, RefreshCw } from 'lucide-react';
+import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
 import type { Address, AddressType } from '../../data/dashboardTypes';
 
 const typeIcon = (t: AddressType) => (t === 'home' ? <Home className="w-4 h-4" /> : t === 'work' ? <Briefcase className="w-4 h-4" /> : <MapIcon className="w-4 h-4" />);
@@ -14,9 +15,40 @@ export const AddressesPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
+  const [detectingGps, setDetectingGps] = useState(false);
+  const [gpsMessage, setGpsMessage] = useState<string | null>(null);
+
   function blank(): Omit<Address, 'id'> {
     return { label: 'Home', type: 'home', fullName: '', mobile: '', line1: '', line2: '', city: '', state: '', country: 'India', pincode: '', landmark: '', isDefault: false };
   }
+
+  const handleAutoDetectGPS = async () => {
+    setDetectingGps(true);
+    setGpsMessage(null);
+    try {
+      const geo = await detectCurrentLocationWithMapbox();
+      const detectedPincode = geo.pincode || '';
+      const detectedCity = geo.city || geo.district || '';
+      const detectedState = geo.state || '';
+      const detectedRoad = [geo.road, geo.colony || geo.neighborhood || geo.village].filter(Boolean).join(', ');
+      const detectedLandmark = geo.mandal || geo.neighborhood || '';
+
+      setForm((f) => ({
+        ...f,
+        pincode: detectedPincode || f.pincode,
+        city: detectedCity || f.city,
+        state: detectedState || f.state,
+        line1: detectedRoad || geo.formattedAddress || f.line1,
+        landmark: detectedLandmark || f.landmark,
+      }));
+      setGpsMessage('Current GPS location detected and filled successfully!');
+      setTimeout(() => setGpsMessage(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Unable to detect GPS location. Please check location permissions in your browser.');
+    } finally {
+      setDetectingGps(false);
+    }
+  };
 
   const startAdd = () => { setForm(blank()); setEditing(null); setOpen(true); };
   const startEdit = (a: Address) => { const { id, ...rest } = a; void id; setForm(rest); setEditing(a); setOpen(true); };
@@ -89,8 +121,46 @@ export const AddressesPage: React.FC = () => {
           <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-white rounded-card shadow-elevated max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-brand-graphite font-heading">{editing ? 'Edit Address' : 'Add Address'}</h3>
-              <button onClick={() => setOpen(false)} className="text-brand-slate hover:text-brand-graphite"><X className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setOpen(false)} className="text-brand-slate hover:text-brand-graphite cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
+
+            {/* Auto GPS Detection Button */}
+            <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-100/80 text-blue-600 rounded-xl">
+                  <Navigation className={`w-4 h-4 ${detectingGps ? 'animate-spin' : ''}`} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-800">Auto-Detect via GPS</p>
+                  <p className="text-[11px] text-slate-500">Automatically fills pincode, city, state, & street address</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleAutoDetectGPS}
+                disabled={detectingGps}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                {detectingGps ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>Locating...</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-3 h-3" />
+                    <span>Use Current Location</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {gpsMessage && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>{gpsMessage}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 flex flex-col gap-1">

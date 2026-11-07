@@ -227,7 +227,7 @@ router.post(['/ticket', '/tickets'], async (req, res) => {
         status: 'open',
         refundRequested: isRefundReq,
         refundAmount: isRefundReq && req.body.refundAmount ? parseFloat(req.body.refundAmount) : null,
-        refundStatus: isRefundReq ? 'requested' : 'none',
+        refundStatus: isRefundReq ? 'pending' : 'none',
         messages: {
           create: [
             {

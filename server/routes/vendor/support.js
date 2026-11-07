@@ -204,7 +204,7 @@ router.post('/tickets/:id/request-refund', async (req, res) => {
       data: {
         refundRequested: true,
         refundAmount: amount,
-        refundStatus: 'requested',
+        refundStatus: 'pending',
         // Escalate to Tier 2 (Regional) or Tier 3 (Super Admin)
         tier: ticket.regionId ? 2 : 3,
         escalatedAt: new Date(),
