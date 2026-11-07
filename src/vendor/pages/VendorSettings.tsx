@@ -476,47 +476,46 @@ export const VendorSettings: React.FC = () => {
                 </div>
               </div>
 
-              {/* Delivery Radius Slider */}
+              {/* Delivery Radius Slider (Strict 5 km - 10 km Limit) */}
               <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-emerald-600" />
-                      Quick Commerce Delivery Radius
+                      Quick Commerce Delivery Radius (5 - 10 km)
                     </h4>
                     <p className="text-xs text-gray-500">
-                      Customers within this distance from your store will see your quick items.
+                      Nearby customers within this 5–10 km radius can purchase your store products for instant quick shopping. Shop India products appear pan-India.
                     </p>
                   </div>
                   <span className="text-base font-extrabold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-lg">
-                    {form.deliveryRadiusKm || 5} km
+                    {Math.min(10, Math.max(5, form.deliveryRadiusKm || 5))} km
                   </span>
                 </div>
 
                 <input
                   type="range"
                   min="5"
-                  max="100"
+                  max="10"
                   step="1"
-                  value={form.deliveryRadiusKm || 25}
+                  value={Math.min(10, Math.max(5, form.deliveryRadiusKm || 5))}
                   onChange={e => setForm({ ...form, deliveryRadiusKm: parseFloat(e.target.value) })}
                   className="w-full accent-emerald-600 cursor-pointer"
                 />
                 <div className="flex justify-between items-center text-[11px] font-semibold text-gray-500 pt-1">
-                  <span>5 km (Ultra local)</span>
-                  <span>25 km (Standard Hub)</span>
-                  <span>50 km (Metro Zone)</span>
-                  <span>100 km (Regional Max)</span>
+                  <span>5 km (Ultra Local)</span>
+                  <span>7.5 km (City Zone)</span>
+                  <span>10 km (Maximum Quick Radius)</span>
                 </div>
-                <div className="flex items-center gap-2 pt-1">
-                  {[10, 25, 50, 100].map(rad => (
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
+                  {[5, 6, 7, 8, 9, 10].map(rad => (
                     <button
                       key={rad}
                       type="button"
                       onClick={() => setForm({ ...form, deliveryRadiusKm: rad })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                        form.deliveryRadiusKm === rad
-                          ? 'bg-emerald-600 text-white border-emerald-600'
+                      className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        (form.deliveryRadiusKm || 5) === rad
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
                       }`}
                     >

@@ -108,20 +108,29 @@ async function createShiprocketOrder({ order, vendor }) {
   }
 
   try {
-    const shippingAddress = order.shippingAddress || {};
+    const customer = order.customer || {};
+    const deliveryAddress = [order.deliveryLine1, order.deliveryLine2].filter(Boolean).join(', ') || order.shippingAddress?.street || 'Customer Delivery Address';
+    const deliveryCity = order.deliveryCity || order.shippingAddress?.city || 'Hyderabad';
+    const deliveryPincode = order.deliveryPincode || order.shippingAddress?.pincode || '500001';
+    const deliveryState = order.deliveryState || order.shippingAddress?.state || 'Telangana';
+    const customerName = customer.name || order.shippingAddress?.name || 'Customer';
+    const customerPhone = customer.phone || order.shippingAddress?.phone || '9999999999';
+    const customerEmail = customer.email || order.shippingAddress?.email || 'customer@example.com';
+    const pickupLocation = vendor?.businessName || `Store_${vendor?.id?.slice(0, 6) || 'Main'}`;
+
     const payload = {
       order_id: order.orderNumber,
       order_date: new Date().toISOString().slice(0, 10),
-      pickup_location: vendor?.businessName || 'Primary_Warehouse',
-      billing_customer_name: shippingAddress.name || 'Customer',
+      pickup_location: pickupLocation,
+      billing_customer_name: customerName,
       billing_last_name: '',
-      billing_address: shippingAddress.street || 'Delivery Address',
-      billing_city: shippingAddress.city || 'Hyderabad',
-      billing_pincode: shippingAddress.pincode || '500001',
-      billing_state: shippingAddress.state || 'Telangana',
+      billing_address: deliveryAddress,
+      billing_city: deliveryCity,
+      billing_pincode: deliveryPincode,
+      billing_state: deliveryState,
       billing_country: 'India',
-      billing_email: shippingAddress.email || 'customer@example.com',
-      billing_phone: shippingAddress.phone || '9999999999',
+      billing_email: customerEmail,
+      billing_phone: customerPhone,
       shipping_is_billing: true,
       order_items: (order.items || []).map((item) => ({
         name: item.name,

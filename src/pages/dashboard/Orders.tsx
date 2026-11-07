@@ -174,7 +174,10 @@ export const OrdersPage: React.FC = () => {
   const orderVert = openOrder ? getOrderVertical(openOrder) : 'shop';
   const milestoneInfo = openOrder ? getMilestoneProgress(openOrder.status, orderVert) : { milestones: [], currentIndex: 0 };
   const activeOtp = openOrder ? (orderOtps[openOrder.id] || (openOrder as any).deliveryOtp || (openOrder as any).delivery?.deliveryOtp || null) : null;
-  const cancelable = openOrder ? ['pending', 'placed', 'confirmed', 'processing', 'packing'].includes(openOrder.status) : false;
+  const cancelable = openOrder ? (
+    ['pending', 'placed', 'confirmed', 'processing', 'packing'].includes(openOrder.status) &&
+    !['picked_up', 'arrived_customer', 'delivered'].includes((openOrder as any).delivery?.status || '')
+  ) : false;
 
   return (
     <div className="space-y-6 text-left">

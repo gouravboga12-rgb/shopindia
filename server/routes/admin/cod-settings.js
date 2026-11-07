@@ -189,6 +189,7 @@ router.get('/riders', async (req, res) => {
         branch: r.branch?.name || r.branch?.city || 'Unassigned',
         codCashFloat: float,
         codFloatLimit: limit,
+        walletBalance: r.walletBalance || 0,
         unremittedDeliveriesCount: unremittedCount,
         complianceStatus,
         reason,
@@ -526,6 +527,75 @@ router.post('/remittances/:id/verify-bank', async (req, res) => {
     });
   } catch (err) {
     console.error('[Admin COD Verify Bank] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/cod-settings/riders/:id/send-alert
+ * Super Admin or Regional Admin sends a due clearance alert to rider.
+ */
+router.post('/riders/:id/send-alert', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customMessage } = req.body;
+    const rider = await prisma.riderProfile.findUnique({
+      where: { id },
+      include: { user: { select: { id: true, name: true, phone: true } } },
+    });
+
+    if (!rider) return res.status(404).json({ error: 'Rider not found.' });
+
+    const float = rider.codCashFloat || 0;
+    const msg = customMessage?.trim() || `Urgent: You have an outstanding cash due of ₹${float.toLocaleString('en-IN')}. Please complete more delivery rides to offset your cash balance and avoid account suspension.`;
+
+    if (rider.userId) {
+      await prisma.userNotification.create({
+        data: {
+          userId: rider.userId,
+          category: 'cod_alert',
+          title: '⚠️ COD Cash Due Reminder',
+          message: msg,
+          channel: 'in_app',
+          isRead: false,
+          link: '/rider/wallet',
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Alert successfully sent to rider ${rider.user?.name || ''}!`,
+    });
+  } catch (err) {
+    console.error('[Admin COD Alert] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/cod-settings/riders/:id/toggle-active
+ * Suspend or reactivate a rider.
+ */
+router.patch('/riders/:id/toggle-active', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rider = await prisma.riderProfile.findUnique({ where: { id } });
+    if (!rider) return res.status(404).json({ error: 'Rider not found.' });
+
+    const newActiveState = !rider.isActive;
+    const updated = await prisma.riderProfile.update({
+      where: { id },
+      data: { isActive: newActiveState },
+    });
+
+    res.json({
+      success: true,
+      isActive: updated.isActive,
+      message: `Rider account is now ${updated.isActive ? 'Active & Receiving Orders' : 'Suspended / Blocked from Orders'}.`,
+    });
+  } catch (err) {
+    console.error('[Admin COD Toggle Rider] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -21,6 +21,7 @@ router.post('/create-shipment', verifyToken, async (req, res) => {
       include: {
         items: true,
         vendor: true,
+        customer: { select: { id: true, name: true, phone: true, email: true } },
         shiprocketShipment: true,
       },
     });

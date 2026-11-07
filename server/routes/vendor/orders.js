@@ -364,5 +364,113 @@ router.post('/:id/broadcast', async (req, res) => {
   }
 });
 
+/** POST /api/vendor/orders/:id/handover — Vendor confirms physical package handover to rider */
+router.post('/:id/handover', async (req, res) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, vendorId: req.user.vendorId },
+      include: { delivery: true },
+    });
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+    if (!order.delivery) return res.status(400).json({ error: 'No delivery assigned to this order.' });
+
+    await prisma.$transaction([
+      prisma.delivery.update({
+        where: { id: order.delivery.id },
+        data: { status: 'picked_up', pickedUpAt: new Date() },
+      }),
+      prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'in_transit' },
+      }),
+    ]);
+
+    res.json({ success: true, message: 'Handover confirmed! Order is out for delivery with the rider.' });
+  } catch (err) {
+    console.error('Handover order error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /api/vendor/orders/:id/cancel — Vendor cancels order with mandatory reason */
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Cancellation reason is strictly mandatory.' });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, vendorId: req.user.vendorId },
+      include: { items: true, delivery: true },
+    });
+
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+    if (order.status === 'delivered') {
+      return res.status(400).json({ error: 'Delivered orders cannot be cancelled.' });
+    }
+    if (order.status === 'in_transit' && order.type === 'quick_commerce' && order.delivery?.status === 'picked_up') {
+      return res.status(400).json({ error: 'Order has already been handed over to rider and is in transit.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Update order status and record reason
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'cancelled',
+          refundReason: reason.trim(),
+        },
+      });
+
+      // 2. Restock items
+      for (const it of order.items) {
+        if (it.productId) {
+          await tx.product.update({
+            where: { id: it.productId },
+            data: {
+              stock: { increment: it.quantity },
+              isOutOfStock: false,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      // 3. If quick commerce delivery was scheduled, cancel delivery
+      if (order.delivery) {
+        await tx.delivery.update({
+          where: { id: order.delivery.id },
+          data: { status: 'cancelled' },
+        }).catch(() => {});
+      }
+    });
+
+    // 4. Notify customer
+    if (order.customerId) {
+      const isPrepaid = order.paymentStatus === 'paid';
+      const refundMsg = isPrepaid ? ' Your refund will be processed back to your original payment method in 3–5 working days.' : '';
+      await prisma.userNotification.create({
+        data: {
+          userId: order.customerId,
+          category: 'order',
+          title: `Order #${order.orderNumber} Cancelled by Store`,
+          message: `The store cancelled your order. Reason: "${reason.trim()}".${refundMsg}`,
+          channel: 'in_app',
+          isRead: false,
+          link: `/orders/${order.id}`,
+        },
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      message: 'Order cancelled successfully. Customer has been notified with the reason, and inventory has been restocked.',
+    });
+  } catch (err) {
+    console.error('Vendor cancel order error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 

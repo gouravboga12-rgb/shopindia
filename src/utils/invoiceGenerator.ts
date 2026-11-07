@@ -347,6 +347,25 @@ export function generateAndPrintInvoice(order: InvoiceOrderData) {
         <div style="font-size:10px;color:#94a3b8;">For ${vendorName}</div>
       </div>
     </div>
+
+    <!-- BOX PACKING SLIP & RIDER PICKUP CODE -->
+    <div style="margin-top:28px; border-top:2px dashed #94a3b8; padding-top:20px; page-break-inside:avoid;">
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:14px 18px; border-radius:8px; border:1px solid #cbd5e1;">
+        <div>
+          <span style="font-size:10px; font-weight:800; text-transform:uppercase; color:#475569; letter-spacing:1px;">📦 PARCEL PACKING SLIP (CUT &amp; PASTE ON BOX OR WRITE WITH PEN)</span>
+          <div style="font-size:18px; font-weight:900; color:#0f172a; margin-top:2px;">Order #${orderNum}</div>
+          <div style="font-size:11px; color:#475569; margin-top:3px; max-width:480px; line-height:1.4;">
+            <strong>Deliver To:</strong> ${customerName} ${customerPhone ? `(${customerPhone})` : ''}<br>
+            <strong>Destination:</strong> ${addressText}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#059669; letter-spacing:0.5px;">STORE PICKUP CODE</div>
+          <div style="font-size:24px; font-weight:900; color:#059669; font-family:monospace; letter-spacing:1px;">PK-${orderNum.slice(-4)}</div>
+          <div style="font-size:10px; color:#64748b; margin-top:2px;">Verify rider details &amp; hand over</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>

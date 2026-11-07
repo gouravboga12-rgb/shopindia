@@ -18,6 +18,10 @@ export const VendorOrders: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [channelFilter, setChannelFilter] = useState<'all' | 'quick_commerce' | 'traditional'>('all');
+  const [cancelModalOrder, setCancelModalOrder] = useState<any | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
 
   const load = () => {
     setLoading(true);
@@ -75,6 +79,35 @@ export const VendorOrders: React.FC = () => {
     }
   };
 
+  const handleConfirmHandover = async (orderId: string) => {
+    setActionLoadingId(orderId);
+    try {
+      await api.post(`/api/vendor/orders/${orderId}/handover`, {});
+      setSuccessToast(`Handover confirmed! Order #${orders.find(o => o.id === orderId)?.orderNumber || orderId} handed to rider. 🛵`);
+      load();
+    } catch (err: any) {
+      alert(err.message || 'Failed to confirm handover');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleExecuteCancel = async () => {
+    if (!cancelModalOrder || !cancelReason.trim()) return;
+    setIsCancelling(true);
+    try {
+      await api.post(`/api/vendor/orders/${cancelModalOrder.id}/cancel`, { reason: cancelReason.trim() });
+      setSuccessToast(`Order #${cancelModalOrder.orderNumber} cancelled. Inventory restocked & customer notified.`);
+      setCancelModalOrder(null);
+      setCancelReason('');
+      load();
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel order');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!orderToDelete) return;
     setDeleteLoading(true);
@@ -98,6 +131,9 @@ export const VendorOrders: React.FC = () => {
   };
 
   const filtered = orders.filter(o => {
+    const matchesChannel = channelFilter === 'all' ||
+      (channelFilter === 'quick_commerce' ? o.type === 'quick_commerce' : o.type !== 'quick_commerce');
+
     const matchesQ = !q ||
       o.orderNumber?.toLowerCase().includes(q.toLowerCase()) ||
       o.id?.toLowerCase().includes(q.toLowerCase()) ||
@@ -107,7 +143,7 @@ export const VendorOrders: React.FC = () => {
       o.items?.some((item: any) => item.name?.toLowerCase().includes(q.toLowerCase()) || item.product?.name?.toLowerCase().includes(q.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
-    return matchesQ && matchesStatus;
+    return matchesChannel && matchesQ && matchesStatus;
   });
 
   return (
@@ -135,6 +171,42 @@ export const VendorOrders: React.FC = () => {
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           <span>Refresh Orders</span>
+        </button>
+      </div>
+
+      {/* Channel Selector Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => setChannelFilter('all')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            channelFilter === 'all'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          All Channels ({orders.length})
+        </button>
+        <button
+          onClick={() => setChannelFilter('quick_commerce')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            channelFilter === 'quick_commerce'
+              ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
+              : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
+          }`}
+        >
+          <Zap size={13} className="fill-current" />
+          <span>⚡ Quick Shopping (Hyperlocal) ({orders.filter(o => o.type === 'quick_commerce').length})</span>
+        </button>
+        <button
+          onClick={() => setChannelFilter('traditional')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            channelFilter === 'traditional'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-white text-blue-700 border border-blue-200 hover:bg-blue-50'
+          }`}
+        >
+          <Truck size={13} />
+          <span>🇮🇳 Shop India (Pan-India) ({orders.filter(o => o.type !== 'quick_commerce').length})</span>
         </button>
       </div>
 
@@ -370,144 +442,187 @@ export const VendorOrders: React.FC = () => {
 
                     {/* Fulfillment Actions */}
                     <td className="px-4 py-4 align-top">
-                      <div className="flex flex-col gap-1.5">
-                        {o.status === 'placed' && (
-                          <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => updateStatus(o.id, 'confirmed')}
-                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
-                          >
-                            Confirm Order
-                          </button>
-                        )}
-                        {o.status === 'confirmed' && (
-                          <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => updateStatus(o.id, 'packing')}
-                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
-                          >
-                            Start Packing
-                          </button>
-                        )}
-                        {/* Multi-channel Quick-Commerce / 3PL Dispatch Controls */}
-                        {o.type === 'quick_commerce' && (o.status === 'confirmed' || o.status === 'packing' || o.status === 'ready_to_ship' || o.status === 'placed') && (
-                          <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => handleBroadcastToRiders(o.id)}
-                            className="px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-extrabold rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shadow-sm flex items-center gap-1 active:scale-95"
-                            title="Broadcast to online riders within operational radius"
-                          >
-                            <Bike size={13} className="stroke-[2.5]" />
-                            <span>🚀 Broadcast to Riders</span>
-                          </button>
-                        )}
-
-                        {o.delivery && (
-                          <div className="flex flex-col gap-1.5 mt-1">
-                            {o.delivery.riderProfile?.user ? (
-                              <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-slate-800 flex items-center justify-between gap-2 shadow-2xs">
-                                <div className="flex items-center gap-2">
-                                  <div className="p-1.5 bg-emerald-500 text-white rounded-lg shadow-2xs">
-                                    <Bike size={13} />
-                                  </div>
-                                  <div>
-                                    <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                                      <span>{o.delivery.riderProfile.user.name}</span>
-                                      <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded capitalize">
-                                        {o.delivery.riderProfile.vehicleType || 'Bike'}
-                                      </span>
+                      <div className="flex flex-col gap-2">
+                        {/* ⚡ Quick Commerce Pipeline */}
+                        {o.type === 'quick_commerce' ? (
+                          <div className="flex flex-col gap-2">
+                            {/* Handshake / Pickup Code & Handover */}
+                            {o.delivery?.riderProfile?.user ? (
+                              <div className="p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-emerald-500 text-white rounded-lg">
+                                      <Bike size={13} />
                                     </div>
-                                    {o.delivery.riderProfile.user.phone && (
-                                      <a
-                                        href={`tel:${o.delivery.riderProfile.user.phone}`}
-                                        className="text-[11px] text-emerald-700 font-mono font-semibold hover:underline flex items-center gap-1 mt-0.5"
-                                      >
-                                        <Phone size={10} />
-                                        <span>{o.delivery.riderProfile.user.phone}</span>
-                                      </a>
-                                    )}
+                                    <div>
+                                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                        <span>{o.delivery.riderProfile.user.name}</span>
+                                        <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded capitalize">
+                                          {o.delivery.riderProfile.vehicleType || 'Bike'}
+                                        </span>
+                                      </div>
+                                      {o.delivery.riderProfile.user.phone && (
+                                        <a
+                                          href={`tel:${o.delivery.riderProfile.user.phone}`}
+                                          className="text-[11px] text-emerald-700 font-mono font-semibold hover:underline flex items-center gap-1 mt-0.5"
+                                        >
+                                          <Phone size={10} />
+                                          <span>{o.delivery.riderProfile.user.phone}</span>
+                                        </a>
+                                      )}
+                                    </div>
                                   </div>
+                                  <button
+                                    onClick={() => setTrackingOrderId(o.id)}
+                                    className="px-2 py-1 bg-white hover:bg-emerald-100/50 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                  >
+                                    <Zap size={10} className="fill-emerald-500 text-emerald-500" />
+                                    <span>Track</span>
+                                  </button>
                                 </div>
 
-                                <button
-                                  onClick={() => setTrackingOrderId(o.id)}
-                                  className="px-2.5 py-1 bg-white hover:bg-emerald-100/50 text-emerald-900 border border-emerald-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
-                                  title="Track rider live GPS position"
-                                >
-                                  <Zap size={11} className="fill-emerald-500 text-emerald-500" />
-                                  <span>Track GPS</span>
-                                </button>
+                                {/* Pickup Code Box & Confirm Handover Button */}
+                                {o.delivery.status !== 'picked_up' && o.delivery.status !== 'arrived_customer' && o.delivery.status !== 'delivered' && o.status !== 'delivered' && (
+                                  <div className="bg-white p-2 rounded-lg border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div>
+                                      <span className="text-[10px] font-bold text-gray-500 uppercase block">Store Pickup Code</span>
+                                      <span className="font-mono font-black text-emerald-700 text-sm tracking-wider">
+                                        PK-{o.orderNumber?.slice(-4) || '0000'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      disabled={actionLoadingId === o.id}
+                                      onClick={() => handleConfirmHandover(o.id)}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                                      title="Confirm rider verified the items and picked up the order"
+                                    >
+                                      {actionLoadingId === o.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                      <span>🤝 Confirm Handover</span>
+                                    </button>
+                                  </div>
+                                )}
+
+                                {o.delivery.status === 'picked_up' || o.delivery.status === 'arrived_customer' ? (
+                                  <div className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200 flex items-center gap-1">
+                                    <Bike size={12} />
+                                    <span>Out for Delivery with Rider</span>
+                                  </div>
+                                ) : null}
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <button
-                                  onClick={() => setTrackingOrderId(o.id)}
-                                  className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
-                                  title="Track rider live GPS position"
-                                >
-                                  <Bike size={11} className="text-orange-600" />
-                                  <span>Track Rider</span>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                </button>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-                                  <Zap size={10} className="fill-orange-500 text-orange-500" />
-                                  <span>{o.delivery.status === 'broadcasted' ? 'Searching Nearby Riders' : o.delivery.status}</span>
-                                </span>
+                              /* Broadcast / Searching Nearby Riders */
+                              <div className="space-y-1.5">
+                                {(o.status === 'confirmed' || o.status === 'packing' || o.status === 'placed') && (
+                                  <button
+                                    disabled={actionLoadingId === o.id}
+                                    onClick={() => handleBroadcastToRiders(o.id)}
+                                    className="w-full px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-extrabold rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shadow-sm flex items-center justify-center gap-1 active:scale-95"
+                                  >
+                                    <Bike size={13} className="stroke-[2.5]" />
+                                    <span>🚀 Broadcast to Riders</span>
+                                  </button>
+                                )}
+                                {o.delivery?.status === 'broadcasted' && (
+                                  <div className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                    <span>Searching nearby riders (within 10 km)…</span>
+                                  </div>
+                                )}
                               </div>
+                            )}
+
+                            {o.status === 'delivered' && (
+                              <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                                <CheckCircle2 size={12} /> Delivered via Customer OTP
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          /* 🇮🇳 Traditional E-Commerce / Courier Pipeline */
+                          <div className="flex flex-col gap-1.5">
+                            {o.status === 'placed' && (
+                              <button
+                                disabled={actionLoadingId === o.id}
+                                onClick={() => updateStatus(o.id, 'confirmed')}
+                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                              >
+                                Confirm Order
+                              </button>
+                            )}
+                            {o.status === 'confirmed' && (
+                              <button
+                                disabled={actionLoadingId === o.id}
+                                onClick={() => updateStatus(o.id, 'packing')}
+                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                              >
+                                Start Packing
+                              </button>
+                            )}
+                            {(o.status === 'confirmed' || o.status === 'packing' || o.status === 'ready_to_ship' || o.status === 'placed') && (
+                              <button
+                                disabled={actionLoadingId === o.id}
+                                onClick={() => handleShipViaShiprocket(o.id)}
+                                className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-extrabold rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shadow-sm flex items-center gap-1 active:scale-95"
+                                title="Generate Shiprocket AWB tracking number & shipping label"
+                              >
+                                <Truck size={13} />
+                                <span>📦 Ship via Shiprocket</span>
+                              </button>
+                            )}
+                            {o.shiprocketShipment?.awbCode && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                                <Box size={10} />
+                                <span>AWB: {o.shiprocketShipment.awbCode}</span>
+                              </span>
+                            )}
+                            {o.status === 'packing' && (
+                              <button
+                                disabled={actionLoadingId === o.id}
+                                onClick={() => updateStatus(o.id, 'ready_to_ship')}
+                                className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                              >
+                                Mark Ready to Ship
+                              </button>
+                            )}
+                            {o.status === 'ready_to_ship' && (
+                              <button
+                                disabled={actionLoadingId === o.id}
+                                onClick={() => updateStatus(o.id, 'shipped')}
+                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                              >
+                                Dispatch / Ship
+                              </button>
+                            )}
+                            {o.status === 'shipped' && (
+                              <button
+                                disabled={actionLoadingId === o.id}
+                                onClick={() => updateStatus(o.id, 'delivered')}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                              >
+                                Mark Delivered
+                              </button>
+                            )}
+                            {o.status === 'delivered' && (
+                              <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                                <CheckCircle2 size={12} /> Completed
+                              </span>
                             )}
                           </div>
                         )}
 
-                        {o.type === 'traditional' && (o.status === 'confirmed' || o.status === 'packing' || o.status === 'ready_to_ship' || o.status === 'placed') && (
+                        {/* Store Cancellation Button (Available before delivery) */}
+                        {o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'refunded' && (
                           <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => handleShipViaShiprocket(o.id)}
-                            className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-extrabold rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shadow-sm flex items-center gap-1 active:scale-95"
-                            title="Generate Shiprocket AWB tracking number & shipping label"
+                            onClick={() => {
+                              setCancelReason('');
+                              setCancelModalOrder(o);
+                            }}
+                            className="px-2 py-1 text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 mt-1"
+                            title="Cancel order before handover / dispatch"
                           >
-                            <Truck size={13} />
-                            <span>📦 Ship via Shiprocket</span>
+                            <X size={12} />
+                            <span>Cancel Order</span>
                           </button>
-                        )}
-
-                        {o.shiprocketShipment?.awbCode && (
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
-                            <Box size={10} />
-                            <span>AWB: {o.shiprocketShipment.awbCode}</span>
-                          </span>
-                        )}
-
-                        {o.status === 'packing' && (
-                          <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => updateStatus(o.id, 'ready_to_ship')}
-                            className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
-                          >
-                            Mark Ready to Ship
-                          </button>
-                        )}
-                        {o.status === 'ready_to_ship' && (
-                          <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => updateStatus(o.id, 'shipped')}
-                            className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
-                          >
-                            Dispatch / Ship
-                          </button>
-                        )}
-                        {o.status === 'shipped' && (
-                          <button
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => updateStatus(o.id, 'delivered')}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-xs"
-                          >
-                            Mark Delivered
-                          </button>
-                        )}
-                        {o.status === 'delivered' && (
-                          <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-                            <CheckCircle2 size={12} /> Completed
-                          </span>
                         )}
                       </div>
                     </td>
@@ -637,6 +752,114 @@ export const VendorOrders: React.FC = () => {
                     <>
                       <Trash2 className="w-4 h-4" />
                       <span>OK, Delete Order</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STICKY CANCEL ORDER MODAL */}
+      {cancelModalOrder && (
+        <div
+          className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-red-100 overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-600 to-rose-700 px-6 py-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/30">
+                  <X className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black font-heading">Cancel Order #{cancelModalOrder.orderNumber}</h3>
+                  <p className="text-xs text-white/80">Mandatory cancellation reason required</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCancelModalOrder(null)}
+                className="text-white/80 hover:text-white p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                  <AlertTriangle size={13} className="text-amber-600" />
+                  Store Cancellation Notice:
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  Cancelling will immediately restock inventory, notify the customer that prepaid funds will be refunded in 3–5 working days, and cancel any active rider dispatch.
+                </p>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Select common reason or type below:
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {[
+                    'Item out of stock / damaged',
+                    'Store closed temporarily',
+                    'Item specification mismatch',
+                    'Customer requested cancellation',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCancelReason(preset)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
+                        cancelReason === preset
+                          ? 'bg-red-50 text-red-700 border-red-300'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Enter detailed reason for cancellation (mandatory)..."
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isCancelling}
+                  onClick={() => setCancelModalOrder(null)}
+                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  Back (Keep Order)
+                </button>
+                <button
+                  type="button"
+                  disabled={isCancelling || !cancelReason.trim()}
+                  onClick={handleExecuteCancel}
+                  className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-red-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Cancelling…</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4" />
+                      <span>Confirm Cancellation</span>
                     </>
                   )}
                 </button>

@@ -10,6 +10,7 @@ const router = express.Router();
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
+const { registerPickupLocation } = require('../../lib/shiprocket');
 
 router.use(verifyToken, requireRole('vendor'));
 
@@ -141,12 +142,12 @@ router.put('/', async (req, res) => {
     if (logo !== undefined) updateData.logo = logo?.trim() || null;
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
-    // Hyper-local quick commerce settings
+    // Hyper-local quick commerce settings: strictly locked to 5 km - 10 km
     if (lat !== undefined) updateData.lat = lat !== null && lat !== '' ? parseFloat(lat) : null;
     if (lng !== undefined) updateData.lng = lng !== null && lng !== '' ? parseFloat(lng) : null;
     if (deliveryRadiusKm !== undefined) {
       const radius = parseFloat(deliveryRadiusKm);
-      updateData.deliveryRadiusKm = isNaN(radius) || radius <= 0 ? 5 : radius;
+      updateData.deliveryRadiusKm = isNaN(radius) || radius <= 0 ? 5 : Math.min(10, Math.max(5, radius));
     }
     if (supportsQuick !== undefined) updateData.supportsQuick = Boolean(supportsQuick);
 
@@ -161,6 +162,13 @@ router.put('/', async (req, res) => {
       where: { id: vendorId },
       data: updateData,
     });
+
+    // Auto-sync vendor store address as Shiprocket 3PL pickup location
+    if (updatedVendor.street && updatedVendor.city && updatedVendor.pincode) {
+      registerPickupLocation(updatedVendor).catch(err =>
+        console.warn('[VendorSettings] Background Shiprocket pickup registration warning:', err.message)
+      );
+    }
 
     // Write audit log if banking or UPI details were modified
     if (bankChanged) {

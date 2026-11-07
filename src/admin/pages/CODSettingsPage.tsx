@@ -12,7 +12,12 @@ import {
   Search,
   Bike,
   CreditCard,
-  Download
+  Download,
+  Phone,
+  MessageCircle,
+  Bell,
+  UserX,
+  UserCheck
 } from 'lucide-react';
 
 interface CODSettings {
@@ -33,6 +38,7 @@ interface MonitoredRider {
   branch: string;
   codCashFloat: number;
   codFloatLimit: number;
+  walletBalance?: number;
   unremittedDeliveriesCount: number;
   complianceStatus: 'compliant' | 'warning' | 'overdue_paused';
   reason: string;
@@ -310,6 +316,32 @@ export const CODSettingsPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleSendRiderAlert = async (rider: MonitoredRider) => {
+    try {
+      const res: any = await api.post(`/api/admin/cod-settings/riders/${rider.id}/send-alert`, {
+        customMessage: `Urgent: You have an outstanding cash due of ₹${rider.codCashFloat.toLocaleString('en-IN')}. Please complete more delivery rides to offset this balance, or your account will be suspended.`,
+      });
+      alert(res.message || `Alert sent to rider ${rider.name} successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to send alert to rider');
+    }
+  };
+
+  const handleToggleRiderActive = async (rider: MonitoredRider) => {
+    const confirmMsg = rider.isActive
+      ? `Are you sure you want to SUSPEND rider ${rider.name}? They will be blocked from receiving new orders until their cash due is settled.`
+      : `Reactivate rider ${rider.name} to receive orders?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res: any = await api.patch(`/api/admin/cod-settings/riders/${rider.id}/toggle-active`, {});
+      alert(res.message || 'Rider status updated!');
+      fetchSettingsAndRiders();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update rider status');
+    }
   };
 
   const filteredRiders = riders.filter((r) => {
@@ -772,63 +804,133 @@ export const CODSettingsPage: React.FC = () => {
                       <th className="py-3 px-4">Rider Profile</th>
                       <th className="py-3 px-4">Territory / Branch</th>
                       <th className="py-3 px-4">Floating Cash</th>
-                      <th className="py-3 px-4">Unremitted Orders</th>
+                      <th className="py-3 px-4">Wallet Balance / Due</th>
                       <th className="py-3 px-4">Compliance Status</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
+                      <th className="py-3 px-4 text-right">Recovery Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRiders.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900">{r.name}</div>
-                          <div className="text-[11px] text-slate-400 font-mono">{r.phone} • {r.vehicleType}</div>
-                        </td>
+                    {filteredRiders.map((r) => {
+                      const cleanPhone = (r.phone || '').replace(/\D/g, '');
+                      const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                      const waMsg = encodeURIComponent(
+                        `Hi ${r.name}, this is ShopIndia Operations. You have an outstanding cash due of ₹${(r.codCashFloat || 0).toLocaleString('en-IN')} (Wallet: ₹${(r.walletBalance || 0).toLocaleString('en-IN')}). Please complete more delivery rides today to offset this balance, or your account may be temporarily paused. Thank you!`
+                      );
 
-                        <td className="py-3.5 px-4 font-semibold text-slate-700">{r.branch}</td>
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900">{r.name}</div>
+                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                              <span>{r.phone} • {r.vehicleType}</span>
+                              <span className={`w-2 h-2 rounded-full ${r.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} title={r.isActive ? 'Active' : 'Suspended'} />
+                            </div>
+                          </td>
 
-                        <td className="py-3.5 px-4">
-                          <span className="font-black text-slate-900 font-mono text-sm">
-                            ₹{r.codCashFloat.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-[11px] text-slate-400 block font-normal">
-                            Limit: ₹{r.codFloatLimit.toLocaleString('en-IN')}
-                          </span>
-                        </td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-700">{r.branch}</td>
 
-                        <td className="py-3.5 px-4 font-semibold text-slate-700">
-                          {r.unremittedDeliveriesCount} orders
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          {r.complianceStatus === 'compliant' && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                              Compliant
+                          <td className="py-3.5 px-4">
+                            <span className="font-black text-slate-900 font-mono text-sm">
+                              ₹{r.codCashFloat.toLocaleString('en-IN')}
                             </span>
-                          )}
-                          {r.complianceStatus === 'warning' && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                              Approaching Limit
+                            <span className="text-[11px] text-slate-400 block font-normal">
+                              Limit: ₹{r.codFloatLimit.toLocaleString('en-IN')}
                             </span>
-                          )}
-                          {r.complianceStatus === 'overdue_paused' && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">
-                              Radar Paused
-                            </span>
-                          )}
-                        </td>
+                          </td>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRider(r)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg text-[11px] transition-colors cursor-pointer"
-                          >
-                            Force Clear
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="py-3.5 px-4">
+                            <span className={`font-black font-mono text-xs px-2 py-0.5 rounded-md ${
+                              (r.walletBalance || 0) < 0
+                                ? 'bg-red-50 text-red-700 border border-red-200'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            }`}>
+                              ₹{(r.walletBalance || 0).toLocaleString('en-IN')} {(r.walletBalance || 0) < 0 ? 'DUE' : ''}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            {r.complianceStatus === 'compliant' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                Compliant
+                              </span>
+                            )}
+                            {r.complianceStatus === 'warning' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                Approaching Limit
+                              </span>
+                            )}
+                            {r.complianceStatus === 'overdue_paused' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">
+                                Radar Paused
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              {/* Call */}
+                              {r.phone && (
+                                <a
+                                  href={`tel:${r.phone}`}
+                                  className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                                  title="Call Rider directly"
+                                >
+                                  <Phone className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+
+                              {/* WhatsApp */}
+                              {cleanPhone.length >= 10 && (
+                                <a
+                                  href={`https://wa.me/${waPhone}?text=${waMsg}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                                  title="Open WhatsApp chat with prefilled warning"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+
+                              {/* Send In-App Alert */}
+                              <button
+                                type="button"
+                                onClick={() => handleSendRiderAlert(r)}
+                                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                title="Send push alert to rider phone"
+                              >
+                                <Bell className="w-3 h-3 text-amber-600" />
+                                <span>Alert</span>
+                              </button>
+
+                              {/* Suspend / Reactivate */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleRiderActive(r)}
+                                className={`px-2 py-1 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                                  r.isActive
+                                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                }`}
+                                title={r.isActive ? 'Suspend rider from receiving orders' : 'Reactivate rider account'}
+                              >
+                                {r.isActive ? <UserX className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+                                <span>{r.isActive ? 'Suspend' : 'Activate'}</span>
+                              </button>
+
+                              {/* Force Clear */}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRider(r)}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg text-[10.5px] transition-colors cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

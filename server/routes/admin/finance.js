@@ -283,7 +283,7 @@ router.get('/settlements', async (req, res) => {
         take: limitNum,
       }),
       prisma.payoutRequest.findMany({
-        where: { status: { in: ['approved', 'processed', 'completed'] } },
+        where: { status: { in: ['approved', 'processing', 'completed'] } },
         include: {
           vendor: { select: { businessName: true } },
           riderProfile: { include: { user: { select: { name: true } } } },

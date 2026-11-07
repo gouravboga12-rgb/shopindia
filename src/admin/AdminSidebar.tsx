@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
   Building2, ShieldCheck, MapPin, Headphones, Percent, LogOut,
   Truck, Tag, BarChart3, Bell, LayoutGrid, Image, Globe2,
-  DollarSign, CreditCard, Bike, Banknote, Wrench
+  DollarSign, CreditCard, Bike, Banknote, Wrench, AlertOctagon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -19,10 +19,10 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'view_dashboard' },
     { id: 'finance', label: 'Finance Center', icon: DollarSign, perm: 'manage_commissions' },
     { id: 'payouts-vendors', label: 'Merchant Payouts', icon: Store, perm: 'manage_commissions' },
-    { id: 'payouts-fleet', label: 'Fleet & Service Payouts', icon: Bike, perm: 'manage_commissions' },
+    { id: 'payouts-fleet', label: 'Rider & Tech Bank Withdrawals', icon: Bike, perm: 'manage_commissions' },
     { id: 'accounts', label: 'Accounts & Statements', icon: CreditCard, perm: 'manage_commissions' },
-    { id: 'cod-settings', label: 'COD & Cash Clearance', icon: Banknote, perm: 'manage_commissions' },
-    { id: 'commissions', label: 'Pricing & Commission', icon: Percent, perm: 'manage_commissions' },
+    { id: 'cod-settings', label: 'Rider Cash Float & Due Recovery', icon: Banknote, perm: 'manage_commissions' },
+    { id: 'commissions', label: 'Delivery Charges & Rider Pay', icon: Percent, perm: 'manage_commissions' },
     { id: 'regional-admins', label: 'Regional Admins', icon: Globe2, perm: 'manage_users' },
     { id: 'vendors', label: 'Vendors', icon: Store, perm: 'view_vendors' },
     { id: 'riders', label: 'Riders Operations', icon: Truck, perm: 'view_users' },
@@ -30,6 +30,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'products', label: 'Products Catalog', icon: Package, perm: 'view_products' },
     { id: 'services', label: 'Services & Repairs', icon: Wrench, perm: 'view_products' },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, perm: 'view_orders' },
+    { id: 'canceled-orders', label: 'Canceled Orders & Refunds', icon: AlertOctagon, perm: 'view_orders' },
     { id: 'branches', label: 'Branches', icon: Building2, perm: 'view_branches' },
     { id: 'rbac', label: 'RBAC Controls', icon: ShieldCheck, perm: 'manage_users' },
     { id: 'service-areas', label: 'Service Areas', icon: MapPin, perm: 'manage_service_areas' },

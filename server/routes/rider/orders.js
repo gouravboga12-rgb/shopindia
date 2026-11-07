@@ -441,14 +441,37 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
         },
       });
 
+      // Net wallet balance adjustment:
+      // If customer paid offline COD, rider keeps the physical order cash in pocket.
+      // Therefore: Wallet gets +feeToCredit (earning) MINUS orderCash (collected cash in hand).
+      // Example: Wallet was ₹100. Order is ₹200. Rider fee is ₹50. Net wallet change = ₹50 - ₹200 = -₹150.
+      // New wallet balance = ₹100 - ₹150 = -₹50 (Negative balance / Cash Due).
+      const netWalletChange = isCOD && orderCash > 0 ? (feeToCredit - orderCash) : feeToCredit;
+
       await tx.riderProfile.update({
         where: { id: profile.id },
         data: {
-          walletBalance: { increment: feeToCredit },
+          walletBalance: { increment: netWalletChange },
           totalDeliveries: { increment: 1 },
           ...(isCOD && orderCash > 0 ? { codCashFloat: { increment: orderCash } } : {}),
         },
       });
+
+      // If offline cash was collected, log COD_COLLECTION debit entry in ledger
+      if (isCOD && orderCash > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            type: 'DEBIT',
+            party: 'RIDER',
+            partyId: profile.id,
+            amount: orderCash,
+            entryType: 'COD_COLLECTION',
+            orderId: delivery.orderId,
+            description: `Doorstep offline cash collected for Order #${delivery.order?.orderNumber || delivery.orderId}`,
+            riderProfileId: profile.id,
+          },
+        }).catch(err => console.warn('[RiderOrders] Ledger COD debit warning:', err.message));
+      }
 
       // Write immutable ledger entry for this delivery fee credit
       await recordRiderCredit(tx, {

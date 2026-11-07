@@ -27,6 +27,7 @@ import { AccountsPage } from './pages/AccountsPage';
 import { AccountStatementPage } from './pages/AccountStatementPage';
 import { CODSettingsPage } from './pages/CODSettingsPage';
 import { ServicesManagementPage } from './pages/ServicesManagementPage';
+import { CanceledOrdersPage } from './pages/CanceledOrdersPage';
 
 export interface ManagedVendor { id: string; name: string; }
 
@@ -86,6 +87,7 @@ const AdminContent: React.FC = () => {
       case 'products': return <ProductsPage />;
       case 'services': return <ServicesManagementPage />;
       case 'orders': return <OrdersPage />;
+      case 'canceled-orders': return <CanceledOrdersPage />;
       case 'branches': return <BranchesPage />;
       case 'rbac': return <RBACPage />;
       case 'service-areas': return <ServiceAreasPage />;

@@ -357,14 +357,17 @@ router.post('/', async (req, res) => {
       }
     }
 
+    const fulfillmentType = mapType(resolvedVertical);
+    const isQuickOrder = fulfillmentType === 'quick_commerce';
+
     const order = await prisma.order.create({
       data: {
         orderNumber,
         customerId,
         vendorId: resolved.length ? resolved[0].vendorId : null,
         branchId,
-        type: mapType(resolvedVertical),
-        status: 'placed',
+        type: fulfillmentType,
+        status: isQuickOrder ? 'confirmed' : 'placed',
         subtotal,
         discount,
         commission: totalCommission,
@@ -431,6 +434,71 @@ router.post('/', async (req, res) => {
           status: 'captured',
         }
       }).catch(err => console.error('Failed to create PaymentRecord on order placement:', err));
+    }
+
+    // Resolve Customer's stable 4-Digit Master Delivery PIN
+    let masterDeliveryPin = '1234';
+    const customerRecord = customerId
+      ? await prisma.user.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true } })
+      : null;
+
+    if (customerRecord?.phone && customerRecord.phone.replace(/\D/g, '').length >= 4) {
+      masterDeliveryPin = customerRecord.phone.replace(/\D/g, '').slice(-4);
+    } else if (customerId) {
+      let hash = 0;
+      for (let i = 0; i < customerId.length; i++) {
+        hash = (hash * 31 + customerId.charCodeAt(i)) % 9000;
+      }
+      masterDeliveryPin = String(1000 + Math.abs(hash));
+    }
+
+    // Auto-create Delivery record and broadcast to nearby riders immediately for Quick Shopping
+    if (order.type === 'quick_commerce' && order.vendorId) {
+      const vendorRecord = await prisma.vendor.findUnique({
+        where: { id: order.vendorId },
+        select: { id: true, businessName: true, phone: true, street: true, city: true, state: true, pincode: true, lat: true, lng: true },
+      });
+
+      if (vendorRecord) {
+        const pickupLat = vendorRecord.lat || 17.3732;
+        const pickupLng = vendorRecord.lng || 78.5385;
+        const dropoffLat = order.deliveryLat || (pickupLat + 0.015);
+        const dropoffLng = order.deliveryLng || (pickupLng - 0.008);
+        const pickupAddress = [vendorRecord.street, vendorRecord.city, vendorRecord.state, vendorRecord.pincode].filter(Boolean).join(', ') || 'Merchant Store Address';
+        const dropoffAddress = [order.deliveryLine1, order.deliveryCity, order.deliveryState, order.deliveryPincode].filter(Boolean).join(', ') || 'Customer Delivery Address';
+
+        // Distance via Haversine
+        const dLat = ((dropoffLat - pickupLat) * Math.PI) / 180;
+        const dLng = ((dropoffLng - pickupLng) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((pickupLat * Math.PI) / 180) *
+            Math.cos((dropoffLat * Math.PI) / 180) *
+            Math.sin(dLng / 2) *
+            Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const calculatedDist = Math.max(1, Math.round(6371 * c * 10) / 10);
+
+        await prisma.delivery.create({
+          data: {
+            orderId: order.id,
+            status: 'broadcasted',
+            deliveryFee: deliveryFee || 50,
+            distanceKm: calculatedDist,
+            deliveryOtp: masterDeliveryPin,
+            pickupName: vendorRecord.businessName || 'Merchant Store',
+            pickupAddress,
+            pickupLat,
+            pickupLng,
+            pickupPhone: vendorRecord.phone || null,
+            dropoffName: customerRecord?.name || 'Customer',
+            dropoffAddress,
+            dropoffLat,
+            dropoffLng,
+            dropoffPhone: customerRecord?.phone || '9999999999',
+          },
+        }).catch(err => console.error('Auto-broadcast delivery error:', err.message));
+      }
     }
 
     // Save notification to PostgreSQL for the customer
