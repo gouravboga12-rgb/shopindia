@@ -268,7 +268,7 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
             <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
               <Bike className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Delivery Fleet & Technician Payouts</h1>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Delivery Riders & Technician Payouts</h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Review and disburse earnings for Delivery Riders, Home Repair Technicians, and All-Rounders from a single unified wallet.
@@ -300,21 +300,21 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${roleFilter === 'all' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
         >
           <Zap className="w-3.5 h-3.5" />
-          <span>All Fleet & Service</span>
+          <span>All Delivery Riders & Technicians</span>
         </button>
         <button
           onClick={() => setRoleFilter('delivery')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${roleFilter === 'delivery' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
         >
           <Bike className="w-3.5 h-3.5" />
-          <span>Delivery Riders Only</span>
+          <span>Delivery Riders (Quick Commerce)</span>
         </button>
         <button
           onClick={() => setRoleFilter('service')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${roleFilter === 'service' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
         >
           <Wrench className="w-3.5 h-3.5" />
-          <span>Home Service Technicians</span>
+          <span>Service Technicians (Glacons)</span>
         </button>
         <button
           onClick={() => setRoleFilter('both')}
@@ -447,7 +447,7 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
               ) : filteredRequests.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No fleet or technician payout requests found for the selected filters.
+                    No delivery rider or technician payout requests found for the selected filters.
                   </td>
                 </tr>
               ) : (
@@ -582,7 +582,7 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                         <div className="flex items-center justify-end gap-1.5">
                           {onOpenStatement && rider?.id && (
                             <button
-                              onClick={() => onOpenStatement('RIDER', rider.id, user?.name || 'Fleet Partner')}
+                              onClick={() => onOpenStatement('RIDER', rider.id, user?.name || 'Delivery Partner')}
                               className="px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                             >
                               Passbook
@@ -783,8 +783,8 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                   <Bike className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-900">{inspectRider.user?.name || 'Fleet Partner'}</h3>
-                  <p className="text-xs text-slate-500">Fleet Partner Driving License & Identity KYC</p>
+                  <h3 className="font-bold text-base text-slate-900">{inspectRider.user?.name || 'Delivery Partner'}</h3>
+                  <p className="text-xs text-slate-500">Delivery Rider Driving License &amp; Identity KYC</p>
                 </div>
               </div>
               <button onClick={() => setInspectRider(null)} className="text-slate-400 hover:text-slate-600 p-1">✕</button>

@@ -403,7 +403,7 @@ export const CODSettingsPage: React.FC = () => {
               }`}
             >
               <Bike className="w-3.5 h-3.5" />
-              <span>Fleet Custody Monitor</span>
+              <span>Rider Cash Float &amp; Custody</span>
             </button>
 
             <button
@@ -542,7 +542,7 @@ export const CODSettingsPage: React.FC = () => {
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
               <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
-                <span>Fleet Cash in Field</span>
+                <span>Rider Cash in Field</span>
                 <Banknote className="w-4 h-4 text-orange-500" />
               </div>
               <p className="text-2xl font-black text-orange-600 mt-2 font-mono">
@@ -717,7 +717,7 @@ export const CODSettingsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
               <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-                <span>Fleet Cash in Hand</span>
+                <span>Rider Cash in Hand</span>
                 <Banknote className="w-4 h-4 text-emerald-600" />
               </div>
               <p className="text-2xl font-black text-slate-900 mt-2 font-mono">
@@ -754,13 +754,13 @@ export const CODSettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Monitored Fleet Table Section */}
+          {/* Monitored Rider Custody Table Section */}
           <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
             <div className="p-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Bike className="w-5 h-5 text-slate-700" />
-                  Live Fleet Cash Custody & Compliance Monitor
+                  Live Delivery Rider Cash Custody &amp; Compliance Monitor
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Real-time monitoring of all delivery personnel holding customer cash-on-delivery payments.

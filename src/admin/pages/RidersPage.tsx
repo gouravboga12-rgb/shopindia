@@ -94,7 +94,7 @@ export const RidersPage: React.FC = () => {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-heading">Rider & Fleet Operations</h1>
+          <h1 className="text-2xl font-bold text-gray-900 font-heading">Delivery Rider Operations</h1>
           <p className="text-sm text-gray-500">Track operating cities, partner trade roles, live GPS, and COD cash float</p>
         </div>
 
@@ -103,14 +103,14 @@ export const RidersPage: React.FC = () => {
           className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh Fleet</span>
+          <span>Refresh Riders</span>
         </button>
       </div>
 
       {/* KPI Stats Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-premium">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Registered Fleet</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Active Delivery Riders</span>
           <span className="text-xl font-black text-gray-900 font-numbers mt-1 block">{riders.length} Partners</span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-premium">

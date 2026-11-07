@@ -45,8 +45,9 @@ export const VerticalShop: React.FC = () => {
     partnerNote: 'Enjoy 1-day delivery and special discount prices on items displaying the ShopIndia Assured badge.',
     isActive: true
   });
+  const [apiBrands, setApiBrands] = useState<Array<{ id?: string; name: string; logo: string | null; isFeatured?: boolean }>>([]);
 
-  const CURATED_DEFAULT_BRANDS = ['Apple', 'Samsung', 'boAt', 'OnePlus', 'Levi’s', 'Nike', 'Sony', 'Puma'];
+  const normalizeBrand = (str: string) => str.trim().toLowerCase().replace(/[’']/g, "'");
 
   useEffect(() => {
     // 1. Fetch active banners (all active promotions for the carousel)
@@ -91,17 +92,56 @@ export const VerticalShop: React.FC = () => {
         if (d.spotlight) setSpotlightPromo(d.spotlight);
       })
       .catch(() => {});
+
+    // 3. Fetch active brands curated by Admin
+    api.get<{ brands: any[] }>('/api/brands')
+      .then(d => {
+        if (d?.brands && Array.isArray(d.brands)) {
+          setApiBrands(d.brands);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Filter products for this vertical
   const shopProducts = products.filter(p => p.vertical === 'shop');
 
-  // Dynamic sections
+  // Dynamic sections: Curated & Live Brands with normalization (prevents duplicate Levi's)
   const topBrands = React.useMemo(() => {
-    const live = Array.from(new Set(shopProducts.map(p => p.brand))).filter(Boolean) as string[];
-    const combined = Array.from(new Set([...live, ...CURATED_DEFAULT_BRANDS]));
-    return combined.slice(0, 8);
-  }, [shopProducts]);
+    const result: Array<{ name: string; logo?: string | null }> = [];
+    const seen = new Set<string>();
+
+    // 1. Official brands from Database
+    for (const b of apiBrands) {
+      const key = normalizeBrand(b.name);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ name: b.name, logo: b.logo });
+      }
+    }
+
+    // 2. Any active brands from live vendor products
+    for (const p of shopProducts) {
+      if (!p.brand) continue;
+      const key = normalizeBrand(p.brand);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ name: p.brand, logo: BRAND_LOGOS[p.brand] || BRAND_LOGOS[key] || null });
+      }
+    }
+
+    // 3. Fallback defaults if database has not loaded or has few brands
+    const fallbackDefaults = ['Apple', 'Samsung', 'boAt', 'OnePlus', "Levi's", 'Nike', 'Sony', 'Puma'];
+    for (const fb of fallbackDefaults) {
+      const key = normalizeBrand(fb);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ name: fb, logo: BRAND_LOGOS[fb] });
+      }
+    }
+
+    return result.slice(0, 8);
+  }, [apiBrands, shopProducts]);
 
   const justForYou = shopProducts.length > 5 ? shopProducts.slice().sort(() => 0.5 - Math.random()).slice(0, 6) : shopProducts.slice(0, 6);
 
@@ -139,8 +179,11 @@ export const VerticalShop: React.FC = () => {
     customerToggleWishlist(productId);
   };
 
-  // Real dynamic categories matching products for Shop vertical
+  // Real dynamic categories matching products for Shop vertical.
+  // CRITICAL FIX: Any unmapped active products are collected so NO vendor product is ever hidden!
   const populatedCategories = React.useMemo(() => {
+    const mappedProductIds = new Set<string>();
+
     const fromApi = categories
       .filter(cat => (cat.vertical || '').toLowerCase() === 'shop' && cat.isActive !== false)
       .map(category => {
@@ -151,6 +194,7 @@ export const VerticalShop: React.FC = () => {
           const catSlug = (category.slug || '').toLowerCase().trim();
           return pCat === catName || pCat === catSlug || (p.tags && p.tags.includes(category.name));
         });
+        categoryProducts.forEach(p => mappedProductIds.add(p.id));
         return {
           id: category.id,
           name: category.name,
@@ -159,6 +203,42 @@ export const VerticalShop: React.FC = () => {
         };
       })
       .filter(c => c.products.length > 0);
+
+    // Collect any products that didn't match the shop categories so NO product is ever hidden
+    const unmappedProducts = shopProducts.filter(p => !mappedProductIds.has(p.id));
+
+    if (unmappedProducts.length > 0) {
+      const extraMap = new Map<string, typeof shopProducts>();
+      const trulyUncategorized: typeof shopProducts = [];
+
+      for (const p of unmappedProducts) {
+        const rawCat = (p.category || '').trim();
+        if (rawCat && rawCat.toLowerCase() !== 'uncategorized') {
+          if (!extraMap.has(rawCat)) extraMap.set(rawCat, []);
+          extraMap.get(rawCat)!.push(p);
+        } else {
+          trulyUncategorized.push(p);
+        }
+      }
+
+      extraMap.forEach((prods, catTitle) => {
+        fromApi.push({
+          id: `dyn-${catTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+          name: catTitle,
+          image: prods[0]?.image || '',
+          products: prods
+        });
+      });
+
+      if (trulyUncategorized.length > 0) {
+        fromApi.push({
+          id: 'cat-more-marketplace',
+          name: 'More Marketplace Products & New Arrivals',
+          image: trulyUncategorized[0]?.image || '',
+          products: trulyUncategorized
+        });
+      }
+    }
 
     if (fromApi.length > 0) return fromApi;
 
@@ -354,19 +434,19 @@ export const VerticalShop: React.FC = () => {
               </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3.5">
-              {topBrands.map(brand => {
-                const logoUrl = BRAND_LOGOS[brand];
+              {topBrands.map(b => {
+                const logoUrl = b.logo || BRAND_LOGOS[b.name] || BRAND_LOGOS[b.name.replace(/[’']/g, "'")];
                 return (
                   <div
-                    key={brand}
-                    onClick={() => { setSearchQuery(brand); navigateTo('search'); }}
+                    key={b.name}
+                    onClick={() => { setSearchQuery(b.name); navigateTo('search'); }}
                     className="h-20 rounded-xl border border-brand-border/80 bg-slate-50/70 hover:bg-white hover:border-brand-blue/40 flex flex-col items-center justify-center cursor-pointer hover:shadow-soft transition-all group px-2 text-center active:scale-95 gap-1.5"
                   >
                     <div className="h-7 w-full flex items-center justify-center px-2">
                       {logoUrl ? (
                         <img
                           src={logoUrl}
-                          alt={brand}
+                          alt={b.name}
                           onError={(e) => {
                             // If external image fails, hide image and show text badge
                             e.currentTarget.style.display = 'none';
@@ -376,10 +456,10 @@ export const VerticalShop: React.FC = () => {
                           className="max-h-full max-w-[75px] object-contain transition-transform group-hover:scale-105"
                         />
                       ) : null}
-                      <span className={`brand-fallback font-extrabold text-xs text-brand-graphite ${logoUrl ? 'hidden' : 'block'}`}>{brand}</span>
+                      <span className={`brand-fallback font-extrabold text-xs text-brand-graphite ${logoUrl ? 'hidden' : 'block'}`}>{b.name}</span>
                     </div>
                     <span className="font-bold text-[10.5px] text-slate-500 group-hover:text-brand-blue transition-colors line-clamp-1">
-                      {brand}
+                      {b.name}
                     </span>
                   </div>
                 );

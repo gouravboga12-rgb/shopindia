@@ -493,7 +493,7 @@ export const PricingSettingsPage: React.FC = () => {
                   <Layers className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">Hyperlocal Quick Commerce (Rider Fleet)</h3>
+                  <h3 className="text-sm font-bold text-gray-900">Hyperlocal Quick Commerce (Delivery Riders)</h3>
                   <p className="text-xs text-gray-500">Instant 10-30 min grocery & food delivery</p>
                 </div>
               </div>
@@ -604,7 +604,7 @@ export const PricingSettingsPage: React.FC = () => {
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition-colors border border-indigo-200"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Open Fleet & Technician Payouts</span>
+              <span>Open Rider & Technician Payouts</span>
             </a>
           </div>
 

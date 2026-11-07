@@ -43,6 +43,8 @@ export const VendorProducts: React.FC = () => {
   const [isRx, setIsRx] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
+  const [availableBrands, setAvailableBrands] = useState<any[]>([]);
+  const [isCustomBrand, setIsCustomBrand] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [existingImage, setExistingImage] = useState<string>('');
   const [uploading, setUploading] = useState(false);
@@ -91,6 +93,14 @@ export const VendorProducts: React.FC = () => {
     api.get<any[]>('/api/categories')
       .then(res => setCategories(Array.isArray(res) ? res : []))
       .catch(console.error);
+
+    api.get<{ brands: any[] }>('/api/brands')
+      .then(res => {
+        if (res?.brands && Array.isArray(res.brands)) {
+          setAvailableBrands(res.brands);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Live preview pricing resolution
@@ -122,6 +132,7 @@ export const VendorProducts: React.FC = () => {
   const resetForm = () => {
     setEditingId(null);
     setName(''); setBrand(''); setDescription(''); setPrice(0); setStock(10);
+    setIsCustomBrand(false);
     setVendorPrice(0); setMrp(0); setPricePreview(null);
     setShowcaseReviews([]);
     setNewReviewAuthor('');
@@ -142,7 +153,10 @@ export const VendorProducts: React.FC = () => {
   const openEdit = (p: any) => {
     setEditingId(p.id || p._id);
     setName(p.name || '');
-    setBrand(p.brand || '');
+    const currentBrand = p.brand || '';
+    setBrand(currentBrand);
+    const brandMatchesOfficial = availableBrands.some(b => b.name?.toLowerCase() === currentBrand.toLowerCase());
+    setIsCustomBrand(Boolean(currentBrand && !brandMatchesOfficial));
     const { desc, reviews } = parseDescriptionAndReviews(p.description || '');
     setDescription(desc);
     setShowcaseReviews(reviews || []);
@@ -668,13 +682,54 @@ export const VendorProducts: React.FC = () => {
 
             {/* Brand / Producer */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Brand Name (Optional)</label>
-              <input
-                value={brand}
-                onChange={e => setBrand(e.target.value)}
-                placeholder="e.g. Fortune / Tata / Amul / Nestlé"
-                className="w-full px-3.5 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#10B981]/20"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-700">Official Brand (Optional)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomBrand(!isCustomBrand);
+                    if (isCustomBrand) setBrand('');
+                  }}
+                  className="text-[11px] text-indigo-600 font-bold hover:underline cursor-pointer"
+                >
+                  {isCustomBrand ? '← Choose from Verified Brands' : '+ Enter Unlisted / Custom Brand'}
+                </button>
+              </div>
+
+              {!isCustomBrand ? (
+                <select
+                  value={brand}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setIsCustomBrand(true);
+                      setBrand('');
+                    } else {
+                      setBrand(e.target.value);
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="">-- No Brand / Generic / Unbranded --</option>
+                  {availableBrands.map(b => (
+                    <option key={b.id || b.name} value={b.name}>
+                      {b.name} {b.isFeatured ? '★ (Featured Brand)' : ''}
+                    </option>
+                  ))}
+                  <option value="__custom__">+ Other / Not in list...</option>
+                </select>
+              ) : (
+                <div className="space-y-1">
+                  <input
+                    value={brand}
+                    onChange={e => setBrand(e.target.value)}
+                    placeholder="Type unlisted brand name (e.g. Local Organic Farm)"
+                    className="w-full px-3.5 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[10px] text-gray-400">
+                    Entering a custom brand. To be featured on the storefront "Explore Brands" carousel, brand must be verified by Admin.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Product Description */}
