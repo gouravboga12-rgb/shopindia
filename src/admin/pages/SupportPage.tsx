@@ -4,8 +4,10 @@ import {
   Send, X, AlertTriangle,
   DollarSign, Store, User, Clock,
   ShieldCheck, RefreshCw, MessageSquare,
-  Edit2, Trash2, Calendar, Check
+  Edit2, Trash2, Calendar, Check, Search
 } from 'lucide-react';
+
+type FilterTabType = 'all' | 'pending' | 'active' | 'sla_breached' | 'escalated' | 'refund_requests' | 'closed';
 
 export const SupportPage: React.FC = () => {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -13,7 +15,27 @@ export const SupportPage: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replying, setReplying] = useState(false);
-  const [filterTab, setFilterTab] = useState<'all' | 'sla_breached' | 'escalated' | 'refund_requests'>('all');
+  const [filterTab, setFilterTab] = useState<FilterTabType>('all');
+  const [q, setQ] = useState('');
+
+  // Live Counts for Tabs
+  const [counts, setCounts] = useState<{
+    all: number;
+    pending: number;
+    active: number;
+    closed: number;
+    refund: number;
+    breached: number;
+    escalated: number;
+  }>({
+    all: 0,
+    pending: 0,
+    active: 0,
+    closed: 0,
+    refund: 0,
+    breached: 0,
+    escalated: 0,
+  });
 
   // Day-wise / Date Filter State
   const [dateRange, setDateRange] = useState<'all' | 'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom'>('all');
@@ -42,8 +64,11 @@ export const SupportPage: React.FC = () => {
       if (endDate) params.set('endDate', endDate);
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    api.get<{ tickets: any[] }>(`/api/admin/support/tickets${query}`)
-      .then(d => setTickets(d.tickets || []))
+    api.get<{ tickets: any[]; total: number; counts: any }>(`/api/admin/support/tickets${query}`)
+      .then(d => {
+        setTickets(d.tickets || []);
+        if (d.counts) setCounts(d.counts);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -61,9 +86,10 @@ export const SupportPage: React.FC = () => {
         if (endDate) params.set('endDate', endDate);
       }
       const query = params.toString() ? `?${params.toString()}` : '';
-      api.get<{ tickets: any[] }>(`/api/admin/support/tickets${query}`)
+      api.get<{ tickets: any[]; counts: any }>(`/api/admin/support/tickets${query}`)
         .then(d => {
           if (d.tickets) setTickets(d.tickets);
+          if (d.counts) setCounts(d.counts);
         })
         .catch(() => {});
     }, 4000);
@@ -211,12 +237,29 @@ export const SupportPage: React.FC = () => {
     }
   };
 
-  const filteredTickets = tickets;
-  const breachedCount = tickets.filter(t => t.isBreached).length;
-  const refundReqCount = tickets.filter(t => t.refundRequested && t.refundStatus === 'requested').length;
+  const filteredTickets = tickets.filter(t => {
+    if (!q) return true;
+    const search = q.toLowerCase();
+    const ticketNo = (t.ticketNumber || '').toLowerCase();
+    const subject = (t.subject || '').toLowerCase();
+    const customerName = (t.customer?.name || '').toLowerCase();
+    const vendorName = (t.vendor?.businessName || '').toLowerCase();
+    const phone = (t.vendor?.phone || t.customer?.phone || '').toLowerCase();
+    return ticketNo.includes(search) || subject.includes(search) || customerName.includes(search) || vendorName.includes(search) || phone.includes(search);
+  });
+
+  const TABS: Array<{ id: FilterTabType; label: string; count: number; alert?: boolean }> = [
+    { id: 'all', label: 'All Tickets', count: counts.all },
+    { id: 'pending', label: '🟡 Pending Review', count: counts.pending, alert: counts.pending > 0 },
+    { id: 'active', label: '🟢 Active / In Progress', count: counts.active },
+    { id: 'sla_breached', label: '🚨 SLA Breached', count: counts.breached, alert: counts.breached > 0 },
+    { id: 'escalated', label: '⚡ Escalated', count: counts.escalated },
+    { id: 'refund_requests', label: '💳 Refund Requests', count: counts.refund, alert: counts.refund > 0 },
+    { id: 'closed', label: '🔒 Closed & Resolved', count: counts.closed },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -225,7 +268,7 @@ export const SupportPage: React.FC = () => {
             <span>Support &amp; Partner Help Desk Queue</span>
           </h1>
           <p className="text-sm text-gray-500">
-            Unified support queue for Customer and Store Merchant inquiries with live chat, date filters, and refund approvals
+            Unified support queue with pending, active, and closed lifecycle filtering, live chat, and dispute resolution
           </p>
         </div>
 
@@ -238,89 +281,94 @@ export const SupportPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Tabs (Queue Type) */}
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1">
-        {[
-          { id: 'all', label: 'All Tickets', count: tickets.length },
-          { id: 'sla_breached', label: '🚨 SLA Breached', count: breachedCount, alert: breachedCount > 0 },
-          { id: 'escalated', label: '⚡ Escalated (Tier 2/3)' },
-          { id: 'refund_requests', label: '💳 Refund Requests', count: refundReqCount, alert: refundReqCount > 0 },
-        ].map((tab: any) => {
+      {/* Unified Primary Status & Queue Tabs */}
+      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1.5">
+        {TABS.map(tab => {
           const active = filterTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setFilterTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 active
                   ? 'bg-[#0F2C59] text-white shadow-sm'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200/70'
               }`}
             >
               <span>{tab.label}</span>
-              {tab.count != null && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                  tab.alert
-                    ? 'bg-red-500 text-white animate-pulse'
-                    : active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-numbers font-bold ${
+                tab.alert
+                  ? 'bg-red-500 text-white animate-pulse'
+                  : active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {tab.count}
+              </span>
             </button>
           );
         })}
       </div>
 
-      {/* Day-Wise / Date Range Filter Bar */}
+      {/* Compact Search & Day-wise Filter Toolbar */}
       <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5 mr-1">
-            <Calendar className="w-4 h-4 text-indigo-600" />
-            <span>Day-wise Filter:</span>
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Search by ticket #, requester, phone, or subject..."
+            className="w-full pl-9 pr-4 py-2 bg-gray-50/70 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20"
+          />
+        </div>
+
+        {/* Day-Wise Filter Pill Buttons */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500 flex items-center gap-1 mr-1">
+            <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Date:</span>
           </span>
 
           {[
-            { id: 'all', label: 'All Dates' },
+            { id: 'all', label: 'All' },
             { id: 'today', label: 'Today' },
             { id: 'yesterday', label: 'Yesterday' },
-            { id: 'last7days', label: 'Last 7 Days' },
-            { id: 'last30days', label: 'Last 30 Days' },
-            { id: 'custom', label: 'Custom Range' },
+            { id: 'last7days', label: '7 Days' },
+            { id: 'last30days', label: '30 Days' },
+            { id: 'custom', label: 'Custom' },
           ].map((d: any) => (
             <button
               key={d.id}
               type="button"
               onClick={() => setDateRange(d.id as any)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 dateRange === d.id
-                  ? 'bg-[#0F2C59] text-white shadow-xs'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
               }`}
             >
               {d.label}
             </button>
           ))}
-        </div>
 
-        {/* Custom Date Inputs if custom range selected */}
-        {dateRange === 'custom' && (
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800"
-            />
-            <span className="text-xs text-gray-400">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800"
-            />
-          </div>
-        )}
+          {/* Custom Date Pickers */}
+          {dateRange === 'custom' && (
+            <div className="flex items-center gap-1 ml-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+              />
+              <span className="text-xs text-gray-400">-</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tickets Table */}
@@ -344,7 +392,11 @@ export const SupportPage: React.FC = () => {
                 <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 animate-pulse rounded" /></td></tr>
               ))
             ) : filteredTickets.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-gray-400 font-medium">No tickets found for this queue &amp; date filter.</td></tr>
+              <tr>
+                <td colSpan={8} className="text-center py-12 text-gray-400 font-medium">
+                  No tickets found in this filtered view.
+                </td>
+              </tr>
             ) : (
               filteredTickets.map(t => {
                 const id = t.id || t._id;
@@ -451,14 +503,15 @@ export const SupportPage: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Status */}
+                    {/* Status Badge */}
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        t.status === 'open' ? 'bg-amber-100 text-amber-800' :
-                        t.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-emerald-100 text-emerald-800'
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        t.status === 'open' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                        t.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                        t.status === 'resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                        'bg-gray-100 text-gray-700 border border-gray-200'
                       }`}>
-                        {t.status.replace('_', ' ')}
+                        {t.status === 'open' ? 'Pending' : t.status.replace('_', ' ')}
                       </span>
                     </td>
 
@@ -594,7 +647,7 @@ export const SupportPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleStartEdit(m)}
-                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-indigo-600 transition-colors"
+                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Edit Message"
                           >
                             <Edit2 className="w-3 h-3" />
@@ -602,7 +655,7 @@ export const SupportPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleDeleteMessage(m.id)}
-                            className="p-1 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
+                            className="p-1 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors cursor-pointer"
                             title="Delete Message"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -623,7 +676,7 @@ export const SupportPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setEditingMsgId(null)}
-                              className="px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-lg"
+                              className="px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-lg cursor-pointer"
                               disabled={savingEdit}
                             >
                               Cancel
@@ -632,7 +685,7 @@ export const SupportPage: React.FC = () => {
                               type="button"
                               onClick={() => handleSaveEdit(m.id)}
                               disabled={savingEdit || !editMsgText.trim()}
-                              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 shadow-xs"
+                              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 shadow-xs cursor-pointer"
                             >
                               <Check className="w-3 h-3" />
                               <span>{savingEdit ? 'Saving...' : 'Save Edit'}</span>
@@ -716,7 +769,7 @@ export const SupportPage: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-bold text-base text-gray-900">Review &amp; Execute Customer Refund</h3>
-              <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -759,7 +812,7 @@ export const SupportPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleRejectRefund}
-                className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs"
+                className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs cursor-pointer"
               >
                 Reject Claim
               </button>
@@ -767,7 +820,7 @@ export const SupportPage: React.FC = () => {
                 type="button"
                 onClick={handleApproveRefund}
                 disabled={processingRefund}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs"
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs cursor-pointer"
               >
                 {processingRefund ? 'Executing...' : 'Approve Refund'}
               </button>

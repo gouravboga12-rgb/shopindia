@@ -19,7 +19,13 @@ router.get('/tickets', async (req, res) => {
     if (assignedTo) where.assignedToId = assignedTo;
 
     // Filter tabs
-    if (filter === 'refund_requests') {
+    if (filter === 'pending') {
+      where.status = 'open';
+    } else if (filter === 'active') {
+      where.status = 'in_progress';
+    } else if (filter === 'closed') {
+      where.status = { in: ['closed', 'resolved'] };
+    } else if (filter === 'refund_requests') {
       where.refundRequested = true;
     } else if (filter === 'escalated') {
       where.OR = [
@@ -69,7 +75,7 @@ router.get('/tickets', async (req, res) => {
     const pageNum = Number(page);
     const limitNum = Number(limit);
 
-    const [tickets, total] = await Promise.all([
+    const [tickets, total, allCount, pendingCount, activeCount, closedCount, refundCount, breachedCount, escalatedCount] = await Promise.all([
       prisma.ticket.findMany({
         where,
         include: {
@@ -100,6 +106,13 @@ router.get('/tickets', async (req, res) => {
         take: limitNum,
       }),
       prisma.ticket.count({ where }),
+      prisma.ticket.count(),
+      prisma.ticket.count({ where: { status: 'open' } }),
+      prisma.ticket.count({ where: { status: 'in_progress' } }),
+      prisma.ticket.count({ where: { status: { in: ['closed', 'resolved'] } } }),
+      prisma.ticket.count({ where: { refundRequested: true } }),
+      prisma.ticket.count({ where: { slaDeadline: { lte: now }, status: { in: ['open', 'in_progress'] } } }),
+      prisma.ticket.count({ where: { OR: [{ tier: { in: [2, 3] } }, { escalatedAt: { not: null } }] } }),
     ]);
 
     // Fetch vendor details for any ticket having vendorId
@@ -133,7 +146,21 @@ router.get('/tickets', async (req, res) => {
       };
     });
 
-    res.json({ tickets: enriched, total, page: pageNum, pages: Math.ceil(total / limitNum) });
+    res.json({
+      tickets: enriched,
+      total,
+      counts: {
+        all: allCount,
+        pending: pendingCount,
+        active: activeCount,
+        closed: closedCount,
+        refund: refundCount,
+        breached: breachedCount,
+        escalated: escalatedCount,
+      },
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
