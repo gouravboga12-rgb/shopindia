@@ -1,90 +1,89 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { useAuth } from '../../context/AuthContext';
 import {
   Banknote,
   CheckCircle2,
-  Clock,
-  ArrowUpRight,
-  ShieldCheck,
+  AlertTriangle,
   RefreshCw,
   AlertCircle,
   Bike,
-  Building2,
-  CreditCard,
-  History,
-  Copy,
-  Check,
-  X
+  Phone,
+  MessageCircle,
+  BellRing,
+  Edit3,
+  Search,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  Package,
+  Calendar,
+  X,
+  Wallet,
 } from 'lucide-react';
 
-interface RiderUser {
+interface RecentDelivery {
+  id: string;
+  orderNumber: string;
+  amount: number;
+  customerName: string;
+  customerPhone?: string;
+  deliveredAt: string;
+  address: string;
+}
+
+interface RiderItem {
+  id: string;
+  userId: string;
   name: string;
   phone: string;
-  email?: string;
-}
-
-interface RiderProfileData {
-  id: string;
-  user: RiderUser;
-}
-
-interface RemittanceRecord {
-  id: string;
-  amount: number;
-  status: 'pending' | 'received_by_regional' | 'remitted_to_super';
-  clearanceMode: string;
-  notes?: string;
-  createdAt: string;
-  receivedByAdminAt?: string;
-  remittedToSuperAt?: string;
-  superAdminRazorpayId?: string;
-  riderProfile: RiderProfileData;
+  email: string;
+  vehicleType: string;
+  vehicleNumber: string;
+  isOnline: boolean;
+  isApproved: boolean;
+  codCashFloat: number;
+  codFloatLimit: number;
+  floatPercent: number;
+  riskLevel: 'safe' | 'warning' | 'breached';
+  walletBalance: number;
+  totalDeliveries: number;
+  recentCODDeliveries: RecentDelivery[];
 }
 
 interface CODResponse {
   success: boolean;
   hubName: string;
-  totalCashInCustody: number;
-  pendingCount: number;
-  pendingSubmissions: RemittanceRecord[];
-  collectedPool: RemittanceRecord[];
-  pastRemittances: RemittanceRecord[];
-  acceptedHandovers?: (RemittanceRecord & { isSettledToHQ?: boolean })[];
+  district: string;
+  metrics: {
+    totalFleetCashFloat: number;
+    ridersHoldingCashCount: number;
+    highRiskCount: number;
+    compliantCount: number;
+    totalTerritoryRiders: number;
+    defaultFloatLimit: number;
+  };
+  riders: RiderItem[];
 }
 
 export const RegionalCODCollection: React.FC = () => {
-  const { user } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<CODResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'custody' | 'history'>('pending');
+  const [filterTab, setFilterTab] = useState<'all' | 'holding' | 'risk' | 'compliant'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Confirmation modal state
-  const [confirmingRecord, setConfirmingRecord] = useState<RemittanceRecord | null>(null);
-  const [confirmNotes, setConfirmNotes] = useState<string>('');
-  const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  // Expandable deliveries per rider
+  const [expandedRiderId, setExpandedRiderId] = useState<string | null>(null);
 
-  // Selection for bulk remittance
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isRemitting, setIsRemitting] = useState<boolean>(false);
+  // Edit contact modal state
+  const [editingRider, setEditingRider] = useState<RiderItem | null>(null);
+  const [editName, setEditName] = useState<string>('');
+  const [editPhone, setEditPhone] = useState<string>('');
+  const [savingContact, setSavingContact] = useState<boolean>(false);
 
-  // Dual Remittance Modal State (Razorpay vs Bank Transfer)
-  const [showRemitModal, setShowRemitModal] = useState<boolean>(false);
-  const [remitMode, setRemitMode] = useState<'razorpay' | 'bank'>('razorpay');
-  const [superBankDetails, setSuperBankDetails] = useState<{
-    bankName: string;
-    accountNumber: string;
-    ifsc: string;
-    accountHolder: string;
-    upiId: string;
-  } | null>(null);
-  const [loadingBankDetails, setLoadingBankDetails] = useState<boolean>(false);
-  const [utrInput, setUtrInput] = useState<string>('');
-  const [bankSenderInput, setBankSenderInput] = useState<string>('');
-  const [isSubmittingBank, setIsSubmittingBank] = useState<boolean>(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // Alert sending state
+  const [sendingAlertId, setSendingAlertId] = useState<string | null>(null);
 
-  // Notifications
+  // Feedback notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -95,8 +94,6 @@ export const RegionalCODCollection: React.FC = () => {
       const res = await api.get<CODResponse>('/api/regional-admin/cod');
       if (res.success) {
         setData(res);
-        // Default select all in collected pool for convenient remittance
-        setSelectedIds(res.collectedPool.map((c) => c.id));
       }
     } catch (err: unknown) {
       console.error('Failed to fetch regional COD data:', err);
@@ -106,214 +103,92 @@ export const RegionalCODCollection: React.FC = () => {
     }
   };
 
-  const handleOpenRemitModal = async () => {
-    if (selectedIds.length === 0) {
-      alert('Please select at least one cash batch to remit.');
-      return;
-    }
-    setShowRemitModal(true);
-    setUtrInput('');
-    setBankSenderInput('');
-    if (!superBankDetails) {
-      setLoadingBankDetails(true);
-      try {
-        const res: any = await api.get('/api/regional-admin/cod/super-bank-details');
-        if (res?.bankDetails) {
-          setSuperBankDetails(res.bankDetails);
-        }
-      } catch (e) {
-        console.warn('Failed to load super bank details:', e);
-      } finally {
-        setLoadingBankDetails(false);
-      }
-    }
-  };
-
-  const handleCopyText = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2500);
-  };
-
-  const handleSubmitBankTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!utrInput.trim()) {
-      alert('Please enter the Bank UTR / Transaction Reference number.');
-      return;
-    }
-    setIsSubmittingBank(true);
-    setErrorMessage(null);
-    try {
-      const res: any = await api.post('/api/regional-admin/cod/remit-bank-transfer', {
-        remittanceIds: selectedIds,
-        utrNumber: utrInput.trim(),
-        bankName: bankSenderInput.trim(),
-      });
-      if (res?.success) {
-        setSuccessMessage(res.message || 'Offline bank transfer submitted for Super Admin verification!');
-        setShowRemitModal(false);
-        setUtrInput('');
-        setTimeout(() => setSuccessMessage(null), 5000);
-        await fetchCODData();
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to submit bank transfer');
-    } finally {
-      setIsSubmittingBank(false);
-    }
-  };
-
   useEffect(() => {
     fetchCODData();
   }, []);
 
-  const handleConfirmReceipt = async () => {
-    if (!confirmingRecord) return;
-    setIsConfirming(true);
+  const handleSendAlert = async (rider: RiderItem) => {
+    setSendingAlertId(rider.id);
     setErrorMessage(null);
     try {
       const res = await api.post<{ success: boolean; message: string }>(
-        `/api/regional-admin/cod/${confirmingRecord.id}/confirm-receipt`,
-        { notes: confirmNotes }
+        `/api/regional-admin/cod/riders/${rider.id}/send-alert`,
+        {}
       );
       if (res.success) {
         setSuccessMessage(res.message);
-        setConfirmingRecord(null);
-        setConfirmNotes('');
+        setTimeout(() => setSuccessMessage(null), 4000);
+      }
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to send alert');
+    } finally {
+      setSendingAlertId(null);
+    }
+  };
+
+  const handleOpenEdit = (rider: RiderItem) => {
+    setEditingRider(rider);
+    setEditName(rider.name);
+    setEditPhone(rider.phone);
+  };
+
+  const handleSaveContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRider) return;
+    setSavingContact(true);
+    setErrorMessage(null);
+    try {
+      const res = await api.patch<{ success: boolean; message: string; user: { name: string; phone: string } }>(
+        `/api/regional-admin/cod/riders/${editingRider.id}/contact`,
+        { name: editName, phone: editPhone }
+      );
+      if (res.success) {
+        setSuccessMessage(res.message);
+        setEditingRider(null);
         setTimeout(() => setSuccessMessage(null), 4000);
         await fetchCODData();
       }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to confirm receipt');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to update contact');
     } finally {
-      setIsConfirming(false);
+      setSavingContact(false);
     }
   };
 
-  const handleRemitToSuperAdmin = async () => {
-    if (selectedIds.length === 0) {
-      alert('Please select at least one cash batch to remit.');
-      return;
+  const ridersList = data?.riders || [];
+
+  // Filter riders based on active tab and search query
+  const filteredRiders = ridersList.filter((r) => {
+    if (filterTab === 'holding' && r.codCashFloat <= 0) return false;
+    if (filterTab === 'risk' && r.riskLevel === 'safe') return false;
+    if (filterTab === 'compliant' && r.codCashFloat > 0) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = r.name.toLowerCase().includes(q);
+      const matchPhone = r.phone.toLowerCase().includes(q);
+      const matchVehicle = r.vehicleNumber.toLowerCase().includes(q);
+      const matchEmail = r.email.toLowerCase().includes(q);
+      return matchName || matchPhone || matchVehicle || matchEmail;
     }
-
-    setIsRemitting(true);
-    setErrorMessage(null);
-
-    try {
-      // 1. Create Razorpay order
-      const orderRes = await api.post<{
-        success: boolean;
-        orderId: string;
-        amount: number;
-        totalINR: number;
-        keyId: string;
-        remittanceIds: string[];
-      }>('/api/regional-admin/cod/create-super-remittance-order', {
-        remittanceIds: selectedIds,
-      });
-
-      if (!orderRes.success) throw new Error('Order creation failed');
-
-      // 2. Open Razorpay modal
-      const Razorpay = (window as any).Razorpay;
-      if (!Razorpay) {
-        alert('Razorpay SDK is loading. Please try again in a few moments.');
-        setIsRemitting(false);
-        return;
-      }
-
-      const options = {
-        key: orderRes.keyId,
-        amount: orderRes.amount,
-        currency: 'INR',
-        name: 'ShopIndia Super Admin Remittance',
-        description: `Regional Cash Remittance for ${selectedIds.length} batch(es)`,
-        order_id: orderRes.orderId,
-        prefill: {
-          name: user?.name || 'Regional Admin',
-          email: user?.email || '',
-        },
-        theme: {
-          color: '#0F2C59',
-        },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id: string;
-          razorpay_signature: string;
-        }) => {
-          try {
-            const verifyRes = await api.post<{ success: boolean; message: string }>(
-              '/api/regional-admin/cod/verify-super-remittance',
-              {
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-                remittanceIds: selectedIds,
-              }
-            );
-
-            if (verifyRes.success) {
-              setSuccessMessage('Physical cash pool remitted to Super Admin nodal account via Razorpay!');
-              setTimeout(() => setSuccessMessage(null), 5000);
-              await fetchCODData();
-            }
-          } catch (verr: unknown) {
-            setErrorMessage(verr instanceof Error ? verr.message : 'Verification failed');
-          } finally {
-            setIsRemitting(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setIsRemitting(false);
-          },
-        },
-      };
-
-      const rzp = new Razorpay(options);
-      rzp.open();
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to initiate Razorpay transfer');
-      setIsRemitting(false);
-    }
-  };
-
-  const toggleSelectBatch = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === (data?.collectedPool.length || 0)) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(data?.collectedPool.map((c) => c.id) || []);
-    }
-  };
-
-  const selectedTotal =
-    data?.collectedPool
-      .filter((c) => selectedIds.includes(c.id))
-      .reduce((acc, c) => acc + c.amount, 0) || 0;
+    return true;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Top Header */}
+      {/* ─── Top Header ────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200/80">
-              <Banknote className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Cash on Delivery (COD) Remittance Hub
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">
-                Territory cash reception from delivery fleet and bulk nodal remittance to Super Admin.
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200/80 shadow-2xs">
+            <Banknote className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              Rider Cash & COD Float Monitoring Hub
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Territory fleet cash-in-hand oversight, safety limit tracking, clearance alerts, and rider contact management.
+            </p>
           </div>
         </div>
 
@@ -321,703 +196,417 @@ export const RegionalCODCollection: React.FC = () => {
           type="button"
           onClick={fetchCODData}
           disabled={loading}
-          className="flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-2xs cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Sync Hub</span>
         </button>
       </div>
 
-      {/* Alert Notices */}
+      {/* ─── Toast Notifications ───────────────────────────────────── */}
       {successMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-semibold flex items-center gap-3 shadow-2xs">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
       {errorMessage && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-800 text-xs font-semibold flex items-center gap-3 shadow-2xs">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Hub Metrics Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Metric 1 */}
-        <div className="bg-gradient-to-br from-[#0F2C59] to-[#1E3A8A] text-white p-5 rounded-2xl sm:rounded-3xl shadow-sm relative overflow-hidden">
+      {/* ─── 4 Territory Metric Summary Cards ──────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Fleet COD Cash Held */}
+        <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-5 rounded-3xl shadow-sm border border-blue-500/20 relative overflow-hidden">
           <div className="flex items-center justify-between text-white/70 text-xs font-bold uppercase tracking-wider">
-            <span>Physical Cash in Custody</span>
-            <Building2 className="w-4 h-4 text-emerald-400" />
+            <span>Fleet Cash in Hand</span>
+            <Banknote className="w-4 h-4 text-emerald-400" />
           </div>
           <p className="text-3xl font-black mt-2 font-mono text-emerald-300">
-            ₹{(data?.totalCashInCustody || 0).toLocaleString('en-IN')}
+            ₹{(data?.metrics?.totalFleetCashFloat || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
           <div className="text-[11px] text-white/60 mt-1 flex items-center gap-1 font-medium">
             <span>Hub: {data?.hubName || 'Regional Hub'}</span>
           </div>
         </div>
 
-        {/* Metric 2 */}
-        <div className="bg-white p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs">
+        {/* Card 2: Riders Holding Cash */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
-            <span>Pending Rider Submissions</span>
-            <Clock className="w-4 h-4 text-amber-500" />
+            <span>Riders Holding Cash</span>
+            <Bike className="w-4 h-4 text-amber-500" />
           </div>
           <p className="text-3xl font-black text-amber-600 mt-2 font-mono">
-            {data?.pendingCount || 0}
+            {data?.metrics?.ridersHoldingCashCount || 0}
+            <span className="text-xs text-slate-400 font-sans font-normal ml-1.5">
+              / {data?.metrics?.totalTerritoryRiders || 0} active
+            </span>
           </p>
-          <span className="text-[11px] text-slate-500 mt-1 block">Awaiting physical handover</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Active cash floats to monitor</span>
         </div>
 
-        {/* Metric 3 */}
-        <div className="bg-white p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
-              <span>Super Admin Remittance</span>
-              <CreditCard className="w-4 h-4 text-blue-600" />
-            </div>
-            <p className="text-xs text-slate-600 mt-1">
-              Transfer collected cash pool to Super Admin via instant Razorpay settlement.
-            </p>
+        {/* Card 3: High Risk / Breached Float */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <span>High Risk / Breached</span>
+            <AlertTriangle className={`w-4 h-4 ${(data?.metrics?.highRiskCount || 0) > 0 ? 'text-rose-500' : 'text-emerald-500'}`} />
           </div>
+          <p className={`text-3xl font-black mt-2 font-mono ${(data?.metrics?.highRiskCount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+            {data?.metrics?.highRiskCount || 0}
+          </p>
+          <span className="text-[11px] text-slate-500 mt-1 block">
+            {(data?.metrics?.highRiskCount || 0) > 0 ? 'Exceeding 80% float limit' : 'All riders within safety limit'}
+          </span>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('custody')}
-            className="mt-3 w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <span>View Custody Pool</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+        {/* Card 4: Default Safety Float Ceiling */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <span>Safety Float Ceiling</span>
+            <ShieldCheck className="w-4 h-4 text-blue-600" />
+          </div>
+          <p className="text-3xl font-black text-slate-800 mt-2 font-mono">
+            ₹{(data?.metrics?.defaultFloatLimit || 3000).toLocaleString('en-IN')}
+          </p>
+          <span className="text-[11px] text-slate-500 mt-1 block">Max float before assignment pause</span>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('pending')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'pending'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>Pending Handovers ({data?.pendingSubmissions.length || 0})</span>
-        </button>
+      {/* ─── Filter Tabs & Search Bar ──────────────────────────────── */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {[
+            { id: 'all', label: `All Riders (${ridersList.length})` },
+            { id: 'holding', label: `Holding Cash (${data?.metrics?.ridersHoldingCashCount || 0})` },
+            { id: 'risk', label: `High Risk (${data?.metrics?.highRiskCount || 0})` },
+            { id: 'compliant', label: `Zero Float (${data?.metrics?.compliantCount || 0})` },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterTab(tab.id as any)}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                filterTab === tab.id
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('custody')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'custody'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Banknote className="w-3.5 h-3.5" />
-          <span>Cash in Custody Pool ({data?.collectedPool.length || 0})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'history'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <History className="w-3.5 h-3.5" />
-          <span>Remittance History ({data?.pastRemittances.length || 0})</span>
-        </button>
+        {/* Search Input */}
+        <div className="relative min-w-[240px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by rider name, phone, vehicle..."
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
       </div>
 
-      {/* TAB 1: PENDING HANDOVERS QUEUE */}
-      {activeTab === 'pending' && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-800">
-              Riders Awaiting Physical Cash Handover
-            </h2>
-            <span className="text-xs text-slate-500">Verify handover OTP before receiving physical cash</span>
-          </div>
+      {/* ─── Rider Oversight Fleet Cards ───────────────────────────── */}
+      {filteredRiders.length === 0 ? (
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-400 shadow-2xs">
+          <ShieldCheck className="w-12 h-12 mx-auto mb-3 text-emerald-500 opacity-60" />
+          <p className="text-sm font-bold text-slate-800">No riders match the current filter</p>
+          <p className="text-xs text-slate-400 mt-1">All territory riders are clear or no matching contacts found.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredRiders.map((rider) => {
+            const isExpanded = expandedRiderId === rider.id;
+            const cleanPhone = (rider.phone || '').replace(/\D/g, '');
+            const phoneWith91 = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+            const prefilledMsg = encodeURIComponent(
+              `Hello ${rider.name}, this is Shop India Regional Operations Hub. You currently hold ₹${rider.codCashFloat.toFixed(
+                2
+              )} in collected COD cash. Please ensure this float is cleared promptly via your Rider App wallet to keep receiving new orders. Thank you!`
+            );
 
-          {data?.pendingSubmissions.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-500 opacity-60" />
-              <p className="text-sm font-semibold text-slate-700">No pending handovers</p>
-              <p className="text-xs text-slate-400 mt-1">All territory riders have either cleared online or have zero pending cash.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data?.pendingSubmissions.map((record) => (
-                <div key={record.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
-                      <Bike className="w-5 h-5" />
+            return (
+              <div
+                key={rider.id}
+                className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs hover:shadow-xs transition-shadow overflow-hidden"
+              >
+                {/* Rider Top Summary Bar */}
+                <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  {/* Left: Rider Info & Contact Details */}
+                  <div className="flex items-start gap-3.5">
+                    <div className="p-3 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 rounded-2xl border border-blue-200/80 shrink-0">
+                      <Bike className="w-6 h-6" />
                     </div>
-                    <div>
-                      <div className="font-bold text-slate-900 text-sm">
-                        {record.riderProfile?.user?.name || 'Rider Partner'}
+
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-slate-900 text-base">{rider.name}</h3>
+                        {rider.isOnline ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Online
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                            Offline
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-700">
+                          {rider.vehicleType.toUpperCase()} • {rider.vehicleNumber}
+                        </span>
                       </div>
-                      <div className="text-xs text-slate-500 font-mono">
-                        {record.riderProfile?.user?.phone} • {record.riderProfile?.user?.email}
+
+                      {/* Contact & Phone Display with Edit */}
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span className="font-mono text-slate-700 font-semibold flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-blue-500" />
+                          {rider.phone || 'No phone recorded'}
+                        </span>
+                        {rider.email && (
+                          <span className="text-slate-400">({rider.email})</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(rider)}
+                          className="text-[11px] font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>Edit Contact</span>
+                        </button>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        Requested: {new Date(record.createdAt).toLocaleString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+
+                      {/* 1-Click Action Buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        {cleanPhone && (
+                          <>
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-colors border border-blue-200 inline-flex items-center gap-1.5 shadow-2xs"
+                              title="Call Rider Directly"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Call</span>
+                            </a>
+                            <a
+                              href={`https://wa.me/${phoneWith91}?text=${prefilledMsg}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                              title="Send WhatsApp Reminder"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 text-emerald-100" />
+                              <span>WhatsApp</span>
+                            </a>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={sendingAlertId === rider.id}
+                          onClick={() => handleSendAlert(rider)}
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs disabled:opacity-50 cursor-pointer"
+                          title="Send In-App Clearance Alert"
+                        >
+                          <BellRing className={`w-3.5 h-3.5 text-amber-600 ${sendingAlertId === rider.id ? 'animate-bounce' : ''}`} />
+                          <span>{sendingAlertId === rider.id ? 'Sending...' : 'Send Alert'}</span>
+                        </button>
                       </div>
-                      {record.notes && (
-                        <div className="mt-1.5 inline-block text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                          {record.notes}
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0">
+                  {/* Right: Cash Float & Safety Limit Status */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 border-t lg:border-t-0 pt-3 lg:pt-0">
+                    {/* Wallet Balance */}
                     <div className="text-left sm:text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">Cash Amount</span>
-                      <span className="text-lg font-black text-slate-900 font-mono">
-                        ₹{record.amount.toLocaleString('en-IN')}
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block flex items-center gap-1 sm:justify-end">
+                        <Wallet className="w-3 h-3 text-slate-400" />
+                        Wallet Balance
+                      </span>
+                      <span className="text-sm font-black text-slate-700 font-mono">
+                        ₹{rider.walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmingRecord(record);
-                        setConfirmNotes(`Verified physical handover of ₹${record.amount} from ${record.riderProfile?.user?.name}`);
-                      }}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
-                    >
-                      Confirm Cash Received
-                    </button>
+                    {/* Cash Float Meter */}
+                    <div className="min-w-[160px] text-left sm:text-right">
+                      <div className="flex items-baseline justify-between sm:justify-end gap-2">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">COD Cash Held</span>
+                        {rider.riskLevel === 'breached' && (
+                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                            Limit Breached
+                          </span>
+                        )}
+                        {rider.riskLevel === 'warning' && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                            Caution
+                          </span>
+                        )}
+                        {rider.riskLevel === 'safe' && (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Safe
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-2xl font-black text-slate-900 font-mono mt-0.5">
+                        ₹{rider.codCashFloat.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+
+                      {/* Safety Limit Progress Bar */}
+                      <div className="mt-1 space-y-0.5">
+                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/60">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              rider.riskLevel === 'breached'
+                                ? 'bg-rose-500'
+                                : rider.riskLevel === 'warning'
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(4, rider.floatPercent))}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                          <span>{rider.floatPercent}% Used</span>
+                          <span>Limit: ₹{rider.codFloatLimit.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 2: CASH IN CUSTODY POOL */}
-      {activeTab === 'custody' && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden space-y-4">
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800">
-                Cash Pool in Regional Custody (Pending Remittance to HQ)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Select batches to remit directly to Super Admin nodal account via Razorpay.
-              </p>
-            </div>
-
-            {data && data.collectedPool.length > 0 && (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={toggleSelectAll}
-                  className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
-                >
-                  {selectedIds.length === data.collectedPool.length ? 'Deselect All' : 'Select All'}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={selectedIds.length === 0 || isRemitting}
-                  onClick={handleOpenRemitModal}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Remit Selected (₹{selectedTotal.toLocaleString('en-IN')}) to Super Admin</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {data?.collectedPool.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-              <ShieldCheck className="w-10 h-10 mx-auto mb-2 text-blue-500 opacity-60" />
-              <p className="text-sm font-semibold text-slate-700">Custody Pool is Empty</p>
-              <p className="text-xs text-slate-400 mt-1">
-                All physical cash received from riders has been successfully remitted to Super Admin!
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data?.collectedPool.map((batch) => {
-                const isChecked = selectedIds.includes(batch.id);
-                return (
-                  <div
-                    key={batch.id}
-                    onClick={() => toggleSelectBatch(batch.id)}
-                    className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${
-                      isChecked ? 'bg-blue-50/40' : 'hover:bg-slate-50'
-                    }`}
+                {/* Collapsible Recent Delivered COD Orders */}
+                <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedRiderId(isExpanded ? null : rider.id)}
+                    className="text-slate-600 hover:text-slate-900 font-bold inline-flex items-center gap-1.5 cursor-pointer py-1"
                   >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}} // Handled by row click
-                        className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
-                      />
-                      <div>
-                        <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                          {batch.riderProfile?.user?.name || 'Rider Partner'}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          Received on{' '}
-                          {batch.receivedByAdminAt
-                            ? new Date(batch.receivedByAdminAt).toLocaleString('en-IN', {
+                    <Package className="w-3.5 h-3.5 text-slate-500" />
+                    <span>
+                      Recent COD Orders ({rider.recentCODDeliveries.length})
+                    </span>
+                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <span className="text-[11px] text-slate-400">
+                    {rider.totalDeliveries} total career deliveries
+                  </span>
+                </div>
+
+                {isExpanded && (
+                  <div className="p-4 bg-white border-t border-slate-100 divide-y divide-slate-100 text-xs">
+                    {rider.recentCODDeliveries.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-2">No recent COD deliveries recorded for this rider.</p>
+                    ) : (
+                      rider.recentCODDeliveries.map((delivery) => (
+                        <div key={delivery.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900">{delivery.orderNumber}</span>
+                              <span className="text-[11px] text-slate-500 font-medium">({delivery.customerName})</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 truncate max-w-sm">{delivery.address}</p>
+                          </div>
+
+                          <div className="flex items-center gap-4 justify-between sm:justify-end">
+                            <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(delivery.deliveredAt).toLocaleDateString('en-IN', {
                                 month: 'short',
                                 day: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit',
-                              })
-                            : 'Confirmed'}
+                              })}
+                            </span>
+                            <span className="font-mono font-bold text-slate-900 text-sm">
+                              ₹{delivery.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
                         </div>
-                        {batch.notes && <div className="text-[10px] text-slate-500 mt-0.5">{batch.notes}</div>}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-sm sm:text-base font-black text-slate-900 font-mono">
-                        ₹{batch.amount.toLocaleString('en-IN')}
-                      </span>
-                      <span className="block text-[10px] text-emerald-600 font-semibold uppercase">
-                        In Regional Custody
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: COMPLETE AUDIT & REMITTANCE HISTORY */}
-      {activeTab === 'history' && (
-        <div className="space-y-5">
-          {/* Section A: All Fleet Cash Handovers Accepted by this Hub */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-800">Fleet Cash Receipts Confirmed by Hub</h2>
-                <p className="text-[11px] text-slate-500">Every physical cash handover accepted from riders at this hub</p>
-              </div>
-              <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                {data?.acceptedHandovers?.length || 0} Receipts
-              </span>
-            </div>
-
-            {(!data?.acceptedHandovers || data.acceptedHandovers.length === 0) ? (
-              <div className="p-10 text-center text-slate-400">
-                <Banknote className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-                <p className="text-xs">No physical cash receipts confirmed yet.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {data.acceptedHandovers.map((rcpt) => (
-                  <div key={rcpt.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                          {rcpt.riderProfile?.user?.name || 'Rider'}
-                        </span>
-                        {rcpt.riderProfile?.user?.phone && (
-                          <span className="text-[11px] text-slate-500 font-mono">
-                            ({rcpt.riderProfile.user.phone})
-                          </span>
-                        )}
-                        {rcpt.isSettledToHQ ? (
-                          <span className="text-[9.5px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
-                            Forwarded to Super Admin
-                          </span>
-                        ) : (
-                          <span className="text-[9.5px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-                            In Regional Custody Pool
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-[11px] text-slate-400 font-mono mt-1">
-                        Accepted on:{' '}
-                        {rcpt.receivedByAdminAt
-                          ? new Date(rcpt.receivedByAdminAt).toLocaleString('en-IN')
-                          : new Date(rcpt.createdAt).toLocaleString('en-IN')}
-                      </div>
-
-                      {rcpt.notes && (
-                        <p className="text-[11px] text-slate-600 italic mt-0.5">
-                          Receipt note: {rcpt.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-left sm:text-right shrink-0">
-                      <span className="font-mono font-black text-sm text-slate-900">
-                        ₹{rcpt.amount.toLocaleString('en-IN')}
-                      </span>
-                      <span className="block text-[10px] text-emerald-600 font-bold">
-                        Liability Transferred to Hub
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Section B: Past Completed Remittances to Super Admin HQ */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-800">Settlements Forwarded to Super Admin HQ</h2>
-                <p className="text-[11px] text-slate-500">Bulk remittances deposited via Razorpay or Bank Transfer</p>
-              </div>
-              <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                {data?.pastRemittances.length || 0} Settled
-              </span>
-            </div>
-
-            {data?.pastRemittances.length === 0 ? (
-              <div className="p-10 text-center text-slate-400">
-                <History className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-                <p className="text-xs">No bulk remittances settled to Super Admin HQ yet.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {data?.pastRemittances.map((hist) => (
-                  <div key={hist.id} className="p-4 flex items-center justify-between text-xs hover:bg-slate-50/60 transition-colors">
-                    <div>
-                      <div className="font-bold text-slate-900">
-                        Remitted Batch (Rider: {hist.riderProfile?.user?.name || 'Rider'})
-                      </div>
-                      <div className="text-slate-400 text-[11px] font-mono">
-                        Settled at:{' '}
-                        {hist.remittedToSuperAt
-                          ? new Date(hist.remittedToSuperAt).toLocaleString('en-IN')
-                          : 'Settled'}
-                      </div>
-                      {hist.superAdminRazorpayId && (
-                        <div className="text-[10px] text-blue-600 font-mono mt-0.5">
-                          Reference / Payment ID: {hist.superAdminRazorpayId}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <span className="font-mono font-black text-sm text-slate-900">
-                        ₹{hist.amount.toLocaleString('en-IN')}
-                      </span>
-                      <span className="block text-[10px] text-emerald-600 font-bold uppercase">
-                        Settled to HQ
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {confirmingRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <h3 className="text-base font-bold text-slate-900">Confirm Physical Cash Receipt</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setConfirmingRecord(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              You are confirming physical receipt of cash from{' '}
-              <strong className="text-slate-800">{confirmingRecord.riderProfile?.user?.name}</strong>. This decrements the rider's COD float and transfers custody liability to you until remitted to Super Admin.
-            </p>
-
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Amount to Accept:</span>
-                <span className="font-mono font-black text-emerald-600 text-base">
-                  ₹{confirmingRecord.amount.toLocaleString('en-IN')}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Rider Phone:</span>
-                <span className="font-mono text-slate-800">{confirmingRecord.riderProfile?.user?.phone}</span>
-              </div>
-              {confirmingRecord.notes && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Handover Note:</span>
-                  <span className="font-mono text-blue-700 font-bold">{confirmingRecord.notes}</span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Receipt Notes
-              </label>
-              <textarea
-                rows={2}
-                value={confirmNotes}
-                onChange={(e) => setConfirmNotes(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmingRecord(null)}
-                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isConfirming}
-                onClick={handleConfirmReceipt}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-              >
-                {isConfirming && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>Confirm & Accept Cash</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Dual Remittance to Super Admin Modal */}
-      {showRemitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl space-y-5 border border-slate-200 overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                  <Banknote className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Remit Custody Cash to Super Admin</h3>
-                  <p className="text-xs text-slate-500">Total batch selected: <strong>₹{selectedTotal.toLocaleString('en-IN')}</strong> ({selectedIds.length} batches)</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowRemitModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Mode Switcher Tabs */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setRemitMode('razorpay')}
-                className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  remitMode === 'razorpay'
-                    ? 'bg-white text-blue-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <CreditCard className="w-3.5 h-3.5" />
-                <span>Pay via Razorpay</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRemitMode('bank')}
-                className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  remitMode === 'bank'
-                    ? 'bg-white text-blue-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Building2 className="w-3.5 h-3.5" />
-                <span>Super Admin Bank Transfer</span>
-              </button>
-            </div>
-
-            {/* TAB A: RAZORPAY ONLINE */}
-            {remitMode === 'razorpay' && (
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl text-xs text-blue-950 space-y-1">
-                  <p className="font-bold">Instant Automated Clearance</p>
-                  <p className="text-[11px] text-blue-700 leading-relaxed">
-                    Paying via Razorpay gateway will automatically verify your payment signature, immediately debit custody liability from your account, and settle the funds directly into the Super Admin bank account.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-600">Total Net Remittance:</span>
-                  <span className="text-xl font-black text-slate-900 font-mono">₹{selectedTotal.toLocaleString('en-IN')}</span>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={isRemitting}
-                  onClick={() => {
-                    setShowRemitModal(false);
-                    handleRemitToSuperAdmin();
-                  }}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>Launch Razorpay Checkout (₹{selectedTotal.toLocaleString('en-IN')})</span>
-                </button>
-              </div>
-            )}
-
-            {/* TAB B: SUPER ADMIN BANK DETAILS */}
-            {remitMode === 'bank' && (
-              <form onSubmit={handleSubmitBankTransfer} className="space-y-4">
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl text-xs text-amber-950 space-y-1">
-                  <p className="font-bold">Official Super Admin Bank Coordinates</p>
-                  <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Transfer <strong>₹{selectedTotal.toLocaleString('en-IN')}</strong> directly to the company bank account or UPI ID below, then enter your Bank UTR number to submit for Super Admin verification.
-                  </p>
-                </div>
-
-                {loadingBankDetails ? (
-                  <div className="py-6 text-center text-xs text-slate-400">Loading bank details...</div>
-                ) : superBankDetails ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2 text-xs">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">Bank Name</span>
-                      <strong className="text-slate-900">{superBankDetails.bankName}</strong>
-                    </div>
-
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">Account Number</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-900">{superBankDetails.accountNumber}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(superBankDetails.accountNumber, 'acc')}
-                          className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
-                          title="Copy Account Number"
-                        >
-                          {copiedKey === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">IFSC Code</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-900">{superBankDetails.ifsc}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(superBankDetails.ifsc, 'ifsc')}
-                          className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
-                          title="Copy IFSC"
-                        >
-                          {copiedKey === 'ifsc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">Account Holder</span>
-                      <strong className="text-slate-900">{superBankDetails.accountHolder}</strong>
-                    </div>
-
-                    {superBankDetails.upiId && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Company UPI ID</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-emerald-700">{superBankDetails.upiId}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(superBankDetails.upiId, 'upi')}
-                            className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
-                            title="Copy UPI ID"
-                          >
-                            {copiedKey === 'upi' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
+                      ))
                     )}
                   </div>
-                ) : null}
-
-                {/* UTR Input Form */}
-                <div className="space-y-3 pt-1">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">
-                      Bank UTR / Transaction Reference Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. 249104812901 or SBIN2491048"
-                      value={utrInput}
-                      onChange={(e) => setUtrInput(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Your Bank / Payment Mode (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. SBI NEFT / PhonePe UPI / HDFC IMPS"
-                      value={bankSenderInput}
-                      onChange={(e) => setBankSenderInput(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowRemitModal(false)}
-                    className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingBank || !utrInput.trim()}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    {isSubmittingBank && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                    <span>Submit UTR for Verification</span>
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
+      {/* ─── Edit Contact Modal ─────────────────────────────────────── */}
+      {editingRider && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-blue-600" />
+                <h3 className="font-bold text-slate-900 text-base">Update Rider Contact</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingRider(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveContact} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase block mb-1">Rider Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase block mb-1">
+                  Phone & WhatsApp Number (10 digits)
+                </label>
+                <input
+                  type="tel"
+                  required
+                  maxLength={10}
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Used for rider login notifications, 1-click calls, and WhatsApp reminders.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingRider(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingContact}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {savingContact ? 'Saving...' : 'Save Contact'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,9 @@
 'use strict';
 /**
  * server/routes/regional-admin/cod.js
- * Regional Admin Territory Cash Collection & Super Admin Remittance Queue.
+ * Regional Admin Fleet Cash on Delivery (COD) Float & Compliance Monitoring Hub.
+ * Dedicated to tracking fleet cash-in-hand, enforcing float limits, sending clearance alerts,
+ * and managing rider contact details. (Physical cash custody & bulk HQ remittance flows removed).
  */
 
 const express = require('express');
@@ -9,105 +11,176 @@ const router = express.Router();
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
-const { postLedgerEntries } = require('../../lib/ledger');
-const { createRazorpayOrder, verifyPaymentSignature, fetchPaymentDetails } = require('../../lib/razorpay');
 
-router.use(verifyToken, requireRole('regional_admin', 'super_admin'));
+router.use(verifyToken, requireRole('super_admin', 'regional_admin', 'branch_manager'));
+
+/**
+ * Helper to compute great-circle distance between two GPS coordinates in km
+ */
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 999999;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Helper to fetch Regional Admin profile
+ */
+async function getAdminProfile(userId) {
+  return prisma.regionalAdminProfile.findUnique({
+    where: { userId },
+    include: { branch: true },
+  });
+}
 
 /**
  * GET /api/regional-admin/cod
- * Returns pending rider cash handovers and collected pool status.
+ * Returns territory fleet COD float oversight data, risk counts, and individual rider ledgers.
  */
 router.get('/', async (req, res) => {
   try {
     const userId = req.user?.userId || req.user?.id;
-    const profile = await prisma.regionalAdminProfile.findUnique({
-      where: { userId },
-      include: { branch: true },
+    const profile = await getAdminProfile(userId);
+
+    const hubLat = profile?.currentLat;
+    const hubLng = profile?.currentLng;
+    const branchFilter = profile?.branchId ? { branchId: profile.branchId } : {};
+
+    // Fetch all active/approved riders in this territory
+    const rawRiders = await prisma.riderProfile.findMany({
+      where: {
+        isApproved: true,
+        isActive: true,
+        ...branchFilter,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+          },
+        },
+        deliveries: {
+          where: {
+            status: 'delivered',
+            order: {
+              paymentMethod: 'cod',
+              status: { notIn: ['cancelled', 'refunded'] },
+            },
+          },
+          select: {
+            id: true,
+            deliveryFee: true,
+            codAmount: true,
+            deliveredAt: true,
+            createdAt: true,
+            order: {
+              select: {
+                id: true,
+                orderNumber: true,
+                total: true,
+                deliveryAddress: true,
+                deliveryLine1: true,
+                deliveryCity: true,
+                customer: {
+                  select: {
+                    name: true,
+                    phone: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { deliveredAt: 'desc' },
+          take: 10,
+        },
+      },
+      orderBy: { codCashFloat: 'desc' },
     });
 
-    const regionalAdminId = profile?.id;
+    // Deduplicate riders by phone or user ID and territory scope
+    const seenPhones = new Set();
+    const riders = [];
 
-    const [pendingSubmissions, collectedPool, pastRemittances, acceptedHandovers] = await Promise.all([
-      // 1. Pending handovers from territory riders (physical submission not yet verified by admin)
-      prisma.cODRemittance.findMany({
-        where: {
-          status: { in: ['pending', 'submitted_to_admin'] },
-          clearanceMode: 'physical',
-          receivedByAdminAt: null,
-          ...(regionalAdminId ? { regionalAdminId } : {}),
-        },
-        include: {
-          riderProfile: {
-            include: { user: { select: { name: true, phone: true, email: true } } },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
+    for (const r of rawRiders) {
+      const phone = (r.user?.phone || '').replace(/\D/g, '');
+      const riderId = r.userId || r.id;
+      if (phone && seenPhones.has(phone)) continue;
+      if (phone) seenPhones.add(phone);
 
-      // 2. Cash physically verified and held in custody by this regional admin not yet remitted to Super Admin
-      prisma.cODRemittance.findMany({
-        where: {
-          status: 'verified',
-          clearanceMode: 'physical',
-          receivedByAdminAt: { not: null },
-          remittedToSuperAt: null,
-          ...(regionalAdminId ? { regionalAdminId } : {}),
-        },
-        include: {
-          riderProfile: {
-            include: { user: { select: { name: true, phone: true } } },
-          },
-        },
-        orderBy: { receivedByAdminAt: 'desc' },
-      }),
+      // Check GPS distance if coordinates available
+      if (hubLat && hubLng && r.currentLat && r.currentLng) {
+        const dist = haversineDistanceKm(hubLat, hubLng, r.currentLat, r.currentLng);
+        if (dist > 50) continue; // Outside territory operational radius
+      }
 
-      // 3. Past completed remittances to Super Admin
-      prisma.cODRemittance.findMany({
-        where: {
-          remittedToSuperAt: { not: null },
-          ...(regionalAdminId ? { regionalAdminId } : {}),
-        },
-        include: {
-          riderProfile: {
-            include: { user: { select: { name: true, phone: true } } },
-          },
-        },
-        orderBy: { remittedToSuperAt: 'desc' },
-        take: 30,
-      }),
+      const floatAmount = Number(r.codCashFloat || 0);
+      const floatLimit = Number(r.codFloatLimit || 3000);
+      const floatPercent = floatLimit > 0 ? Math.min(100, Math.round((floatAmount / floatLimit) * 100)) : 0;
 
-      // 4. All physical cash receipts confirmed by this regional admin (Passbook History)
-      prisma.cODRemittance.findMany({
-        where: {
-          clearanceMode: 'physical',
-          receivedByAdminAt: { not: null },
-          ...(regionalAdminId ? { regionalAdminId } : {}),
-        },
-        include: {
-          riderProfile: {
-            include: { user: { select: { name: true, phone: true, email: true } } },
-          },
-        },
-        orderBy: { receivedByAdminAt: 'desc' },
-        take: 50,
-      }),
-    ]);
+      let riskLevel = 'safe'; // safe | warning | breached
+      if (floatAmount >= floatLimit) {
+        riskLevel = 'breached';
+      } else if (floatPercent >= 70) {
+        riskLevel = 'warning';
+      }
 
-    const totalCashInCustody = collectedPool.reduce((acc, r) => acc + (r.amount || 0), 0);
+      riders.push({
+        id: r.id,
+        userId: r.userId,
+        name: r.user?.name || 'Rider Partner',
+        phone: r.user?.phone || '',
+        email: r.user?.email || '',
+        vehicleType: r.vehicleType || 'bike',
+        vehicleNumber: r.vehicleNumber || 'Unassigned',
+        isOnline: Boolean(r.isOnline),
+        isApproved: Boolean(r.isApproved),
+        codCashFloat: Math.round(floatAmount * 100) / 100,
+        codFloatLimit: floatLimit,
+        floatPercent,
+        riskLevel,
+        walletBalance: Math.round(Number(r.walletBalance || 0) * 100) / 100,
+        totalDeliveries: r.totalDeliveries || 0,
+        recentCODDeliveries: r.deliveries.map((d) => ({
+          id: d.id,
+          orderNumber: d.order?.orderNumber || `OD-${d.id.slice(0, 8).toUpperCase()}`,
+          amount: Number(d.codAmount || d.order?.total || 0),
+          customerName: d.order?.customer?.name || 'Customer',
+          customerPhone: d.order?.customer?.phone || '',
+          deliveredAt: d.deliveredAt || d.createdAt,
+          address: d.order?.deliveryLine1 || d.order?.deliveryAddress || d.order?.deliveryCity || 'Area Dropoff',
+        })),
+      });
+    }
+
+    // Compute territory aggregates
+    const totalFleetCashFloat = Math.round(riders.reduce((sum, r) => sum + r.codCashFloat, 0) * 100) / 100;
+    const ridersHoldingCashCount = riders.filter((r) => r.codCashFloat > 0).length;
+    const highRiskCount = riders.filter((r) => r.riskLevel === 'breached' || r.riskLevel === 'warning').length;
+    const compliantCount = riders.filter((r) => r.codCashFloat === 0).length;
 
     res.json({
       success: true,
-      hubName: profile?.branch?.name || profile?.regionName || profile?.branch?.city || 'Regional Hub',
-      totalCashInCustody,
-      pendingCount: pendingSubmissions.length,
-      pendingSubmissions: pendingSubmissions.map((r) => ({ ...r, status: 'pending' })),
-      collectedPool: collectedPool.map((r) => ({ ...r, status: 'received_by_regional' })),
-      pastRemittances: pastRemittances.map((r) => ({ ...r, status: 'remitted_to_super' })),
-      acceptedHandovers: acceptedHandovers.map((r) => ({
-        ...r,
-        isSettledToHQ: !!r.remittedToSuperAt,
-      })),
+      hubName: profile?.branch?.name || profile?.regionName || 'Regional Operations Hub',
+      district: profile?.district || 'Medchal-Malkajgiri',
+      metrics: {
+        totalFleetCashFloat,
+        ridersHoldingCashCount,
+        highRiskCount,
+        compliantCount,
+        totalTerritoryRiders: riders.length,
+        defaultFloatLimit: 3000,
+      },
+      riders,
     });
   } catch (err) {
     console.error('[Regional Admin COD] Fetch error:', err);
@@ -116,312 +189,108 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * POST /api/regional-admin/cod/:id/confirm-receipt
- * Regional Admin confirms physical receipt of offline cash from a delivery rider.
+ * POST /api/regional-admin/cod/riders/:id/send-alert
+ * Dispatches an instant operational reminder alert to the rider to clear their pending COD cash float.
  */
-router.post('/:id/confirm-receipt', async (req, res) => {
+router.post('/riders/:id/send-alert', async (req, res) => {
   try {
     const { id } = req.params;
-    const { notes } = req.body;
+    const { customMessage } = req.body;
 
-    const remittance = await prisma.cODRemittance.findUnique({
+    const rider = await prisma.riderProfile.findUnique({
       where: { id },
       include: {
-        riderProfile: {
-          include: { user: { select: { id: true, name: true } } },
-        },
+        user: { select: { id: true, name: true, phone: true, email: true } },
       },
     });
 
-    if (!remittance) return res.status(404).json({ error: 'Remittance record not found.' });
-    if (remittance.receivedByAdminAt) {
-      return res.status(400).json({ error: 'Remittance is already verified and received.' });
+    if (!rider) {
+      return res.status(404).json({ error: 'Rider profile not found.' });
     }
 
-    const rider = remittance.riderProfile;
-    const amount = remittance.amount;
+    const floatAmount = Number(rider.codCashFloat || 0);
+    const recipientPhone = rider.user?.phone || rider.user?.email || 'Rider';
+    const message =
+      customMessage ||
+      `Shop India Operations Alert: You currently hold ₹${floatAmount.toFixed(
+        2
+      )} in collected COD cash. Please settle your float via your Rider App wallet to keep receiving delivery orders.`;
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Mark remittance as verified and received by regional admin
-      await tx.cODRemittance.update({
-        where: { id },
-        data: {
-          status: 'verified',
-          receivedByAdminAt: new Date(),
-          notes: notes?.trim() || remittance.notes,
-        },
-      });
-
-      // 2. Decrement rider's codCashFloat
-      await tx.riderProfile.update({
-        where: { id: rider.id },
-        data: {
-          codCashFloat: { decrement: amount },
-        },
-      });
-
-      // 3. Post double-entry ledger entry transferring custody liability to Regional Admin
-      await postLedgerEntries(
-        tx,
-        [
-          {
-            type: 'DEBIT',
-            party: 'RIDER',
-            partyId: rider.id,
-            amount,
-            entryType: 'COD_REMITTANCE',
-            description: `Physical COD cash submitted by ${rider.user?.name || 'Rider'} to Regional Admin`,
-            metadata: {
-              remittanceId: id,
-              clearedAt: new Date().toISOString(),
-              receivedBy: req.user?.userId || req.user?.id,
-            },
-            riderProfileId: rider.id,
-          },
-        ]
-      );
-    });
-
-    res.json({
-      success: true,
-      message: `Confirmed receipt of ₹${amount} cash from ${rider.user?.name || 'Rider'}. Rider float decremented.`,
-    });
-  } catch (err) {
-    console.error('[Regional Admin Confirm Cash] Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * POST /api/regional-admin/cod/create-super-remittance-order
- * Regional Admin creates a Razorpay payment order to transfer the collected cash pool to Super Admin.
- */
-router.post('/create-super-remittance-order', async (req, res) => {
-  try {
-    const { remittanceIds } = req.body;
-
-    if (!remittanceIds || !Array.isArray(remittanceIds) || remittanceIds.length === 0) {
-      return res.status(400).json({ error: 'Please select at least one remittance batch to remit.' });
-    }
-
-    const remittances = await prisma.cODRemittance.findMany({
-      where: {
-        id: { in: remittanceIds },
-        status: 'verified',
-        remittedToSuperAt: null,
-      },
-    });
-
-    if (remittances.length === 0) {
-      return res.status(400).json({ error: 'No valid collected cash batches found to remit.' });
-    }
-
-    const totalToRemit = remittances.reduce((acc, r) => acc + (r.amount || 0), 0);
-
-    const rzpOrder = await createRazorpayOrder({
-      amount: totalToRemit,
-      currency: 'INR',
-      receipt: `reg_remit_${Date.now()}`,
-      notes: {
-        regionalAdminId: req.user?.userId || req.user?.id,
-        remittanceCount: remittances.length,
-        type: 'REGIONAL_ADMIN_COD_REMITTANCE',
+    // Record notification log
+    await prisma.notificationLog.create({
+      data: {
+        recipient: recipientPhone,
+        type: 'SMS',
+        event: 'COD_CLEARANCE_ALERT',
+        status: 'sent',
+        message,
+        sentAt: new Date(),
       },
     });
 
     res.json({
       success: true,
-      orderId: rzpOrder.id,
-      amount: rzpOrder.amount,
-      totalINR: totalToRemit,
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TrcIdNBK1BkfF0',
-      remittanceIds,
+      message: `COD clearance alert successfully sent to ${rider.user?.name || 'Rider'} (${recipientPhone}).`,
+      sentAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error('[Regional Remittance Razorpay Order] Error:', err);
+    console.error('[Regional COD Send Alert] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
- * POST /api/regional-admin/cod/verify-super-remittance
- * Verifies Razorpay payment signature and marks cash batches as remitted to Super Admin.
+ * PATCH /api/regional-admin/cod/riders/:id/contact
+ * Updates a rider's phone number, WhatsApp contact, or name if their panel/contact details change.
  */
-router.post('/verify-super-remittance', async (req, res) => {
+router.patch('/riders/:id/contact', async (req, res) => {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, remittanceIds } = req.body;
+    const { id } = req.params;
+    const { phone, name } = req.body;
 
-    let isValid = verifyPaymentSignature({
-      orderId: razorpayOrderId,
-      paymentId: razorpayPaymentId,
-      signature: razorpaySignature,
+    const rider = await prisma.riderProfile.findUnique({
+      where: { id },
+      include: { user: true },
     });
 
-    if (!isValid && razorpayPaymentId) {
-      try {
-        const paymentDetails = await fetchPaymentDetails(razorpayPaymentId);
-        if (paymentDetails && (paymentDetails.status === 'captured' || paymentDetails.status === 'authorized')) {
-          isValid = true;
-          console.log(`[Regional COD] Payment ${razorpayPaymentId} verified via Razorpay API fetch fallback.`);
-        }
-      } catch (fetchErr) {
-        console.warn('[Regional COD] Fallback Razorpay fetch failed:', fetchErr.message);
+    if (!rider) {
+      return res.status(404).json({ error: 'Rider profile not found.' });
+    }
+
+    const updateData = {};
+    if (phone && phone.trim()) {
+      const cleanPhone = phone.trim().replace(/\D/g, '');
+      if (cleanPhone.length < 10) {
+        return res.status(400).json({ error: 'Please enter a valid 10-digit phone number.' });
       }
+      updateData.phone = cleanPhone;
+    }
+    if (name && name.trim()) {
+      updateData.name = name.trim();
     }
 
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid payment signature from Razorpay.' });
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No contact details provided to update.' });
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.cODRemittance.updateMany({
-        where: { id: { in: remittanceIds } },
-        data: {
-          status: 'verified',
-          remittedToSuperAt: new Date(),
-          superAdminRazorpayId: razorpayPaymentId,
-        },
-      });
-
-      // Post platform ledger credit
-      const remittedTotal = (
-        await tx.cODRemittance.findMany({
-          where: { id: { in: remittanceIds } },
-          select: { amount: true },
-        })
-      ).reduce((acc, r) => acc + r.amount, 0);
-
-      await postLedgerEntries(
-        tx,
-        [
-          {
-            type: 'CREDIT',
-            party: 'PLATFORM',
-            partyId: 'SUPER_ADMIN',
-            amount: remittedTotal,
-            entryType: 'COD_REMITTANCE',
-            description: `Regional Admin bulk COD remittance of ₹${remittedTotal} received at HQ via Razorpay`,
-            metadata: {
-              razorpayPaymentId,
-              razorpayOrderId,
-              regionalAdminUserId: req.user.userId,
-              timestamp: new Date().toISOString(),
-            },
-          },
-        ]
-      );
-    });
-
-    res.json({
-      success: true,
-      message: 'Successfully remitted cash pool to Super Admin nodal account via Razorpay!',
-    });
-  } catch (err) {
-    console.error('[Regional Remittance Verify] Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * GET /api/regional-admin/cod/super-bank-details
- * Returns Super Admin bank details strictly to authenticated Regional Admins for offline cash remittance.
- * Securely isolated from public, vendor, or customer endpoints.
- */
-router.get('/super-bank-details', async (req, res) => {
-  try {
-    const setting = await prisma.appSetting.findUnique({
-      where: { key: 'super_admin_cod_bank_details' },
-    });
-
-    let details = {
-      bankName: 'HDFC Bank Ltd',
-      accountNumber: '50200088921456',
-      ifsc: 'HDFC0001234',
-      accountHolder: 'ShopIndia Technologies Pvt Ltd',
-      upiId: 'shopindia.hq@okhdfcbank',
-    };
-
-    if (setting?.value) {
-      try {
-        const parsed = JSON.parse(setting.value);
-        details = { ...details, ...parsed };
-      } catch (e) {
-        console.warn('Failed to parse bank details json:', e);
-      }
-    }
-
-    res.json({
-      success: true,
-      bankDetails: details,
-    });
-  } catch (err) {
-    console.error('[Regional COD Super Bank Details] Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * POST /api/regional-admin/cod/remit-bank-transfer
- * Regional Admin submits an offline NEFT/IMPS bank transfer to Super Admin with UTR number for verification.
- */
-router.post('/remit-bank-transfer', async (req, res) => {
-  try {
-    const { remittanceIds, utrNumber, bankName, transferDate, notes } = req.body;
-
-    if (!remittanceIds || !Array.isArray(remittanceIds) || remittanceIds.length === 0) {
-      return res.status(400).json({ error: 'Please select at least one collected cash batch to remit.' });
-    }
-
-    const cleanUtr = String(utrNumber || '').trim();
-    if (!cleanUtr || cleanUtr.length < 6) {
-      return res.status(400).json({ error: 'A valid Bank Transaction ID or UTR Number (minimum 6 characters) is required.' });
-    }
-
-    // Check if this UTR has already been submitted
-    const duplicate = await prisma.cODRemittance.findFirst({
-      where: {
-        superAdminRazorpayId: cleanUtr,
-        remittedToSuperAt: { not: null },
+    const updatedUser = await prisma.user.update({
+      where: { id: rider.userId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
       },
     });
 
-    if (duplicate) {
-      return res.status(400).json({ error: 'This UTR Number has already been submitted and processed.' });
-    }
-
-    const remittances = await prisma.cODRemittance.findMany({
-      where: {
-        id: { in: remittanceIds },
-        receivedByAdminAt: { not: null },
-      },
-    });
-
-    if (remittances.length === 0) {
-      return res.status(400).json({ error: 'No valid verified cash batches found to remit.' });
-    }
-
-    const totalToRemit = remittances.reduce((acc, r) => acc + (r.amount || 0), 0);
-    const adminUser = req.user?.name || req.user?.email || 'Regional Admin';
-
-    await prisma.$transaction(async (tx) => {
-      await tx.cODRemittance.updateMany({
-        where: { id: { in: remittanceIds } },
-        data: {
-          superAdminRazorpayId: cleanUtr,
-          clearanceMode: 'bank_transfer',
-          notes: `Offline Bank Transfer (UTR: ${cleanUtr}, Bank: ${bankName || 'Direct Transfer'}) submitted by ${adminUser}. Awaiting Super Admin verification. ${notes ? 'Note: ' + notes : ''}`,
-        },
-      });
-    });
-
     res.json({
       success: true,
-      message: `Offline bank transfer of ₹${totalToRemit} (UTR: ${cleanUtr}) submitted successfully! Super Admin has been notified for verification.`,
-      totalRemitted: totalToRemit,
-      utr: cleanUtr,
+      message: `Contact details for ${updatedUser.name} updated successfully.`,
+      user: updatedUser,
     });
   } catch (err) {
-    console.error('[Regional Remit Bank Transfer] Error:', err);
+    console.error('[Regional COD Update Contact] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -15,7 +15,7 @@ export const RegionalAdminSidebar: React.FC<RegionalAdminSidebarProps> = ({ curr
     { id: 'live-map', label: 'Live Dispatch Radar', icon: Radar },
     { id: 'vendors', label: 'Territory Merchants', icon: Store },
     { id: 'riders', label: 'Delivery Fleet & KYC', icon: Bike },
-    { id: 'cod-remittance', label: 'Cash & COD Remittance', icon: Banknote },
+    { id: 'cod-remittance', label: 'Rider Cash & COD Float', icon: Banknote },
     { id: 'payouts', label: 'Payout Approvals', icon: Wallet },
     { id: 'support', label: 'Territory Support', icon: Headphones },
   ];
