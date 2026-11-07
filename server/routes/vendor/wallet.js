@@ -6,7 +6,7 @@ const { requireRole } = require('../../middleware/rbac');
 const router = express.Router();
 router.use(verifyToken, requireRole('vendor'));
 
-/** GET /api/vendor/wallet — FR-02.5: Earnings dashboard with optional date filtering */
+/** GET /api/vendor/wallet — Unified earnings dashboard with Vendor Net Model & real-time sync */
 router.get('/', async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -26,95 +26,130 @@ router.get('/', async (req, res) => {
     }
     const hasDateFilter = Boolean(from || to);
 
-    const earnings = await prisma.order.aggregate({
+    // Fetch orders associated with this vendor (excluding deleted or cancelled orders)
+    const orders = await prisma.order.findMany({
       where: {
         vendorId: req.user.vendorId,
-        paymentStatus: 'paid',
+        status: { notIn: ['cancelled', 'refunded'] },
         ...(hasDateFilter ? { createdAt: dateFilter } : {})
       },
-      _sum: { total: true, commission: true },
-      _count: { id: true },
-    });
-
-    const grossRevenue = earnings._sum.total || 0;
-    const totalCommission = earnings._sum.commission || 0;
-
-    const paidOrders = await prisma.order.findMany({
-      where: {
-        vendorId: req.user.vendorId,
-        paymentStatus: 'paid',
-        ...(hasDateFilter ? { createdAt: dateFilter } : {})
-      },
-      select: {
-        id: true,
-        orderNumber: true,
-        total: true,
-        commission: true,
-        createdAt: true,
-        status: true,
-      }
-    });
-
-    const withdrawals = await prisma.transaction.findMany({
-      where: {
-        userId: vendor.userId,
-        type: 'withdrawal',
-        ...(hasDateFilter ? { createdAt: dateFilter } : {})
+      include: {
+        items: {
+          select: { price: true, quantity: true, basePrice: true }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const transactions = [
-      ...paidOrders.map(o => ({
+    // Unified withdrawals from PayoutRequest (Single source of truth shared with Super Admin)
+    const withdrawals = await prisma.payoutRequest.findMany({
+      where: {
+        partyType: 'VENDOR',
+        partyId: req.user.vendorId,
+        ...(hasDateFilter ? { requestedAt: dateFilter } : {})
+      },
+      orderBy: { requestedAt: 'desc' }
+    });
+
+    // Calculate Vendor Net earnings (100% of vendor item prices; zero commission cut)
+    let grossRevenue = 0;
+    const paidOrders = orders.filter(o => o.status === 'delivered');
+    const orderCount = paidOrders.length;
+
+    const saleTransactions = orders.map(o => {
+      const vendorItemsTotal = o.items?.reduce(
+        (sum, it) => sum + ((it.price || it.basePrice || 0) * (it.quantity || 1)),
+        0
+      ) || (o.total || 0);
+
+      if (o.status === 'delivered') {
+        grossRevenue += vendorItemsTotal;
+      }
+
+      return {
         id: o.id,
         createdAt: o.createdAt,
         type: 'sale',
-        amount: Math.round(((o.total || 0) - (o.commission || 0)) * 100) / 100,
-        status: o.status === 'delivered' ? 'paid' : (o.paymentStatus || 'paid'),
-        note: `Order ${o.orderNumber}`
-      })),
-      ...withdrawals.map(w => ({
-        id: w.id,
-        createdAt: w.createdAt,
-        type: 'withdrawal',
-        amount: -Math.abs(w.amount),
-        status: w.status,
-        note: `Withdrawal Request`
-      }))
-    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    // Also get all-time earnings for the persistent summary card
-    const allTimeEarnings = await prisma.order.aggregate({
-      where: { vendorId: req.user.vendorId, paymentStatus: 'paid' },
-      _sum: { total: true, commission: true },
-      _count: { id: true }
+        amount: Math.round(vendorItemsTotal * 100) / 100,
+        status: o.status === 'delivered' ? 'paid' : 'pending',
+        note: `Order #${o.orderNumber || o.id.slice(0, 8)} (${o.status === 'delivered' ? 'Delivered' : o.status})`
+      };
     });
 
+    const withdrawalTransactions = withdrawals.map(w => ({
+      id: w.id,
+      createdAt: w.requestedAt,
+      type: 'withdrawal',
+      amount: -Math.abs(w.amount),
+      status: w.status === 'completed' ? 'paid' : (w.status === 'rejected' ? 'rejected' : 'pending'),
+      note: w.notes ? w.notes.split('\n')[0] : `Payout Request (${w.status})`
+    }));
+
+    const transactions = [...saleTransactions, ...withdrawalTransactions].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    // Pending payouts currently awaiting Super Admin review/disbursement
+    const pendingPayoutsAgg = await prisma.payoutRequest.aggregate({
+      where: {
+        partyType: 'VENDOR',
+        partyId: req.user.vendorId,
+        status: { in: ['pending', 'approved'] }
+      },
+      _sum: { amount: true }
+    });
+    const pendingSum = pendingPayoutsAgg._sum.amount || 0;
+
+    const rawBalance = Math.max(0, vendor.walletBalance || 0);
+    const availableBalance = Math.max(0, rawBalance - pendingSum);
+
+    // All-time delivered product gross
+    const allDeliveredOrders = await prisma.order.findMany({
+      where: {
+        vendorId: req.user.vendorId,
+        status: 'delivered'
+      },
+      include: {
+        items: { select: { price: true, quantity: true, basePrice: true } }
+      }
+    });
+
+    const allTimeGross = allDeliveredOrders.reduce((sum, o) => {
+      const itTot = o.items?.reduce((s, it) => s + ((it.price || it.basePrice || 0) * (it.quantity || 1)), 0) || (o.total || 0);
+      return sum + itTot;
+    }, 0);
+
     res.json({
-      walletBalance:   vendor.walletBalance,
-      commissionRate:  vendor.commissionRate,
-      grossRevenue,
-      totalCommission,
-      netEarnings:     grossRevenue - totalCommission,
-      orderCount:      earnings._count.id || 0,
-      allTimeGross:    allTimeEarnings._sum.total || 0,
-      allTimeCommission: allTimeEarnings._sum.commission || 0,
+      walletBalance: rawBalance,
+      availableBalance,
+      pendingPayouts: pendingSum,
+      commissionRate: 0, // 0% deduction under Vendor Net Protection Model
+      grossRevenue: Math.round(grossRevenue * 100) / 100,
+      totalCommission: 0,
+      netEarnings: Math.round(grossRevenue * 100) / 100,
+      orderCount,
+      allTimeGross: Math.round(allTimeGross * 100) / 100,
+      allTimeCommission: 0,
       transactions,
       bankDetails: {
         accountHolder: vendor.accountHolder,
         accountNumber: vendor.accountNumber,
         ifsc: vendor.ifsc,
         bankName: vendor.bankName,
+        upiId: vendor.upiId,
       },
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    console.error('[VendorWallet] GET error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-/** GET /api/vendor/wallet/transactions — recent paid orders as ledger */
+/** GET /api/vendor/wallet/transactions — recent delivered orders */
 router.get('/transactions', async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const where = { vendorId: req.user.vendorId, paymentStatus: 'paid' };
+    const where = { vendorId: req.user.vendorId, status: 'delivered' };
     const pageNum = Number(page);
     const limitNum = Number(limit);
 
@@ -143,49 +178,46 @@ router.get('/transactions', async (req, res) => {
 router.post('/withdraw', async (req, res) => {
   try {
     const { amount } = req.body;
+    const withdrawAmt = parseFloat(amount);
     const vendor = await prisma.vendor.findUnique({ where: { id: req.user.vendorId } });
     if (!vendor) return res.status(404).json({ error: 'Vendor not found.' });
 
-    const pendingWithdrawals = await prisma.transaction.aggregate({
-      where: { userId: vendor.userId, type: 'withdrawal', status: 'pending' },
+    const pendingPayoutsAgg = await prisma.payoutRequest.aggregate({
+      where: {
+        partyType: 'VENDOR',
+        partyId: vendor.id,
+        status: { in: ['pending', 'approved'] }
+      },
       _sum: { amount: true }
     });
-    const pendingSum = pendingWithdrawals._sum.amount || 0;
-    const available = vendor.walletBalance - pendingSum;
+    const pendingSum = pendingPayoutsAgg._sum.amount || 0;
+    const available = Math.max(0, (vendor.walletBalance || 0) - pendingSum);
 
-    if (amount <= 0 || amount > available) {
-      return res.status(400).json({ error: 'Invalid withdrawal amount or insufficient available balance.' });
+    if (isNaN(withdrawAmt) || withdrawAmt <= 0 || withdrawAmt > available) {
+      return res.status(400).json({
+        error: `Invalid withdrawal amount or insufficient available balance (Available: ₹${available}).`
+      });
     }
 
-    const [tx, payoutReq] = await prisma.$transaction([
-      prisma.transaction.create({
-        data: {
-          userId: vendor.userId,
-          type: 'withdrawal',
-          amount: parseFloat(amount),
-          status: 'pending',
-          gatewayRef: 'withdrawal_request'
-        }
-      }),
-      prisma.payoutRequest.create({
-        data: {
-          partyType: 'VENDOR',
-          partyId: vendor.id,
-          vendorId: vendor.id,
-          amount: parseFloat(amount),
-          status: 'pending',
-          bankSnapshot: {
-            accountHolder: vendor.accountHolder,
-            accountNumber: vendor.accountNumber,
-            ifsc: vendor.ifsc,
-            bankName: vendor.bankName,
-            upiId: vendor.upiId,
-          },
-        }
-      })
-    ]);
+    const payoutReq = await prisma.payoutRequest.create({
+      data: {
+        partyType: 'VENDOR',
+        partyId: vendor.id,
+        vendorId: vendor.id,
+        amount: withdrawAmt,
+        status: 'pending',
+        bankSnapshot: {
+          accountHolder: vendor.accountHolder,
+          accountNumber: vendor.accountNumber,
+          ifsc: vendor.ifsc,
+          bankName: vendor.bankName,
+          upiId: vendor.upiId,
+        },
+      }
+    });
 
     res.json({
+      success: true,
       message: 'Withdrawal request submitted for approval.',
       walletBalance: vendor.walletBalance,
       payoutRequestId: payoutReq.id

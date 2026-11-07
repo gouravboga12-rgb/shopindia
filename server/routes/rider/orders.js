@@ -479,6 +479,44 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
         riderProfileId: profile.id,
         deliveryFee: feeToCredit,
       });
+
+      // Credit Vendor Wallet (Vendor Net Model: Vendor receives 100% of product price)
+      if (delivery.order?.vendorId) {
+        const orderForVendor = await tx.order.findUnique({
+          where: { id: delivery.orderId },
+          include: { items: true }
+        });
+        if (orderForVendor) {
+          const vendorEarning = orderForVendor.items?.reduce(
+            (sum, it) => sum + ((it.price || it.basePrice || 0) * (it.quantity || 1)),
+            0
+          ) || (orderForVendor.total || 0);
+
+          if (vendorEarning > 0) {
+            await tx.vendor.update({
+              where: { id: delivery.order.vendorId },
+              data: { walletBalance: { increment: vendorEarning } }
+            });
+
+            await tx.orderItem.updateMany({
+              where: { orderId: delivery.orderId },
+              data: { vendorPaidOut: true }
+            });
+
+            await tx.ledgerEntry.create({
+              data: {
+                type: 'CREDIT',
+                party: 'VENDOR',
+                partyId: delivery.order.vendorId,
+                amount: vendorEarning,
+                entryType: 'VENDOR_CREDIT',
+                orderId: delivery.orderId,
+                description: `Vendor 100% payout credit for delivered Order #${orderForVendor.orderNumber || delivery.orderId}`
+              }
+            }).catch(err => console.warn('[RiderOrders] Vendor ledger warning:', err.message));
+          }
+        }
+      }
     });
 
     emitDeliveryStageChange(req.params.id, { stage: 'delivered' });

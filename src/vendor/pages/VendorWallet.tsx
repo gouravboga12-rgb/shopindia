@@ -39,7 +39,15 @@ export const VendorWallet: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => {
+      api.get<any>('/api/vendor/wallet')
+        .then(d => setWallet(d))
+        .catch(() => {});
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (wallet?.bankDetails) {
@@ -223,12 +231,12 @@ export const VendorWallet: React.FC = () => {
 
   if (loading) return <div className="h-40 skeleton-shimmer rounded-2xl" />;
 
-  const pendingSum = wallet?.transactions
+  const pendingSum = wallet?.pendingPayouts ?? (wallet?.transactions
     ?.filter((t: any) => t.type === 'withdrawal' && t.status === 'pending')
-    ?.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0) || 0;
+    ?.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0) || 0);
   
-  const rawBalance = wallet?.walletBalance || 0;
-  const availableBalance = rawBalance - pendingSum;
+  const rawBalance = Math.max(0, wallet?.walletBalance || 0);
+  const availableBalance = Math.max(0, rawBalance - pendingSum);
 
   return (
     <div className="space-y-6">
@@ -237,7 +245,7 @@ export const VendorWallet: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-heading">Vendor Wallet & Payouts</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Monitor earnings ledger, platform commission deductions, date-filtered transactions, and request bank payouts (FR-02.5)
+            Monitor earnings ledger, verified settlements, date-filtered transactions, and request bank payouts
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -274,23 +282,21 @@ export const VendorWallet: React.FC = () => {
               </span>
             )}
           </div>
-          <div className="flex items-center justify-between text-xs text-white/80 pt-1 border-t border-white/20">
-            <span>Commission Rate: <strong>{wallet?.commissionRate || 10}%</strong></span>
-            {availableBalance <= 0 && (
-              <span className="text-[10px] bg-amber-400/30 text-amber-100 px-1.5 py-0.5 rounded font-semibold">
-                Settles on deliveries
-              </span>
-            )}
+          <div className="flex items-center justify-between text-xs text-white/90 pt-1 border-t border-white/20">
+            <span>Vendor Net: <strong>100% Product Price</strong></span>
+            <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
+              Zero Commission Cuts
+            </span>
           </div>
         </div>
 
         {/* Card 2: Gross Sales Revenue */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-premium space-y-2 relative">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gross Sales Revenue (All-Time)</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gross Sales Revenue (Delivered)</p>
           <p className="text-2xl font-black text-gray-900 font-numbers">₹{(wallet?.allTimeGross || wallet?.grossRevenue || 0).toLocaleString('en-IN')}</p>
           <div className="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-100">
-            <span className="text-red-500 font-bold">-₹{(wallet?.allTimeCommission || wallet?.totalCommission || 0).toLocaleString('en-IN')} Platform Comm.</span>
-            <span className="text-emerald-600 font-bold font-numbers">{wallet?.orderCount || 0} Paid Orders</span>
+            <span className="text-emerald-700 font-bold flex items-center gap-1">✓ 100% Net to Vendor</span>
+            <span className="text-emerald-600 font-bold font-numbers">{wallet?.orderCount || 0} Delivered Orders</span>
           </div>
         </div>
 
@@ -299,17 +305,22 @@ export const VendorWallet: React.FC = () => {
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Building2 size={13} className="text-gray-400" />
-              Settled Bank Account
+              Settled Bank &amp; UPI Details
             </p>
             <button
               onClick={() => setBankModal(true)}
               className="px-2.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
             >
-              {wallet?.bankDetails?.bankName ? 'Edit Details' : 'Link Account'}
+              {wallet?.bankDetails?.bankName || wallet?.bankDetails?.upiId ? 'Edit Details' : 'Link Account'}
             </button>
           </div>
-          <p className="text-base font-black text-gray-900">{wallet?.bankDetails?.bankName || 'No Bank Linked'}</p>
-          <p className="text-xs font-mono text-gray-600 font-semibold">{wallet?.bankDetails?.accountNumber || 'Add account to receive NEFT/IMPS transfers'}</p>
+          <p className="text-base font-black text-gray-900">{wallet?.bankDetails?.bankName || 'Primary Bank'}</p>
+          <p className="text-xs font-mono text-gray-600 font-semibold">
+            {wallet?.bankDetails?.accountNumber ? `A/C: ${wallet.bankDetails.accountNumber}` : 'Add account to receive NEFT/IMPS transfers'}
+          </p>
+          {wallet?.bankDetails?.upiId && (
+            <p className="text-xs font-mono font-bold text-emerald-700">⚡ UPI: {wallet.bankDetails.upiId}</p>
+          )}
           {wallet?.bankDetails?.ifsc && (
             <p className="text-[11px] font-mono text-gray-400 uppercase">IFSC: {wallet.bankDetails.ifsc}</p>
           )}

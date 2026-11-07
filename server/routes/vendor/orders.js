@@ -193,27 +193,27 @@ router.delete('/:id', async (req, res) => {
     const orderId = req.params.id;
 
     await prisma.$transaction(async (tx) => {
-      // Revert vendor wallet balance if order was delivered & credited, ensuring non-negative balance
-      if (existing.status === 'delivered' && existing.paymentStatus === 'paid' && existing.total) {
+      // Revert vendor wallet balance if order was delivered & credited (Vendor Net: 100% of vendor items price)
+      if (existing.status === 'delivered') {
+        const orderItems = await tx.orderItem.findMany({ where: { orderId } });
+        const vendorEarningsToRevert = orderItems.reduce(
+          (sum, it) => sum + ((it.price || 0) * (it.quantity || 1)),
+          0
+        ) || (existing.total || 0);
+
         const vendor = await tx.vendor.findUnique({ where: { id: req.user.vendorId } });
-        if (vendor) {
-          const commRateRaw = Number(vendor.commissionRate) || 10;
-          const commRate = commRateRaw > 1 ? commRateRaw / 100 : commRateRaw;
-          const commission = (existing.commission != null && existing.commission > 0)
-            ? existing.commission
-            : (existing.total * commRate);
-          const netEarnings = Math.max(0, existing.total - commission);
+        if (vendor && vendorEarningsToRevert > 0) {
           await tx.vendor.update({
             where: { id: req.user.vendorId },
-            data: { walletBalance: Math.max(0, (vendor.walletBalance || 0) - netEarnings) },
+            data: { walletBalance: Math.max(0, (vendor.walletBalance || 0) - vendorEarningsToRevert) },
           });
         }
       }
 
-      // 1. Detach non-cascading foreign keys
+      // Purge related ledger and transaction rows so deleted order completely disappears from wallet history
+      await tx.ledgerEntry.deleteMany({ where: { orderId } }).catch(() => {});
+      await tx.transaction.deleteMany({ where: { orderId } }).catch(() => {});
       await tx.ticket.updateMany({ where: { orderId }, data: { orderId: null } });
-      await tx.ledgerEntry.updateMany({ where: { orderId }, data: { orderId: null } });
-      await tx.transaction.updateMany({ where: { orderId }, data: { orderId: null } });
 
       // 2. Detach review references from order items
       const orderItems = await tx.orderItem.findMany({ where: { orderId }, select: { id: true } });
