@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
       },
       include: {
         items: {
-          select: { price: true, quantity: true, basePrice: true }
+          select: { price: true, quantity: true, vendorPrice: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
 
     const saleTransactions = orders.map(o => {
       const vendorItemsTotal = o.items?.reduce(
-        (sum, it) => sum + ((it.price || it.basePrice || 0) * (it.quantity || 1)),
+        (sum, it) => sum + ((it.price || it.vendorPrice || 0) * (it.quantity || 1)),
         0
       ) || (o.total || 0);
 
@@ -110,12 +110,12 @@ router.get('/', async (req, res) => {
         status: 'delivered'
       },
       include: {
-        items: { select: { price: true, quantity: true, basePrice: true } }
+        items: { select: { price: true, quantity: true, vendorPrice: true } }
       }
     });
 
     const allTimeGross = allDeliveredOrders.reduce((sum, o) => {
-      const itTot = o.items?.reduce((s, it) => s + ((it.price || it.basePrice || 0) * (it.quantity || 1)), 0) || (o.total || 0);
+      const itTot = o.items?.reduce((s, it) => s + ((it.price || it.vendorPrice || 0) * (it.quantity || 1)), 0) || (o.total || 0);
       return sum + itTot;
     }, 0);
 
