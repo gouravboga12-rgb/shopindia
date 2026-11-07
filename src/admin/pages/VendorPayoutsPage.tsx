@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   Wallet, CheckCircle2, XCircle, Clock, AlertTriangle,
   RefreshCw, ShieldCheck, Zap, Calendar, Store,
-  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText, Copy
+  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText, Copy, Building2
 } from 'lucide-react';
 
 interface PayoutRequestItem {
@@ -37,9 +37,14 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
 
   // Modal State for Disbursing Payout (Marking Paid with UTR)
   const [activePayoutForComplete, setActivePayoutForComplete] = useState<PayoutRequestItem | null>(null);
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState<'UPI Transfer' | 'Bank Transfer'>('UPI Transfer');
   const [utrNumber, setUtrNumber] = useState<string>('');
   const [payoutNotes, setPayoutNotes] = useState<string>('');
   const [processingAction, setProcessingAction] = useState<boolean>(false);
+
+  // Vendor Statement & Ledger Modal
+  const [activeVendorLedger, setActiveVendorLedger] = useState<any | null>(null);
+  const [ledgerTab, setLedgerTab] = useState<'orders' | 'payouts'>('orders');
 
   // Modal State for Rejection
   const [activePayoutForReject, setActivePayoutForReject] = useState<PayoutRequestItem | null>(null);
@@ -120,6 +125,19 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
     }
   };
 
+  const openVendorLedger = async (vendorId: string) => {
+    try {
+      const res: any = await api.get(`/api/admin/payouts/vendor/${vendorId}/ledger`);
+      if (res?.success) {
+        setActiveVendorLedger(res);
+      } else {
+        alert(res?.error || 'Failed to load vendor ledger.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to load vendor ledger.');
+    }
+  };
+
   const handleDisburseWithUTR = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePayoutForComplete) return;
@@ -127,9 +145,10 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
     try {
       setProcessingAction(true);
       const res: any = await api.post(`/api/admin/payouts/${activePayoutForComplete.id}/complete`, {
+        paymentMode: selectedPaymentMode,
         utr: utrNumber.trim(),
         razorpayPayoutId: utrNumber.trim(),
-        notes: payoutNotes.trim() || 'Disbursed via Super Admin Portal',
+        notes: payoutNotes.trim() || `Transferred via ${selectedPaymentMode}`,
       });
 
       if (res?.success) {
@@ -555,6 +574,15 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {vendor?.id && (
+                            <button
+                              onClick={() => openVendorLedger(vendor.id)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+                              title="View full delivered orders and payouts ledger for this vendor"
+                            >
+                              View Ledger
+                            </button>
+                          )}
                           {onOpenStatement && vendor?.id && (
                             <button
                               onClick={() => onOpenStatement('VENDOR', vendor.id, vendor.businessName)}
@@ -706,12 +734,42 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
 
             <form onSubmit={handleDisburseWithUTR} className="space-y-3">
               <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Disbursement Payment Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMode('UPI Transfer')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      selectedPaymentMode === 'UPI Transfer'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>⚡ UPI Transfer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMode('Bank Transfer')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      selectedPaymentMode === 'Bank Transfer'
+                        ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>🏦 Bank Transfer</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Bank / Razorpay UTR Reference Number <span className="text-slate-400 font-normal">(Optional)</span>
+                  Bank / UPI Transaction Reference (UTR Number)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. CMS182947192, UTR-20261023-01, or leave empty for direct clearance"
+                  placeholder={selectedPaymentMode === 'UPI Transfer' ? 'e.g. 431209847123 or UPI RRN' : 'e.g. CMS182947192, IMPS UTR'}
                   value={utrNumber}
                   onChange={e => setUtrNumber(e.target.value)}
                   className="w-full text-xs font-mono px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -971,6 +1029,187 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                 }`}
               >
                 {suspending ? 'Updating...' : suspendTarget.isSuspended ? 'Confirm Reactivation' : 'Confirm Suspension'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Full Statement of Accounts & Ledger for Vendor */}
+      {activeVendorLedger && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-2xl">
+                  <Store className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">{activeVendorLedger.vendor.businessName}</h3>
+                  <p className="text-xs text-slate-500">Merchant Statement of Accounts &amp; Outstanding Ledger</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveVendorLedger(null)} className="text-slate-400 hover:text-slate-600 p-1 text-sm font-bold">✕</button>
+            </div>
+
+            {/* 3 Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">All-Time Delivered Sales</p>
+                <p className="text-xl font-black text-slate-900 mt-1 font-mono">{formatINR(activeVendorLedger.summary.totalEarned)}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">100% vendor product earnings</p>
+              </div>
+
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                <p className="text-[10.5px] font-bold text-emerald-700 uppercase tracking-wider">Total Disbursed (Cleared)</p>
+                <p className="text-xl font-black text-emerald-800 mt-1 font-mono">{formatINR(activeVendorLedger.summary.totalCleared)}</p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Transferred with Bank UTR reference</p>
+              </div>
+
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                <p className="text-[10.5px] font-bold text-amber-700 uppercase tracking-wider">Pending from Shop India</p>
+                <p className="text-xl font-black text-amber-800 mt-1 font-mono">{formatINR(activeVendorLedger.summary.pendingBalance)}</p>
+                <p className="text-[10px] text-amber-600 mt-0.5">Awaiting payout disbursement</p>
+              </div>
+            </div>
+
+            {/* Bank Coordinates */}
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px] uppercase">Bank Account</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {activeVendorLedger.vendor.accountNumber ? `${activeVendorLedger.vendor.bankName || 'Bank'} (A/C: ${activeVendorLedger.vendor.accountNumber})` : 'No bank account added'}
+                </span>
+                {activeVendorLedger.vendor.ifsc && (
+                  <span className="text-[10px] font-mono text-slate-500 ml-2">IFSC: {activeVendorLedger.vendor.ifsc}</span>
+                )}
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px] uppercase">Fast UPI ID</span>
+                <span className="font-mono font-bold text-emerald-700">
+                  {activeVendorLedger.vendor.upiId ? `⚡ ${activeVendorLedger.vendor.upiId}` : 'No UPI added'}
+                </span>
+              </div>
+            </div>
+
+            {/* Tabs: Orders Ledger vs Payouts */}
+            <div className="flex items-center gap-2 border-b border-slate-100 pt-1">
+              <button
+                type="button"
+                onClick={() => setLedgerTab('orders')}
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  ledgerTab === 'orders'
+                    ? 'border-emerald-600 text-emerald-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Delivered Orders ({activeVendorLedger.orders.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLedgerTab('payouts')}
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  ledgerTab === 'payouts'
+                    ? 'border-emerald-600 text-emerald-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Disbursement History ({activeVendorLedger.payouts.length})
+              </button>
+            </div>
+
+            {/* TAB CONTENT: Orders */}
+            {ledgerTab === 'orders' && (
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b text-[10px] font-bold text-slate-500 uppercase">
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Order #</th>
+                      <th className="py-2.5 px-3">Customer</th>
+                      <th className="py-2.5 px-3">Items</th>
+                      <th className="py-2.5 px-3 text-right">Vendor Price</th>
+                      <th className="py-2.5 px-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {activeVendorLedger.orders.map((o: any) => (
+                      <tr key={o.id} className="hover:bg-slate-50/60">
+                        <td className="py-2.5 px-3 font-mono text-slate-600 text-[11px]">
+                          {new Date(o.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">#{o.orderNumber}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-bold text-slate-800 block">{o.customerName}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{o.customerPhone}</span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {o.items?.map((it: any, i: number) => (
+                            <span key={i} className="text-[11px] text-slate-600 block">
+                              {it.name} ×{it.quantity}
+                            </span>
+                          ))}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900">{formatINR(o.totalDue)}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase ${
+                            o.isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {o.isPaid ? 'Cleared & Paid' : 'Pending from Shop India'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* TAB CONTENT: Payouts */}
+            {ledgerTab === 'payouts' && (
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b text-[10px] font-bold text-slate-500 uppercase">
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Ref</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Mode</th>
+                      <th className="py-2.5 px-3">Bank UTR</th>
+                      <th className="py-2.5 px-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {activeVendorLedger.payouts.map((p: any) => (
+                      <tr key={p.id} className="hover:bg-slate-50/60">
+                        <td className="py-2.5 px-3 font-mono text-slate-600 text-[11px]">
+                          {new Date(p.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{p.payoutRef}</td>
+                        <td className="py-2.5 px-3 font-mono font-black text-emerald-700">{formatINR(p.amount)}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-bold text-slate-700 text-[10.5px]">{p.paymentMode}</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-800 font-bold">{p.utr || '—'}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                            {p.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveVendorLedger(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Close Ledger
               </button>
             </div>
           </div>

@@ -47,12 +47,13 @@ router.get('/summary', async (req, res) => {
     }
 
     // Match orders that contain at least one item from this vendor or have order.vendorId set
+    // Strictly exclude cancelled and refunded orders
     const vendorOrderCondition = {
       OR: [
         { vendorId },
         { items: { some: { vendorId } } },
       ],
-      status: { not: 'cancelled' },
+      status: { notIn: ['cancelled', 'refunded'] },
     };
 
     // Fetch all relevant orders within the selected period
@@ -76,14 +77,17 @@ router.get('/summary', async (req, res) => {
       }),
     ]);
 
-    // Calculate all-time totals strictly for this vendor's items
+    // Calculate all-time totals strictly for DELIVERED orders of this vendor
     let allTimeGross = 0;
     let allTimeNet = 0;
+    let allTimeDeliveredCount = 0;
     allTimeOrders.forEach(order => {
+      if (order.status !== 'delivered') return;
+      allTimeDeliveredCount += 1;
       const vendorItems = order.items.filter(it => it.vendorId === vendorId || (!it.vendorId && order.vendorId === vendorId));
       vendorItems.forEach(it => {
-        const itemGross = (it.price || 0) * (it.quantity || 1);
-        const itemNet = (it.vendorPrice != null ? it.vendorPrice : (it.price || 0) * 0.9) * (it.quantity || 1);
+        const itemGross = (it.price || it.vendorPrice || 0) * (it.quantity || 1);
+        const itemNet = (it.vendorPrice != null ? it.vendorPrice : (it.price || 0)) * (it.quantity || 1);
         allTimeGross += itemGross;
         allTimeNet += itemNet;
       });
@@ -92,6 +96,7 @@ router.get('/summary', async (req, res) => {
     // Calculate period stats
     let periodGross = 0;
     let periodNet = 0;
+    let periodDeliveredCount = 0;
     const statusMap = {};
     const productMap = {};
     const dailyMap = {};
@@ -108,27 +113,33 @@ router.get('/summary', async (req, res) => {
       let orderVendorGross = 0;
       let orderVendorNet = 0;
 
-      const day = order.createdAt.toISOString().slice(0, 10);
-      if (!dailyMap[day]) dailyMap[day] = { _id: day, revenue: 0, netPayout: 0, orders: 0 };
-      dailyMap[day].orders += 1;
-
       vendorItems.forEach(item => {
-        const gross = (item.price || 0) * (item.quantity || 1);
-        const net = (item.vendorPrice != null ? item.vendorPrice : (item.price || 0) * 0.9) * (item.quantity || 1);
-
+        const gross = (item.price || item.vendorPrice || 0) * (item.quantity || 1);
+        const net = (item.vendorPrice != null ? item.vendorPrice : (item.price || 0)) * (item.quantity || 1);
         orderVendorGross += gross;
         orderVendorNet += net;
-        periodGross += gross;
-        periodNet += net;
-
-        dailyMap[day].revenue += gross;
-        dailyMap[day].netPayout += net;
-
-        const pId = item.productId || item.name;
-        if (!productMap[pId]) productMap[pId] = { _id: pId, name: item.name, revenue: 0, sold: 0 };
-        productMap[pId].revenue += gross;
-        productMap[pId].sold += item.quantity;
       });
+
+      // ONLY delivered orders contribute to revenue, charts, and product sales metrics
+      if (order.status === 'delivered') {
+        periodDeliveredCount += 1;
+        periodGross += orderVendorGross;
+        periodNet += orderVendorNet;
+
+        const day = order.createdAt.toISOString().slice(0, 10);
+        if (!dailyMap[day]) dailyMap[day] = { _id: day, revenue: 0, netPayout: 0, orders: 0 };
+        dailyMap[day].orders += 1;
+        dailyMap[day].revenue += orderVendorGross;
+        dailyMap[day].netPayout += orderVendorNet;
+
+        vendorItems.forEach(item => {
+          const gross = (item.price || item.vendorPrice || 0) * (item.quantity || 1);
+          const pId = item.productId || item.name;
+          if (!productMap[pId]) productMap[pId] = { _id: pId, name: item.name, revenue: 0, sold: 0 };
+          productMap[pId].revenue += gross;
+          productMap[pId].sold += item.quantity;
+        });
+      }
 
       rawOrders.push({
         orderNumber: order.orderNumber,
@@ -166,13 +177,13 @@ router.get('/summary', async (req, res) => {
       allTime: {
         total: Math.round(allTimeGross * 100) / 100,
         netPayout: Math.round(allTimeNet * 100) / 100,
-        count: allTimeOrders.length,
+        count: allTimeDeliveredCount,
       },
       period: {
         total: Math.round(periodGross * 100) / 100,
         netPayout: Math.round(periodNet * 100) / 100,
-        commission: Math.round((periodGross - periodNet) * 100) / 100,
-        count: periodOrders.length,
+        commission: 0,
+        count: periodDeliveredCount,
       },
       ordersByStatus,
       topProducts,

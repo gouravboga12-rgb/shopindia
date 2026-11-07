@@ -172,8 +172,9 @@ router.post('/:id/approve', async (req, res) => {
 router.post('/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
-    const { utr, razorpayPayoutId, utrNumber, notes } = req.body;
+    const { utr, razorpayPayoutId, utrNumber, paymentMode, notes } = req.body;
     const finalUtr = (utr || razorpayPayoutId || utrNumber || '').trim();
+    const finalMode = (paymentMode || 'UPI Transfer').trim();
 
     const request = await prisma.payoutRequest.findUnique({ where: { id } });
     if (!request) return res.status(404).json({ error: 'Payout request not found.' });
@@ -182,8 +183,10 @@ router.post('/:id/complete', async (req, res) => {
       return res.status(400).json({ error: 'This payout has already been marked as completed.' });
     }
 
+    const noteText = `[Mode: ${finalMode}]${finalUtr ? ` [UTR: ${finalUtr}]` : ''}${notes ? ` - ${notes}` : ''}`;
+
     // Execute in database transaction:
-    // 1. Mark request completed (UTR is optional)
+    // 1. Mark request completed (UTR is stored in razorpayPayoutId)
     // 2. Decrement partner walletBalance
     // 3. Post immutable LedgerEntry (PAYOUT DEBIT)
     const result = await prisma.$transaction(async (tx) => {
@@ -193,11 +196,185 @@ router.post('/:id/complete', async (req, res) => {
           status: 'completed',
           processedAt: new Date(),
           razorpayPayoutId: finalUtr || null,
-          notes: notes
-            ? `${request.notes || ''}\n[Completed${finalUtr ? ` UTR: ${finalUtr}` : ''}]: ${notes}`.trim()
-            : (finalUtr ? `UTR: ${finalUtr}` : 'Disbursed via Super Admin Portal'),
+          notes: request.notes ? `${request.notes}\n${noteText}` : noteText,
         },
       });
+
+      // Update wallet and ledger based on partyType
+      if (request.partyType === 'VENDOR' && request.vendorId) {
+        await tx.vendor.update({
+          where: { id: request.vendorId },
+          data: { walletBalance: { decrement: request.amount } },
+        });
+
+        await tx.ledgerEntry.create({
+          data: {
+            type: 'DEBIT',
+            party: 'VENDOR',
+            partyId: request.vendorId,
+            vendorId: request.vendorId,
+            amount: request.amount,
+            entryType: 'PAYOUT',
+            description: `Merchant Payout #${completedRequest.id.slice(0, 8)} (${finalMode}${finalUtr ? ` UTR: ${finalUtr}` : ''})`,
+            metadata: JSON.stringify({ payoutId: completedRequest.id, utr: finalUtr, paymentMode: finalMode }),
+          },
+        });
+      }
+
+      return completedRequest;
+    });
+
+    res.json({
+      success: true,
+      message: `Payout of ₹${request.amount.toLocaleString('en-IN')} marked as completed via ${finalMode}${finalUtr ? ` (UTR: ${finalUtr})` : ''}.`,
+      payout: result,
+    });
+  } catch (err) {
+    console.error('[AdminPayouts] Complete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/payouts/vendor/:vendorId/ledger
+ * Complete statement of accounts for a specific vendor (Delivered orders, paid vs unpaid, customer details)
+ */
+router.get('/vendor/:vendorId/ledger', async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: { user: { select: { name: true, phone: true, email: true } } }
+    });
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found.' });
+
+    // 1. Fetch delivered orders strictly
+    const deliveredOrders = await prisma.order.findMany({
+      where: {
+        vendorId,
+        status: 'delivered',
+      },
+      include: {
+        customer: { select: { name: true, phone: true, email: true } },
+        items: {
+          select: {
+            id: true,
+            name: true,
+            quantity: true,
+            price: true,
+            vendorPrice: true,
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // 2. Fetch all payout requests for this vendor
+    const payouts = await prisma.payoutRequest.findMany({
+      where: { partyType: 'VENDOR', partyId: vendorId },
+      orderBy: { requestedAt: 'desc' }
+    });
+
+    let totalEarned = 0;
+    const ordersList = deliveredOrders.map(o => {
+      const orderTotal = o.items.reduce((sum, it) => {
+        const itemVal = (it.vendorPrice != null ? it.vendorPrice : (it.price || 0)) * (it.quantity || 1);
+        return sum + itemVal;
+      }, 0);
+      totalEarned += orderTotal;
+
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber || o.id.slice(0, 8),
+        date: o.createdAt,
+        customerName: o.customer?.name || 'Customer',
+        customerPhone: o.customer?.phone || '',
+        customerEmail: o.customer?.email || '',
+        items: o.items.map(it => ({
+          name: it.name,
+          quantity: it.quantity,
+          unitPrice: it.vendorPrice != null ? it.vendorPrice : it.price,
+          totalPrice: (it.vendorPrice != null ? it.vendorPrice : it.price) * it.quantity,
+        })),
+        totalDue: Math.round(orderTotal * 100) / 100,
+      };
+    });
+
+    let totalCleared = 0;
+    let pendingPayoutsSum = 0;
+
+    const formattedPayouts = payouts.map(p => {
+      if (p.status === 'completed') totalCleared += p.amount;
+      if (p.status === 'pending' || p.status === 'approved') pendingPayoutsSum += p.amount;
+
+      let paymentMode = 'Bank Transfer';
+      const nLower = (p.notes || '').toLowerCase();
+      if (nLower.includes('upi') || (p.bankSnapshot && p.bankSnapshot.upiId)) paymentMode = 'UPI Transfer';
+
+      let utr = p.razorpayPayoutId || '';
+      if (!utr && p.notes) {
+        const m = p.notes.match(/UTR[:\s]+([A-Za-z0-9_-]+)/i);
+        if (m) utr = m[1];
+      }
+
+      return {
+        id: p.id,
+        payoutRef: 'PO-' + p.id.slice(0, 8).toUpperCase(),
+        date: p.processedAt || p.requestedAt,
+        amount: p.amount,
+        status: p.status,
+        paymentMode,
+        utr: utr || null,
+        notes: p.notes || '',
+        bankSnapshot: p.bankSnapshot,
+      };
+    });
+
+    const pendingBalance = Math.max(0, Math.round((totalEarned - totalCleared) * 100) / 100);
+
+    // Stamp which orders are cleared vs pending
+    let pool = totalCleared;
+    const ordersWithStatus = [...ordersList].reverse().map(ord => {
+      let isPaid = false;
+      if (pool >= ord.totalDue && ord.totalDue > 0) {
+        isPaid = true;
+        pool -= ord.totalDue;
+      }
+      return {
+        ...ord,
+        isPaid,
+        status: isPaid ? 'cleared' : 'pending_from_shopindia',
+      };
+    }).reverse();
+
+    res.json({
+      success: true,
+      vendor: {
+        id: vendor.id,
+        businessName: vendor.businessName,
+        contactName: vendor.contactName,
+        phone: vendor.phone,
+        email: vendor.email,
+        upiId: vendor.upiId,
+        accountHolder: vendor.accountHolder,
+        accountNumber: vendor.accountNumber,
+        ifsc: vendor.ifsc,
+        bankName: vendor.bankName,
+      },
+      summary: {
+        totalEarned: Math.round(totalEarned * 100) / 100,
+        totalCleared: Math.round(totalCleared * 100) / 100,
+        pendingBalance,
+        pendingPayoutsSum: Math.round(pendingPayoutsSum * 100) / 100,
+      },
+      orders: ordersWithStatus,
+      payouts: formattedPayouts,
+    });
+  } catch (err) {
+    console.error('[AdminPayouts] Vendor ledger error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
       // Update wallet and ledger based on partyType
       if (request.partyType === 'VENDOR' && request.vendorId) {

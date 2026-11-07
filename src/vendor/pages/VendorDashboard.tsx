@@ -22,7 +22,7 @@ export const VendorDashboard: React.FC = () => {
   }
 
   const pendingCount = data?.ordersByStatus
-    ?.filter((s: any) => !['delivered', 'cancelled'].includes(s._id))
+    ?.filter((s: any) => !['delivered', 'cancelled', 'refunded'].includes(s._id))
     ?.reduce((sum: number, s: any) => sum + s.count, 0) || 0;
 
   return (

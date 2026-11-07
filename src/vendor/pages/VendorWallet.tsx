@@ -7,47 +7,70 @@ import {
   Search,
   RefreshCw,
   X,
-  TrendingUp,
-  TrendingDown,
   Building2,
+  Clock,
+  CheckCircle2,
+  Copy,
+  Zap,
+  CreditCard,
+  ShoppingBag
 } from 'lucide-react';
 
 export const VendorWallet: React.FC = () => {
   const [wallet, setWallet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'payouts' | 'orders'>('payouts');
+
+  // Modal states
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [amount, setAmount] = useState<number>(1000);
+  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
 
   const [bankModal, setBankModal] = useState(false);
   const [bankName, setBankName] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [ifsc, setIfsc] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [submittingBank, setSubmittingBank] = useState(false);
 
-  // Date Filter & Table Controls
-  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'yesterday' | '7days' | '30days' | 'this_month' | 'custom'>('all');
+  // Filters
+  const [datePreset, setDatePreset] = useState<'all' | 'this_month' | 'last_month' | 'custom'>('all');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'sale' | 'withdrawal'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
 
-  const load = () => {
-    setLoading(true);
-    api.get<any>('/api/vendor/wallet')
-      .then(d => setWallet(d))
+  const loadWallet = (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
+    let url = '/api/vendor/wallet';
+    const params = new URLSearchParams();
+    if (datePreset === 'this_month') params.append('period', 'this_month');
+    if (datePreset === 'last_month') params.append('period', 'last_month');
+    if (datePreset === 'custom') {
+      if (customStart) params.append('from', customStart);
+      if (customEnd) params.append('to', customEnd);
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+
+    api.get<any>(url)
+      .then(d => {
+        if (d?.success) setWallet(d);
+      })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (showSpinner) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    load();
+    loadWallet(true);
     const interval = setInterval(() => {
-      api.get<any>('/api/vendor/wallet')
-        .then(d => setWallet(d))
-        .catch(() => {});
-    }, 8000);
+      loadWallet(false);
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [datePreset, customStart, customEnd]);
 
   useEffect(() => {
     if (wallet?.bankDetails) {
@@ -55,212 +78,162 @@ export const VendorWallet: React.FC = () => {
       setAccountHolder(wallet.bankDetails.accountHolder || '');
       setAccountNumber(wallet.bankDetails.accountNumber || '');
       setIfsc(wallet.bankDetails.ifsc || '');
+      setUpiId(wallet.bankDetails.upiId || '');
     }
   }, [wallet]);
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (amount <= 0) return;
+    setSubmittingWithdraw(true);
     try {
-      await api.post('/api/vendor/wallet/withdraw', { amount });
-      load();
+      const res: any = await api.post('/api/vendor/wallet/withdraw', { amount });
+      alert(res.message || 'Withdrawal request submitted successfully!');
       setWithdrawModal(false);
+      loadWallet(true);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Failed to submit withdrawal request.');
+    } finally {
+      setSubmittingWithdraw(false);
     }
   };
 
-  const handleSaveBankDetails = async () => {
+  const handleSaveBankDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingBank(true);
     try {
       await api.patch('/api/vendor/wallet/bank-details', {
         bankName,
         accountHolder,
         accountNumber,
-        ifsc
+        ifsc,
+        upiId,
       });
-      load();
+      alert('Bank & UPI details updated successfully!');
       setBankModal(false);
+      loadWallet(false);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Failed to save bank details.');
+    } finally {
+      setSubmittingBank(false);
     }
   };
 
-  // Helper to test if a transaction createdAt is within the chosen preset / range
-  const isWithinRange = (dateStr: string) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    const now = new Date();
-
-    if (datePreset === 'all') return true;
-
-    if (datePreset === 'today') {
-      return d.toDateString() === now.toDateString();
-    }
-
-    if (datePreset === 'yesterday') {
-      const yest = new Date(now);
-      yest.setDate(yest.getDate() - 1);
-      return d.toDateString() === yest.toDateString();
-    }
-
-    if (datePreset === '7days') {
-      const past7 = new Date(now);
-      past7.setDate(past7.getDate() - 7);
-      past7.setHours(0, 0, 0, 0);
-      return d >= past7 && d <= now;
-    }
-
-    if (datePreset === '30days') {
-      const past30 = new Date(now);
-      past30.setDate(past30.getDate() - 30);
-      past30.setHours(0, 0, 0, 0);
-      return d >= past30 && d <= now;
-    }
-
-    if (datePreset === 'this_month') {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return d >= startOfMonth && d <= now;
-    }
-
-    if (datePreset === 'custom') {
-      if (customStart) {
-        const s = new Date(customStart);
-        s.setHours(0, 0, 0, 0);
-        if (d < s) return false;
-      }
-      if (customEnd) {
-        const e = new Date(customEnd);
-        e.setHours(23, 59, 59, 999);
-        if (d > e) return false;
-      }
-      return true;
-    }
-
-    return true;
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedUtr(id);
+    setTimeout(() => setCopiedUtr(null), 2500);
   };
 
-  // Filtered transactions memo
-  const filteredTransactions = useMemo(() => {
-    if (!wallet?.transactions) return [];
-    return wallet.transactions.filter((t: any) => {
-      // 1. Date filter
-      if (!isWithinRange(t.createdAt)) return false;
-
-      // 2. Type filter
-      if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-
-      // 3. Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const noteMatch = t.note?.toLowerCase().includes(q);
-        const typeMatch = t.type?.toLowerCase().includes(q);
-        const statusMatch = t.status?.toLowerCase().includes(q);
-        const amountMatch = t.amount?.toString().includes(q);
-        if (!noteMatch && !typeMatch && !statusMatch && !amountMatch) return false;
-      }
-
-      return true;
+  // Filtered Payouts
+  const filteredPayouts = useMemo(() => {
+    if (!wallet?.payouts) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return wallet.payouts.filter((p: any) => {
+      if (!q) return true;
+      return (
+        p.payoutRef?.toLowerCase().includes(q) ||
+        p.utr?.toLowerCase().includes(q) ||
+        p.notes?.toLowerCase().includes(q) ||
+        p.amount?.toString().includes(q) ||
+        p.paymentMode?.toLowerCase().includes(q)
+      );
     });
-  }, [wallet?.transactions, datePreset, customStart, customEnd, typeFilter, searchQuery]);
+  }, [wallet?.payouts, searchQuery]);
 
-  // Dynamic metrics for the selected period
-  const periodStats = useMemo(() => {
-    let salesTotal = 0;
-    let withdrawalsTotal = 0;
-    let salesCount = 0;
-    let withdrawalsCount = 0;
-
-    for (const t of filteredTransactions) {
-      if (t.type === 'sale') {
-        salesTotal += (t.amount > 0 ? t.amount : 0);
-        salesCount++;
-      } else if (t.type === 'withdrawal') {
-        withdrawalsTotal += Math.abs(t.amount);
-        withdrawalsCount++;
-      }
-    }
-
-    return {
-      salesTotal,
-      withdrawalsTotal,
-      net: salesTotal - withdrawalsTotal,
-      totalCount: filteredTransactions.length,
-      salesCount,
-      withdrawalsCount
-    };
-  }, [filteredTransactions]);
+  // Filtered Delivered Orders
+  const filteredOrders = useMemo(() => {
+    if (!wallet?.ordersLedger) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return wallet.ordersLedger.filter((o: any) => {
+      if (!q) return true;
+      const matchItems = o.items?.some((it: any) => it.name.toLowerCase().includes(q));
+      return (
+        o.orderNumber?.toLowerCase().includes(q) ||
+        o.customerName?.toLowerCase().includes(q) ||
+        o.customerPhone?.includes(q) ||
+        o.totalDue?.toString().includes(q) ||
+        matchItems
+      );
+    });
+  }, [wallet?.ordersLedger, searchQuery]);
 
   // Export CSV
   const exportCSV = () => {
-    if (!filteredTransactions.length) {
-      alert('No transactions to export for the selected filter.');
-      return;
+    if (activeTab === 'payouts') {
+      if (!filteredPayouts.length) return alert('No payouts to export.');
+      const headers = ['Date', 'Payout Ref', 'Amount (INR)', 'Payment Mode', 'Bank UTR', 'Status', 'Notes'];
+      const rows = filteredPayouts.map((p: any) => [
+        `"${new Date(p.date).toLocaleString('en-IN')}"`,
+        `"${p.payoutRef}"`,
+        `"${p.amount}"`,
+        `"${p.paymentMode}"`,
+        `"${p.utr || '—'}"`,
+        `"${p.status}"`,
+        `"${(p.notes || '').replace(/"/g, '""')}"`,
+      ].join(','));
+      const blob = new Blob([headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payouts-statement-${datePreset}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    } else {
+      if (!filteredOrders.length) return alert('No orders to export.');
+      const headers = ['Order Date', 'Order #', 'Customer', 'Items', 'Total Due (INR)', 'Status'];
+      const rows = filteredOrders.map((o: any) => [
+        `"${new Date(o.date).toLocaleString('en-IN')}"`,
+        `"${o.orderNumber}"`,
+        `"${o.customerName}"`,
+        `"${o.items?.map((it: any) => `${it.name} (x${it.quantity})`).join('; ')}"`,
+        `"${o.totalDue}"`,
+        `"${o.settlementStatus === 'cleared' ? 'Cleared by Admin' : 'Pending from Shop India'}"`,
+      ].join(','));
+      const blob = new Blob([headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders-ledger-${datePreset}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
     }
-    const headers = ['Date', 'Time', 'Type', 'Amount (INR)', 'Status', 'Note/Reference'];
-    const rows = filteredTransactions.map((t: any) => {
-      const dateObj = t.createdAt ? new Date(t.createdAt) : null;
-      const dateStr = dateObj ? dateObj.toLocaleDateString('en-IN') : '—';
-      const timeStr = dateObj ? dateObj.toLocaleTimeString('en-IN') : '—';
-      return [
-        `"${dateStr}"`,
-        `"${timeStr}"`,
-        `"${t.type}"`,
-        `"${t.amount}"`,
-        `"${t.status}"`,
-        `"${(t.note || '').replace(/"/g, '""')}"`
-      ].join(',');
-    });
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `vendor-transactions-${datePreset}-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
-  const isFilterActive = datePreset !== 'all' || typeFilter !== 'all' || searchQuery.trim() !== '' || customStart !== '' || customEnd !== '';
+  if (loading && !wallet) {
+    return <div className="h-64 skeleton-shimmer rounded-2xl" />;
+  }
 
-  const clearAllFilters = () => {
-    setDatePreset('all');
-    setCustomStart('');
-    setCustomEnd('');
-    setTypeFilter('all');
-    setSearchQuery('');
-  };
-
-  if (loading) return <div className="h-40 skeleton-shimmer rounded-2xl" />;
-
-  const pendingSum = wallet?.pendingPayouts ?? (wallet?.transactions
-    ?.filter((t: any) => t.type === 'withdrawal' && t.status === 'pending')
-    ?.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0) || 0);
-  
-  const rawBalance = Math.max(0, wallet?.walletBalance || 0);
-  const availableBalance = Math.max(0, rawBalance - pendingSum);
+  const pendingAmount = wallet?.pendingFromShopIndia || 0;
+  const clearedAmount = wallet?.totalClearedByAdmin || 0;
+  const pendingRequestsSum = wallet?.pendingPayoutsSum || 0;
+  const availableToWithdraw = Math.max(0, pendingAmount - pendingRequestsSum);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans max-w-6xl mx-auto pb-12">
       {/* Top Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200/80 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-heading">Vendor Wallet & Payouts</h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Monitor earnings ledger, verified settlements, date-filtered transactions, and request bank payouts
+          <h1 className="text-2xl font-black text-gray-900 font-heading">Vendor Wallet & Settlement Ledger</h1>
+          <p className="text-xs text-gray-500 font-medium mt-0.5">
+            Transparent breakdown of outstanding balance from Shop India, verified bank UTR disbursements, and itemized orders
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={load}
+            onClick={() => loadWallet(true)}
             className="p-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-            title="Refresh Data"
+            title="Refresh Ledger"
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
           <button
-            onClick={() => setWithdrawModal(true)}
-            disabled={availableBalance <= 0}
-            className="px-4 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => {
+              setAmount(availableToWithdraw);
+              setWithdrawModal(true);
+            }}
+            disabled={availableToWithdraw <= 0}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowDownRight className="w-4 h-4" />
             <span>Request Payout</span>
@@ -268,426 +241,546 @@ export const VendorWallet: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Overview Stat Cards */}
+      {/* 3 Core Financial Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Available Wallet Balance */}
-        <div className="bg-gradient-to-br from-[#10B981] via-[#059669] to-[#047857] rounded-2xl p-6 text-white shadow-xl space-y-2 relative overflow-hidden">
-          <div className="absolute right-[-20px] top-[-20px] w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
-          <p className="text-xs uppercase font-bold tracking-wider text-white/80">Available Wallet Balance</p>
-          <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-black font-numbers">₹{availableBalance.toLocaleString('en-IN')}</p>
-            {pendingSum > 0 && (
-              <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                ₹{pendingSum} pending payout
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-between text-xs text-white/90 pt-1 border-t border-white/20">
-            <span>Vendor Net: <strong>100% Product Price</strong></span>
-            <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
-              Zero Commission Cuts
-            </span>
-          </div>
-        </div>
-
-        {/* Card 2: Gross Sales Revenue */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-premium space-y-2 relative">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gross Sales Revenue (Delivered)</p>
-          <p className="text-2xl font-black text-gray-900 font-numbers">₹{(wallet?.allTimeGross || wallet?.grossRevenue || 0).toLocaleString('en-IN')}</p>
-          <div className="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-100">
-            <span className="text-emerald-700 font-bold flex items-center gap-1">✓ 100% Net to Vendor</span>
-            <span className="text-emerald-600 font-bold font-numbers">{wallet?.orderCount || 0} Delivered Orders</span>
-          </div>
-        </div>
-
-        {/* Card 3: Settled Bank Account */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-premium space-y-2 relative group">
+        {/* Card 1: PENDING FROM SHOP INDIA (Outstanding Receivable) */}
+        <div className="bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 rounded-2xl p-6 text-white shadow-lg space-y-2 relative overflow-hidden">
+          <div className="absolute right-[-15px] top-[-15px] w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Building2 size={13} className="text-gray-400" />
-              Settled Bank &amp; UPI Details
+            <p className="text-xs uppercase font-extrabold tracking-wider text-amber-100 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Pending from Shop India</span>
             </p>
-            <button
-              onClick={() => setBankModal(true)}
-              className="px-2.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
-            >
-              {wallet?.bankDetails?.bankName || wallet?.bankDetails?.upiId ? 'Edit Details' : 'Link Account'}
-            </button>
-          </div>
-          <p className="text-base font-black text-gray-900">{wallet?.bankDetails?.bankName || 'Primary Bank'}</p>
-          <p className="text-xs font-mono text-gray-600 font-semibold">
-            {wallet?.bankDetails?.accountNumber ? `A/C: ${wallet.bankDetails.accountNumber}` : 'Add account to receive NEFT/IMPS transfers'}
-          </p>
-          {wallet?.bankDetails?.upiId && (
-            <p className="text-xs font-mono font-bold text-emerald-700">⚡ UPI: {wallet.bankDetails.upiId}</p>
-          )}
-          {wallet?.bankDetails?.ifsc && (
-            <p className="text-[11px] font-mono text-gray-400 uppercase">IFSC: {wallet.bankDetails.ifsc}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Transaction & Payout History Section with Date-Wise Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-premium overflow-hidden">
-        {/* Section Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-sm text-gray-900 font-heading">Transaction &amp; Payout History</h2>
-              <span className="text-[11px] font-bold px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                {filteredTransactions.length} records
-              </span>
-            </div>
-            <p className="text-[11px] text-gray-400 mt-0.5">Filter sales credits, commission debits, and withdrawal requests date-wise</p>
-          </div>
-
-          {/* Action buttons: Clear Filters & Export CSV */}
-          <div className="flex items-center gap-2">
-            {isFilterActive && (
-              <button
-                onClick={clearAllFilters}
-                className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
-              >
-                <X size={12} />
-                <span>Reset Filters</span>
-              </button>
-            )}
-            <button
-              onClick={exportCSV}
-              className="px-3 py-1.5 bg-[#0F2C59] hover:bg-[#1E3A8A] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap"
-              title="Download Statement CSV"
-            >
-              <Download size={13} />
-              <span>Export CSV</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Controls Bar (Date Presets + Custom Date Pickers + Type Filter + Search) */}
-        <div className="p-4 bg-gray-50/70 border-b border-gray-100 space-y-3">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            {/* Date Preset Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1 flex items-center gap-1 shrink-0">
-                <Calendar size={12} /> Date:
-              </span>
-              {[
-                { id: 'all', label: 'All Time' },
-                { id: 'today', label: 'Today' },
-                { id: 'yesterday', label: 'Yesterday' },
-                { id: '7days', label: 'Last 7 Days' },
-                { id: '30days', label: 'Last 30 Days' },
-                { id: 'this_month', label: 'This Month' },
-                { id: 'custom', label: 'Custom Range 📅' },
-              ].map(preset => (
-                <button
-                  key={preset.id}
-                  onClick={() => setDatePreset(preset.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    datePreset === preset.id
-                      ? 'bg-[#10B981] text-white shadow-xs'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100/70'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Type Filter & Search Bar */}
-            <div className="flex items-center gap-2 self-start lg:self-auto w-full lg:w-auto">
-              {/* Type Pill Toggle */}
-              <div className="inline-flex bg-white border border-gray-200 rounded-xl p-0.5 text-xs font-bold">
-                {[
-                  { id: 'all', label: 'All Types' },
-                  { id: 'sale', label: 'Sales (+)' },
-                  { id: 'withdrawal', label: 'Payouts (-)' },
-                ].map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTypeFilter(t.id as any)}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
-                      typeFilter === t.id
-                        ? 'bg-gray-900 text-white shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Quick Search */}
-              <div className="relative flex-1 lg:w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search order #, note..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 font-medium"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Custom Date Range Pickers (Visible when 'custom' is active) */}
-          {datePreset === 'custom' && (
-            <div className="p-3 bg-white rounded-xl border border-gray-200 flex flex-wrap items-center gap-3 animate-in fade-in duration-200">
-              <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
-                <Calendar size={13} className="text-[#10B981]" />
-                Select Custom Date Range:
-              </span>
-              <div className="flex items-center gap-2 text-xs">
-                <label className="text-gray-500 font-semibold">From:</label>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={e => setCustomStart(e.target.value)}
-                  className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#10B981]"
-                />
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <label className="text-gray-500 font-semibold">To:</label>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={e => setCustomEnd(e.target.value)}
-                  className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#10B981]"
-                />
-              </div>
-              {(customStart || customEnd) && (
-                <button
-                  onClick={() => { setCustomStart(''); setCustomEnd(''); }}
-                  className="text-xs text-rose-600 hover:underline font-bold"
-                >
-                  Clear Range
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Dynamic Period Summary Chips Banner */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-lg font-bold flex items-center gap-1">
-                <TrendingUp size={12} className="text-emerald-600" />
-                <span>Sales Credits:</span>
-                <span className="font-numbers font-black">+₹{periodStats.salesTotal.toLocaleString('en-IN')}</span>
-                <span className="text-[10px] text-emerald-600">({periodStats.salesCount})</span>
-              </span>
-
-              <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200/80 rounded-lg font-bold flex items-center gap-1">
-                <TrendingDown size={12} className="text-rose-600" />
-                <span>Withdrawals:</span>
-                <span className="font-numbers font-black">-₹{periodStats.withdrawalsTotal.toLocaleString('en-IN')}</span>
-                <span className="text-[10px] text-rose-600">({periodStats.withdrawalsCount})</span>
-              </span>
-
-              <span className="px-2.5 py-1 bg-blue-50 text-blue-900 border border-blue-200/80 rounded-lg font-bold flex items-center gap-1">
-                <span>Net Activity:</span>
-                <span className={`font-numbers font-black ${periodStats.net >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
-                  {periodStats.net >= 0 ? '+' : ''}₹{periodStats.net.toLocaleString('en-IN')}
-                </span>
-              </span>
-            </div>
-
-            <span className="text-[11px] text-gray-500 font-medium">
-              Showing <strong>{filteredTransactions.length}</strong> of {wallet?.transactions?.length || 0} transactions
+            <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold">
+              Outstanding
             </span>
           </div>
+
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-black font-numbers">₹{pendingAmount.toLocaleString('en-IN')}</p>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-amber-100 pt-2 border-t border-amber-400/40">
+            <span>Delivered items awaiting payout</span>
+            {pendingRequestsSum > 0 && (
+              <span className="font-bold bg-amber-800/40 px-2 py-0.5 rounded text-[10.5px]">
+                ₹{pendingRequestsSum.toLocaleString('en-IN')} in review
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Transactions Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left min-w-[700px]">
-            <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="px-5 py-3 font-bold">Date &amp; Time</th>
-                <th className="px-5 py-3 font-bold">Transaction Type</th>
-                <th className="px-5 py-3 font-bold">Amount (INR)</th>
-                <th className="px-5 py-3 font-bold">Status</th>
-                <th className="px-5 py-3 font-bold">Note / Reference</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400">
-                    <Calendar size={28} className="mx-auto mb-2 text-gray-300 stroke-1" />
-                    <p className="font-bold text-gray-500">No transactions match the selected date or filters.</p>
-                    <p className="text-[11px] text-gray-400 mt-1">Try selecting "All Time" or adjusting your date range.</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((t: any) => {
-                  const dateObj = t.createdAt ? new Date(t.createdAt) : null;
-                  const dateFormatted = dateObj ? dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-                  const timeFormatted = dateObj ? dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+        {/* Card 2: TRANSFERRED TO YOUR BANK (All-Time Cleared by Super Admin) */}
+        <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 rounded-2xl p-6 text-white shadow-lg space-y-2 relative overflow-hidden">
+          <div className="absolute right-[-15px] top-[-15px] w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase font-extrabold tracking-wider text-emerald-100 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Transferred to Your Bank</span>
+            </p>
+            <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold">
+              All-Time Cleared
+            </span>
+          </div>
 
-                  return (
-                    <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
-                      {/* Date & Time */}
-                      <td className="px-5 py-3.5 text-gray-600">
-                        <div className="font-bold text-gray-900">{dateFormatted}</div>
-                        {timeFormatted && <div className="text-[10px] text-gray-400 font-mono">{timeFormatted}</div>}
-                      </td>
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-black font-numbers">₹{clearedAmount.toLocaleString('en-IN')}</p>
+          </div>
 
-                      {/* Type */}
-                      <td className="px-5 py-3.5">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] capitalize ${
-                          t.type === 'sale'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200'
-                        }`}>
-                          {t.type === 'sale' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                          <span>{t.type}</span>
-                        </span>
-                      </td>
+          <div className="flex items-center justify-between text-xs text-emerald-100 pt-2 border-t border-emerald-500/40">
+            <span>Settled with Bank UTR reference</span>
+            <span className="font-bold">{wallet?.payouts?.filter((p: any) => p.status === 'completed').length || 0} Transfers</span>
+          </div>
+        </div>
 
-                      {/* Amount */}
-                      <td className={`px-5 py-3.5 font-numbers font-black text-sm ${t.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {t.amount >= 0 ? '+' : ''}₹{Math.abs(t.amount).toLocaleString('en-IN')}
-                      </td>
+        {/* Card 3: SETTLED BANK & UPI ACCOUNT */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200/90 shadow-sm space-y-2 relative flex flex-col justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Building2 size={13} className="text-gray-400" />
+                <span>Settlement Bank &amp; UPI</span>
+              </p>
+              <button
+                onClick={() => setBankModal(true)}
+                className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
+              >
+                {wallet?.bankDetails?.bankName || wallet?.bankDetails?.upiId ? 'Edit Details' : 'Link Account'}
+              </button>
+            </div>
+            <p className="text-base font-black text-gray-900">{wallet?.bankDetails?.bankName || 'Direct Account'}</p>
+            <p className="text-xs font-mono text-gray-600 font-semibold truncate">
+              {wallet?.bankDetails?.accountNumber ? `A/C: ${wallet.bankDetails.accountNumber}` : 'Add bank account for IMPS/NEFT'}
+            </p>
+          </div>
 
-                      {/* Status */}
-                      <td className="px-5 py-3.5">
-                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
-                          t.status === 'paid'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : t.status === 'pending'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}>
-                          {t.status}
-                        </span>
-                      </td>
-
-                      {/* Note */}
-                      <td className="px-5 py-3.5 text-gray-600 font-medium">
-                        {t.note || '—'}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          <div className="pt-2 border-t border-gray-100 text-xs">
+            {wallet?.bankDetails?.upiId ? (
+              <p className="font-mono font-bold text-emerald-700 truncate">⚡ UPI: {wallet.bankDetails.upiId}</p>
+            ) : (
+              <p className="text-gray-400 font-medium">Add UPI ID for instant 1-click settlements</p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Payout Withdrawal Modal */}
-      {withdrawModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4 border border-gray-100">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-gray-900 text-lg font-heading">Request Payout</h3>
-              <button onClick={() => setWithdrawModal(false)} className="text-gray-400 hover:text-gray-700">
-                <X size={16} />
-              </button>
-            </div>
-            <p className="text-xs text-gray-500">
-              Maximum withdrawable: <strong className="font-numbers text-emerald-600 font-bold">₹{Math.max(0, availableBalance)}</strong>
-            </p>
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Withdrawal Amount (₹)</label>
+      {/* Month & Date-wise Filter Bar */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Quick Month Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-bold text-gray-500 mr-1 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Period:</span>
+            </span>
+            <button
+              onClick={() => setDatePreset('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                datePreset === 'all'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              All Time
+            </button>
+            <button
+              onClick={() => setDatePreset('this_month')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                datePreset === 'this_month'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setDatePreset('last_month')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                datePreset === 'last_month'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Last Month
+            </button>
+            <button
+              onClick={() => setDatePreset('custom')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                datePreset === 'custom'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Custom Date
+            </button>
+          </div>
+
+          {/* Export CSV Button */}
+          <button
+            onClick={exportCSV}
+            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ml-auto"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+
+        {/* Custom Date Pickers */}
+        {datePreset === 'custom' && (
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
+              <span>From:</span>
               <input
-                type="number"
-                value={amount}
-                max={Math.max(0, availableBalance)}
-                onChange={e => setAmount(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-numbers focus:ring-2 focus:ring-[#10B981]/20 focus:outline-none"
+                type="date"
+                value={customStart}
+                onChange={e => setCustomStart(e.target.value)}
+                className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs"
               />
             </div>
-            <div className="bg-gray-50 p-3 rounded-xl text-xs space-y-1">
-              <span className="text-gray-500 font-semibold">Destination:</span>
-              <p className="font-bold text-gray-800">{wallet?.bankDetails?.bankName || 'HDFC Bank'} ({wallet?.bankDetails?.accountNumber || 'Primary Account'})</p>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
+              <span>To:</span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={e => setCustomEnd(e.target.value)}
+                className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs"
+              />
             </div>
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setWithdrawModal(false)}
-                className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleWithdraw}
-                disabled={amount <= 0 || amount > availableBalance}
-                className="flex-1 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer disabled:opacity-50"
-              >
-                Confirm Payout
+          </div>
+        )}
+
+        {/* Filtered Period Metrics Row */}
+        {datePreset !== 'all' && (
+          <div className="bg-slate-50 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs border border-slate-200/70">
+            <span className="font-bold text-slate-700">
+              Selected Period Activity:
+            </span>
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="font-medium text-amber-800">
+                ⏳ Accrued Pending: <strong>₹{(wallet?.periodStats?.periodPending || 0).toLocaleString('en-IN')}</strong>
+              </span>
+              <span className="font-medium text-emerald-800">
+                ✅ Cleared &amp; Paid: <strong>₹{(wallet?.periodStats?.periodCleared || 0).toLocaleString('en-IN')}</strong>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Ledger Section with Two Distinct Tabs */}
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
+        {/* Navigation Tabs Header */}
+        <div className="px-5 pt-4 border-b border-gray-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('payouts')}
+              className={`pb-3.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'payouts'
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Bank Transfers &amp; UTRs ({filteredPayouts.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`pb-3.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'orders'
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Delivered Orders &amp; Items Due ({filteredOrders.length})</span>
+            </button>
+          </div>
+
+          {/* Search Query */}
+          <div className="relative pb-3 sm:pb-0 w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder={activeTab === 'payouts' ? "Search UTR, amount, notes..." : "Search order #, customer, item..."}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+        </div>
+
+        {/* TAB 1 CONTENT: Bank Transfers & UTRs Received */}
+        {activeTab === 'payouts' && (
+          <div className="overflow-x-auto">
+            {filteredPayouts.length === 0 ? (
+              <div className="py-16 text-center text-xs text-gray-400 space-y-1">
+                <CreditCard className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="font-bold text-gray-600 text-sm">No Payout Records Found</p>
+                <p>When Super Admin transfers funds to your bank/UPI, verified UTR records appear here.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-gray-200/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Date &amp; Time</th>
+                    <th className="py-3 px-4">Payout Ref</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4">Payment Mode</th>
+                    <th className="py-3 px-4">Bank UTR / Reference</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredPayouts.map((p: any) => (
+                    <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3.5 px-4 font-mono text-gray-600">
+                        {new Date(p.date).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
+                        {p.payoutRef}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-black text-emerald-700 text-sm">
+                        ₹{Number(p.amount).toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center gap-1 font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md text-[10.5px]">
+                          {p.paymentMode === 'UPI Transfer' ? <Zap className="w-3 h-3 text-emerald-600" /> : <Building2 className="w-3 h-3 text-blue-600" />}
+                          <span>{p.paymentMode}</span>
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {p.utr ? (
+                          <div className="flex items-center gap-1.5 font-mono font-bold text-gray-800 bg-slate-50 px-2 py-1 rounded-lg border border-gray-200 w-fit">
+                            <span>{p.utr}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(p.utr, p.id)}
+                              className="text-gray-400 hover:text-emerald-700 p-0.5"
+                              title="Copy Bank UTR"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            {copiedUtr === p.id && (
+                              <span className="text-[9.5px] text-emerald-700 font-sans font-bold">Copied!</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 font-mono italic">Pending UTR</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          p.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : p.status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {p.status === 'completed' ? '✓ Cleared' : p.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-500 max-w-xs truncate" title={p.notes}>
+                        {p.notes || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2 CONTENT: Delivered Orders & Items Due */}
+        {activeTab === 'orders' && (
+          <div className="overflow-x-auto">
+            {filteredOrders.length === 0 ? (
+              <div className="py-16 text-center text-xs text-gray-400 space-y-1">
+                <ShoppingBag className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="font-bold text-gray-600 text-sm">No Delivered Orders Found</p>
+                <p>When orders are delivered to customers, their payable breakdown will reflect here.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-gray-200/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Order Date</th>
+                    <th className="py-3 px-4">Order #</th>
+                    <th className="py-3 px-4">Customer</th>
+                    <th className="py-3 px-4">Products &amp; Quantities</th>
+                    <th className="py-3 px-4">Amount Due</th>
+                    <th className="py-3 px-4">Settlement Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredOrders.map((o: any) => (
+                    <tr key={o.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3.5 px-4 font-mono text-gray-600">
+                        {new Date(o.date).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
+                        #{o.orderNumber}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-gray-800 block">{o.customerName}</span>
+                        {o.customerPhone && (
+                          <span className="text-[11px] font-mono text-gray-400">{o.customerPhone}</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1 max-w-sm">
+                          {o.items?.map((it: any, i: number) => (
+                            <div key={i} className="text-[11px] text-gray-700 flex items-center justify-between gap-3">
+                              <span className="truncate">{it.name} <strong className="text-gray-900">× {it.quantity}</strong></span>
+                              <span className="font-mono text-gray-500 shrink-0">₹{it.totalPrice}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-black text-gray-900 text-sm">
+                        ₹{Number(o.totalDue).toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {o.settlementStatus === 'cleared' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Cleared &amp; Paid</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">
+                            <Clock className="w-3 h-3" />
+                            <span>Pending from Shop India</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* WITHDRAWAL REQUEST MODAL */}
+      {withdrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900">Request Payout from Shop India</h3>
+              <button onClick={() => setWithdrawModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
               </button>
             </div>
+
+            <form onSubmit={handleWithdraw} className="space-y-4">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs text-amber-900">
+                <p className="font-bold">Total Available for Payout: ₹{availableToWithdraw.toLocaleString('en-IN')}</p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Super Admin will review and disburse funds directly to your settled Bank Account or UPI handle.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Withdrawal Amount (₹)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={availableToWithdraw}
+                  value={amount}
+                  onChange={e => setAmount(Number(e.target.value))}
+                  required
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-gray-200 rounded-xl text-xs space-y-1">
+                <p className="font-bold text-gray-700">Destination Account:</p>
+                <p className="text-gray-600 font-mono">
+                  {wallet?.bankDetails?.upiId ? `⚡ UPI: ${wallet.bankDetails.upiId}` : wallet?.bankDetails?.accountNumber ? `🏦 A/C: ${wallet.bankDetails.accountNumber} (${wallet.bankDetails.bankName})` : '⚠️ No bank linked'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setWithdrawModal(false)}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingWithdraw || availableToWithdraw <= 0}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                >
+                  <ArrowDownRight className="w-4 h-4" />
+                  <span>{submittingWithdraw ? 'Submitting...' : 'Submit Request'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Settlement Bank Account Modal */}
+      {/* EDIT BANK & UPI DETAILS MODAL */}
       {bankModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4 border border-gray-100">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-gray-900 text-lg font-heading">Settlement Bank Details</h3>
-              <button onClick={() => setBankModal(false)} className="text-gray-400 hover:text-gray-700">
-                <X size={16} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900">Settled Bank &amp; UPI Details</h3>
+              <button onClick={() => setBankModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-3">
+
+            <form onSubmit={handleSaveBankDetails} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Bank Name</label>
+                <label className="block font-bold text-gray-700 mb-1">Instant UPI ID (Recommended for fast settlements)</label>
                 <input
                   type="text"
+                  placeholder="e.g. yourname@okhdfcbank or 9876543210@paytm"
+                  value={upiId}
+                  onChange={e => setUpiId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-xl font-mono text-gray-800"
+                />
+              </div>
+
+              <div className="border-t border-gray-100 pt-2 font-bold text-gray-500 uppercase text-[10px]">
+                Or Bank Account Details
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Bank Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. HDFC Bank, SBI, ICICI"
                   value={bankName}
                   onChange={e => setBankName(e.target.value)}
-                  placeholder="e.g. HDFC Bank, ICICI Bank"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-xl text-gray-800"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Account Holder Name</label>
+                <label className="block font-bold text-gray-700 mb-1">Account Holder Name</label>
                 <input
                   type="text"
+                  placeholder="Name as printed in passbook"
                   value={accountHolder}
                   onChange={e => setAccountHolder(e.target.value)}
-                  placeholder="e.g. Rahul Sharma"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-xl text-gray-800"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Account Number</label>
+                <label className="block font-bold text-gray-700 mb-1">Account Number</label>
                 <input
                   type="text"
+                  placeholder="e.g. 50100458921102"
                   value={accountNumber}
                   onChange={e => setAccountNumber(e.target.value)}
-                  placeholder="e.g. 50100458921102"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-medium focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-xl font-mono text-gray-800"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">IFSC Code</label>
+                <label className="block font-bold text-gray-700 mb-1">IFSC Code</label>
                 <input
                   type="text"
+                  placeholder="e.g. HDFC0001824"
                   value={ifsc}
                   onChange={e => setIfsc(e.target.value.toUpperCase())}
-                  placeholder="e.g. HDFC0001824"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono uppercase font-medium focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-xl font-mono uppercase text-gray-800"
                 />
               </div>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setBankModal(false)}
-                className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveBankDetails}
-                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer"
-              >
-                Save Account
-              </button>
-            </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setBankModal(false)}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingBank}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm"
+                >
+                  {submittingBank ? 'Saving...' : 'Save Bank Details'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
