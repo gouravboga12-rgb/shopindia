@@ -219,6 +219,33 @@ router.post('/:id/complete', async (req, res) => {
             metadata: JSON.stringify({ payoutId: completedRequest.id, utr: finalUtr, paymentMode: finalMode }),
           },
         });
+      } else if (request.partyType === 'RIDER' && request.riderProfileId) {
+        await tx.riderProfile.update({
+          where: { id: request.riderProfileId },
+          data: { walletBalance: { decrement: request.amount } },
+        });
+
+        await tx.ledgerEntry.create({
+          data: {
+            type: 'DEBIT',
+            party: 'RIDER',
+            partyId: request.riderProfileId,
+            riderProfileId: request.riderProfileId,
+            amount: request.amount,
+            entryType: 'PAYOUT',
+            description: finalUtr ? `Rider/Technician Payout Disbursed — UTR: ${finalUtr}` : 'Rider/Technician Payout Disbursed — Super Admin Clearance',
+            metadata: JSON.stringify({ payoutId: completedRequest.id, utr: finalUtr, paymentMode: finalMode }),
+          },
+        });
+
+        await tx.riderPayout.updateMany({
+          where: {
+            riderProfileId: request.riderProfileId,
+            amount: request.amount,
+            status: 'pending',
+          },
+          data: { status: 'completed' },
+        });
       }
 
       return completedRequest;
@@ -373,78 +400,6 @@ router.get('/vendor/:vendorId/ledger', async (req, res) => {
   } catch (err) {
     console.error('[AdminPayouts] Vendor ledger error:', err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-      // Update wallet and ledger based on partyType
-      if (request.partyType === 'VENDOR' && request.vendorId) {
-        await tx.vendor.update({
-          where: { id: request.vendorId },
-          data: { walletBalance: { decrement: request.amount } },
-        });
-
-        await tx.ledgerEntry.create({
-          data: {
-            type: 'DEBIT',
-            party: 'VENDOR',
-            partyId: request.vendorId,
-            vendorId: request.vendorId,
-            amount: request.amount,
-            entryType: 'PAYOUT',
-            description: finalUtr ? `Bank/UPI Payout Disbursed — UTR: ${finalUtr}` : 'Bank/UPI Payout Disbursed — Super Admin Clearance',
-            metadata: {
-              payoutRequestId: id,
-              utr: finalUtr || 'N/A',
-              processedBy: req.user.id || 'super_admin',
-            },
-          },
-        });
-      } else if (request.partyType === 'RIDER' && request.riderProfileId) {
-        await tx.riderProfile.update({
-          where: { id: request.riderProfileId },
-          data: { walletBalance: { decrement: request.amount } },
-        });
-
-        await tx.ledgerEntry.create({
-          data: {
-            type: 'DEBIT',
-            party: 'RIDER',
-            partyId: request.riderProfileId,
-            riderProfileId: request.riderProfileId,
-            amount: request.amount,
-            entryType: 'PAYOUT',
-            description: finalUtr ? `Rider/Technician Payout Disbursed — UTR: ${finalUtr}` : 'Rider/Technician Payout Disbursed — Super Admin Clearance',
-            metadata: {
-              payoutRequestId: id,
-              utr: finalUtr || 'N/A',
-              processedBy: req.user.id || 'super_admin',
-            },
-          },
-        });
-
-        // Also sync the legacy RiderPayout record status so the Rider Wallet history
-        // shows "Completed" instead of "Pending" after admin disbursal.
-        await tx.riderPayout.updateMany({
-          where: {
-            riderProfileId: request.riderProfileId,
-            amount: request.amount,
-            status: 'pending',
-          },
-          data: { status: 'completed' },
-        });
-      }
-
-      return completedRequest;
-    });
-
-    res.json({
-      success: true,
-      message: `Payout of ₹${request.amount} marked paid successfully${finalUtr ? ` with UTR ${finalUtr}` : ''}.`,
-      payout: result,
-    });
-  } catch (err) {
-    console.error('[AdminPayouts] Complete error:', err);
-    res.status(500).json({ error: err.message || 'Failed to complete payout disbursement.' });
   }
 });
 
