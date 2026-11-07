@@ -163,6 +163,11 @@ router.post('/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        error: user.status === 'blocked' ? 'This account has been deleted or deactivated.' : `Account is currently ${user.status}. Please contact support.`
+      });
+    }
     res.json({
       token: sign(user),
       user: { id: user.id, name: user.name, email: user.email, role: user.role },

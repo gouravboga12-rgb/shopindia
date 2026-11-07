@@ -56,9 +56,13 @@ router.post('/change-password', async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'currentPassword required; newPassword must be 6+ chars.' });
+      return res.status(400).json({ error: 'Current password is required; new password must be at least 6 characters.' });
     }
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (!user.password) {
+      return res.status(400).json({ error: 'No password set on this account. Please use forgot password to set one.' });
+    }
     const ok = await bcrypt.compare(currentPassword, user.password);
     if (!ok) return res.status(401).json({ error: 'Current password incorrect.' });
     const hashed = await bcrypt.hash(newPassword, 10);
@@ -74,11 +78,22 @@ router.delete('/', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    if (req.body?.password) {
-      const ok = await bcrypt.compare(req.body.password, user.password);
-      if (!ok) return res.status(401).json({ error: 'Password incorrect.' });
+    const { password } = req.body || {};
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required to confirm account deletion.' });
     }
-    await prisma.user.update({ where: { id: req.user.userId }, data: { status: 'blocked' } });
+    if (user.password) {
+      const ok = await bcrypt.compare(password, user.password);
+      if (!ok) return res.status(401).json({ error: 'Password incorrect. Please enter your valid password.' });
+    }
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        status: 'blocked',
+        resetOtp: null,
+        resetOtpExpires: null,
+      },
+    });
     res.json({ ok: true, message: 'Account deleted successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
