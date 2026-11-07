@@ -3,10 +3,25 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const customerAuth = require('../middleware/customerAuth');
-const { calculateItemPricing, calculateDeliveryPricing } = require('../lib/pricing');
+const { calculateItemPricing, calculateDeliveryPricing, calculateCartTotals, getCachedRules } = require('../lib/pricing');
 const { verifyPaymentSignature } = require('../lib/razorpay');
 
 const router = express.Router();
+
+function calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 3.5;
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.max(0.5, Math.round(R * c * 10) / 10);
+}
 
 function mapType(vertical) {
   switch (vertical) {
@@ -15,6 +30,99 @@ function mapType(vertical) {
     default: return 'traditional';
   }
 }
+
+/** GET /api/orders/pricing-config — Public dynamic checkout settings */
+router.get('/pricing-config', async (req, res) => {
+  try {
+    const { settings } = await getCachedRules();
+    res.json({
+      success: true,
+      settings: {
+        shiprocket_base_fee: parseFloat(settings['shiprocket_base_fee'] || 49),
+        shiprocket_free_threshold: parseFloat(settings['shiprocket_free_threshold'] || 499),
+        quick_customer_base_fee: parseFloat(settings['quick_customer_base_fee'] || 35),
+        quick_customer_per_km: parseFloat(settings['quick_customer_per_km'] || 7),
+        quick_free_threshold: parseFloat(settings['quick_free_threshold'] || 999),
+        service_visit_charge: parseFloat(settings['service_visit_charge'] || 199),
+        gst_percent: parseFloat(settings['gst_percent'] || 18),
+        cgst_percent: parseFloat(settings['cgst_percent'] || 9),
+        sgst_percent: parseFloat(settings['sgst_percent'] || 9),
+        platform_charge_pct: parseFloat(settings['platform_charge_pct'] || 3.0),
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /api/orders/quote — Real-time dynamic checkout bill calculation */
+router.post('/quote', async (req, res) => {
+  try {
+    const { items = [], vertical = 'traditional', latitude, longitude, addressId } = req.body || {};
+    
+    let userLat = latitude ? parseFloat(latitude) : null;
+    let userLng = longitude ? parseFloat(longitude) : null;
+    if ((!userLat || !userLng) && addressId) {
+      try {
+        const addr = await prisma.address.findUnique({ where: { id: addressId } });
+        if (addr) {
+          userLat = addr.latitude || userLat;
+          userLng = addr.longitude || userLng;
+        }
+      } catch (_) {}
+    }
+
+    const productIds = items.map(i => i.productId).filter(Boolean);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, basePrice: true, vendorId: true, categoryId: true }
+    });
+    const pMap = new Map(products.map(p => [p.id, p]));
+
+    const resolved = items.map(it => {
+      const p = pMap.get(it.productId);
+      return {
+        productId: it.productId,
+        vendorId: p?.vendorId || it.vendorId,
+        categoryId: p?.categoryId || it.categoryId,
+        price: p?.basePrice || it.price || 0,
+        quantity: it.quantity || 1
+      };
+    });
+
+    let distanceKm = 3.5;
+    if (resolved.length && resolved[0].vendorId && userLat && userLng) {
+      const v = await prisma.vendor.findUnique({
+        where: { id: resolved[0].vendorId },
+        select: { lat: true, lng: true }
+      });
+      if (v?.lat && v?.lng) {
+        distanceKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
+      }
+    }
+
+    const totals = await calculateCartTotals({
+      items: resolved,
+      fulfillmentType: mapType(vertical),
+      distanceKm
+    });
+
+    res.json({
+      success: true,
+      quote: {
+        subtotal: totals.subtotal,
+        deliveryFee: totals.deliveryFee,
+        platformFee: totals.customerPlatformFee,
+        discount: totals.discount,
+        total: totals.finalCustomerTotal,
+        distanceKm,
+        isFreeDelivery: totals.delivery?.isFreeDelivery || false
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 function resolveCustomerId(req) {
   const header = req.headers['authorization'];
@@ -315,18 +423,32 @@ router.post('/', async (req, res) => {
 
     const customerId = resolveCustomerId(req) || (await getGuestCustomer()).id;
 
-    const subtotal = resolved.reduce((sum, it) => sum + it.price * it.quantity, 0);
-    const discount = 0;
+    // Resolve distanceKm for Quick Commerce using actual vendor store & customer GPS
+    let orderDistKm = 3.5;
+    if (resolved.length && resolved[0].vendorId && orderLat && orderLng) {
+      const vRec = await prisma.vendor.findUnique({
+        where: { id: resolved[0].vendorId },
+        select: { lat: true, lng: true }
+      });
+      if (vRec?.lat && vRec?.lng) {
+        orderDistKm = calculateHaversineDistanceKm(vRec.lat, vRec.lng, orderLat, orderLng);
+      }
+    }
 
-    // Calculate delivery pricing based on fulfillment type
-    const deliveryPricing = await calculateDeliveryPricing({
-      fulfillmentType: mapType(resolvedVertical),
-      subtotal,
-      distanceKm: 3.5
+    const fulfillmentType = mapType(resolvedVertical);
+    const cartTotals = await calculateCartTotals({
+      items: resolved,
+      fulfillmentType,
+      distanceKm: orderDistKm,
+      zoneId: branchId
     });
 
-    const deliveryFee = deliveryPricing.customerDeliveryFee || 0;
-    const total = subtotal - discount + deliveryFee;
+    const subtotal = cartTotals.subtotal;
+    const discount = cartTotals.discount || 0;
+    const deliveryFee = cartTotals.deliveryFee;
+    const totalCommission = cartTotals.totalAdminCommission;
+    const total = cartTotals.finalCustomerTotal;
+    const riderFee = cartTotals.totalRiderPayout;
     const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
 
     // Geographic Routing based on Pincode
@@ -483,8 +605,8 @@ router.post('/', async (req, res) => {
           data: {
             orderId: order.id,
             status: 'broadcasted',
-            deliveryFee: deliveryFee || 50,
-            distanceKm: calculatedDist,
+            deliveryFee: riderFee || 30,
+            distanceKm: orderDistKm || calculatedDist,
             deliveryOtp: masterDeliveryPin,
             pickupName: vendorRecord.businessName || 'Merchant Store',
             pickupAddress,

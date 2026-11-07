@@ -170,8 +170,26 @@ router.put('/', async (req, res) => {
       );
     }
 
-    // Write audit log if banking or UPI details were modified
+    // Write audit log and sync pending payout requests if banking or UPI details were modified
     if (bankChanged) {
+      // Auto-sync any open pending payout requests with the updated bank / UPI snapshot
+      await prisma.payoutRequest.updateMany({
+        where: {
+          partyType: 'VENDOR',
+          partyId: vendorId,
+          status: 'pending'
+        },
+        data: {
+          bankSnapshot: {
+            accountHolder: updatedVendor.accountHolder,
+            accountNumber: updatedVendor.accountNumber,
+            ifsc: updatedVendor.ifsc,
+            bankName: updatedVendor.bankName,
+            upiId: updatedVendor.upiId
+          }
+        }
+      }).catch(err => console.warn('[VendorSettings] Payout requests bank sync warning:', err.message));
+
       await prisma.settingsAuditLog.create({
         data: {
           settingKey: `vendor_payout_details_${vendorId}`,

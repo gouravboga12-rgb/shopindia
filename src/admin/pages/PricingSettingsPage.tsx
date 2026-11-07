@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
-  Calculator, Percent, Truck, Wrench, ShieldAlert, Plus,
+  Calculator, Percent, Truck, Wrench, Plus,
   Save, Trash2, CheckCircle2, AlertTriangle, RefreshCw, History,
   Sparkles, Layers, ArrowRight, Zap, ExternalLink, CreditCard, ShieldCheck
 } from 'lucide-react';
@@ -40,10 +40,14 @@ interface AppSettings {
   service_visit_charge: string;
   service_technician_min_pay: string;
   service_commission_pct: string;
+  gst_percent: string;
+  cgst_percent: string;
+  sgst_percent: string;
+  platform_charge_pct: string;
 }
 
 export const PricingSettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'commission' | 'delivery' | 'services' | 'gateway' | 'audit'>('commission');
+  const [activeTab, setActiveTab] = useState<'commission' | 'delivery' | 'services' | 'settings' | 'audit'>('commission');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rules, setRules] = useState<PricingRule[]>([]);
@@ -69,7 +73,11 @@ export const PricingSettingsPage: React.FC = () => {
     gateway_fee_percent: '2.36',
     service_visit_charge: '199',
     service_technician_min_pay: '149',
-    service_commission_pct: '15'
+    service_commission_pct: '15',
+    gst_percent: '18',
+    cgst_percent: '9',
+    sgst_percent: '9',
+    platform_charge_pct: '3.0'
   });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -292,7 +300,7 @@ export const PricingSettingsPage: React.FC = () => {
           { id: 'commission', label: 'Product Commissions', icon: Percent },
           { id: 'delivery', label: 'Delivery & Logistics', icon: Truck },
           { id: 'services', label: 'Services & Technicians', icon: Wrench },
-          { id: 'gateway', label: 'Razorpay Gateway & Buffer', icon: ShieldAlert },
+          { id: 'settings', label: 'Taxes & Platform Settings', icon: ShieldCheck },
           { id: 'audit', label: 'Settings Change History', icon: History },
         ].map(t => {
           const Icon = t.icon;
@@ -304,11 +312,10 @@ export const PricingSettingsPage: React.FC = () => {
                 setActiveTab(t.id as any);
                 if (t.id === 'audit') loadAuditLogs();
               }}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                active
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${active
                   ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
-              }`}
+                }`}
             >
               <Icon className="w-4 h-4" />
               <span>{t.label}</span>
@@ -320,6 +327,17 @@ export const PricingSettingsPage: React.FC = () => {
       {/* Tab 1: Product Commission Rules */}
       {activeTab === 'commission' && (
         <div className="space-y-5">
+          <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-start gap-3 text-xs text-emerald-950 font-sans shadow-sm">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-emerald-900 block text-sm">Vendor Net Protection Model Active (Shop India & Quick Shopping)</span>
+              <p className="leading-relaxed">
+                Vendors receive <strong>100% of their listed product price</strong> (e.g. ₹60 = ₹60, zero deductions).
+                The Admin Commission % configured below is added <strong>on top</strong> of the product base price as a platform markup and presented cleanly to the customer. For doorstep services (Glacons), the commission % is deducted from the fixed service catalog rate.
+              </p>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-gray-100 shadow-premium overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
               <div>
@@ -355,13 +373,12 @@ export const PricingSettingsPage: React.FC = () => {
                     rules.map(rule => (
                       <tr key={rule.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-4">
-                          <span className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase tracking-wider ${
-                            rule.scope === 'global' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                            rule.scope === 'vertical' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                            rule.scope === 'category' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                            rule.scope === 'vendor' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                            'bg-pink-50 text-pink-700 border border-pink-200'
-                          }`}>
+                          <span className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase tracking-wider ${rule.scope === 'global' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                              rule.scope === 'vertical' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                rule.scope === 'category' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                  rule.scope === 'vendor' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                    'bg-pink-50 text-pink-700 border border-pink-200'
+                            }`}>
                             {rule.scope}
                           </span>
                         </td>
@@ -807,49 +824,109 @@ export const PricingSettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 4: Razorpay Gateway & Buffer Settings */}
-      {activeTab === 'gateway' && (
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-premium space-y-6">
+      {/* Tab 4: Taxes & Platform Settings */}
+      {activeTab === 'settings' && (
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-premium space-y-6 font-sans">
           <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <ShieldAlert className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Razorpay Fee Buffer & Safety Controls</h3>
-              <p className="text-xs text-gray-500">Prevent platform income erosion from payment gateway processing fees</p>
+              <h3 className="text-sm font-bold text-gray-900 font-heading">Taxes & Central Platform Settings</h3>
+              <p className="text-xs text-gray-500">Configure Goods and Services Tax (GST, CGST, SGST) and backend platform transaction charge</p>
             </div>
           </div>
 
-          <div className="p-4 bg-indigo-50/70 border border-indigo-200/80 rounded-xl space-y-2 text-xs text-indigo-950">
-            <p className="font-bold">Why the Gateway Buffer is Essential:</p>
-            <p className="leading-relaxed">
-              Razorpay charges standard <strong>2.00% + 18% GST (total 2.36%)</strong> on every captured online payment.
-              When <em>"Include Gateway Buffer in Platform Fee"</em> is turned on, this 2.36% is incorporated transparently into the platform fee. The Super Admin receives full platform commission without losing 2.36% to transaction deductions.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+          {/* Tax Configuration Grid */}
+          <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="block text-xs font-bold text-gray-900">Include Gateway Buffer in Platform Fee</span>
-                <span className="text-[11px] text-gray-500">Calculates customer price to absorb 2.36% gateway deduction safely</span>
+                <span className="text-xs font-bold text-gray-900 uppercase tracking-wider block">GST Statutory Tax Slab Rates</span>
+                <span className="text-[11px] text-gray-500">Applied automatically across orders, invoices, and compliant tax calculations</span>
               </div>
-              <input
-                type="checkbox"
-                checked={settings.include_gateway_in_platform_fee === 'true'}
-                onChange={e => setSettings({ ...settings, include_gateway_in_platform_fee: e.target.checked ? 'true' : 'false' })}
-                className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-              />
+              <span className="text-xs font-mono font-bold bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg">
+                GST = CGST + SGST
+              </span>
             </div>
 
-            <div className="max-w-xs">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Razorpay Standard Fee Rate (%)</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Standard GST (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="28"
+                  value={settings.gst_percent ?? '18'}
+                  onChange={e => setSettings({ ...settings, gst_percent: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-numbers font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block">Default: 18%</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Central GST / CGST (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="14"
+                  value={settings.cgst_percent ?? '9'}
+                  onChange={e => setSettings({ ...settings, cgst_percent: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-numbers font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block">Default: 9% (Intra-state central share)</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">State GST / SGST (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="14"
+                  value={settings.sgst_percent ?? '9'}
+                  onChange={e => setSettings({ ...settings, sgst_percent: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-numbers font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block">Default: 9% (Intra-state state share)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Independent Platform Charge Rule */}
+          <div className="p-5 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl space-y-3 text-xs text-indigo-950">
+            <div className="flex items-center gap-2 font-bold text-indigo-900 text-sm">
+              <Zap className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Independent Platform Charge (Backend Total)</span>
+            </div>
+            <p className="leading-relaxed">
+              To eliminate gateway fee erosion (Razorpay charges 2.00% + 18% GST = <strong>2.36%</strong> on the gross collected), an independent charge is calculated on the overall order total at checkout.
+            </p>
+            <div className="p-3 bg-white/80 rounded-xl border border-indigo-100 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-gray-900 block">Customer Display Transparency Rule</span>
+                <span className="text-[11px] text-gray-500">
+                  Zero mention of "3%", "security protection", or "Super Admin" is shown to users. It is quietly integrated under standard <strong>"Platform Fee"</strong> on the checkout receipt.
+                </span>
+              </div>
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-lg whitespace-nowrap">
+                Clean User UI Active
+              </span>
+            </div>
+
+            <div className="max-w-xs pt-2">
+              <label className="block text-xs font-bold text-gray-700 mb-1">Independent Platform Charge Rate (%)</label>
               <input
-                type="text"
-                disabled
-                value="2.36% (2% + 18% GST)"
-                className="w-full px-3 py-2 bg-gray-100 border rounded-xl text-sm font-numbers font-bold text-gray-500"
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={settings.platform_charge_pct ?? '3.0'}
+                onChange={e => setSettings({ ...settings, platform_charge_pct: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm font-numbers font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
+              <span className="text-[10px] text-gray-500 mt-1 block">Default: 3.0% (covers 2.36% gateway fee + transaction overhead)</span>
             </div>
           </div>
 
@@ -860,7 +937,7 @@ export const PricingSettingsPage: React.FC = () => {
               className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-premium transition-all"
             >
               <Save className="w-4 h-4" />
-              <span>{saving ? 'Saving...' : 'Save Gateway Settings'}</span>
+              <span>{saving ? 'Saving...' : 'Save Taxes & Platform Settings'}</span>
             </button>
           </div>
         </div>
@@ -931,11 +1008,10 @@ export const PricingSettingsPage: React.FC = () => {
             </div>
 
             {simResult && (
-              <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 border shadow-lg ${
-                simResult.isProfitable
+              <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 border shadow-lg ${simResult.isProfitable
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
                   : 'bg-red-500/20 text-red-300 border-red-400/30'
-              }`}>
+                }`}>
                 {simResult.isProfitable ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -1135,16 +1211,14 @@ export const PricingSettingsPage: React.FC = () => {
                   </div>
 
                   {/* Card 6: Platform Net Profit */}
-                  <div className={`p-4 rounded-2xl border flex flex-col justify-between ${
-                    simResult.isProfitable
+                  <div className={`p-4 rounded-2xl border flex flex-col justify-between ${simResult.isProfitable
                       ? 'bg-emerald-500/20 border-emerald-400/40'
                       : 'bg-red-500/20 border-red-400/40'
-                  }`}>
+                    }`}>
                     <span className="text-[11px] font-bold text-white/90">Platform Net Profit</span>
                     <div className="my-2">
-                      <span className={`text-2xl font-black font-numbers ${
-                        simResult.isProfitable ? 'text-emerald-300' : 'text-red-300'
-                      }`}>
+                      <span className={`text-2xl font-black font-numbers ${simResult.isProfitable ? 'text-emerald-300' : 'text-red-300'
+                        }`}>
                         ₹{simResult.netProfit}
                       </span>
                     </div>

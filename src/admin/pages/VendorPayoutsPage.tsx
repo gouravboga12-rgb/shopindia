@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   Wallet, CheckCircle2, XCircle, Clock, AlertTriangle,
   RefreshCw, ShieldCheck, Zap, Calendar, Store,
-  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText
+  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText, Copy
 } from 'lucide-react';
 
 interface PayoutRequestItem {
@@ -397,7 +397,6 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
               ) : (
                 requests.map(req => {
                   const vendor = req.vendor;
-                  const bank = req.bankSnapshot || vendor;
                   return (
                     <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3.5 px-4">
@@ -470,19 +469,64 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                       </td>
 
                       <td className="py-3.5 px-4">
-                        {bank?.upiId ? (
-                          <div className="flex items-center gap-1 text-emerald-700 font-mono font-bold">
-                            <Zap className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>{bank.upiId}</span>
-                          </div>
-                        ) : bank?.accountNumber ? (
-                          <div className="space-y-0.5">
-                            <div className="font-mono text-slate-800 font-semibold">{bank.bankName || 'Bank'}: ••••{bank.accountNumber.slice(-4)}</div>
-                            <div className="text-[10px] text-slate-500 font-mono">IFSC: {bank.ifsc} • {bank.accountHolder}</div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">No bank snapshot</span>
-                        )}
+                        {(() => {
+                          const activeUpi = vendor?.upiId || req.bankSnapshot?.upiId;
+                          const activeAcc = vendor?.accountNumber || req.bankSnapshot?.accountNumber;
+                          const activeBank = vendor?.bankName || req.bankSnapshot?.bankName || 'Bank';
+                          const activeIfsc = vendor?.ifsc || req.bankSnapshot?.ifsc;
+                          const activeHolder = vendor?.accountHolder || req.bankSnapshot?.accountHolder;
+
+                          if (activeUpi) {
+                            return (
+                              <div className="space-y-1">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">
+                                  <Zap className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>{activeUpi}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(activeUpi);
+                                      alert(`Copied UPI ID: ${activeUpi}`);
+                                    }}
+                                    className="p-0.5 hover:text-emerald-950 text-emerald-600"
+                                    title="Copy UPI ID"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                {activeAcc && (
+                                  <div className="text-[10px] text-slate-500 font-mono">
+                                    Alt: {activeBank} ••••{activeAcc.slice(-4)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (activeAcc) {
+                            return (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1 font-mono text-slate-800 font-semibold text-xs">
+                                  <span>{activeBank}: {activeAcc}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(activeAcc);
+                                      alert(`Copied Account Number: ${activeAcc}`);
+                                    }}
+                                    className="p-0.5 hover:text-slate-900 text-slate-500"
+                                    title="Copy Account Number"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <div className="text-[10.5px] text-slate-500 font-mono">
+                                  IFSC: <strong>{activeIfsc || '—'}</strong> • {activeHolder || 'Primary'}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return <span className="text-slate-400 italic text-xs">No bank snapshot</span>;
+                        })()}
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
@@ -603,10 +647,61 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
               <button onClick={() => setActivePayoutForComplete(null)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 text-xs space-y-1">
-              <div><span className="text-slate-500">Merchant Store:</span> <strong className="text-slate-800">{activePayoutForComplete.vendor?.businessName}</strong></div>
-              <div><span className="text-slate-500">Payout Amount:</span> <strong className="text-emerald-700 text-sm">{formatINR(activePayoutForComplete.amount)}</strong></div>
-              <div><span className="text-slate-500">Target Bank / UPI:</span> <strong className="font-mono">{activePayoutForComplete.bankSnapshot?.upiId || activePayoutForComplete.bankSnapshot?.accountNumber || 'Primary Bank'}</strong></div>
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 text-xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Merchant Store:</span>
+                <strong className="text-slate-800">{activePayoutForComplete.vendor?.businessName}</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Payout Amount:</span>
+                <strong className="text-emerald-700 text-base">{formatINR(activePayoutForComplete.amount)}</strong>
+              </div>
+              {(() => {
+                const targetUpi = activePayoutForComplete.vendor?.upiId || activePayoutForComplete.bankSnapshot?.upiId;
+                const targetAcc = activePayoutForComplete.vendor?.accountNumber || activePayoutForComplete.bankSnapshot?.accountNumber;
+                const targetBank = activePayoutForComplete.vendor?.bankName || activePayoutForComplete.bankSnapshot?.bankName || 'Bank';
+                const targetIfsc = activePayoutForComplete.vendor?.ifsc || activePayoutForComplete.bankSnapshot?.ifsc;
+                return (
+                  <div className="pt-1 border-t border-slate-200/80 space-y-1.5">
+                    {targetUpi && (
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <div className="flex items-center gap-1.5 text-emerald-800 font-mono font-bold">
+                          <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{targetUpi}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(targetUpi);
+                            alert(`Copied UPI ID: ${targetUpi}`);
+                          }}
+                          className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold"
+                        >
+                          Copy UPI
+                        </button>
+                      </div>
+                    )}
+                    {targetAcc && (
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                        <div className="font-mono text-slate-800">
+                          <div>{targetBank}: <strong>{targetAcc}</strong></div>
+                          <div className="text-[10px] text-slate-500">IFSC: {targetIfsc || '—'}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(targetAcc);
+                            alert(`Copied Account Number: ${targetAcc}`);
+                          }}
+                          className="px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold"
+                        >
+                          Copy A/C
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <form onSubmit={handleDisburseWithUTR} className="space-y-3">

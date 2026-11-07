@@ -286,7 +286,11 @@ router.get('/settings', async (req, res) => {
       gateway_fee_percent: '2.36',
       service_visit_charge: '199',
       service_technician_min_pay: '149',
-      service_commission_pct: '15'
+      service_commission_pct: '15',
+      gst_percent: '18',
+      cgst_percent: '9',
+      sgst_percent: '9',
+      platform_charge_pct: '3.0'
     };
 
     rows.forEach(r => {

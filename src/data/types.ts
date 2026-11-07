@@ -25,6 +25,8 @@ export interface Product {
   quantity?: number;
   stock?: number;
   isOutOfStock?: boolean;
+  vendorId?: string;
+  categoryId?: string;
 
   // Food Delivery specifics
   isVeg?: boolean;

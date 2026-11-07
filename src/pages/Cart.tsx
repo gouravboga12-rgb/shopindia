@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShieldCheck, Ticket } from 'lucide-react';
@@ -7,17 +7,91 @@ import { CheckoutDrawer } from '../components/common/CheckoutDrawer';
 import { requireCustomerAuth } from '../lib/customerAuth';
 
 export const CartPage: React.FC = () => {
-  const { cart, updateQuantity, removeFromCart, getCartTotal, navigateTo } = useApp();
+  const { cart, updateQuantity, removeFromCart, getCartTotal, navigateTo, currentVertical } = useApp();
   const isMobile = useIsMobile();
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
+  const [pricingConfig, setPricingConfig] = useState<any>({
+    shiprocket_base_fee: 49,
+    shiprocket_free_threshold: 499,
+    quick_customer_base_fee: 35,
+    quick_customer_per_km: 7,
+    quick_free_threshold: 999,
+    platform_charge_pct: 3.0
+  });
+
+  const [pricingQuote, setPricingQuote] = useState<{
+    deliveryFee: number;
+    platformFee: number;
+    total: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/orders/pricing-config')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.settings) {
+          setPricingConfig(d.settings);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setPricingQuote(null);
+      return;
+    }
+    const payload = {
+      items: cart.map(i => ({
+        productId: i.product.id,
+        vendorId: i.product.vendorId,
+        categoryId: i.product.categoryId,
+        price: i.product.price,
+        quantity: i.quantity
+      })),
+      vertical: currentVertical
+    };
+    fetch('/api/orders/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.success && data.quote) {
+          setPricingQuote({
+            deliveryFee: data.quote.deliveryFee,
+            platformFee: data.quote.platformFee,
+            total: data.quote.total
+          });
+        }
+      })
+      .catch(() => {});
+  }, [cart, currentVertical]);
+
   const cartTotal = getCartTotal();
   const discountVal = couponApplied ? Math.round(cartTotal * 0.1) : 0;
-  const deliveryCharges = cartTotal > 500 || cartTotal === 0 ? 0 : 49;
-  const finalTotal = cartTotal - discountVal + deliveryCharges;
+
+  const isQuick = currentVertical === 'quick';
+  const baseDelivery = isQuick
+    ? (parseFloat(pricingConfig.quick_customer_base_fee) || 35)
+    : (parseFloat(pricingConfig.shiprocket_base_fee) || 49);
+  const freeThreshold = isQuick
+    ? (parseFloat(pricingConfig.quick_free_threshold) || 999)
+    : (parseFloat(pricingConfig.shiprocket_free_threshold) || 499);
+  const fallbackDelivery = cartTotal === 0 || cartTotal >= freeThreshold ? 0 : baseDelivery;
+
+  const deliveryCharges = pricingQuote != null ? pricingQuote.deliveryFee : fallbackDelivery;
+  const platformFee = pricingQuote != null
+    ? pricingQuote.platformFee
+    : (cartTotal > 0 ? Math.round((cartTotal * 0.15 + (cartTotal + fallbackDelivery) * 0.03) * 100) / 100 : 0);
+  const finalTotal = pricingQuote != null
+    ? Math.max(0, pricingQuote.total - discountVal)
+    : Math.max(0, cartTotal - discountVal + deliveryCharges + platformFee);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,11 +253,21 @@ export const CartPage: React.FC = () => {
                       <span>- ₹{discountVal.toLocaleString('en-IN')}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center border-b border-brand-border pb-3.5">
+                  <div className="flex justify-between items-center">
                     <span>Delivery Charges</span>
                     <span className={deliveryCharges === 0 ? 'text-brand-green' : 'text-brand-graphite'}>
                       {deliveryCharges === 0 ? 'FREE' : `₹${deliveryCharges}`}
                     </span>
+                  </div>
+                  {platformFee > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span>Platform Fee</span>
+                      <span className="text-brand-graphite">₹{platformFee.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center border-b border-brand-border pb-3.5 text-[11px] text-gray-400 font-normal">
+                    <span>Taxes (GST Included)</span>
+                    <span>Included</span>
                   </div>
                   <div className="flex justify-between items-center text-sm font-black text-brand-graphite pt-1 leading-none">
                     <span>Total Amount to Pay</span>
@@ -326,6 +410,16 @@ export const CartPage: React.FC = () => {
                     {deliveryCharges === 0 ? 'FREE' : `₹${deliveryCharges}`}
                   </span>
                 </div>
+                {platformFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span>Platform Fee</span>
+                    <span className="text-zinc-800 font-bold">₹{platformFee.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center text-[11px] text-gray-400 font-normal">
+                  <span>Taxes (GST Included)</span>
+                  <span>Included</span>
+                </div>
                 <div className="flex justify-between items-center text-sm font-black text-zinc-900 pt-3 border-t border-slate-100 leading-none">
                   <span>Total Amount</span>
                   <span className="text-lg tracking-tight">₹{finalTotal.toLocaleString('en-IN')}</span>
@@ -365,6 +459,7 @@ export const CartPage: React.FC = () => {
         subtotal={cartTotal}
         discount={discountVal}
         delivery={deliveryCharges}
+        platformFee={platformFee}
         total={finalTotal}
       />
     </>

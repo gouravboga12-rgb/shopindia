@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useCustomer } from '../../context/CustomerContext';
 import { PageHeader, EmptyState, PrimaryButton } from '../../components/dashboard/DashboardUI';
@@ -12,10 +12,28 @@ export const CartPage: React.FC = () => {
   const [applied, setApplied] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  const [pricingConfig, setPricingConfig] = useState<any>({
+    shiprocket_base_fee: 49,
+    shiprocket_free_threshold: 499
+  });
+
+  useEffect(() => {
+    fetch('/api/orders/pricing-config')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.settings) {
+          setPricingConfig(d.settings);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const subtotal = getCartTotal();
   const discount = applied ? Math.round(subtotal * 0.1) : 0;
   const tax = Math.round(subtotal * 0.12);
-  const shipping = subtotal === 0 || subtotal - discount > 500 ? 0 : 49;
+  const baseFee = parseFloat(pricingConfig.shiprocket_base_fee) || 49;
+  const freeThreshold = parseFloat(pricingConfig.shiprocket_free_threshold) || 499;
+  const shipping = subtotal === 0 || (subtotal - discount) >= freeThreshold ? 0 : baseFee;
   const total = subtotal - discount + tax + shipping;
 
   const applyCoupon = (e: React.FormEvent) => {

@@ -319,45 +319,70 @@ async function calculateCartTotals({
   zoneId = null,
   couponDiscount = 0
 } = {}) {
+  const { settings } = await getCachedRules();
   let subtotal = 0;
   let totalVendorPayout = 0;
-  let totalPlatformCommission = 0;
-  let totalGatewayBuffer = 0;
+  let totalAdminCommission = 0;
   const processedItems = [];
+
+  const isService = fulfillmentType === 'hvac_service' || fulfillmentType === 'services';
 
   for (const item of items) {
     const qty = Number(item.quantity) || 1;
+    const basePrice = Number(item.price || item.basePrice || item.vendorPrice || 0);
+
     const itemPricing = await calculateItemPricing({
-      vendorPrice: item.vendorPrice,
-      basePrice: item.price || item.basePrice,
+      vendorPrice: basePrice,
+      basePrice,
       mrp: item.mrp,
       context: {
         productId: item.productId,
         vendorId: item.vendorId,
-        categoryId: item.categoryId
+        categoryId: item.categoryId,
+        vertical: isService ? 'services' : (fulfillmentType === 'quick_commerce' || fulfillmentType === 'quick' ? 'quick' : 'shop')
       }
     });
 
-    const itemSubtotal = itemPricing.customerPrice * qty;
-    const itemVendorTotal = itemPricing.vendorPrice * qty;
-    const itemPlatformTotal = itemPricing.platformFee * qty;
+    if (isService) {
+      // In Glacons Services, admin commission is DEDUCTED from the catalog price
+      const itemSubtotal = basePrice * qty;
+      const commissionAmount = Math.round((basePrice * (itemPricing.commissionPct / 100)) * 100) / 100 * qty;
+      const technicianPayout = Math.max(0, itemSubtotal - commissionAmount);
 
-    subtotal += itemSubtotal;
-    totalVendorPayout += itemVendorTotal;
-    totalPlatformCommission += (itemPricing.commissionAmount * qty);
-    totalGatewayBuffer += (itemPricing.gatewayBuffer * qty);
+      subtotal += itemSubtotal;
+      totalVendorPayout += technicianPayout;
+      totalAdminCommission += commissionAmount;
 
-    processedItems.push({
-      ...item,
-      quantity: qty,
-      customerUnitPrice: itemPricing.customerPrice,
-      vendorUnitPrice: itemPricing.vendorPrice,
-      platformFeePerUnit: itemPricing.platformFee,
-      commissionAmountPerUnit: itemPricing.commissionAmount,
-      gatewayBufferPerUnit: itemPricing.gatewayBuffer,
-      itemSubtotal,
-      itemVendorTotal
-    });
+      processedItems.push({
+        ...item,
+        quantity: qty,
+        customerUnitPrice: basePrice,
+        vendorUnitPrice: Math.round((technicianPayout / qty) * 100) / 100,
+        commissionAmountPerUnit: itemPricing.commissionAmount,
+        itemSubtotal,
+        itemVendorTotal: technicianPayout
+      });
+    } else {
+      // In Shop India & Quick Shopping, Vendor gets 100% of basePrice (zero cuts)
+      // Admin commission is added on top as markup
+      const itemSubtotal = basePrice * qty;
+      const vendorPayout = itemSubtotal; // 100% to vendor!
+      const commissionAmount = Math.round((basePrice * (itemPricing.commissionPct / 100)) * 100) / 100 * qty;
+
+      subtotal += itemSubtotal;
+      totalVendorPayout += vendorPayout;
+      totalAdminCommission += commissionAmount;
+
+      processedItems.push({
+        ...item,
+        quantity: qty,
+        customerUnitPrice: basePrice,
+        vendorUnitPrice: basePrice, // Full 100% to vendor
+        commissionAmountPerUnit: Math.round((basePrice * (itemPricing.commissionPct / 100)) * 100) / 100,
+        itemSubtotal,
+        itemVendorTotal: vendorPayout
+      });
+    }
   }
 
   // Delivery Pricing
@@ -369,29 +394,41 @@ async function calculateCartTotals({
   });
 
   const discount = Math.min(subtotal, Math.max(0, Number(couponDiscount) || 0));
-  const finalCustomerTotal = Math.max(0, Math.round((subtotal - discount + delivery.customerDeliveryFee) * 100) / 100);
+  const deliveryFee = delivery.customerDeliveryFee || 0;
 
-  // Exact Gateway Fee Estimate: Razorpay standard 2% + 18% GST (2.36%) on gross collected
-  const estimatedGatewayFee = Math.round((finalCustomerTotal * 0.0236) * 100) / 100;
+  // Base Total before independent 3% platform charge
+  const baseTotal = Math.max(0, (subtotal - discount + deliveryFee + totalAdminCommission));
 
-  // Platform Net Profit
-  // Profit = Commission + (Customer Delivery Fee - Rider Pay/Courier Cost) - Discount absorbed - Gateway Fee
+  // Independent 3% Platform Charge on overall order value (to eliminate gateway fees & avoid losses)
+  const platformChargeRate = parseFloat(settings['platform_charge_pct'] || 3.0) / 100;
+  const platformProtectionFee = Math.round((baseTotal * platformChargeRate) * 100) / 100;
+
+  // Final Total charged to customer (via Razorpay or COD)
+  const finalCustomerTotal = Math.round((baseTotal + platformProtectionFee) * 100) / 100;
+
+  // Customer Platform Fee on receipt (cleanly bundles the admin markup + 3% charge; zero mention of 3% or security)
+  const customerPlatformFee = Math.round((totalAdminCommission + platformProtectionFee) * 100) / 100;
+
+  // Admin Margins
   const deliveryMargin = delivery.adminMargin || 0;
+  const totalRiderPayout = delivery.riderPay || 0;
   const platformNetProfit = Math.round(
-    (totalPlatformCommission + deliveryMargin - estimatedGatewayFee) * 100
+    (totalAdminCommission + deliveryMargin + platformProtectionFee) * 100
   ) / 100;
 
   return {
     items: processedItems,
     subtotal,
     delivery,
+    deliveryFee,
     discount,
+    customerPlatformFee,
+    platformProtectionFee,
     finalCustomerTotal,
     totalVendorPayout,
-    totalRiderPayout: delivery.riderPay,
-    totalPlatformCommission,
-    totalGatewayBuffer,
-    estimatedGatewayFee,
+    totalRiderPayout,
+    totalAdminCommission,
+    deliveryMargin,
     platformNetProfit
   };
 }

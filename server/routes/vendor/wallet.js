@@ -193,20 +193,47 @@ router.post('/withdraw', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-/** PATCH /api/vendor/wallet/bank-details — update bank account */
+/** PATCH /api/vendor/wallet/bank-details — update bank account & UPI */
 router.patch('/bank-details', async (req, res) => {
   try {
-    const { accountHolder, accountNumber, ifsc, bankName } = req.body;
+    const { accountHolder, accountNumber, ifsc, bankName, upiId } = req.body;
+    const updateData = {};
+    if (accountHolder !== undefined) updateData.accountHolder = accountHolder?.trim() || null;
+    if (accountNumber !== undefined) updateData.accountNumber = accountNumber?.trim() || null;
+    if (ifsc !== undefined) updateData.ifsc = ifsc?.trim().toUpperCase() || null;
+    if (bankName !== undefined) updateData.bankName = bankName?.trim() || null;
+    if (upiId !== undefined) updateData.upiId = upiId?.trim().toLowerCase() || null;
+
     const vendor = await prisma.vendor.update({
       where: { id: req.user.vendorId },
-      data: { accountHolder, accountNumber, ifsc, bankName },
+      data: updateData,
     });
+
+    // Auto-sync any open pending payout requests with the updated bank / UPI snapshot
+    await prisma.payoutRequest.updateMany({
+      where: {
+        partyType: 'VENDOR',
+        partyId: req.user.vendorId,
+        status: 'pending'
+      },
+      data: {
+        bankSnapshot: {
+          accountHolder: vendor.accountHolder,
+          accountNumber: vendor.accountNumber,
+          ifsc: vendor.ifsc,
+          bankName: vendor.bankName,
+          upiId: vendor.upiId
+        }
+      }
+    }).catch(err => console.warn('[VendorWallet] Payout requests bank sync warning:', err.message));
+
     res.json({
       bankDetails: {
         accountHolder: vendor.accountHolder,
         accountNumber: vendor.accountNumber,
         ifsc: vendor.ifsc,
         bankName: vendor.bankName,
+        upiId: vendor.upiId
       },
     });
   } catch (err) { res.status(500).json({ error: err.message }); }

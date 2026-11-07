@@ -254,4 +254,44 @@ router.post('/tickets/:id/internal-note', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/vendor/support/inquiry
+ * Merchant submits an inquiry directly to Super Admin / Finance Desk
+ */
+router.post('/inquiry', async (req, res) => {
+  try {
+    const { category, subject, message } = req.body;
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message are required' });
+    }
+    const vendorId = req.user.vendorId;
+    const ticketNumber = 'ADM-' + Date.now().toString(36).toUpperCase();
+    const ticket = await prisma.ticket.create({
+      data: {
+        ticketNumber,
+        vendorId,
+        subject,
+        category: category || 'payout',
+        priority: 'high',
+        status: 'open',
+        tier: 3, // Directly to Super Admin Desk
+        messages: {
+          create: {
+            senderRole: 'vendor',
+            text: message,
+            sentAt: new Date()
+          }
+        }
+      },
+      include: {
+        messages: true
+      }
+    });
+    res.json({ success: true, ticket, message: 'Inquiry submitted successfully to Admin Desk.' });
+  } catch (err) {
+    console.error('[VendorSupport] Inquiry error:', err);
+    res.status(500).json({ error: 'Failed to submit inquiry' });
+  }
+});
+
 module.exports = router;

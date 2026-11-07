@@ -12,15 +12,16 @@ interface CheckoutDrawerProps {
   subtotal: number;
   discount: number;
   delivery: number;
+  platformFee?: number;
   total: number;
 }
 
-export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose, subtotal, discount, delivery, total }) => {
+export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose, subtotal, discount, delivery, platformFee = 0, total }) => {
   const { addresses, addAddress, profile } = useCustomer();
   const { cart, placeOrder, currentVertical } = useApp();
 
   const isShopVertical = currentVertical === 'shop' || cart.some(item => ((item.product as any)?.category?.vertical || (item.product as any)?.vertical || '').toLowerCase() === 'shop');
-  
+
   const [selectedAddress, setSelectedAddress] = useState(addresses.find(a => a.isDefault)?.id || addresses[0]?.id || '');
   const [selectedPayment, setSelectedPayment] = useState<'razorpay' | 'COD'>('razorpay');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -184,26 +185,26 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
       {isOpen && (
         <>
           {/* Backdrop */}
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
           />
 
           {/* Drawer */}
-          <motion.div 
-            initial={{ x: '100%' }} 
-            animate={{ x: 0 }} 
-            exit={{ x: '100%' }} 
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col font-sans"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-brand-border bg-slate-50/50">
               <h2 className="text-sm font-black text-brand-graphite font-heading">Checkout</h2>
-              <button 
+              <button
                 onClick={onClose}
                 className="w-8 h-8 rounded-full bg-white border border-brand-border flex items-center justify-center text-brand-slate hover:bg-slate-50 transition-colors"
               >
@@ -213,13 +214,13 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              
+
               {/* Delivery Address */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-wider text-brand-slate font-heading">1. Delivery Address</h3>
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       type="button"
                       onClick={handleAutoFillGps}
                       disabled={isLocating}
@@ -241,75 +242,75 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
                     <span className="truncate">{locationFeedback} (review and edit below)</span>
                   </div>
                 )}
-                
+
                 {isAddingAddress ? (
                   <div className="bg-slate-50 border border-brand-border rounded-xl p-4 space-y-3">
-                    <input 
-                      type="text" 
-                      placeholder="Full Name" 
-                      value={newAddr.fullName} 
-                      onChange={e => setNewAddr({...newAddr, fullName: e.target.value})} 
-                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white" 
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      value={newAddr.fullName}
+                      onChange={e => setNewAddr({ ...newAddr, fullName: e.target.value })}
+                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white"
                     />
-                    <input 
-                      type="text" 
-                      placeholder="Mobile Number" 
-                      value={newAddr.mobile} 
-                      onChange={e => setNewAddr({...newAddr, mobile: e.target.value})} 
-                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white" 
+                    <input
+                      type="text"
+                      placeholder="Mobile Number"
+                      value={newAddr.mobile}
+                      onChange={e => setNewAddr({ ...newAddr, mobile: e.target.value })}
+                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white"
                     />
-                    <input 
-                      type="text" 
-                      placeholder="Flat, House no., Building, Company" 
-                      value={newAddr.line1} 
-                      onChange={e => setNewAddr({...newAddr, line1: e.target.value})} 
-                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white" 
+                    <input
+                      type="text"
+                      placeholder="Flat, House no., Building, Company"
+                      value={newAddr.line1}
+                      onChange={e => setNewAddr({ ...newAddr, line1: e.target.value })}
+                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white"
                     />
                     <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="City" 
-                        value={newAddr.city} 
-                        onChange={e => setNewAddr({...newAddr, city: e.target.value})} 
-                        className="w-1/2 text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white" 
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={newAddr.city}
+                        onChange={e => setNewAddr({ ...newAddr, city: e.target.value })}
+                        className="w-1/2 text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white"
                       />
-                      <input 
-                        type="text" 
-                        placeholder="State" 
-                        value={newAddr.state} 
-                        onChange={e => setNewAddr({...newAddr, state: e.target.value})} 
-                        className="w-1/2 text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white" 
+                      <input
+                        type="text"
+                        placeholder="State"
+                        value={newAddr.state}
+                        onChange={e => setNewAddr({ ...newAddr, state: e.target.value })}
+                        className="w-1/2 text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white"
                       />
                     </div>
-                    <input 
-                      type="text" 
-                      placeholder="Pincode (6 Digits)" 
-                      value={newAddr.pincode} 
-                      onChange={e => setNewAddr({...newAddr, pincode: e.target.value})} 
-                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white font-numbers" 
+                    <input
+                      type="text"
+                      placeholder="Pincode (6 Digits)"
+                      value={newAddr.pincode}
+                      onChange={e => setNewAddr({ ...newAddr, pincode: e.target.value })}
+                      className="w-full text-xs p-2.5 border border-brand-border rounded-lg outline-none focus:border-brand-blue bg-white font-numbers"
                     />
                     <div className="flex gap-2 pt-2">
-                      <button 
-                        onClick={() => { setIsAddingAddress(false); setLocationFeedback(null); }} 
+                      <button
+                        onClick={() => { setIsAddingAddress(false); setLocationFeedback(null); }}
                         className="flex-1 py-2 text-xs font-bold text-brand-slate bg-white border border-brand-border rounded-lg cursor-pointer hover:bg-slate-100"
                       >
                         Cancel
                       </button>
-                      <button 
+                      <button
                         onClick={async () => {
-                          if(!newAddr.fullName || !newAddr.mobile || !newAddr.line1 || !newAddr.city || !newAddr.state || !newAddr.pincode) return alert("Please fill all details");
-                          await addAddress({ 
-                            ...newAddr, 
-                            label: newAddr.label || 'Home', 
-                            type: 'home', 
-                            country: 'India', 
-                            latitude: detectedCoords?.latitude, 
-                            longitude: detectedCoords?.longitude, 
-                            isDefault: true 
+                          if (!newAddr.fullName || !newAddr.mobile || !newAddr.line1 || !newAddr.city || !newAddr.state || !newAddr.pincode) return alert("Please fill all details");
+                          await addAddress({
+                            ...newAddr,
+                            label: newAddr.label || 'Home',
+                            type: 'home',
+                            country: 'India',
+                            latitude: detectedCoords?.latitude,
+                            longitude: detectedCoords?.longitude,
+                            isDefault: true
                           });
                           setIsAddingAddress(false);
                           setLocationFeedback(null);
-                        }} 
+                        }}
                         className="flex-1 py-2 text-xs font-bold text-white bg-brand-blue rounded-lg cursor-pointer hover:bg-blue-700"
                       >
                         Save
@@ -370,7 +371,7 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
 
                 <div className="flex flex-col gap-2.5">
                   {/* Option 1: Razorpay Online Payment */}
-                  <label 
+                  <label
                     onClick={() => setSelectedPayment('razorpay')}
                     className={`flex items-start justify-between p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selectedPayment === 'razorpay' ? 'border-brand-blue bg-blue-50/50 shadow-xs' : 'border-brand-border bg-white hover:border-slate-300'}`}
                   >
@@ -392,7 +393,7 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
 
                   {/* Option 2: Cash on Delivery — Hidden for ShopIndia e-commerce */}
                   {!isShopVertical && (
-                    <label 
+                    <label
                       onClick={() => setSelectedPayment('COD')}
                       className={`flex items-start justify-between p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selectedPayment === 'COD' ? 'border-brand-blue bg-blue-50/50 shadow-xs' : 'border-brand-border bg-white hover:border-slate-300'}`}
                     >
@@ -430,9 +431,21 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
                     <span>- ₹{discount.toLocaleString('en-IN')}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-b border-brand-border pb-3">
-                  <span>Delivery Charges</span>
-                  <span className={delivery === 0 ? 'text-brand-green' : 'text-brand-graphite'}>{delivery === 0 ? 'FREE' : `₹${delivery}`}</span>
+                <div className="flex justify-between">
+                  <span>Delivery Fee</span>
+                  <span className={delivery === 0 ? 'text-brand-green' : 'text-brand-graphite'}>
+                    {delivery === 0 ? 'FREE' : `₹${delivery}`}
+                  </span>
+                </div>
+                {platformFee != null && platformFee > 0 && (
+                  <div className="flex justify-between">
+                    <span>Platform Fee</span>
+                    <span className="text-brand-graphite">₹{platformFee.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-b border-brand-border pb-3 text-[11px] text-gray-400 font-normal">
+                  <span>Taxes (GST Included)</span>
+                  <span>Included</span>
                 </div>
                 <div className="flex justify-between pt-1 text-sm font-black text-brand-graphite">
                   <span>Total Payable</span>
@@ -440,7 +453,7 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
                 </div>
               </div>
 
-              <button 
+              <button
                 disabled={isSubmitting || !selectedAddress || (!selectedPayment && selectedPayment !== 'COD')}
                 onClick={handlePlaceOrder}
                 className="w-full py-3.5 bg-brand-green hover:bg-emerald-650 text-white rounded-button text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-premium disabled:opacity-50 transition-colors cursor-pointer"
