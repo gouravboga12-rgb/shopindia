@@ -31,7 +31,16 @@ export const VendorOrders: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => {
+      // Background silent sync without flashing full-page spinner
+      api.get<{ orders: any[] }>('/api/vendor/orders')
+        .then(d => setOrders(d.orders || []))
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-dismiss success toast
   useEffect(() => {
@@ -472,13 +481,20 @@ export const VendorOrders: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => setTrackingOrderId(o.id)}
-                                    className="px-2 py-1 bg-white hover:bg-emerald-100/50 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                                  >
-                                    <Zap size={10} className="fill-emerald-500 text-emerald-500" />
-                                    <span>Track</span>
-                                  </button>
+                                  {o.status === 'delivered' || o.delivery?.status === 'delivered' ? (
+                                    <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 whitespace-nowrap">
+                                      <CheckCircle2 size={11} className="text-emerald-600" />
+                                      <span>Delivered</span>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => setTrackingOrderId(o.id)}
+                                      className="px-2 py-1 bg-white hover:bg-emerald-100/50 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                    >
+                                      <Zap size={10} className="fill-emerald-500 text-emerald-500" />
+                                      <span>Track</span>
+                                    </button>
+                                  )}
                                 </div>
 
                                 {/* Pickup Code Box & Confirm Handover Button */}
@@ -873,6 +889,9 @@ export const VendorOrders: React.FC = () => {
         <LiveOrderTrackingModal
           orderId={trackingOrderId}
           onClose={() => setTrackingOrderId(null)}
+          onOrderDelivered={() => {
+            load();
+          }}
           viewerRole="vendor"
         />
       )}

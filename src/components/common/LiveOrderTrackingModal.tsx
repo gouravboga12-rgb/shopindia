@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Star,
   KeyRound,
+  CheckCircle2,
 } from 'lucide-react';
 import { RealWorldMap } from './RealWorldMap';
 
@@ -55,18 +56,47 @@ interface LiveOrderTrackingModalProps {
   orderId: string;
   onClose: () => void;
   viewerRole?: 'customer' | 'vendor';
+  onOrderDelivered?: () => void;
 }
 
 export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
   orderId,
   onClose,
   viewerRole = 'customer',
+  onOrderDelivered,
 }) => {
   const [data, setData] = useState<TrackingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [riderCoords, setRiderCoords] = useState<{ lat: number; lng: number; bearing: number; speed: number } | null>(null);
   const [liveStage, setLiveStage] = useState<string>('assigned');
+  const [autoCloseCountdown, setAutoCloseCountdown] = useState<number | null>(null);
+
+  const isDelivered = liveStage === 'delivered' || data?.status === 'delivered';
+
+  // Handle auto-close countdown when order is delivered
+  useEffect(() => {
+    if (isDelivered) {
+      if (onOrderDelivered) {
+        onOrderDelivered();
+      }
+      if (autoCloseCountdown === null) {
+        setAutoCloseCountdown(4);
+      }
+    }
+  }, [isDelivered, autoCloseCountdown, onOrderDelivered]);
+
+  useEffect(() => {
+    if (autoCloseCountdown === null) return;
+    if (autoCloseCountdown <= 0) {
+      onClose();
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAutoCloseCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [autoCloseCountdown, onClose]);
 
   // Initial fetch of tracking info
   useEffect(() => {
@@ -156,25 +186,35 @@ export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 sticky top-0 z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-orange-500/20">
-              <Bike className="w-5 h-5" />
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-md ${
+              isDelivered
+                ? 'bg-gradient-to-tr from-emerald-500 to-green-600 text-white shadow-emerald-500/20'
+                : 'bg-gradient-to-tr from-orange-500 to-amber-500 text-slate-950 shadow-orange-500/20'
+            }`}>
+              {isDelivered ? <CheckCircle2 className="w-5 h-5" /> : <Bike className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-white text-sm sm:text-base">
-                  Live Dispatch Radar
+                  {isDelivered ? 'Delivery Completed' : 'Live Dispatch Radar'}
                 </h3>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                {isDelivered ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold">
+                    Delivered
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                )}
               </div>
               <p className="text-[11px] font-mono text-slate-400">
-                Order #{data?.orderNumber || orderId.slice(0, 8)}
+                Order #{data?.orderNumber || orderId.slice(0, 8)} {isDelivered ? '• Completed' : ''}
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -196,6 +236,28 @@ export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
             </div>
           ) : (
             <>
+              {/* Delivered Celebratory Banner with Auto-Close Notice */}
+              {isDelivered && (
+                <div className="bg-gradient-to-r from-emerald-950/80 via-emerald-900/60 to-slate-900 border border-emerald-500/40 rounded-2xl p-4 shadow-lg flex items-center justify-between gap-3 animate-in fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm sm:text-base font-black text-white">Delivered Successfully! 🎉</h4>
+                      <p className="text-xs text-emerald-300/90 mt-0.5">
+                        Order verified via customer OTP. Live GPS tracking has concluded.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[11px] font-mono text-emerald-300 font-bold bg-slate-900/90 px-3 py-1.5 rounded-xl border border-emerald-500/40 block">
+                      Auto-closing in {autoCloseCountdown ?? 0}s
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Trip Stage Banner */}
               <div className="bg-gradient-to-r from-slate-850 via-slate-800 to-slate-850 border border-slate-700/60 rounded-2xl p-4 shadow-md">
                 <div className="flex items-center justify-between">
@@ -327,12 +389,23 @@ export const LiveOrderTrackingModal: React.FC<LiveOrderTrackingModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-800 bg-slate-900/90 flex justify-end">
+        <div className="px-5 py-3 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between">
+          {isDelivered ? (
+            <span className="text-xs text-emerald-400 font-bold flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" /> Live tracking completed • Auto-closing in {autoCloseCountdown ?? 0}s
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400 font-mono">Live GPS Stream Active</span>
+          )}
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all"
+            className={`px-4 py-2 font-bold text-xs rounded-xl transition-all cursor-pointer ${
+              isDelivered
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+            }`}
           >
-            Close Radar
+            {isDelivered ? 'Close Radar (Done)' : 'Close Radar'}
           </button>
         </div>
 
