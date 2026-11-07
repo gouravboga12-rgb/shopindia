@@ -88,9 +88,10 @@ router.get('/', async (req, res) => {
                 id: true,
                 orderNumber: true,
                 total: true,
-                deliveryAddress: true,
                 deliveryLine1: true,
+                deliveryLine2: true,
                 deliveryCity: true,
+                deliveryPincode: true,
                 customer: {
                   select: {
                     name: true,
@@ -157,7 +158,7 @@ router.get('/', async (req, res) => {
           customerName: d.order?.customer?.name || 'Customer',
           customerPhone: d.order?.customer?.phone || '',
           deliveredAt: d.deliveredAt || d.createdAt,
-          address: d.order?.deliveryLine1 || d.order?.deliveryAddress || d.order?.deliveryCity || 'Area Dropoff',
+          address: [d.order?.deliveryLine1, d.order?.deliveryLine2, d.order?.deliveryCity, d.order?.deliveryPincode].filter(Boolean).join(', ') || 'Area Dropoff',
         })),
       });
     }
