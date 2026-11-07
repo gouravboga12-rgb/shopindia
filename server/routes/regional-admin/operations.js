@@ -84,7 +84,7 @@ router.get('/dashboard', async (req, res) => {
         where: {
           ...branchFilter,
           status: { notIn: ['cancelled', 'refunded', 'returned'] },
-          paymentStatus: { in: ['paid', 'completed'] },
+          paymentStatus: 'paid',
         },
         select: { total: true, createdAt: true, status: true },
         take: 100,
