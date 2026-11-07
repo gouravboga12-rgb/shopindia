@@ -3,7 +3,8 @@ import { api } from '../../lib/api';
 import {
   Send, X, AlertTriangle,
   DollarSign, Store, User, Clock,
-  ShieldCheck, RefreshCw, MessageSquare
+  ShieldCheck, RefreshCw, MessageSquare,
+  Edit2, Trash2, Calendar, Check
 } from 'lucide-react';
 
 export const SupportPage: React.FC = () => {
@@ -14,6 +15,16 @@ export const SupportPage: React.FC = () => {
   const [replying, setReplying] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'sla_breached' | 'escalated' | 'refund_requests'>('all');
 
+  // Day-wise / Date Filter State
+  const [dateRange, setDateRange] = useState<'all' | 'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Message Edit State
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editMsgText, setEditMsgText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Refund Modal state
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number>(0);
@@ -23,19 +34,33 @@ export const SupportPage: React.FC = () => {
 
   const load = () => {
     setLoading(true);
-    const query = filterTab === 'all' ? '' : `?filter=${filterTab}`;
+    const params = new URLSearchParams();
+    if (filterTab !== 'all') params.set('filter', filterTab);
+    if (dateRange !== 'all') params.set('dateRange', dateRange);
+    if (dateRange === 'custom') {
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
     api.get<{ tickets: any[] }>(`/api/admin/support/tickets${query}`)
       .then(d => setTickets(d.tickets || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [filterTab]);
+  useEffect(load, [filterTab, dateRange, startDate, endDate]);
 
   // Live polling for table
   useEffect(() => {
     const timer = setInterval(() => {
-      const query = filterTab === 'all' ? '' : `?filter=${filterTab}`;
+      const params = new URLSearchParams();
+      if (filterTab !== 'all') params.set('filter', filterTab);
+      if (dateRange !== 'all') params.set('dateRange', dateRange);
+      if (dateRange === 'custom') {
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+      }
+      const query = params.toString() ? `?${params.toString()}` : '';
       api.get<{ tickets: any[] }>(`/api/admin/support/tickets${query}`)
         .then(d => {
           if (d.tickets) setTickets(d.tickets);
@@ -43,7 +68,7 @@ export const SupportPage: React.FC = () => {
         .catch(() => {});
     }, 4000);
     return () => clearInterval(timer);
-  }, [filterTab]);
+  }, [filterTab, dateRange, startDate, endDate]);
 
   // Live polling for open modal thread
   useEffect(() => {
@@ -88,6 +113,46 @@ export const SupportPage: React.FC = () => {
       alert(err.message);
     } finally {
       setReplying(false);
+    }
+  };
+
+  const handleStartEdit = (msg: any) => {
+    setEditingMsgId(msg.id);
+    setEditMsgText(msg.text);
+  };
+
+  const handleSaveEdit = async (msgId: string) => {
+    if (!editMsgText.trim()) return;
+    setSavingEdit(true);
+    try {
+      await api.patch(`/api/admin/support/messages/${msgId}`, { text: editMsgText.trim() });
+      if (selectedTicket) {
+        setSelectedTicket((prev: any) => ({
+          ...prev,
+          messages: prev.messages.map((m: any) => m.id === msgId ? { ...m, text: editMsgText.trim() } : m)
+        }));
+      }
+      setEditingMsgId(null);
+      setEditMsgText('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to edit message');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!confirm('Are you sure you want to delete this message from the support thread?')) return;
+    try {
+      await api.delete(`/api/admin/support/messages/${msgId}`);
+      if (selectedTicket) {
+        setSelectedTicket((prev: any) => ({
+          ...prev,
+          messages: prev.messages.filter((m: any) => m.id !== msgId)
+        }));
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete message');
     }
   };
 
@@ -147,7 +212,6 @@ export const SupportPage: React.FC = () => {
   };
 
   const filteredTickets = tickets;
-
   const breachedCount = tickets.filter(t => t.isBreached).length;
   const refundReqCount = tickets.filter(t => t.refundRequested && t.refundStatus === 'requested').length;
 
@@ -161,7 +225,7 @@ export const SupportPage: React.FC = () => {
             <span>Support &amp; Partner Help Desk Queue</span>
           </h1>
           <p className="text-sm text-gray-500">
-            Unified support queue for Customer and Store Merchant inquiries with live chat and refund approvals
+            Unified support queue for Customer and Store Merchant inquiries with live chat, date filters, and refund approvals
           </p>
         </div>
 
@@ -174,7 +238,7 @@ export const SupportPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs (Queue Type) */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1">
         {[
           { id: 'all', label: 'All Tickets', count: tickets.length },
@@ -208,6 +272,57 @@ export const SupportPage: React.FC = () => {
         })}
       </div>
 
+      {/* Day-Wise / Date Range Filter Bar */}
+      <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5 mr-1">
+            <Calendar className="w-4 h-4 text-indigo-600" />
+            <span>Day-wise Filter:</span>
+          </span>
+
+          {[
+            { id: 'all', label: 'All Dates' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'last7days', label: 'Last 7 Days' },
+            { id: 'last30days', label: 'Last 30 Days' },
+            { id: 'custom', label: 'Custom Range' },
+          ].map((d: any) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setDateRange(d.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                dateRange === d.id
+                  ? 'bg-[#0F2C59] text-white shadow-xs'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom Date Inputs if custom range selected */}
+        {dateRange === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800"
+            />
+            <span className="text-xs text-gray-400">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Tickets Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-premium overflow-hidden">
         <table className="w-full text-xs text-left">
@@ -229,7 +344,7 @@ export const SupportPage: React.FC = () => {
                 <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 animate-pulse rounded" /></td></tr>
               ))
             ) : filteredTickets.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-gray-400 font-medium">No tickets found for this queue.</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-gray-400 font-medium">No tickets found for this queue &amp; date filter.</td></tr>
             ) : (
               filteredTickets.map(t => {
                 const id = t.id || t._id;
@@ -369,7 +484,7 @@ export const SupportPage: React.FC = () => {
         </table>
       </div>
 
-      {/* Ticket Details & Action Modal (Clean, Professional Chat Interface) */}
+      {/* Ticket Details & Action Modal (Clean, Professional Chat Interface with Edit & Delete) */}
       {selectedTicket && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
@@ -429,13 +544,14 @@ export const SupportPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Modal Content: Scrollable Message Thread */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/40 min-h-[350px]">
+            {/* Modal Content: Scrollable Message Thread with Message Edit & Delete */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/40 min-h-[350px]">
               {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
                 selectedTicket.messages.map((m: any, idx: number) => {
                   const isStaff = m.senderRole === 'support' || m.senderRole === 'admin';
                   const isSystem = m.senderRole === 'system';
                   const isVendor = m.senderRole === 'vendor';
+                  const isEditingThis = editingMsgId === m.id;
 
                   if (isSystem) {
                     return (
@@ -450,9 +566,10 @@ export const SupportPage: React.FC = () => {
                   return (
                     <div
                       key={m.id || idx}
-                      className={`flex flex-col ${isStaff ? 'items-end' : 'items-start'}`}
+                      className={`flex flex-col group ${isStaff ? 'items-end' : 'items-start'}`}
                     >
-                      <div className="flex items-center gap-1.5 mb-1 text-[10px] text-gray-400">
+                      {/* Message Meta Info Header */}
+                      <div className="flex items-center gap-2 mb-1 text-[10px] text-gray-400">
                         {isStaff ? (
                           <>
                             <ShieldCheck className="w-3 h-3 text-indigo-600" />
@@ -471,18 +588,70 @@ export const SupportPage: React.FC = () => {
                         )}
                         <span>•</span>
                         <span>{new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+
+                        {/* Super Admin Edit / Delete Actions on Hover */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(m)}
+                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-indigo-600 transition-colors"
+                            title="Edit Message"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(m.id)}
+                            className="p-1 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
+                            title="Delete Message"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
-                      <div
-                        className={`max-w-md p-3.5 rounded-2xl text-xs leading-relaxed ${
-                          isStaff
-                            ? 'bg-[#0F2C59] text-white rounded-tr-none shadow-sm'
-                            : isVendor
-                            ? 'bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-tl-none shadow-xs'
-                            : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-xs'
-                        }`}
-                      >
-                        {m.text}
-                      </div>
+
+                      {/* Message Bubble or Inline Edit Form */}
+                      {isEditingThis ? (
+                        <div className="w-full max-w-md p-3 bg-white border border-indigo-300 rounded-2xl shadow-sm space-y-2">
+                          <textarea
+                            rows={3}
+                            value={editMsgText}
+                            onChange={e => setEditMsgText(e.target.value)}
+                            className="w-full p-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900 resize-none"
+                          />
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditingMsgId(null)}
+                              className="px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-lg"
+                              disabled={savingEdit}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(m.id)}
+                              disabled={savingEdit || !editMsgText.trim()}
+                              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 shadow-xs"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>{savingEdit ? 'Saving...' : 'Save Edit'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className={`max-w-md p-3.5 rounded-2xl text-xs leading-relaxed ${
+                            isStaff
+                              ? 'bg-[#0F2C59] text-white rounded-tr-none shadow-sm'
+                              : isVendor
+                              ? 'bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-tl-none shadow-xs'
+                              : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-xs'
+                          }`}
+                        >
+                          {m.text}
+                        </div>
+                      )}
                     </div>
                   );
                 })

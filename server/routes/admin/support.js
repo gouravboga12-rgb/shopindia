@@ -10,7 +10,7 @@ router.use(verifyToken, requirePermission('manage_support'));
 /** GET /api/admin/support/tickets — FR-05.7 */
 router.get('/tickets', async (req, res) => {
   try {
-    const { status, priority, assignedTo, filter, page = 1, limit = 20 } = req.query;
+    const { status, priority, assignedTo, filter, dateRange, startDate, endDate, page = 1, limit = 100 } = req.query;
     const where = {};
     const now = new Date();
 
@@ -29,6 +29,41 @@ router.get('/tickets', async (req, res) => {
     } else if (filter === 'sla_breached') {
       where.slaDeadline = { lte: now };
       where.status = { in: ['open', 'in_progress'] };
+    }
+
+    // Day-wise / Date-range filtering
+    if (dateRange === 'today') {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: startOfDay };
+    } else if (dateRange === 'yesterday') {
+      const startOfYesterday = new Date();
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      startOfYesterday.setHours(0, 0, 0, 0);
+      const endOfYesterday = new Date();
+      endOfYesterday.setDate(endOfYesterday.getDate() - 1);
+      endOfYesterday.setHours(23, 59, 59, 999);
+      where.createdAt = { gte: startOfYesterday, lte: endOfYesterday };
+    } else if (dateRange === 'last7days') {
+      const d7 = new Date();
+      d7.setDate(d7.getDate() - 7);
+      d7.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: d7 };
+    } else if (dateRange === 'last30days') {
+      const d30 = new Date();
+      d30.setDate(d30.getDate() - 30);
+      d30.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: d30 };
+    } else if (startDate && endDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      where.createdAt = { gte: s, lte: e };
+    } else if (startDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: s };
     }
 
     const pageNum = Number(page);
@@ -210,6 +245,30 @@ router.post('/tickets/:id/reply', async (req, res) => {
     }
 
     res.json(ticket);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/** PATCH /api/admin/support/messages/:id — Super Admin edits a message */
+router.patch('/messages/:id', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Message text required' });
+
+    const message = await prisma.ticketMessage.update({
+      where: { id: req.params.id },
+      data: { text: text.trim() },
+    });
+    res.json({ success: true, message });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/** DELETE /api/admin/support/messages/:id — Super Admin deletes a message */
+router.delete('/messages/:id', async (req, res) => {
+  try {
+    await prisma.ticketMessage.delete({
+      where: { id: req.params.id },
+    });
+    res.json({ success: true, message: 'Message deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
