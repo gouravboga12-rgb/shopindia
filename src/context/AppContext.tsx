@@ -201,7 +201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = [newNotif, ...prev];
       try {
         localStorage.setItem('shopindia_notifications', JSON.stringify(updated));
-      } catch {}
+      } catch { }
       return updated;
     });
   };
@@ -211,7 +211,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
       try {
         localStorage.setItem('shopindia_notifications', JSON.stringify(updated));
-      } catch {}
+      } catch { }
       return updated;
     });
   };
@@ -221,7 +221,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = prev.map(n => ({ ...n, read: true }));
       try {
         localStorage.setItem('shopindia_notifications', JSON.stringify(updated));
-      } catch {}
+      } catch { }
       return updated;
     });
   };
@@ -259,7 +259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const combined = [...fresh, ...prev];
             try {
               localStorage.setItem('shopindia_notifications', JSON.stringify(combined));
-            } catch {}
+            } catch { }
             return combined;
           });
         }
@@ -268,7 +268,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
     fetchAppData();
-    
+
     const handleLocationChange = () => {
       if (window.location.hash.startsWith('#/')) {
         const clean = window.location.hash.slice(1);
@@ -316,7 +316,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const list = raw ? JSON.parse(raw) : [];
         const next = [productId, ...list.filter((id: string) => id !== productId)].slice(0, 24);
         localStorage.setItem('shopindia_customer_recently_viewed', JSON.stringify(next));
-      } catch {}
+      } catch { }
     }
     setHistory(prev => [...prev, path]);
     setCurrentPath(path);
@@ -418,27 +418,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Order placement (persists to the backend API)
   const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => {
     try {
-      const created = await api.post<any>('/api/orders', { 
-        ...payload, 
+      const created = await api.post<any>('/api/orders', {
+        ...payload,
         paymentMethod: payload.paymentMethod || (payload.paymentMethodId === 'COD' ? 'cod' : 'razorpay'),
-        vertical: payload.vertical || currentVertical 
+        vertical: payload.vertical || currentVertical
       });
       // Fetch orders again to get the new order
       const res = await api.get<{ orders: Order[] }>('/api/orders');
       if (res.orders) setOrders(res.orders);
-      
+
       // Add a live notification for the placed order
       const isQuick = currentVertical === 'quick';
       const isService = currentVertical === 'services';
-      
+
       addNotification({
         type: isQuick ? 'quick' : isService ? 'service' : 'order',
         title: isQuick ? 'Arriving in 10 mins! ⚡' : isService ? 'Service Booked 🛠️' : 'Order Placed! 🎉',
-        message: isQuick 
-          ? 'Your 10 Min delivery order has been placed and is being packed.' 
-          : isService 
-          ? 'Your service appointment has been successfully booked.' 
-          : 'Your order has been placed! Expected delivery in 2-4 business days via express courier.',
+        message: isQuick
+          ? 'Your 10 Min delivery order has been placed and is being packed.'
+          : isService
+            ? 'Your service appointment has been successfully booked.'
+            : 'Your order has been placed! Expected delivery in 2-4 business days via express courier.',
         actionText: 'Track Order',
         icon: isQuick ? 'Zap' : isService ? 'Wrench' : 'Package',
         color: isQuick ? 'text-[#E5B500]' : isService ? 'text-amber-600' : 'text-blue-600',
@@ -462,7 +462,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) throw new Error('Cancel failed');
-      
+
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
     } catch (err) {
       console.error(err);
@@ -482,7 +482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ status })
       });
       if (!res.ok) throw new Error('Update failed');
-      
+
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as any } : o));
     } catch (err) {
       console.error(err);

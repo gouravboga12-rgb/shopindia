@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   Users, Search, Zap, RefreshCw, FileText,
-  AlertTriangle, SlidersHorizontal
+  AlertTriangle, SlidersHorizontal, Calendar
 } from 'lucide-react';
 
 interface AccountItem {
@@ -35,6 +35,9 @@ interface AccountsPageProps {
 export const AccountsPage: React.FC<AccountsPageProps> = ({ onOpenStatement }) => {
   const [filterType, setFilterType] = useState<'all' | 'vendor' | 'rider'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [dateRange, setDateRange] = useState<'all' | 'today' | 'yesterday' | '7d' | '30d' | 'custom'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -49,7 +52,15 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({ onOpenStatement }) =
   const loadAccounts = async () => {
     setLoading(true);
     try {
-      const res: any = await api.get(`/api/admin/payouts/accounts?type=${filterType}&search=${encodeURIComponent(searchQuery)}`);
+      const params = new URLSearchParams();
+      if (filterType !== 'all') params.set('type', filterType);
+      if (searchQuery) params.set('search', searchQuery);
+      if (dateRange !== 'all') params.set('dateRange', dateRange);
+      if (dateRange === 'custom') {
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+      }
+      const res: any = await api.get(`/api/admin/payouts/accounts?${params.toString()}`);
       if (res?.accounts) setAccounts(res.accounts);
     } catch (err) {
       console.error('Failed to load accounts:', err);
@@ -61,7 +72,7 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({ onOpenStatement }) =
   useEffect(() => {
     const timer = setTimeout(loadAccounts, 300);
     return () => clearTimeout(timer);
-  }, [filterType, searchQuery]);
+  }, [filterType, searchQuery, dateRange, startDate, endDate]);
 
   const handlePostAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,6 +191,55 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({ onOpenStatement }) =
             className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           />
         </div>
+      </div>
+
+      {/* Date Filter Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500 flex items-center gap-1 mr-1">
+            <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Date Range:</span>
+          </span>
+          {[
+            { id: 'all', label: 'All Time' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: '7d', label: '7 Days' },
+            { id: '30d', label: '30 Days' },
+            { id: 'custom', label: 'Custom' },
+          ].map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setDateRange(d.id as any)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                dateRange === d.id
+                  ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        {dateRange === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+            />
+            <span className="text-xs text-gray-400 font-bold">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+            />
+          </div>
+        )}
       </div>
 
       {/* Directory Table */}

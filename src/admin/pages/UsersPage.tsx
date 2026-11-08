@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Search, UserX, Ban, CheckCircle, Plus } from 'lucide-react';
+import { Search, UserX, Ban, CheckCircle, Plus, Download } from 'lucide-react';
 
-const ROLES = ['all', 'customer', 'vendor', 'rider', 'branch_manager', 'support_exec', 'super_admin'];
+const ROLES = ['all', 'customer', 'vendor', 'rider', 'regional_admin', 'super_admin'];
 
 export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -13,7 +13,7 @@ export const UsersPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [newUserRole, setNewUserRole] = useState('branch_manager');
+  const [newUserRole, setNewUserRole] = useState('customer');
 
   const load = () => {
     setLoading(true);
@@ -55,19 +55,53 @@ export const UsersPage: React.FC = () => {
     (!q || u.name.toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()))
   );
 
+  const handleExportCSV = () => {
+    if (!filtered || filtered.length === 0) {
+      alert('No user records match current filters to export.');
+      return;
+    }
+    const headers = ['User ID', 'Name', 'Email', 'Phone', 'Role', 'Status', 'Joined Date'];
+    const rows = filtered.map(u => [
+      `"${u.id || ''}"`,
+      `"${(u.name || '').replace(/"/g, '""')}"`,
+      `"${(u.email || '').replace(/"/g, '""')}"`,
+      `"${(u.phone || '').replace(/"/g, '""')}"`,
+      `"${(u.role || '').toUpperCase()}"`,
+      `"${(u.status || 'ACTIVE').toUpperCase()}"`,
+      `"${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : ''}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `users_export_${role}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-sm text-gray-500">View and manage customers, staff, riders, and vendors</p>
+          <h1 className="text-2xl font-bold text-gray-900 font-heading">User Management</h1>
+          <p className="text-sm text-gray-500">View and manage customers, staff, riders, vendors, and regional admins</p>
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="px-4 py-2 bg-[#0F2C59] text-white rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-[#1a3d73] shadow-md transition-all"
-        >
-          <Plus className="w-4 h-4" /> Add User
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-3.5 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-gray-50 shadow-2xs transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-[#0F2C59]" />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={() => setModal(true)}
+            className="px-4 py-2 bg-[#0F2C59] text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-[#1a3d73] shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add User
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center justify-between">

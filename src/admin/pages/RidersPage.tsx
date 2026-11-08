@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Search, CheckCircle, Ban, Truck, Trash2, AlertTriangle, X, MapPin, Banknote, ShieldAlert, Wrench, Bike, RefreshCw } from 'lucide-react';
+import { Search, CheckCircle, Ban, Truck, Trash2, AlertTriangle, X, MapPin, Banknote, ShieldAlert, Wrench, Bike, RefreshCw, Download } from 'lucide-react';
 
 export const RidersPage: React.FC = () => {
   const [riders, setRiders] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [riderToDelete, setRiderToDelete] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -77,15 +78,48 @@ export const RidersPage: React.FC = () => {
 
   const filtered = riders.filter(r => {
     const matchesQ = !q || r.name.toLowerCase().includes(q.toLowerCase()) || r.phone?.includes(q) || r.email?.toLowerCase().includes(q.toLowerCase());
-    
+
     const rCity = (r.branch?.city || r.riderProfile?.branch?.city || r.riderProfile?.address || '').toLowerCase();
     const matchesCity = cityFilter === 'all' || rCity.includes(cityFilter.toLowerCase());
 
     const pType = r.riderProfile?.partnerType || 'delivery';
     const matchesRole = roleFilter === 'all' || pType === roleFilter;
 
-    return matchesQ && matchesCity && matchesRole;
+    const rStatus = r.status || r.riderProfile?.status || 'active';
+    const matchesStatus = statusFilter === 'all' || rStatus === statusFilter;
+
+    return matchesQ && matchesCity && matchesRole && matchesStatus;
   });
+
+  const handleExportCSV = () => {
+    if (!filtered || filtered.length === 0) {
+      alert('No rider records match current filters to export.');
+      return;
+    }
+    const headers = ['Partner ID', 'Name', 'Phone', 'Email', 'City / Hub', 'Partner Role', 'Vehicle Type', 'Status', 'Online Radar', 'COD Float Held', 'Wallet Balance', 'Joined Date'];
+    const rows = filtered.map(r => [
+      `"${r.id || ''}"`,
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      `"${(r.phone || '').replace(/"/g, '""')}"`,
+      `"${(r.email || '').replace(/"/g, '""')}"`,
+      `"${(r.branch?.city || r.riderProfile?.branch?.city || r.riderProfile?.address || '').replace(/"/g, '""')}"`,
+      `"${(r.riderProfile?.partnerType || 'delivery').toUpperCase()}"`,
+      `"${(r.riderProfile?.vehicleType || 'Bike').toUpperCase()}"`,
+      `"${(r.status || r.riderProfile?.status || 'ACTIVE').toUpperCase()}"`,
+      `"${r.riderProfile?.isOnline ? 'ONLINE' : 'OFFLINE'}"`,
+      `"${r.riderProfile?.codCashFloat || 0}"`,
+      `"${r.riderProfile?.walletBalance || 0}"`,
+      `"${r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : ''}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `riders_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const totalCodHeld = riders.reduce((sum, r) => sum + (r.riderProfile?.codCashFloat || 0), 0);
   const onlineCount = riders.filter(r => r.riderProfile?.isOnline).length;
@@ -98,13 +132,22 @@ export const RidersPage: React.FC = () => {
           <p className="text-sm text-gray-500">Track operating cities, partner trade roles, live GPS, and COD cash float</p>
         </div>
 
-        <button
-          onClick={load}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh Riders</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-[#0F2C59]" />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={load}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh Riders</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Stats Bar */}
@@ -161,12 +204,23 @@ export const RidersPage: React.FC = () => {
         <select
           value={roleFilter}
           onChange={e => setRoleFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20"
+          className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20 cursor-pointer"
         >
           <option value="all">⚡ All Partner Roles</option>
           <option value="delivery">🚚 Quick Delivery Rider</option>
           <option value="service">🛠️ Service Technician</option>
           <option value="both">⚡ All-Rounder (Both)</option>
+        </select>
+
+        {/* Status Filter */}
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20 cursor-pointer"
+        >
+          <option value="all">🛡️ All Statuses</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
         </select>
       </div>
 
@@ -202,7 +256,7 @@ export const RidersPage: React.FC = () => {
                   {/* Partner Details */}
                   <td className="px-5 py-4">
                     <p className="font-bold text-gray-900 flex items-center gap-1.5">
-                      <Truck className="w-4 h-4 text-blue-600"/>
+                      <Truck className="w-4 h-4 text-blue-600" />
                       <span>{r.name}</span>
                     </p>
                     <p className="text-xs text-gray-500 font-mono mt-0.5">{r.phone}</p>
@@ -222,13 +276,12 @@ export const RidersPage: React.FC = () => {
 
                   {/* Role & Vehicle */}
                   <td className="px-5 py-4">
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                      partnerRole === 'service'
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${partnerRole === 'service'
                         ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         : partnerRole === 'both'
-                        ? 'bg-purple-50 text-purple-700 border-purple-200'
-                        : 'bg-orange-50 text-orange-700 border-orange-200'
-                    }`}>
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-orange-50 text-orange-700 border-orange-200'
+                      }`}>
                       {partnerRole === 'service' ? <Wrench className="w-3 h-3" /> : <Bike className="w-3 h-3" />}
                       <span>{partnerRole === 'both' ? 'All-Rounder' : partnerRole}</span>
                     </span>
@@ -270,18 +323,16 @@ export const RidersPage: React.FC = () => {
                   {/* Radar & Status */}
                   <td className="px-5 py-4">
                     <div className="space-y-1">
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                        profile?.isOnline
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${profile?.isOnline
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                           : 'bg-gray-100 text-gray-600 border-gray-200'
-                      }`}>
+                        }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${profile?.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
                         <span>{profile?.isOnline ? 'Online' : 'Offline'}</span>
                       </span>
 
-                      <span className={`block text-[10px] font-semibold px-2 py-0.5 rounded capitalize ${
-                        r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
-                      }`}>
+                      <span className={`block text-[10px] font-semibold px-2 py-0.5 rounded capitalize ${r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                        }`}>
                         {r.status}
                       </span>
                     </div>
@@ -292,12 +343,12 @@ export const RidersPage: React.FC = () => {
                     <div className="flex items-center gap-1.5">
                       {r.status !== 'active' && (
                         <button title="Activate Rider" onClick={() => updateStatus(r.id, 'active')} className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer">
-                          <CheckCircle className="w-4 h-4"/>
+                          <CheckCircle className="w-4 h-4" />
                         </button>
                       )}
                       {r.status !== 'suspended' && (
                         <button title="Suspend Rider" onClick={() => setSuspendTarget({ id: r.id, name: r.name, currentStatus: r.status })} className="p-1.5 text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer">
-                          <Ban className="w-4 h-4"/>
+                          <Ban className="w-4 h-4" />
                         </button>
                       )}
                       <button
@@ -356,11 +407,10 @@ export const RidersPage: React.FC = () => {
                 type="button"
                 disabled={suspending}
                 onClick={handleToggleSuspend}
-                className={`px-5 py-2 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer shadow-sm ${
-                  suspendTarget.currentStatus === 'suspended'
+                className={`px-5 py-2 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer shadow-sm ${suspendTarget.currentStatus === 'suspended'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-amber-600 hover:bg-amber-700'
-                }`}
+                  }`}
               >
                 {suspending ? 'Updating...' : suspendTarget.currentStatus === 'suspended' ? 'Confirm Reactivation' : 'Confirm Suspension'}
               </button>

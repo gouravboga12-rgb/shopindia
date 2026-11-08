@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   CheckCircle, XCircle, Ban, Search, LayoutDashboard,
   Phone, Mail, MapPin, ExternalLink, MessageCircle,
-  Store, Zap, ShoppingBag, Navigation
+  Store, Zap, ShoppingBag, Navigation, Download
 } from 'lucide-react';
 import type { ManagedVendor } from '../AdminPortal';
 
@@ -92,6 +92,36 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
     return matchesSearch && matchesService;
   });
 
+  const handleExportCSV = () => {
+    if (!filtered || filtered.length === 0) {
+      alert('No vendor records match current filters to export.');
+      return;
+    }
+    const headers = ['Vendor ID', 'Store Name', 'Owner / Contact', 'Email', 'Phone', 'City', 'State', 'Pincode', 'Vertical Opted', 'Status', 'Wallet Balance', 'Joined Date'];
+    const rows = filtered.map(v => [
+      `"${v.id || ''}"`,
+      `"${(v.businessName || '').replace(/"/g, '""')}"`,
+      `"${(v.contactPerson || v.user?.name || '').replace(/"/g, '""')}"`,
+      `"${(v.user?.email || '').replace(/"/g, '""')}"`,
+      `"${(v.phone || v.user?.phone || '').replace(/"/g, '""')}"`,
+      `"${(v.city || '').replace(/"/g, '""')}"`,
+      `"${(v.state || '').replace(/"/g, '""')}"`,
+      `"${(v.pincode || '').replace(/"/g, '""')}"`,
+      `"${v.storeVertical || (v.optedForQuickCommerce ? 'Quick + Traditional' : 'Traditional')}"`,
+      `"${(v.status || 'PENDING').toUpperCase()}"`,
+      `"${v.walletBalance || 0}"`,
+      `"${v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-IN') : ''}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `vendors_export_${filter}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-5">
       {/* ─── Header ────────────────────────────────────────────── */}
@@ -99,14 +129,23 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-heading flex items-center gap-2">
             <Store className="w-6 h-6 text-[#0F2C59]" />
-            Vendor Partners Directory
+            <span>Vendor Partners Directory</span>
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Complete merchant profiles with verified area locations, GPS coordinates, 1-click Call & WhatsApp options, and opted delivery verticals.
+            Complete merchant profiles with verified area locations, GPS coordinates, 1-click Call &amp; WhatsApp options, and opted delivery verticals.
           </p>
         </div>
-        <div className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-          {filtered.length} of {vendors.length} Vendors Active
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-3.5 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-gray-50 shadow-2xs transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-[#0F2C59]" />
+            <span>Export CSV</span>
+          </button>
+          <div className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+            {filtered.length} of {vendors.length} Vendors Active
+          </div>
         </div>
       </div>
 

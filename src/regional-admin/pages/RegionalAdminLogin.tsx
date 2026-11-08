@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Globe2, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
+import { api } from '../../lib/api';
 
 interface RegionalAdminLoginProps {
   onSwitchToRegister?: () => void;
@@ -22,13 +23,10 @@ export const RegionalAdminLogin: React.FC<RegionalAdminLoginProps> = ({ onSwitch
     setLoading(true);
 
     try {
-      const res = await fetch('/api/regional-admin/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const data = await api.post<{ token: string; user: any }>('/api/regional-admin/auth/login', {
+        email,
+        password
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
 
       login(data.token, data.user);
     } catch (err: unknown) {

@@ -7,7 +7,6 @@ import { VendorsPage } from './pages/VendorsPage';
 import { UsersPage } from './pages/UsersPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { OrdersPage } from './pages/OrdersPage';
-import { RBACPage } from './pages/RBACPage';
 import { ServiceAreasPage } from './pages/ServiceAreasPage';
 import { SupportPage } from './pages/SupportPage';
 import { PricingSettingsPage } from './pages/PricingSettingsPage';
@@ -86,7 +85,6 @@ const AdminContent: React.FC = () => {
       case 'services': return <ServicesManagementPage />;
       case 'orders': return <OrdersPage />;
       case 'canceled-orders': return <CanceledOrdersPage />;
-      case 'rbac': return <RBACPage />;
       case 'service-areas': return <ServiceAreasPage />;
       case 'support': return <SupportPage />;
       case 'commissions': return <PricingSettingsPage />;

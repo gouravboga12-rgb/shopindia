@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, CheckCircle2, AlertCircle, Building2, MapPin, RefreshCw } from 'lucide-react';
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
+import { api } from '../../lib/api';
 
 interface RegionalAdminRegisterProps {
   onSwitchToLogin: () => void;
@@ -66,17 +67,10 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
         .map((p) => p.trim())
         .filter(Boolean);
 
-      const res = await fetch('/api/regional-admin/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          assignedPincodes: pincodeList,
-        }),
+      await api.post('/api/regional-admin/auth/register', {
+        ...formData,
+        assignedPincodes: pincodeList,
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
 
       setSuccess('Application submitted! Once approved by Super Admin, your login credentials will be activated.');
       setTimeout(() => onSwitchToLogin(), 2500);

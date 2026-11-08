@@ -445,18 +445,68 @@ router.post('/:id/reject', async (req, res) => {
  */
 router.get('/accounts', async (req, res) => {
   try {
-    const { type = 'all', search } = req.query;
+    const { type = 'all', search, dateRange, startDate, endDate } = req.query;
+
+    let dateFilter = undefined;
+    if (dateRange === 'today') {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      dateFilter = { gte: start };
+    } else if (dateRange === 'yesterday') {
+      const start = new Date();
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+      dateFilter = { gte: start, lte: end };
+    } else if (dateRange === '7d') {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      dateFilter = { gte: start };
+    } else if (dateRange === '30d') {
+      const start = new Date();
+      start.setDate(start.getDate() - 30);
+      dateFilter = { gte: start };
+    } else if (dateRange === 'custom' && (startDate || endDate)) {
+      dateFilter = {};
+      if (startDate) dateFilter.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.lte = end;
+      }
+    }
+
+    const vendorWhere = {};
+    if (search) {
+      vendorWhere.OR = [
+        { businessName: { contains: search, mode: 'insensitive' } },
+        { contactName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (dateFilter) {
+      vendorWhere.createdAt = dateFilter;
+    }
+
+    const riderWhere = {};
+    if (search) {
+      riderWhere.OR = [
+        { user: { name: { contains: search, mode: 'insensitive' } } },
+        { user: { phone: { contains: search, mode: 'insensitive' } } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { address: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (dateFilter) {
+      riderWhere.createdAt = dateFilter;
+    }
 
     const [vendors, riders] = await Promise.all([
       type === 'rider' ? [] : prisma.vendor.findMany({
-        where: search ? {
-          OR: [
-            { businessName: { contains: search, mode: 'insensitive' } },
-            { contactName: { contains: search, mode: 'insensitive' } },
-            { email: { contains: search, mode: 'insensitive' } },
-            { phone: { contains: search, mode: 'insensitive' } },
-          ],
-        } : {},
+        where: vendorWhere,
         select: {
           id: true,
           businessName: true,
@@ -479,6 +529,7 @@ router.get('/accounts', async (req, res) => {
       }),
 
       type === 'vendor' ? [] : prisma.riderProfile.findMany({
+        where: riderWhere,
         include: {
           user: { select: { name: true, phone: true, email: true } },
         },

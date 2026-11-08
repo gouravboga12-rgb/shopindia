@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
-  ShieldCheck, MapPin, Headphones, Percent, LogOut,
+  MapPin, Headphones, Percent, LogOut,
   Truck, Tag, Bell, LayoutGrid, Image, Globe2,
   DollarSign, CreditCard, Bike, Banknote, Wrench, AlertOctagon
 } from 'lucide-react';
@@ -29,14 +29,13 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }
     { id: 'users', label: 'Users & Roles', icon: Users, perm: 'view_users' },
     { id: 'products', label: 'Products Catalog', icon: Package, perm: 'view_products' },
     { id: 'services', label: 'Services & Repairs', icon: Wrench, perm: 'view_products' },
+    { id: 'categories', label: 'Categories & Brands', icon: LayoutGrid, perm: 'view_products' },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, perm: 'view_orders' },
     { id: 'canceled-orders', label: 'Canceled Orders & Refunds', icon: AlertOctagon, perm: 'view_orders' },
-    { id: 'rbac', label: 'RBAC Controls', icon: ShieldCheck, perm: 'manage_users' },
     { id: 'service-areas', label: 'Service Areas', icon: MapPin, perm: 'manage_service_areas' },
     { id: 'support', label: 'Support Queue', icon: Headphones, perm: 'view_support' },
     { id: 'promotions', label: 'Promotions', icon: Image, perm: 'manage_commissions' },
     { id: 'offers', label: 'Offers & Coupons', icon: Tag, perm: 'manage_commissions' },
-    { id: 'categories', label: 'Categories & Brands', icon: LayoutGrid, perm: 'view_products' },
     { id: 'notifications', label: 'Notifications', icon: Bell, perm: 'manage_users' },
   ];
 

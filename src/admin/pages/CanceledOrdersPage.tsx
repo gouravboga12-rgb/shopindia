@@ -47,6 +47,9 @@ export const CanceledOrdersPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending_refund' | 'refunded' | 'cod'>('all');
+  const [dateRange, setDateRange] = useState<'all' | 'today' | 'yesterday' | '7d' | '30d' | 'custom'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
@@ -133,8 +136,35 @@ export const CanceledOrdersPage: React.FC = () => {
       return o.paymentStatus === 'refunded';
     }
     if (paymentFilter === 'cod') {
-      return isCOD;
+      if (!isCOD) return false;
     }
+
+    if (dateRange !== 'all') {
+      const orderDate = new Date(o.createdAt);
+      const now = new Date();
+      if (dateRange === 'today') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (orderDate < start) return false;
+      } else if (dateRange === 'yesterday') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (orderDate < start || orderDate >= end) return false;
+      } else if (dateRange === '7d') {
+        const start = new Date(now.getTime() - 7 * 86400000);
+        if (orderDate < start) return false;
+      } else if (dateRange === '30d') {
+        const start = new Date(now.getTime() - 30 * 86400000);
+        if (orderDate < start) return false;
+      } else if (dateRange === 'custom') {
+        if (startDate && orderDate < new Date(startDate)) return false;
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (orderDate > end) return false;
+        }
+      }
+    }
+
     return true;
   });
 
@@ -239,6 +269,55 @@ export const CanceledOrdersPage: React.FC = () => {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Date-Wise Filter Toolbar */}
+      <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500 flex items-center gap-1 mr-1">
+            <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Date Range:</span>
+          </span>
+          {[
+            { id: 'all', label: 'All Time' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: '7d', label: '7 Days' },
+            { id: '30d', label: '30 Days' },
+            { id: 'custom', label: 'Custom' },
+          ].map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setDateRange(d.id as any)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                dateRange === d.id
+                  ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        {dateRange === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+            />
+            <span className="text-xs text-gray-400 font-bold">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+            />
+          </div>
+        )}
       </div>
 
       {/* Main Table */}
