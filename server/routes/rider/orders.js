@@ -478,10 +478,6 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
           },
         }).catch(err => console.warn('[RiderOrders] Ledger COD debit warning:', err.message));
       }
-            riderProfileId: profile.id,
-          },
-        }).catch(err => console.warn('[RiderOrders] Ledger COD debit warning:', err.message));
-      }
 
       // Write immutable ledger entry for this delivery fee credit
       await recordRiderCredit(tx, {
