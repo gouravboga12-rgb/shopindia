@@ -47,9 +47,12 @@ export const SupportCenterPage: React.FC = () => {
   const [sendingTicketReply, setSendingTicketReply] = useState(false);
 
   // Live Chat State
-  const [chat, setChat] = useState<{ from: string; text: string; time?: string }[]>(INITIAL_CHAT);
+  const [chat, setChat] = useState<{ id?: string; from: string; senderRole?: string; senderLabel?: string; text: string; time?: string }[]>(INITIAL_CHAT);
   const [chatInput, setChatInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isAgentConnected, setIsAgentConnected] = useState(false);
+  const [connectedAgentName, setConnectedAgentName] = useState<string | null>(null);
+  const [liveSessionNumber, setLiveSessionNumber] = useState<string | null>(null);
 
   // FAQ Accordion State
   const [faqOpen, setFaqOpen] = useState<string | null>(null);
@@ -85,6 +88,67 @@ export const SupportCenterPage: React.FC = () => {
 
   useEffect(() => {
     loadTickets();
+  }, []);
+
+  // Load persistent chat history from database
+  const loadChatHistory = async () => {
+    try {
+      const res = await api.get<{
+        messages: any[];
+        isAgentConnected: boolean;
+        agentName: string | null;
+        sessionNumber: string | null;
+      }>('/api/support/chat/history');
+      if (res && Array.isArray(res.messages) && res.messages.length > 0) {
+        setChat(res.messages);
+      }
+      if (res.isAgentConnected) {
+        setIsAgentConnected(true);
+        setConnectedAgentName(res.agentName || 'Support Specialist');
+      }
+      if (res.sessionNumber) {
+        setLiveSessionNumber(res.sessionNumber);
+      }
+    } catch {
+      // Keep default fallback
+    }
+  };
+
+  useEffect(() => {
+    loadChatHistory();
+  }, []);
+
+  // Real-time polling for Live Chat messages & agent replies (every 3.5s)
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const res = await api.get<{
+          messages: any[];
+          isAgentConnected: boolean;
+          agentName: string | null;
+          sessionNumber: string | null;
+        }>('/api/support/chat/history');
+        if (res && Array.isArray(res.messages) && res.messages.length > 0) {
+          setChat(prev => {
+            if (res.messages.length > prev.length) {
+              return res.messages;
+            }
+            return prev;
+          });
+        }
+        if (res.isAgentConnected) {
+          setIsAgentConnected(true);
+          setConnectedAgentName(res.agentName || 'Support Specialist');
+        }
+        if (res.sessionNumber) {
+          setLiveSessionNumber(res.sessionNumber);
+        }
+      } catch {
+        // Silent poll error
+      }
+    }, 3500);
+
+    return () => clearInterval(timer);
   }, []);
 
   // Real-time polling for active ticket conversation (every 3s)
@@ -232,9 +296,9 @@ export const SupportCenterPage: React.FC = () => {
   };
 
   // Send message in Live Chat
-  const sendChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = chatInput.trim();
+  const sendChat = async (e?: React.FormEvent, directQuery?: string) => {
+    if (e) e.preventDefault();
+    const q = (directQuery || chatInput).trim();
     if (!q) return;
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -243,22 +307,38 @@ export const SupportCenterPage: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const res = await api.post<{ answer: string; suggestTicket?: boolean }>('/api/support/chat', { query: q });
+      const res = await api.post<{
+        answer: string;
+        sessionNumber?: string;
+        isEscalated?: boolean;
+        suggestTicket?: boolean;
+        time?: string;
+      }>('/api/support/chat', { query: q });
+
       setIsTyping(false);
       setChat((c) => [
         ...c, 
         { 
           from: 'agent', 
+          senderLabel: res.isEscalated ? 'Support Desk' : 'ShopIndia Assistant',
           text: res.answer || 'Thank you for contacting ShopIndia Support. A specialist is on standby to assist.',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: res.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
+      if (res.isEscalated) {
+        setIsAgentConnected(true);
+        setConnectedAgentName('Support Specialist (Queued)');
+      }
+      if (res.sessionNumber) {
+        setLiveSessionNumber(res.sessionNumber);
+      }
     } catch {
       setIsTyping(false);
       setChat((c) => [
         ...c, 
         { 
           from: 'agent', 
+          senderLabel: 'ShopIndia Assistant',
           text: 'Thanks for reaching out! If your query requires specialized assistance, you can also Raise a Support Ticket on the left.',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -644,27 +724,46 @@ export const SupportCenterPage: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-extrabold font-heading tracking-wide">Live Chat Support</p>
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Online" />
+                  {liveSessionNumber && (
+                    <span className="text-[9px] font-mono font-bold bg-white/15 px-1.5 py-0.5 rounded text-white/90">
+                      #{liveSessionNumber}
+                    </span>
+                  )}
                 </div>
-                <p className="text-[10.5px] text-white/70">Instant AI answers & human specialist backup</p>
+                <p className="text-[10.5px] text-white/70">
+                  {isAgentConnected ? `Connected with ${connectedAgentName || 'Specialist'}` : 'Instant AI order answers & human specialist backup'}
+                </p>
               </div>
             </div>
 
-            <span className="text-[10px] bg-emerald-400/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">
-              Online
-            </span>
+            {isAgentConnected ? (
+              <span className="text-[10px] bg-blue-500/30 text-blue-200 font-bold px-2.5 py-0.5 rounded-full border border-blue-400/40 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Specialist Online</span>
+              </span>
+            ) : (
+              <span className="text-[10px] bg-emerald-400/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">
+                Online
+              </span>
+            )}
           </div>
 
           {/* Chat Timeline */}
           <div className="flex-1 p-4 space-y-3 min-h-[300px] max-h-[380px] overflow-y-auto bg-slate-50/40 text-xs">
             {chat.map((m, i) => (
-              <div key={i} className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}>
+              <div key={m.id || i} className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-xs ${
+                  className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-xs ${
                     m.from === 'me' 
                       ? 'bg-brand-blue text-white rounded-br-none' 
                       : 'bg-white border border-brand-border text-brand-graphite rounded-bl-none'
                   }`}
                 >
+                  {m.from !== 'me' && m.senderLabel && (
+                    <span className="text-[9.5px] font-black uppercase text-brand-blue block mb-1 tracking-wider">
+                      {m.senderLabel}
+                    </span>
+                  )}
                   <p className="font-semibold whitespace-pre-wrap">{m.text}</p>
                   {m.time && (
                     <span className={`text-[9px] block mt-1 ${m.from === 'me' ? 'text-blue-100 text-right' : 'text-slate-400'}`}>
@@ -696,14 +795,8 @@ export const SupportCenterPage: React.FC = () => {
             ].map(chip => (
               <button
                 key={chip}
-                onClick={() => {
-                  setChatInput(chip);
-                  setTimeout(() => {
-                    const form = document.getElementById('chat-form') as HTMLFormElement;
-                    form?.requestSubmit();
-                  }, 50);
-                }}
-                className="shrink-0 text-[10.5px] font-bold bg-white hover:bg-blue-50 text-brand-slate hover:text-brand-blue border border-brand-border px-2.5 py-1 rounded-full shadow-2xs transition-colors"
+                onClick={() => sendChat(undefined, chip)}
+                className="shrink-0 text-[10.5px] font-bold bg-white hover:bg-blue-50 text-brand-slate hover:text-brand-blue border border-brand-border px-2.5 py-1 rounded-full shadow-2xs transition-colors cursor-pointer"
               >
                 {chip}
               </button>
@@ -711,7 +804,7 @@ export const SupportCenterPage: React.FC = () => {
           </div>
 
           {/* Chat Input Form */}
-          <form id="chat-form" onSubmit={sendChat} className="p-3 border-t border-brand-border flex gap-2 bg-white">
+          <form id="chat-form" onSubmit={(e) => sendChat(e)} className="p-3 border-t border-brand-border flex gap-2 bg-white">
             <input 
               ref={chatInputRef}
               className="flex-1 px-4 py-2 border border-brand-border bg-slate-50 focus:bg-white rounded-full text-xs font-semibold focus:outline-none focus:border-brand-blue transition-all" 

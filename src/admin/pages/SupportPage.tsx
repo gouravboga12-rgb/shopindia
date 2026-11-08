@@ -459,7 +459,15 @@ export const SupportPage: React.FC = () => {
 
                     {/* Subject & Order */}
                     <td className="px-5 py-4 max-w-xs">
-                      <div className="font-semibold text-gray-800 line-clamp-1">{t.subject}</div>
+                      <div className="font-semibold text-gray-800 line-clamp-1 flex items-center gap-1.5 flex-wrap">
+                        {t.subject?.includes('[LIVE CHAT') && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Chat
+                          </span>
+                        )}
+                        <span>{t.subject}</span>
+                      </div>
                       {t.order?.orderNumber && (
                         <span className="font-mono text-[10px] text-indigo-600 bg-indigo-50 px-1 rounded font-bold">
                           {t.order.orderNumber}

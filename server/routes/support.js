@@ -90,7 +90,83 @@ router.get('/faqs', (_req, res) => {
 });
 
 /**
- * POST /api/support/chat - Interactive AI / Auto-help query
+ * GET /api/support/chat/history - Retrieve persistent chat history for customer
+ */
+router.get('/chat/history', async (req, res) => {
+  try {
+    const customerId = getVerifiedUserId(req) || getOptionalUserId(req);
+    if (!customerId) {
+      return res.json({
+        messages: [
+          { from: 'agent', text: 'Hi! 👋 Welcome to ShopIndia Live Support. How can we help you today?' }
+        ],
+        isAgentConnected: false,
+        sessionNumber: null
+      });
+    }
+
+    const liveTicket = await prisma.ticket.findFirst({
+      where: {
+        customerId,
+        subject: { startsWith: '[LIVE CHAT' },
+        status: { not: 'closed' }
+      },
+      include: {
+        messages: { orderBy: { sentAt: 'asc' } },
+        assignedTo: { select: { name: true, role: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!liveTicket || !liveTicket.messages || liveTicket.messages.length === 0) {
+      return res.json({
+        messages: [
+          { from: 'agent', text: 'Hi! 👋 Welcome to ShopIndia Live Support. How can we help you today?' }
+        ],
+        isAgentConnected: false,
+        sessionNumber: null
+      });
+    }
+
+    const hasAgent = liveTicket.messages.some(m => m.senderRole !== 'customer' && m.senderRole !== 'bot');
+    const agentName = liveTicket.assignedTo?.name || 'Support Specialist';
+
+    const formattedMessages = liveTicket.messages.map(m => {
+      const isMe = m.senderRole === 'customer';
+      let senderLabel = undefined;
+      if (!isMe) {
+        if (m.senderRole === 'bot') senderLabel = 'ShopIndia Assistant';
+        else if (m.senderRole === 'regional_admin') senderLabel = 'Regional Support';
+        else if (m.senderRole === 'vendor') senderLabel = 'Merchant';
+        else senderLabel = agentName;
+      }
+
+      return {
+        id: m.id,
+        from: isMe ? 'me' : 'agent',
+        senderRole: m.senderRole,
+        senderLabel,
+        text: m.text,
+        time: new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+    });
+
+    res.json({
+      sessionId: liveTicket.id,
+      sessionNumber: liveTicket.ticketNumber,
+      isAgentConnected: hasAgent,
+      agentName: hasAgent ? agentName : null,
+      status: liveTicket.status,
+      messages: formattedMessages
+    });
+  } catch (err) {
+    console.error('Fetch chat history error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/support/chat - Interactive AI / Auto-help query with live order data & DB persistence
  */
 router.post('/chat', async (req, res) => {
   try {
@@ -100,31 +176,204 @@ router.post('/chat', async (req, res) => {
     }
 
     const lowerQuery = query.toLowerCase().trim();
-    
-    // Find best match in FAQs
-    let matchedFaq = SERVICE_FAQS.find(faq => 
-      faq.keywords.some(k => lowerQuery.includes(k)) ||
-      lowerQuery.includes(faq.question.toLowerCase())
-    );
+    let customerId = getVerifiedUserId(req) || getOptionalUserId(req);
+
+    // If customer is not authenticated, fallback to guest or find first user
+    if (!customerId) {
+      const guest = await prisma.user.findFirst({ where: { role: 'customer' } });
+      if (guest) customerId = guest.id;
+    }
+
+    // Find or create active Live Chat Ticket in DB for persistence
+    let liveTicket = null;
+    if (customerId) {
+      liveTicket = await prisma.ticket.findFirst({
+        where: {
+          customerId,
+          subject: { startsWith: '[LIVE CHAT' },
+          status: { not: 'closed' }
+        }
+      });
+
+      if (!liveTicket) {
+        liveTicket = await prisma.ticket.create({
+          data: {
+            ticketNumber: 'CHAT-' + Math.floor(100000 + Math.random() * 900000),
+            customerId,
+            subject: `[LIVE CHAT] Customer Support Session`,
+            category: 'other',
+            priority: 'medium',
+            status: 'open'
+          }
+        });
+      }
+
+      // Record customer's message in database
+      await prisma.ticketMessage.create({
+        data: {
+          ticketId: liveTicket.id,
+          senderRole: 'customer',
+          text: query.trim()
+        }
+      });
+    }
 
     let answer = '';
-    if (matchedFaq) {
-      answer = matchedFaq.answer;
-    } else if (lowerQuery.includes('hello') || lowerQuery.includes('hi') || lowerQuery.includes('hey')) {
-      answer = 'Hello! 👋 How can I help you with your home services, bookings, or technician requests today? You can select any quick question below or ask me directly.';
+    let isEscalated = false;
+
+    // 1. ORDER & DELIVERY TRACKING QUERIES
+    if (
+      lowerQuery.includes('track') ||
+      lowerQuery.includes('delivery') ||
+      lowerQuery.includes('where is my order') ||
+      lowerQuery.includes('order status') ||
+      lowerQuery.includes('eta')
+    ) {
+      let latestOrder = null;
+      if (customerId) {
+        latestOrder = await prisma.order.findFirst({
+          where: { customerId },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: { include: { product: { select: { name: true, fulfillmentType: true } } } },
+            riderDeliveries: {
+              include: { rider: { select: { user: { select: { name: true, phone: true } } } } }
+            }
+          }
+        });
+      }
+
+      if (latestOrder) {
+        const itemNames = latestOrder.items.map(i => i.product?.name || 'Item').slice(0, 2).join(', ') + 
+          (latestOrder.items.length > 2 ? ` (+${latestOrder.items.length - 2} more)` : '');
+        const rider = latestOrder.riderDeliveries?.[0]?.rider?.user;
+        const isQuick = latestOrder.fulfillmentType === 'quick_commerce';
+        const rawStatus = latestOrder.status.replace(/_/g, ' ').toUpperCase();
+
+        let etaText = isQuick 
+          ? '⚡ Hyperlocal Delivery: 10–20 minute express transit.' 
+          : '🚚 Standard Delivery: Pan-India courier transit.';
+
+        if (rider) {
+          etaText += ` Assigned Delivery Partner: ${rider.name}${rider.phone ? ` (${rider.phone})` : ''}.`;
+        }
+
+        answer = `📦 Latest Order Details (#${latestOrder.orderNumber || latestOrder.id.slice(-6)}):\n` +
+          `• Item(s): ${itemNames}\n` +
+          `• Status: ${rawStatus}\n` +
+          `• Total Amount: ₹${latestOrder.totalAmount?.toLocaleString('en-IN')}\n` +
+          `• ${etaText}\n\n` +
+          `You can view full real-time route tracking anytime in your Orders tab!`;
+      } else {
+        answer = '📦 Order Tracking:\nYou currently have no active deliveries in transit. If you recently placed an order, please allow a couple minutes for order processing, or verify in your Orders tab.';
+      }
+    } 
+    // 2. REFUND & RETURN QUERIES
+    else if (
+      lowerQuery.includes('refund') || 
+      lowerQuery.includes('money back') || 
+      lowerQuery.includes('return')
+    ) {
+      let refundOrder = null;
+      if (customerId) {
+        refundOrder = await prisma.order.findFirst({
+          where: { 
+            customerId, 
+            OR: [{ paymentStatus: 'refunded' }, { status: 'cancelled' }] 
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+      }
+
+      if (refundOrder) {
+        answer = `💳 Refund Details for Order #${refundOrder.orderNumber || refundOrder.id.slice(-6)}:\n` +
+          `• Amount: ₹${refundOrder.totalAmount?.toLocaleString('en-IN')}\n` +
+          `• Status: Refund processed back to your original source.\n` +
+          `• Timeline: Instant for UPI/Wallets (2-4 hours), 2-5 business days for Cards & NetBanking.`;
+      } else {
+        answer = `💳 ShopIndia Refund Policy:\n` +
+          `• Order Cancellations: Processed immediately back to original payment mode.\n` +
+          `• Returns: Delivered items can be returned within 7 days from the Orders tab.\n` +
+          `• For instant refund review, please click "Talk to specialist" below.`;
+      }
+    }
+    // 3. SERVICE RESCHEDULING & GLACONS BOOKINGS
+    else if (
+      lowerQuery.includes('reschedule') || 
+      lowerQuery.includes('service') || 
+      lowerQuery.includes('technician') ||
+      lowerQuery.includes('slot')
+    ) {
+      answer = `🔧 Glacons Service Bookings:\n` +
+        `• Rescheduling: You can change technician appointment dates/slots free of charge up to 2 hours before the visit.\n` +
+        `• 30-Day Warranty: All repairs include free technician revisits if any problem persists.\n` +
+        `• Verified Experts: All technicians are background-checked and carry genuine parts.`;
+    }
+    // 4. TALK TO SPECIALIST / HUMAN ESCALATION
+    else if (
+      lowerQuery.includes('specialist') ||
+      lowerQuery.includes('agent') ||
+      lowerQuery.includes('human') ||
+      lowerQuery.includes('executive') ||
+      lowerQuery.includes('talk to') ||
+      lowerQuery.includes('support team')
+    ) {
+      isEscalated = true;
+      if (liveTicket) {
+        await prisma.ticket.update({
+          where: { id: liveTicket.id },
+          data: {
+            priority: 'urgent',
+            status: 'in_progress',
+            subject: `[LIVE CHAT - WAITING FOR AGENT] Support Session #${liveTicket.ticketNumber}`
+          }
+        });
+      }
+
+      answer = `🔔 You are now connected with our Live Support Desk (Session #${liveTicket?.ticketNumber || 'LIVE'}).\n\n` +
+        `A support specialist has been notified and will reply right here in this chat window. Please type your message or order details below so we can resolve it immediately!`;
+    }
+    // 5. GREETINGS & FAQ MATCHES
+    else if (lowerQuery.includes('hello') || lowerQuery.includes('hi') || lowerQuery.includes('hey')) {
+      answer = 'Hello! 👋 Welcome to ShopIndia Live Support. How can we help you today? You can select any quick option below (Track delivery, Refund status, Service reschedule) or type your question directly.';
     } else if (lowerQuery.includes('thank')) {
-      answer = 'You are welcome! 😊 Let me know if you need anything else, or feel free to raise a support ticket anytime.';
+      answer = 'You are welcome! 😊 Let me know if you need any other assistance, or click "Talk to specialist" if you have any questions.';
     } else {
-      answer = `Thank you for asking about "${query}". To get dedicated assistance for this specific request, please click "Raise a Support Ticket" below and our specialist will reach out immediately.`;
+      // Find best match in FAQs
+      const matchedFaq = SERVICE_FAQS.find(faq => 
+        faq.keywords.some(k => lowerQuery.includes(k)) ||
+        lowerQuery.includes(faq.question.toLowerCase())
+      );
+
+      if (matchedFaq) {
+        answer = matchedFaq.answer;
+      } else {
+        answer = `Thank you for reaching out! Our Live Assistant is on standby. If you need personalized one-on-one help with this request, click "Talk to specialist" below and an agent will join immediately.`;
+      }
+    }
+
+    // Save bot response to database so history is preserved
+    if (liveTicket) {
+      await prisma.ticketMessage.create({
+        data: {
+          ticketId: liveTicket.id,
+          senderRole: 'bot',
+          text: answer
+        }
+      });
     }
 
     res.json({
       query,
       answer,
-      suggestTicket: !matchedFaq,
-      suggestedQuestions: SERVICE_FAQS.slice(0, 3).map(f => f.question)
+      sessionId: liveTicket?.id,
+      sessionNumber: liveTicket?.ticketNumber,
+      isEscalated,
+      suggestTicket: !isEscalated,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   } catch (err) {
+    console.error('Chat error:', err);
     res.status(500).json({ error: err.message });
   }
 });
