@@ -21,7 +21,8 @@ import {
   Phone,
   MessageSquare,
   X,
-  Building2
+  Building2,
+  Bell
 } from 'lucide-react';
 
 interface RiderDashboardProps {
@@ -81,8 +82,20 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
     }
   };
 
+  const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
+
   useEffect(() => {
     fetchHubStatus();
+    const fetchAlerts = async () => {
+      try {
+        const res: any = await api.get('/api/rider/notifications');
+        if (res?.success && Array.isArray(res.notifications)) {
+          const unread = res.notifications.filter((n: any) => !n.isRead);
+          setActiveAlerts(unread.slice(0, 2));
+        }
+      } catch {}
+    };
+    fetchAlerts();
   }, []);
 
   const handleOpenHubModal = async () => {
@@ -256,6 +269,49 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
           </button>
         </div>
       </div>
+
+      {/* Fleet Broadcast Alert Banner */}
+      {activeAlerts.length > 0 && (
+        <div className="space-y-2">
+          {activeAlerts.map(alert => (
+            <div
+              key={alert.id}
+              className="p-4 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-orange-50 border border-orange-300 rounded-2xl flex items-start justify-between gap-3 shadow-xs animate-in fade-in"
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-orange-500 text-white rounded-xl shrink-0 mt-0.5 shadow-sm shadow-orange-500/20">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-orange-950 uppercase tracking-wide">
+                      {alert.title}
+                    </span>
+                    <span className="text-[10px] bg-orange-200/90 text-orange-900 font-bold px-2 py-0.2 rounded-full border border-orange-300">
+                      Announcement
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-700 mt-1 leading-relaxed font-medium">
+                    {alert.message}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.put(`/api/rider/notifications/${alert.id}/read`, {});
+                    setActiveAlerts(prev => prev.filter(a => a.id !== alert.id));
+                  } catch {}
+                }}
+                className="text-[11px] font-bold text-orange-800 hover:text-orange-950 bg-white/90 border border-orange-300 hover:bg-orange-100 px-2.5 py-1 rounded-lg shrink-0 transition-colors cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Floating Cash in Hand Alert Banner (Prominent COD Cash Remittance to Super Admin) */}
       {(profile?.codCashFloat ?? 0) > 0 && (

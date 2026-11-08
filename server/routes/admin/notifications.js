@@ -30,22 +30,61 @@ router.post('/broadcast', async (req, res) => {
       mappedRoles.push('regional_admin');
     }
 
-    if (mappedRoles.length === 0) {
-      return res.status(400).json({ error: 'No valid recipient roles selected.' });
+    // Rider fleet targets
+    const riderPartnerTypes = new Set();
+    if (targets.includes('riders_delivery')) {
+      riderPartnerTypes.add('delivery');
+      riderPartnerTypes.add('both');
+    }
+    if (targets.includes('riders_service')) {
+      riderPartnerTypes.add('service');
+      riderPartnerTypes.add('both');
+    }
+    if (targets.includes('riders_all') || targets.includes('riders')) {
+      riderPartnerTypes.add('delivery');
+      riderPartnerTypes.add('service');
+      riderPartnerTypes.add('both');
     }
 
-    // Query active recipients
-    const users = await prisma.user.findMany({
-      where: {
-        role: { in: mappedRoles },
-        status: { not: 'banned' }
-      },
-      select: { id: true, role: true }
-    });
+    if (mappedRoles.length === 0 && riderPartnerTypes.size === 0) {
+      return res.status(400).json({ error: 'No valid recipient targets selected.' });
+    }
 
-    if (users.length > 0) {
-      const records = users.map(u => ({
-        userId: u.id,
+    const recipientUserIds = new Set();
+
+    // 1. Query standard role recipients
+    if (mappedRoles.length > 0) {
+      const standardUsers = await prisma.user.findMany({
+        where: {
+          role: { in: mappedRoles },
+          status: { not: 'banned' }
+        },
+        select: { id: true }
+      });
+      standardUsers.forEach(u => recipientUserIds.add(u.id));
+    }
+
+    // 2. Query rider fleet based on capability (Quick Shopping vs Service vs Both)
+    if (riderPartnerTypes.size > 0) {
+      const partnerTypesArray = Array.from(riderPartnerTypes);
+      const riders = await prisma.user.findMany({
+        where: {
+          role: 'rider',
+          status: { not: 'banned' },
+          riderProfile: {
+            partnerType: { in: partnerTypesArray }
+          }
+        },
+        select: { id: true }
+      });
+      riders.forEach(r => recipientUserIds.add(r.id));
+    }
+
+    const uniqueUserIds = Array.from(recipientUserIds);
+
+    if (uniqueUserIds.length > 0) {
+      const records = uniqueUserIds.map(userId => ({
+        userId,
         title: title.trim(),
         message: message.trim(),
         category: category || 'alert',
@@ -64,12 +103,17 @@ router.post('/broadcast', async (req, res) => {
     }
 
     // Audit log in notification logs
-    const targetLabel = targets.map(t => {
-      if (t.includes('cust') || t.includes('user')) return 'Customers';
-      if (t.includes('vend')) return 'Vendors';
-      if (t.includes('region')) return 'Regional Admins';
-      return t;
-    }).join(' + ');
+    const labels = [];
+    if (targets.includes('customers') || targets.includes('customer') || targets.includes('users')) labels.push('Customers');
+    if (targets.includes('vendors') || targets.includes('vendor')) labels.push('Vendors');
+    if (targets.includes('regional_admins') || targets.includes('regional_admin')) labels.push('Regional Admins');
+    if (targets.includes('riders_all') || targets.includes('riders')) {
+      labels.push('All Fleet Partners');
+    } else {
+      if (targets.includes('riders_delivery')) labels.push('Quick Shopping Delivery Riders');
+      if (targets.includes('riders_service')) labels.push('Services & Repairs Technicians');
+    }
+    const targetLabel = labels.join(' + ') || 'Selected Partners';
 
     await prisma.notificationLog.create({
       data: {
@@ -83,9 +127,9 @@ router.post('/broadcast', async (req, res) => {
 
     res.json({
       success: true,
-      deliveredCount: users.length,
+      deliveredCount: uniqueUserIds.length,
       targetLabel,
-      message: `Alert successfully dispatched to ${users.length} recipients across ${targetLabel}.`
+      message: `Alert successfully dispatched to ${uniqueUserIds.length} recipients across ${targetLabel}.`
     });
   } catch (error) {
     console.error('[NOTIFICATIONS BROADCAST ERROR]:', error);

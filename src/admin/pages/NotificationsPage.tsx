@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import { 
   Bell, Send, Users, Store, Globe2, 
   CheckCircle2, Clock, AlertTriangle,
-  RefreshCw, ExternalLink
+  RefreshCw, ExternalLink, Zap, Wrench, Bike
 } from 'lucide-react';
 
 export const NotificationsPage: React.FC = () => {
@@ -13,6 +13,8 @@ export const NotificationsPage: React.FC = () => {
   const [targetCustomers, setTargetCustomers] = useState(true);
   const [targetVendors, setTargetVendors] = useState(false);
   const [targetRegionalAdmins, setTargetRegionalAdmins] = useState(false);
+  const [targetRidersDelivery, setTargetRidersDelivery] = useState(false);
+  const [targetRidersService, setTargetRidersService] = useState(false);
 
   // Form inputs
   const [title, setTitle] = useState('');
@@ -59,9 +61,11 @@ export const NotificationsPage: React.FC = () => {
     if (targetCustomers) targets.push('customers');
     if (targetVendors) targets.push('vendors');
     if (targetRegionalAdmins) targets.push('regional_admins');
+    if (targetRidersDelivery) targets.push('riders_delivery');
+    if (targetRidersService) targets.push('riders_service');
 
     if (targets.length === 0) {
-      setErrorMessage('Please select at least one recipient audience (Customers, Vendors, or Regional Admins).');
+      setErrorMessage('Please select at least one recipient audience (Customers, Vendors, Regional Admins, or Rider Fleet).');
       return;
     }
     if (!title.trim() || !message.trim()) {
@@ -170,9 +174,11 @@ export const NotificationsPage: React.FC = () => {
           <form onSubmit={handleSendBroadcast} className="lg:col-span-2 bg-white rounded-3xl border border-gray-200 p-6 shadow-sm space-y-5">
             <div>
               <label className="block text-xs font-black uppercase tracking-wider text-gray-500 mb-2 font-heading">
-                Step 1: Select Target Recipients (Check 1, 2, or all 3)
+                Step 1: Select Target Recipients (Check any combination)
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+              {/* Core Panels */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                 {/* Customers */}
                 <label className={`p-4 rounded-2xl border-2 transition-all flex flex-col gap-2 cursor-pointer ${
                   targetCustomers ? 'border-blue-600 bg-blue-50/40 text-blue-900' : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
@@ -229,6 +235,71 @@ export const NotificationsPage: React.FC = () => {
                     <span className="text-[10px] text-gray-500 block">Territory &amp; Hub Managers</span>
                   </div>
                 </label>
+              </div>
+
+              {/* Rider & Field Fleet Section */}
+              <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bike className="w-4 h-4 text-orange-600" />
+                    <span className="text-xs font-bold text-slate-800">Rider &amp; Field Partner Fleet</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allSelected = targetRidersDelivery && targetRidersService;
+                      setTargetRidersDelivery(!allSelected);
+                      setTargetRidersService(!allSelected);
+                    }}
+                    className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                  >
+                    {targetRidersDelivery && targetRidersService ? 'Unselect Fleet' : 'Select All Fleet'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Quick Shopping Delivery Riders */}
+                  <label className={`p-3.5 rounded-xl border-2 transition-all flex flex-col gap-1.5 cursor-pointer ${
+                    targetRidersDelivery ? 'border-orange-500 bg-orange-50/50 text-orange-950' : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+                        <span className="font-bold text-xs">Quick Shopping Riders</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={targetRidersDelivery}
+                        onChange={e => setTargetRidersDelivery(e.target.checked)}
+                        className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Dispatches to delivery partners &amp; dual-role partners with delivery capability
+                    </p>
+                  </label>
+
+                  {/* Glacons Services & Repairs Technicians */}
+                  <label className={`p-3.5 rounded-xl border-2 transition-all flex flex-col gap-1.5 cursor-pointer ${
+                    targetRidersService ? 'border-amber-600 bg-amber-50/50 text-amber-950' : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Wrench className="w-4 h-4 text-amber-600" />
+                        <span className="font-bold text-xs">Services Members</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={targetRidersService}
+                        onChange={e => setTargetRidersService(e.target.checked)}
+                        className="w-4 h-4 text-amber-600 rounded cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Dispatches to electricians, AC tech, plumbers &amp; dual-role partners
+                    </p>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -305,7 +376,7 @@ export const NotificationsPage: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={sending || (!targetCustomers && !targetVendors && !targetRegionalAdmins)}
+                disabled={sending || (!targetCustomers && !targetVendors && !targetRegionalAdmins && !targetRidersDelivery && !targetRidersService)}
                 className="w-full sm:w-auto px-6 py-3 bg-[#0F2C59] hover:bg-[#1E3E62] disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />
@@ -354,20 +425,30 @@ export const NotificationsPage: React.FC = () => {
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {targetCustomers && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                      👤 Customers (Active)
+                      👤 Customers
                     </span>
                   )}
                   {targetVendors && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      🏪 Vendors (Active)
+                      🏪 Vendors
                     </span>
                   )}
                   {targetRegionalAdmins && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                      📍 Regional Admins (Active)
+                      📍 Regional Admins
                     </span>
                   )}
-                  {!targetCustomers && !targetVendors && !targetRegionalAdmins && (
+                  {targetRidersDelivery && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                      ⚡ Quick Shopping Riders
+                    </span>
+                  )}
+                  {targetRidersService && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                      🛠️ Services Members
+                    </span>
+                  )}
+                  {!targetCustomers && !targetVendors && !targetRegionalAdmins && !targetRidersDelivery && !targetRidersService && (
                     <span className="text-xs text-red-500 font-medium italic">
                       No targets selected yet
                     </span>

@@ -93,6 +93,7 @@ app.use('/api/rider/profile', require('./routes/rider/profile'));
 app.use('/api/rider/orders', require('./routes/rider/orders'));
 app.use('/api/rider/wallet', require('./routes/rider/wallet'));
 app.use('/api/rider/cod', require('./routes/rider/cod'));
+app.use('/api/rider/notifications', require('./routes/rider/notifications'));
 
 // Shiprocket 3PL Logistics routes
 app.use('/api/shiprocket', require('./routes/shiprocket/shipments'));
