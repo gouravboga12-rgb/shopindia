@@ -282,6 +282,7 @@ router.get('/settings', async (req, res) => {
       shiprocket_estimated_cost: '45',
       quick_customer_base_fee: '35',
       quick_customer_per_km: '7',
+      quick_free_delivery_enabled: 'false',
       quick_free_threshold: '999',
       include_gateway_in_platform_fee: 'true',
       gateway_fee_percent: '2.36',
@@ -454,6 +455,35 @@ router.get('/audit-logs', async (req, res) => {
   } catch (err) {
     console.error('[AdminPricing] Error fetching audit logs:', err);
     res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+/**
+ * DELETE /api/admin/pricing/audit-logs/:id
+ * Permanently delete a specific audit log record
+ */
+router.delete('/audit-logs/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.settingsAuditLog.delete({ where: { id } });
+    res.json({ success: true, message: 'Audit log deleted successfully' });
+  } catch (err) {
+    console.error('[AdminPricing] Error deleting audit log:', err);
+    res.status(500).json({ error: 'Failed to delete audit log' });
+  }
+});
+
+/**
+ * DELETE /api/admin/pricing/audit-logs
+ * Permanently purge all audit log records from the database
+ */
+router.delete('/audit-logs', async (req, res) => {
+  try {
+    const deleted = await prisma.settingsAuditLog.deleteMany({});
+    res.json({ success: true, message: `All ${deleted.count} audit logs cleared successfully` });
+  } catch (err) {
+    console.error('[AdminPricing] Error clearing audit logs:', err);
+    res.status(500).json({ error: 'Failed to clear audit logs' });
   }
 });
 

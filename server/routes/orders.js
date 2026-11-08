@@ -43,6 +43,7 @@ router.get('/pricing-config', async (req, res) => {
         shiprocket_free_threshold: parseFloat(settings['shiprocket_free_threshold'] || 499),
         quick_customer_base_fee: parseFloat(settings['quick_customer_base_fee'] || 35),
         quick_customer_per_km: parseFloat(settings['quick_customer_per_km'] || 7),
+        quick_free_delivery_enabled: String(settings['quick_free_delivery_enabled']) === 'true',
         quick_free_threshold: parseFloat(settings['quick_free_threshold'] || 999),
         service_visit_charge: parseFloat(settings['service_visit_charge'] || 199),
         gst_percent: parseFloat(settings['gst_percent'] || 18),

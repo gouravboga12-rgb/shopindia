@@ -122,6 +122,7 @@ export const PricingSettingsPage: React.FC = () => {
           ...prev,
           ...sRes.settings,
           shiprocket_free_delivery_enabled: String(sRes.settings.shiprocket_free_delivery_enabled || 'false'),
+          quick_free_delivery_enabled: String(sRes.settings.quick_free_delivery_enabled || 'false'),
           service_commission_pct: sRes.settings.service_commission_pct || '15',
           platform_charge_pct: sRes.settings.platform_charge_pct || '3.0'
         }));
@@ -224,6 +225,28 @@ export const PricingSettingsPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Failed to delete rule', 'error');
+    }
+  };
+
+  const handleDeleteAuditLog = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this activity log record?')) return;
+    try {
+      await api.delete(`/api/admin/pricing/audit-logs/${id}`);
+      setAuditLogs(prev => prev.filter(l => l.id !== id));
+      showToast('Activity record deleted permanently');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete activity log', 'error');
+    }
+  };
+
+  const handleClearAllAuditLogs = async () => {
+    if (!window.confirm('Are you sure you want to permanently clear ALL activity history? This will delete the entire audit log from the database.')) return;
+    try {
+      await api.delete('/api/admin/pricing/audit-logs');
+      setAuditLogs([]);
+      showToast('Entire activity history cleared from database');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to clear activity logs', 'error');
     }
   };
 
@@ -597,18 +620,57 @@ export const PricingSettingsPage: React.FC = () => {
                   <span className="text-[10px] text-gray-400 mt-1 block">Added to base fee for every kilometer past 2 km.</span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Free Delivery Threshold (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={settings.quick_free_threshold}
-                    onChange={e => setSettings({ ...settings, quick_free_threshold: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <span className="text-[10px] text-gray-400 mt-1 block">Cart total required for free delivery (0 to disable).</span>
+                {/* Free Delivery Policy & Toggle for Quick Commerce */}
+                <div className="pt-3 border-t border-gray-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700">
+                        Free Delivery on High-Value Quick Orders
+                      </label>
+                      <p className="text-[11px] text-gray-500">
+                        When disabled, standard quick delivery fee is always charged regardless of order value.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.quick_free_delivery_enabled === 'true'}
+                        onChange={e =>
+                          setSettings({
+                            ...settings,
+                            quick_free_delivery_enabled: e.target.checked ? 'true' : 'false'
+                          })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  {settings.quick_free_delivery_enabled === 'true' ? (
+                    <div className="pt-2">
+                      <label className="block text-xs font-bold text-emerald-800 mb-1">
+                        Free Quick Delivery Cart Threshold (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={settings.quick_free_threshold}
+                          onChange={e => setSettings({ ...settings, quick_free_threshold: e.target.value })}
+                          className="w-full pl-9 pr-4 py-2.5 bg-white border border-emerald-300 rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <span className="text-[11px] text-emerald-600 mt-1 block">
+                        Active: Orders with item subtotal ₹{settings.quick_free_threshold} or more receive free quick delivery.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-800">
+                      <strong>Free Delivery Disabled:</strong> Quick delivery charges (Base Fee + Distance Fee per KM) will always be applied to all orders.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -733,6 +795,7 @@ export const PricingSettingsPage: React.FC = () => {
                     {
                       quick_customer_base_fee: settings.quick_customer_base_fee,
                       quick_customer_per_km: settings.quick_customer_per_km,
+                      quick_free_delivery_enabled: settings.quick_free_delivery_enabled,
                       quick_free_threshold: settings.quick_free_threshold
                     },
                     deliveryRule,
@@ -1014,17 +1077,28 @@ export const PricingSettingsPage: React.FC = () => {
       {/* TAB 5: AUDIT LOGS */}
       {activeTab === 'audit' && (
         <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm space-y-6 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
             <div>
               <h3 className="text-base font-bold text-gray-900">Settings Change History</h3>
               <p className="text-xs text-gray-500">Transparent audit trail of all pricing, commission, and delivery updates.</p>
             </div>
-            <button
-              onClick={loadAuditLogs}
-              className="px-4 py-2 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              Refresh Logs
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClearAllAuditLogs}
+                disabled={auditLogs.length === 0}
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-40"
+                title="Permanently purge all activity history from database"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear All History</span>
+              </button>
+              <button
+                onClick={loadAuditLogs}
+                className="px-4 py-2 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Refresh Logs
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -1036,11 +1110,12 @@ export const PricingSettingsPage: React.FC = () => {
                   <th className="py-3 px-4">Setting Key</th>
                   <th className="py-3 px-4">Old Value</th>
                   <th className="py-3 px-4">New Value</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 font-mono text-[11px]">
                 {auditLogs.map((log, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/60">
+                  <tr key={log.id || idx} className="hover:bg-gray-50/60 transition-colors">
                     <td className="py-3 px-4 text-gray-500 font-sans">
                       {new Date(log.changedAt).toLocaleString('en-IN', {
                         day: 'numeric',
@@ -1054,11 +1129,20 @@ export const PricingSettingsPage: React.FC = () => {
                     <td className="py-3 px-4 font-bold text-gray-800">{log.settingKey}</td>
                     <td className="py-3 px-4 text-gray-400 max-w-xs truncate">{log.oldValue || '—'}</td>
                     <td className="py-3 px-4 text-emerald-700 font-bold max-w-xs truncate">{log.newValue}</td>
+                    <td className="py-3 px-4 text-right font-sans">
+                      <button
+                        onClick={() => handleDeleteAuditLog(log.id)}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete this activity log record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {auditLogs.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-400 font-sans">
+                    <td colSpan={6} className="py-8 text-center text-gray-400 font-sans">
                       No audit history recorded yet.
                     </td>
                   </tr>

@@ -276,11 +276,12 @@ async function calculateDeliveryPricing({
     // Customer quick delivery charge: configured or matches base + perKm
     const customerBase = parseFloat(settings['quick_customer_base_fee'] || 35);
     const customerPerKm = parseFloat(settings['quick_customer_per_km'] || 7);
+    const quickFreeDeliveryEnabled = String(settings['quick_free_delivery_enabled']) === 'true';
     const customerFreeThreshold = parseFloat(settings['quick_free_threshold'] || 999);
 
     let customerDeliveryFee = Math.round(customerBase + (extraKm * customerPerKm));
     let isFreeDelivery = false;
-    if (subtotal >= customerFreeThreshold && customerFreeThreshold > 0) {
+    if (quickFreeDeliveryEnabled && subtotal >= customerFreeThreshold && customerFreeThreshold > 0) {
       customerDeliveryFee = 0;
       isFreeDelivery = true;
     }
@@ -292,6 +293,7 @@ async function calculateDeliveryPricing({
       riderPay,
       distanceKm: dist,
       isFreeDelivery,
+      freeDeliveryEnabled: quickFreeDeliveryEnabled,
       freeThreshold: customerFreeThreshold,
       adminMargin: customerDeliveryFee - riderPay
     };
