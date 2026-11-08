@@ -57,7 +57,7 @@ router.post('/broadcast', async (req, res) => {
       const standardUsers = await prisma.user.findMany({
         where: {
           role: { in: mappedRoles },
-          status: { not: 'banned' }
+          status: { not: 'blocked' }
         },
         select: { id: true }
       });
@@ -70,7 +70,7 @@ router.post('/broadcast', async (req, res) => {
       const riders = await prisma.user.findMany({
         where: {
           role: 'rider',
-          status: { not: 'banned' },
+          status: { not: 'blocked' },
           riderProfile: {
             partnerType: { in: partnerTypesArray }
           }
