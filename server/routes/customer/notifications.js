@@ -48,6 +48,16 @@ router.post('/read-all', async (req, res) => {
   }
 });
 
+/** DELETE /api/customer/notifications/clear-all */
+router.delete('/clear-all', async (req, res) => {
+  try {
+    await prisma.userNotification.deleteMany({ where: { userId: req.user.userId } });
+    res.json({ ok: true, message: 'All notifications cleared' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** DELETE /api/customer/notifications/:id */
 router.delete('/:id', async (req, res) => {
   try {

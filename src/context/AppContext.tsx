@@ -48,7 +48,7 @@ export interface Order {
   } | string;
 }
 
-export type NotificationType = 'order' | 'quick' | 'service' | 'promo';
+export type NotificationType = 'order' | 'quick' | 'service' | 'promo' | 'alert';
 
 export interface Notification {
   id: string;
@@ -58,6 +58,7 @@ export interface Notification {
   timestamp: string;
   read: boolean;
   actionText?: string;
+  link?: string;
   icon: any;
   color: string;
   bg: string;
@@ -91,6 +92,8 @@ interface AppContextType {
   addNotification: (n: Omit<Notification, 'id' | 'read' | 'timestamp'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
+  deleteNotification: (id: string) => void;
+  clearAllNotifications: () => void;
   lastAddedProduct: { product: Product; timestamp: number } | null;
   clearLastAddedProduct: () => void;
   requireAuth: (actionDescription?: string) => boolean;
@@ -206,7 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
     setNotifications(prev => {
       const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
       try {
@@ -214,9 +217,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch { }
       return updated;
     });
+    try {
+      await api.patch(`/api/customer/notifications/${id}/read`, {});
+    } catch { }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(prev => {
       const updated = prev.map(n => ({ ...n, read: true }));
       try {
@@ -224,6 +230,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch { }
       return updated;
     });
+    try {
+      await api.post('/api/customer/notifications/read-all', {});
+    } catch { }
+  };
+
+  const deleteNotification = async (id: string) => {
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      try {
+        localStorage.setItem('shopindia_notifications', JSON.stringify(updated));
+      } catch { }
+      return updated;
+    });
+    try {
+      await api.delete(`/api/customer/notifications/${id}`);
+    } catch { }
+  };
+
+  const clearAllNotifications = async () => {
+    setNotifications([]);
+    try {
+      localStorage.removeItem('shopindia_notifications');
+    } catch { }
+    try {
+      await api.delete('/api/customer/notifications/clear-all');
+    } catch { }
   };
 
   // Fetch initial data from API
@@ -242,18 +274,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (ordersRes.status === 'fulfilled' && ordersRes.value?.orders) setOrders(ordersRes.value.orders);
         if (notifsRes.status === 'fulfilled' && notifsRes.value?.notifications && Array.isArray(notifsRes.value.notifications) && notifsRes.value.notifications.length > 0) {
           setNotifications(prev => {
-            const serverNotifs = notifsRes.value.notifications.map((sn: any) => ({
-              id: sn.id || Math.random().toString(),
-              type: sn.type || 'order',
-              title: sn.title,
-              message: sn.message,
-              read: sn.isRead || false,
-              timestamp: sn.createdAt ? new Date(sn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
-              actionText: 'View Order',
-              icon: sn.type === 'quick' ? 'Zap' : sn.type === 'service' ? 'Wrench' : 'Package',
-              color: 'text-blue-600',
-              bg: 'bg-blue-50'
-            }));
+            const serverNotifs = notifsRes.value.notifications.map((sn: any) => {
+              const isQuick = sn.type === 'quick' || sn.category === 'quick';
+              const isService = sn.type === 'service' || sn.category === 'service';
+              const isPromo = sn.type === 'promo' || sn.category === 'promotion' || sn.category === 'coupon';
+              const isAlert = sn.category === 'alert' || sn.category === 'system';
+
+              let actionText: string | undefined = undefined;
+              if (sn.link) {
+                actionText = 'Open Link';
+              } else if (isQuick || sn.type === 'order') {
+                actionText = 'View Order';
+              } else if (isService) {
+                actionText = 'View Booking';
+              } else {
+                actionText = 'View Details';
+              }
+
+              return {
+                id: sn.id || Math.random().toString(),
+                type: (isQuick ? 'quick' : isService ? 'service' : isPromo ? 'promo' : isAlert ? 'alert' : 'order') as NotificationType,
+                title: sn.title,
+                message: sn.message,
+                read: sn.isRead || false,
+                timestamp: sn.createdAt ? new Date(sn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+                actionText,
+                link: sn.link || undefined,
+                icon: isQuick ? 'Zap' : isService ? 'Wrench' : isAlert ? 'Bell' : 'Package',
+                color: isQuick ? 'text-[#E5B500]' : isService ? 'text-amber-600' : isAlert ? 'text-purple-600' : 'text-blue-600',
+                bg: isQuick ? 'bg-amber-50' : isService ? 'bg-orange-50' : isAlert ? 'bg-purple-50' : 'bg-blue-50'
+              };
+            });
             const ids = new Set(prev.map(p => p.id));
             const fresh = serverNotifs.filter((s: any) => !ids.has(s.id));
             const combined = [...fresh, ...prev];
@@ -520,6 +571,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addNotification,
         markAsRead,
         markAllAsRead,
+        deleteNotification,
+        clearAllNotifications,
         lastAddedProduct,
         clearLastAddedProduct,
         requireAuth: requireCustomerAuth
