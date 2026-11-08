@@ -150,26 +150,14 @@ export const VerticalShopMobile: React.FC = () => {
   const { products } = useProducts();
   const shopProducts = products.filter(p => p.vertical === 'shop');
 
-  // Curated Deals of the Day (Super Admin Handpicked with High-Discount Fallback)
+  // Curated Deals of the Day (Strictly respects Super Admin configuration)
   const dealsProducts = React.useMemo(() => {
     if (dealsConfig.productIds && dealsConfig.productIds.length > 0) {
-      const curated = dealsConfig.productIds
+      return dealsConfig.productIds
         .map(id => products.find(p => p.id === id))
         .filter(Boolean) as typeof shopProducts;
-      if (curated.length > 0) return curated;
     }
-    const withDiscount = shopProducts.filter(p => p.originalPrice > p.price);
-    if (withDiscount.length > 0) {
-      return withDiscount
-        .slice()
-        .sort((a, b) => {
-          const discA = (a.originalPrice - a.price) / a.originalPrice;
-          const discB = (b.originalPrice - b.price) / b.originalPrice;
-          return discB - discA;
-        })
-        .slice(0, 8);
-    }
-    return shopProducts.slice(0, 6);
+    return [];
   }, [dealsConfig, products, shopProducts]);
 
   // Autoplay for Hero Carousel

@@ -159,14 +159,46 @@ router.get('/deals', async (req, res) => {
     if (setting && setting.value) {
       try { deals = JSON.parse(setting.value); } catch (e) {}
     }
-    if (!deals) {
+    
+    // If not configured or productIds is empty, auto-populate with the top active discounted storefront products
+    if (!deals || !Array.isArray(deals.productIds) || deals.productIds.length === 0) {
+      // Find top active shop products to feature by default
+      const defaultShopProducts = await prisma.product.findMany({
+        where: {
+          status: 'active',
+          fulfillmentType: { in: ['traditional', 'shop'] }
+        },
+        orderBy: [
+          { mrp: 'desc' },
+          { createdAt: 'desc' }
+        ],
+        take: 6,
+        select: { id: true }
+      });
+
+      const initialProductIds = defaultShopProducts.map(p => p.id);
+
       deals = {
-        isActive: true,
-        title: 'Deals of the Day',
-        badge: 'Limited Offer',
-        productIds: []
+        isActive: deals ? deals.isActive !== false : true,
+        title: deals?.title || 'Deals of the Day',
+        badge: deals?.badge || 'Limited Offer',
+        productIds: initialProductIds
       };
+
+      // Persist the default curated list into appSetting so both Admin and Storefront are in 100% sync
+      if (initialProductIds.length > 0) {
+        await prisma.appSetting.upsert({
+          where: { key: 'deals_of_the_day' },
+          update: { value: JSON.stringify(deals) },
+          create: {
+            key: 'deals_of_the_day',
+            value: JSON.stringify(deals),
+            description: 'Homepage Deals of the Day / Limited Offers curated products'
+          }
+        }).catch(err => console.warn('Failed to persist default deals:', err.message));
+      }
     }
+
     res.json({ deals });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -56,9 +56,10 @@ export const PromotionsPage: React.FC = () => {
       api.get<{ banners: any[] }>('/api/admin/banners').catch(() => ({ banners: [] })),
       api.get<{ spotlight: any }>('/api/admin/banners/spotlight').catch(() => ({ spotlight: null })),
       api.get<{ deals: any }>('/api/admin/banners/deals').catch(() => ({ deals: null })),
-      api.get<{ products: any[] }>('/api/admin/products?limit=100&status=active').catch(() => ({ products: [] })),
+      api.get<{ products: any[] }>('/api/admin/products?limit=150&status=active').catch(() => ({ products: [] })),
+      api.get<any>('/api/products?vertical=shop').catch(() => []),
     ])
-      .then(([bannersRes, spotlightRes, dealsRes, productsRes]) => {
+      .then(([bannersRes, spotlightRes, dealsRes, productsRes, storefrontProds]) => {
         setBanners(bannersRes.banners || []);
         if (spotlightRes.spotlight) {
           setSpotlightForm(prev => ({ ...prev, ...spotlightRes.spotlight }));
@@ -71,9 +72,13 @@ export const PromotionsPage: React.FC = () => {
             productIds: Array.isArray(dealsRes.deals.productIds) ? dealsRes.deals.productIds : []
           });
         }
-        if (productsRes?.products) {
-          setAllProducts(productsRes.products);
+        const adminProds = productsRes?.products || [];
+        const sfProds = Array.isArray(storefrontProds) ? storefrontProds : (storefrontProds as any)?.products || [];
+        const prodMap = new Map();
+        for (const p of [...adminProds, ...sfProds]) {
+          if (p?.id && !prodMap.has(p.id)) prodMap.set(p.id, p);
         }
+        setAllProducts(Array.from(prodMap.values()));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -550,10 +555,10 @@ export const PromotionsPage: React.FC = () => {
                             #{idx + 1}
                           </span>
                           <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200/60 p-1 flex items-center justify-center shrink-0 overflow-hidden">
-                            <img src={imgUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
+                            <img src={imgUrl} alt={p.name || p.title} className="max-h-full max-w-full object-contain" />
                           </div>
                           <div>
-                            <div className="font-bold text-xs text-slate-900 line-clamp-1">{p.name}</div>
+                            <div className="font-bold text-xs text-slate-900 line-clamp-1">{p.name || p.title}</div>
                             <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                               <span>Brand: <strong>{p.brand || 'Unbranded'}</strong></span>
                               <span>•</span>
@@ -564,7 +569,7 @@ export const PromotionsPage: React.FC = () => {
 
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <div className="font-bold text-xs text-slate-900">₹{(p.basePrice || 0).toLocaleString('en-IN')}</div>
+                            <div className="font-bold text-xs text-slate-900">₹{(p.basePrice || p.price || 0).toLocaleString('en-IN')}</div>
                             {discount > 0 ? (
                               <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200/60">
                                 {discount}% OFF
@@ -656,14 +661,14 @@ export const PromotionsPage: React.FC = () => {
                         <div key={p.id} className="py-2.5 px-2 flex items-center justify-between gap-3 hover:bg-slate-50 rounded-xl transition-colors">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-50 border p-1 flex items-center justify-center shrink-0">
-                              <img src={imgUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
+                              <img src={imgUrl} alt={p.name || p.title} className="max-h-full max-w-full object-contain" />
                             </div>
                             <div>
-                              <div className="text-xs font-bold text-slate-900 line-clamp-1">{p.name}</div>
+                              <div className="text-xs font-bold text-slate-900 line-clamp-1">{p.name || p.title}</div>
                               <div className="text-[10px] text-slate-400 flex items-center gap-2">
                                 <span>{p.brand || 'Unbranded'}</span>
                                 <span>•</span>
-                                <span>₹{(p.basePrice || 0).toLocaleString('en-IN')}</span>
+                                <span>₹{(p.basePrice || p.price || 0).toLocaleString('en-IN')}</span>
                                 {discount > 0 && <span className="text-orange-600 font-bold">({discount}% off)</span>}
                               </div>
                             </div>

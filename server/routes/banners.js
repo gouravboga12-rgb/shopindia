@@ -49,11 +49,24 @@ router.get('/deals-of-the-day', async (req, res) => {
       } catch (e) {}
     }
     if (!deals) {
+      const defaultShopProducts = await prisma.product.findMany({
+        where: {
+          status: 'active',
+          fulfillmentType: { in: ['traditional', 'shop'] }
+        },
+        orderBy: [
+          { mrp: 'desc' },
+          { createdAt: 'desc' }
+        ],
+        take: 6,
+        select: { id: true }
+      });
+
       deals = {
         isActive: true,
         title: 'Deals of the Day',
         badge: 'Limited Offer',
-        productIds: []
+        productIds: defaultShopProducts.map(p => p.id)
       };
     }
     res.json({ deals });

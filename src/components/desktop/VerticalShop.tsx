@@ -161,26 +161,14 @@ export const VerticalShop: React.FC = () => {
     return result.slice(0, 8);
   }, [apiBrands, shopProducts]);
 
-  // Curated Deals of the Day (Super Admin Handpicked with High-Discount Fallback)
+  // Curated Deals of the Day (Strictly respects Super Admin configuration)
   const dealsProducts = React.useMemo(() => {
     if (dealsConfig.productIds && dealsConfig.productIds.length > 0) {
-      const curated = dealsConfig.productIds
+      return dealsConfig.productIds
         .map(id => products.find(p => p.id === id))
         .filter(Boolean) as typeof shopProducts;
-      if (curated.length > 0) return curated;
     }
-
-    // Fallback: Products with genuine discounts first, followed by active catalog products
-    const withDiscount = shopProducts
-      .filter(p => p.originalPrice > p.price)
-      .slice()
-      .sort((a, b) => {
-        const discA = (a.originalPrice - a.price) / a.originalPrice;
-        const discB = (b.originalPrice - b.price) / b.originalPrice;
-        return discB - discA;
-      });
-    const remaining = shopProducts.filter(p => !withDiscount.some(d => d.id === p.id));
-    return [...withDiscount, ...remaining].slice(0, 10);
+    return [];
   }, [dealsConfig, products, shopProducts]);
 
   const justForYou = shopProducts.length > 5 ? shopProducts.slice().sort(() => 0.5 - Math.random()).slice(0, 6) : shopProducts.slice(0, 6);
