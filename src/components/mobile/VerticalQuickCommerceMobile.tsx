@@ -20,12 +20,6 @@ const MOBILE_SUB_TABS = [
   { id: 'pharmacy' as QuickSubVertical, label: 'Pharma', icon: Pill, color: 'bg-blue-600' },
 ];
 
-const QUICK_CATEGORIES_FALLBACK: Record<QuickSubVertical, string[]> = {
-  grocery: ['All', 'Fruits & Veggies', 'Dairy, Bread & Eggs', 'Snacks & Munchies', 'Cold Drinks & Juices', 'Personal Care'],
-  food: ['All', 'Biryani & Rice', 'Pizza & Fast Food', 'Thalis & Curries', 'Healthy & Bowls', 'Desserts & Shakes'],
-  pharmacy: ['All', 'Fever & Pain Relief', 'Cough & Cold', 'Vitamins & Immunity', 'First Aid & Care', 'Diabetes Care', 'Ayurveda'],
-};
-
 export const VerticalQuickCommerceMobile: React.FC = () => {
   const { cart, addToCart, updateQuantity, navigateTo, location, setCurrentVertical } = useApp();
   const { products } = useProducts();
@@ -87,7 +81,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
   };
 
 
-  // Dynamic live categories from database
+  // Dynamic live categories from database (100% dynamic, zero fake fallbacks)
   const subCategories = useMemo(() => {
     const fromApi = apiCategories
       .filter((c) => {
@@ -101,9 +95,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
       .map((c) => c.name);
 
     const fromProds = quickProducts.map((p) => p.category).filter(Boolean);
-    const fallback = QUICK_CATEGORIES_FALLBACK[activeSubVertical] || [];
-
-    const merged = Array.from(new Set([...fromApi, ...fromProds, ...fallback.slice(1)]));
+    const merged = Array.from(new Set([...fromApi, ...fromProds]));
     return ['All', ...merged];
   }, [apiCategories, activeSubVertical, quickProducts]);
 

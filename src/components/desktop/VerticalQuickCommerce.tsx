@@ -45,12 +45,6 @@ const SUB_VERTICAL_TABS = [
   },
 ];
 
-const QUICK_CATEGORIES_FALLBACK: Record<QuickSubVertical, string[]> = {
-  grocery: ['All Items', 'Fruits & Veggies', 'Dairy, Bread & Eggs', 'Snacks & Munchies', 'Cold Drinks & Juices', 'Personal Care'],
-  food: ['All Food', 'Biryani & Rice', 'Pizza & Fast Food', 'Thalis & Curries', 'Healthy & Bowls', 'Desserts & Shakes'],
-  pharmacy: ['All Medicines', 'Fever & Pain Relief', 'Cough & Cold', 'Vitamins & Immunity', 'First Aid & Care', 'Diabetes Care', 'Ayurveda'],
-};
-
 export const VerticalQuickCommerce: React.FC = () => {
   const { cart, addToCart, updateQuantity, navigateTo, location, setCurrentVertical } = useApp();
   const { products } = useProducts();
@@ -118,7 +112,7 @@ export const VerticalQuickCommerce: React.FC = () => {
   const activeCartCount = activeCartItems.reduce((acc, i) => acc + i.quantity, 0);
   const activeCartTotal = activeCartItems.reduce((acc, i) => acc + i.product.price * i.quantity, 0);
 
-  // Dynamically derive live category aisles from Admin API + Products
+  // Dynamically derive live category aisles from Admin API + Products (100% dynamic, zero fake fallbacks)
   const subCategories = useMemo(() => {
     const fromApi = apiCategories
       .filter((c) => {
@@ -132,10 +126,9 @@ export const VerticalQuickCommerce: React.FC = () => {
       .map((c) => c.name);
 
     const fromProds = quickProducts.map((p) => p.category).filter(Boolean);
-    const fallback = QUICK_CATEGORIES_FALLBACK[activeSubVertical] || [];
     const defaultLabel = activeSubVertical === 'food' ? 'All Food' : activeSubVertical === 'pharmacy' ? 'All Medicines' : 'All Items';
 
-    const merged = Array.from(new Set([...fromApi, ...fromProds, ...fallback.slice(1)]));
+    const merged = Array.from(new Set([...fromApi, ...fromProds]));
     return [defaultLabel, ...merged];
   }, [apiCategories, activeSubVertical, quickProducts]);
 

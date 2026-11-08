@@ -58,7 +58,7 @@ export const VerticalShop: React.FC = () => {
     productIds: []
   });
 
-  const normalizeBrand = (str: string) => str.trim().toLowerCase().replace(/[’']/g, "'");
+  const normalizeBrand = (str: string) => str.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
   useEffect(() => {
     // 1. Fetch active banners (all active promotions for the carousel)
@@ -170,19 +170,17 @@ export const VerticalShop: React.FC = () => {
       if (curated.length > 0) return curated;
     }
 
-    // Fallback: Products with genuine discounts, sorted from highest discount % to lowest
-    const withDiscount = shopProducts.filter(p => p.originalPrice > p.price);
-    if (withDiscount.length > 0) {
-      return withDiscount
-        .slice()
-        .sort((a, b) => {
-          const discA = (a.originalPrice - a.price) / a.originalPrice;
-          const discB = (b.originalPrice - b.price) / b.originalPrice;
-          return discB - discA;
-        })
-        .slice(0, 8);
-    }
-    return shopProducts.slice(0, 5);
+    // Fallback: Products with genuine discounts first, followed by active catalog products
+    const withDiscount = shopProducts
+      .filter(p => p.originalPrice > p.price)
+      .slice()
+      .sort((a, b) => {
+        const discA = (a.originalPrice - a.price) / a.originalPrice;
+        const discB = (b.originalPrice - b.price) / b.originalPrice;
+        return discB - discA;
+      });
+    const remaining = shopProducts.filter(p => !withDiscount.some(d => d.id === p.id));
+    return [...withDiscount, ...remaining].slice(0, 10);
   }, [dealsConfig, products, shopProducts]);
 
   const justForYou = shopProducts.length > 5 ? shopProducts.slice().sort(() => 0.5 - Math.random()).slice(0, 6) : shopProducts.slice(0, 6);

@@ -243,9 +243,13 @@ export const CategoriesPage: React.FC = () => {
     catch (err: any) { alert(err.message); }
   };
 
-  const removeCat = async (id: string) => {
-    if (!confirm('Delete this category? Products in this category will become uncategorized.')) return;
-    try { await api.delete(`/api/admin/categories/${id}`); loadCategories(); }
+  const removeCat = async (c: Category) => {
+    const prodCount = c._count?.products || 0;
+    const msg = prodCount > 0
+      ? `Delete category "${c.name}"?\n\nIt currently has ${prodCount} product(s) attached. If you delete it, these products will safely become uncategorized and remain in your catalog.`
+      : `Delete category "${c.name}"?`;
+    if (!confirm(msg)) return;
+    try { await api.delete(`/api/admin/categories/${c.id}`); loadCategories(); }
     catch (err: any) { alert(err.message); }
   };
 
@@ -618,7 +622,7 @@ export const CategoriesPage: React.FC = () => {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => removeCat(c.id)}
+                            onClick={() => removeCat(c)}
                             title="Delete Category"
                             className="p-1.5 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 cursor-pointer"
                           >
