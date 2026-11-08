@@ -83,12 +83,17 @@ export const RiderWallet: React.FC = () => {
   const [handoverDetails, setHandoverDetails] = useState<{ name: string; hubName: string } | null>(null);
   const [codSuccess, setCodSuccess] = useState<string | null>(null);
   const [codError, setCodError] = useState<string | null>(null);
+  const [liveBalance, setLiveBalance] = useState<number | null>(null);
 
   const fetchWallet = async () => {
     if (!token) return;
     try {
-      const data = await api.get<{ payouts: PayoutItem[] }>('/api/rider/wallet');
+      const data = await api.get<{ walletBalance?: number; payouts: PayoutItem[] }>('/api/rider/wallet');
       setPayouts(data.payouts || []);
+      if (typeof data.walletBalance === 'number') {
+        setLiveBalance(data.walletBalance);
+      }
+      if (refreshData) refreshData();
     } catch (e) {
       console.error('Wallet fetch error', e);
     }
@@ -113,6 +118,7 @@ export const RiderWallet: React.FC = () => {
   useEffect(() => {
     fetchWallet();
     fetchCODStatus();
+    if (refreshData) refreshData();
   }, [token]);
 
   const handleWithdraw = async (e: React.FormEvent) => {
@@ -511,7 +517,7 @@ export const RiderWallet: React.FC = () => {
             </div>
             <div className="flex items-center gap-1 text-3xl sm:text-5xl font-black text-slate-900 mt-2">
               <IndianRupee className="w-8 h-8 sm:w-11 sm:h-11 text-emerald-600 stroke-[2.5]" />
-              <span>{(profile?.walletBalance || 0).toLocaleString('en-IN')}</span>
+              <span>{(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)).toLocaleString('en-IN')}</span>
             </div>
             <p className="text-xs text-slate-500 mt-1.5 font-medium">
               Credited in real time after every verified OTP customer delivery.

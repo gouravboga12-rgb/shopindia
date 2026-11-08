@@ -395,7 +395,7 @@ router.post(['/:id/verify-doorstep-razorpay', '/orders/:id/verify-doorstep-razor
  */
 router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
   try {
-    const { otp, proofPhotoUrl } = req.body;
+    const { otp, proofPhotoUrl, paymentCollectedVia } = req.body;
     const profile = await getRiderProfile(req.user.userId);
 
     const delivery = await prisma.delivery.findFirst({
@@ -417,8 +417,19 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
     }
 
     const feeToCredit = delivery.deliveryFee || 50;
-    // Only increment cash float if payment was actually collected as physical COD cash (not paid online via Razorpay)
-    const isCOD = delivery.order?.paymentMethod === 'cod' && delivery.order?.paymentStatus !== 'paid';
+    
+    // Determine whether payment was collected as physical cash
+    // If rider explicitly confirmed 'razorpay' or order is already marked paid online, zero cash float is added
+    let isCollectedCash = false;
+    if (delivery.order?.paymentMethod === 'cod') {
+      if (paymentCollectedVia === 'razorpay' || delivery.order?.paymentStatus === 'paid') {
+        isCollectedCash = false;
+      } else if (paymentCollectedVia === 'cash') {
+        isCollectedCash = true;
+      } else {
+        isCollectedCash = delivery.order?.paymentStatus !== 'paid';
+      }
+    }
     const orderCash = delivery.order?.total || 0;
 
     // Atomic transaction: mark delivery completed, update order, credit rider wallet, write ledger entry
@@ -441,24 +452,19 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
         },
       });
 
-      // Net wallet balance adjustment:
-      // If customer paid offline COD, rider keeps the physical order cash in pocket.
-      // Therefore: Wallet gets +feeToCredit (earning) MINUS orderCash (collected cash in hand).
-      // Example: Wallet was ₹100. Order is ₹200. Rider fee is ₹50. Net wallet change = ₹50 - ₹200 = -₹150.
-      // New wallet balance = ₹100 - ₹150 = -₹50 (Negative balance / Cash Due).
-      const netWalletChange = isCOD && orderCash > 0 ? (feeToCredit - orderCash) : feeToCredit;
-
+      // Rider Wallet Balance ALWAYS credits guaranteed delivery fee earnings.
+      // Physical cash collected from customer is tracked cleanly in codCashFloat.
       await tx.riderProfile.update({
         where: { id: profile.id },
         data: {
-          walletBalance: { increment: netWalletChange },
+          walletBalance: { increment: feeToCredit },
           totalDeliveries: { increment: 1 },
-          ...(isCOD && orderCash > 0 ? { codCashFloat: { increment: orderCash } } : {}),
+          ...(isCollectedCash && orderCash > 0 ? { codCashFloat: { increment: orderCash } } : {}),
         },
       });
 
-      // If offline cash was collected, log COD_COLLECTION debit entry in ledger
-      if (isCOD && orderCash > 0) {
+      // If physical cash was collected, log COD_COLLECTION entry in ledger
+      if (isCollectedCash && orderCash > 0) {
         await tx.ledgerEntry.create({
           data: {
             type: 'DEBIT',
@@ -468,6 +474,10 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
             entryType: 'COD_COLLECTION',
             orderId: delivery.orderId,
             description: `Doorstep offline cash collected for Order #${delivery.order?.orderNumber || delivery.orderId}`,
+            riderProfileId: profile.id,
+          },
+        }).catch(err => console.warn('[RiderOrders] Ledger COD debit warning:', err.message));
+      }
             riderProfileId: profile.id,
           },
         }).catch(err => console.warn('[RiderOrders] Ledger COD debit warning:', err.message));

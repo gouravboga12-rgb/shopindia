@@ -175,8 +175,8 @@ export const OrdersPage: React.FC = () => {
   const milestoneInfo = openOrder ? getMilestoneProgress(openOrder.status, orderVert) : { milestones: [], currentIndex: 0 };
   const activeOtp = openOrder ? (orderOtps[openOrder.id] || (openOrder as any).deliveryOtp || (openOrder as any).delivery?.deliveryOtp || null) : null;
   const cancelable = openOrder ? (
-    ['pending', 'placed', 'confirmed', 'processing', 'packing'].includes(openOrder.status) &&
-    !['picked_up', 'arrived_customer', 'delivered'].includes((openOrder as any).delivery?.status || '')
+    ['pending', 'placed'].includes(openOrder.status) &&
+    !['assigned', 'picked_up', 'arrived_customer', 'delivered'].includes((openOrder as any).delivery?.status || '')
   ) : false;
 
   return (
@@ -471,13 +471,13 @@ export const OrdersPage: React.FC = () => {
 
                               {/* PROMINENT 4-DIGIT CUSTOMER DELIVERY OTP (Directly under items / beside tracking) */}
                               {activeOtp ? (
-                                <div className="p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 rounded-2xl shadow-sm flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-orange-500/20">
+                                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-orange-500/20 shrink-0">
                                       <KeyRound className="w-5 h-5 text-white" />
                                     </div>
-                                    <div>
-                                      <div className="flex items-center gap-1.5">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-900">
                                           Customer Delivery OTP
                                         </span>
@@ -485,12 +485,12 @@ export const OrdersPage: React.FC = () => {
                                           Required for Handover
                                         </span>
                                       </div>
-                                      <p className="text-xs text-slate-600 mt-0.5">
+                                      <p className="text-xs text-slate-600 mt-0.5 leading-snug">
                                         Share this 4-digit code with the {orderVert === 'services' ? 'technician' : 'delivery partner'} upon arrival
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="text-right pl-3">
+                                  <div className="self-end sm:self-auto shrink-0">
                                     <div className="font-mono text-2xl sm:text-3xl font-black tracking-widest text-slate-900 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300 shadow-sm inline-block">
                                       {activeOtp}
                                     </div>

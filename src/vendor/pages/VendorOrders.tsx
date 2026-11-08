@@ -294,7 +294,10 @@ export const VendorOrders: React.FC = () => {
                     {/* Order ID */}
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-1.5 py-0.5 bg-orange-100 text-orange-900 border border-orange-300 font-black rounded text-[10px] font-mono shadow-2xs">
+                            Token: #{(o.orderNumber || '').replace(/^OD-/, '').slice(-4)}
+                          </span>
                           <span className="font-mono font-black text-gray-900 text-xs tracking-tight">{o.orderNumber}</span>
                           <button
                             onClick={() => copyOrderNumber(o.orderNumber)}

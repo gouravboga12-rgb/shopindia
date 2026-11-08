@@ -101,9 +101,14 @@ export const RiderOrders: React.FC = () => {
             <span className="text-emerald-600 font-black text-lg sm:text-xl">₹{activeDelivery.deliveryFee}</span>
           </div>
 
-          <h3 className="text-base font-bold text-slate-900">
-            Order #{activeDelivery.order?.orderNumber || activeDelivery.orderId.slice(0, 8)}
-          </h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="px-2 py-0.5 bg-orange-100 text-orange-900 border border-orange-300 font-black rounded-lg text-xs font-mono shadow-2xs">
+              Token: #{(activeDelivery.order?.orderNumber || activeDelivery.orderId || '').replace(/^OD-/, '').slice(-4) || '9786'}
+            </span>
+            <h3 className="text-sm sm:text-base font-bold text-slate-900">
+              Order #{activeDelivery.order?.orderNumber || activeDelivery.orderId.slice(0, 8)}
+            </h3>
+          </div>
 
           <div className="mt-3 text-xs text-slate-700 space-y-1.5">
             <p className="flex items-center gap-2">
@@ -181,7 +186,10 @@ export const RiderOrders: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span className="text-sm font-bold text-slate-900">#{order.orderNumber}</span>
+                        <span className="px-1.5 py-0.2 bg-slate-100 text-slate-800 border border-slate-200 font-bold rounded text-[10px] font-mono">
+                          #{(order.orderNumber || '').replace(/^OD-/, '').slice(-4)}
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[140px] sm:max-w-none">#{order.orderNumber}</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-0.5 truncate max-w-[200px] sm:max-w-md">
                         {order.pickupName} ➔ {order.dropoffName}

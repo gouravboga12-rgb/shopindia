@@ -361,40 +361,42 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       {/* Leaflet Map Div */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* Floating Map Controls Overlay (Top Right) */}
-      <div className="absolute top-2.5 right-2.5 z-[400] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/70 shadow-md">
-        {/* Layer style toggle */}
-        <button
-          type="button"
-          onClick={() =>
-            setMapStyle((prev) => (prev === 'dark' ? 'streets' : 'dark'))
-          }
-          className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-          title={`Switch Map Theme: ${mapStyle === 'dark' ? 'Daylight Streets' : 'Dark Radar'}`}
-        >
-          <Layers className="w-3.5 h-3.5 text-orange-400" />
-        </button>
+      {/* Floating Map Controls Overlay (Top Right - hidden in customer view to keep map clean) */}
+      {viewerRole !== 'customer' && (
+        <div className="absolute top-2.5 right-2.5 z-[400] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/70 shadow-md">
+          {/* Layer style toggle */}
+          <button
+            type="button"
+            onClick={() =>
+              setMapStyle((prev) => (prev === 'dark' ? 'streets' : 'dark'))
+            }
+            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title={`Switch Map Theme: ${mapStyle === 'dark' ? 'Daylight Streets' : 'Dark Radar'}`}
+          >
+            <Layers className="w-3.5 h-3.5 text-orange-400" />
+          </button>
 
-        {/* Center on Rider */}
-        <button
-          type="button"
-          onClick={handleCenterRider}
-          className="p-1.5 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-          title="Track Rider Location"
-        >
-          <Compass className="w-3.5 h-3.5" />
-        </button>
+          {/* Center on Rider */}
+          <button
+            type="button"
+            onClick={handleCenterRider}
+            className="p-1.5 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title="Track Rider Location"
+          >
+            <Compass className="w-3.5 h-3.5" />
+          </button>
 
-        {/* Recenter Full Route */}
-        <button
-          type="button"
-          onClick={handleRecenter}
-          className="p-1.5 text-slate-300 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-          title="Fit Whole Route"
-        >
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          {/* Recenter Full Route */}
+          <button
+            type="button"
+            onClick={handleRecenter}
+            className="p-1.5 text-slate-300 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title="Fit Whole Route"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 1-Tap Google Maps Directions (Bottom Left) */}
       <div className="absolute bottom-2.5 left-2.5 z-[400]">

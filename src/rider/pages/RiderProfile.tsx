@@ -227,15 +227,18 @@ export const RiderProfile: React.FC = () => {
                   {vehicleType} • {vehicleNumber || 'Plate Pending'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-slate-400" /> {user?.email}
+              <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate max-w-[200px] sm:max-w-none">{user?.email}</span>
+                </span>
                 {phone && (
-                  <>
-                    <span className="text-slate-300">•</span>
-                    <Phone className="w-3.5 h-3.5 text-slate-400" /> {phone}
-                  </>
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-semibold text-slate-700 font-mono">{phone}</span>
+                  </span>
                 )}
-              </p>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span className="line-clamp-1">{address || 'No base address configured'}</span>

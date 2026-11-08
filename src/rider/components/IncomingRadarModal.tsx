@@ -230,9 +230,14 @@ export const IncomingRadarModal: React.FC = () => {
                 <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
                 <span>Package Contents {totalItemQty > 0 ? `(${totalItemQty} items)` : ''}</span>
               </span>
-              <span className="text-[10px] sm:text-[11px] text-amber-700 font-semibold font-mono">
-                Order #{incomingBroadcast.order?.orderNumber || 'QUICK'}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 bg-orange-200/80 text-orange-950 font-black rounded-md text-[10px] font-mono border border-orange-300">
+                  Token: #{(incomingBroadcast.order?.orderNumber || '').replace(/^OD-/, '').slice(-4) || '9786'}
+                </span>
+                <span className="text-[10px] text-amber-800 font-medium font-mono hidden sm:inline">
+                  (#{incomingBroadcast.order?.orderNumber || 'QUICK'})
+                </span>
+              </div>
             </div>
 
             {items.length > 0 ? (

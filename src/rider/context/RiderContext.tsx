@@ -106,7 +106,7 @@ interface RiderContextType {
   acceptOrder: (deliveryId: string) => Promise<{ success: boolean; error?: string }>;
   declineOrder: (deliveryId: string) => void;
   advanceStage: (nextStage: 'arrived_pickup' | 'picked_up' | 'arrived_customer') => Promise<void>;
-  completeDelivery: (otp: string, photoProofUrl?: string) => Promise<{ success: boolean; error?: string }>;
+  completeDelivery: (otp: string, photoProofUrl?: string, paymentCollectedVia?: 'cash' | 'razorpay') => Promise<{ success: boolean; error?: string }>;
   refreshData: () => Promise<void>;
   updateGpsLocation: () => Promise<{ success: boolean; address?: string; error?: string }>;
   playChime: () => void;
@@ -398,13 +398,13 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Complete delivery via OTP
-  const completeDelivery = async (otp: string, photoProofUrl?: string) => {
+  const completeDelivery = async (otp: string, photoProofUrl?: string, paymentCollectedVia?: 'cash' | 'razorpay') => {
     if (!token || !activeDelivery) return { success: false, error: 'No active delivery.' };
     try {
       const res = await fetch(`/api/rider/orders/${activeDelivery.id}/complete`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ otp, proofPhotoUrl: photoProofUrl }),
+        body: JSON.stringify({ otp, proofPhotoUrl: photoProofUrl, paymentCollectedVia }),
       });
       const data = await res.json();
       if (res.ok && data.success) {

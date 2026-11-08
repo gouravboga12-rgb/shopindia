@@ -86,6 +86,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
 
   useEffect(() => {
     fetchHubStatus();
+    if (refreshData) refreshData();
     const fetchAlerts = async () => {
       try {
         const res: any = await api.get('/api/rider/notifications');
