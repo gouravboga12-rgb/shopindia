@@ -231,10 +231,11 @@ async function calculateDeliveryPricing({
   // 1. Traditional Pan-India Delivery via Shiprocket 3PL
   if (fulfillmentType === 'traditional' || fulfillmentType === 'shop') {
     const baseFee = parseFloat(settings['shiprocket_base_fee'] || 49);
+    const freeDeliveryEnabled = String(settings['shiprocket_free_delivery_enabled']) === 'true';
     const freeThreshold = parseFloat(settings['shiprocket_free_threshold'] || 499);
     const estimatedCourierCost = parseFloat(settings['shiprocket_estimated_cost'] || 45);
 
-    const isFreeDelivery = subtotal >= freeThreshold;
+    const isFreeDelivery = freeDeliveryEnabled && (subtotal >= freeThreshold);
     const customerDeliveryFee = isFreeDelivery ? 0 : baseFee;
 
     return {
@@ -243,6 +244,7 @@ async function calculateDeliveryPricing({
       customerDeliveryFee,
       riderPay: 0, // No local rider; handled by 3PL courier
       isFreeDelivery,
+      freeDeliveryEnabled,
       freeThreshold,
       baseFee,
       estimatedCourierCost,
@@ -295,17 +297,15 @@ async function calculateDeliveryPricing({
     };
   }
 
-  // 3. Service Jobs (HVAC / Doorstep Services)
-  const visitCharge = parseFloat(settings['service_visit_charge'] || 199);
-  const minTechnicianPay = parseFloat(settings['service_technician_min_pay'] || 149);
-
+  // 3. Service Jobs (Glacons Doorstep Services)
+  // Customers pay the service catalog price directly via Razorpay; no separate inspection charge or delivery fee.
   return {
     type: 'technician',
     fulfillmentType: 'hvac_service',
-    customerDeliveryFee: visitCharge,
-    riderPay: minTechnicianPay,
+    customerDeliveryFee: 0,
+    riderPay: 0,
     isFreeDelivery: false,
-    adminMargin: visitCharge - minTechnicianPay
+    adminMargin: 0
   };
 }
 
@@ -444,6 +444,7 @@ async function simulatePricing({
   fulfillmentType = 'traditional',
   distanceKm = 3.5,
   shippingFee = 49,
+  freeDeliveryEnabled = false,
   freeShippingAbove = 499,
   riderBasePay = 30,
   riderPayPerKm = 5
@@ -473,15 +474,15 @@ async function simulatePricing({
   let deliveryMargin = 0;
 
   if (fulfillmentType === 'traditional' || fulfillmentType === 'shop') {
-    const isFree = customerPrice >= freeShippingAbove;
+    const isFree = freeDeliveryEnabled && (customerPrice >= freeShippingAbove);
     customerDelivery = isFree ? 0 : parseFloat(shippingFee);
     deliveryCost = 45; // Estimated Shiprocket courier cost
     deliveryMargin = customerDelivery - deliveryCost;
   } else if (fulfillmentType === 'services' || fulfillmentType === 'hvac_service') {
-    // Doorstep Services & Repairs
-    customerDelivery = parseFloat(shippingFee) >= 0 ? parseFloat(shippingFee) : 199; // Visit charge paid by customer
-    deliveryCost = parseFloat(riderBasePay) >= 0 ? parseFloat(riderBasePay) : 149; // Guaranteed minimum pay credited to technician
-    deliveryMargin = customerDelivery - deliveryCost;
+    // Doorstep Services: Customer pays catalog service price; no extra visit fee
+    customerDelivery = 0;
+    deliveryCost = 0;
+    deliveryMargin = 0;
   } else {
     // Quick commerce
     const dist = Math.max(0.5, parseFloat(distanceKm) || 3.5);

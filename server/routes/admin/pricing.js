@@ -277,6 +277,7 @@ router.get('/settings', async (req, res) => {
     const settings = {
       // Defaults
       shiprocket_base_fee: '49',
+      shiprocket_free_delivery_enabled: 'false',
       shiprocket_free_threshold: '499',
       shiprocket_estimated_cost: '45',
       quick_customer_base_fee: '35',
