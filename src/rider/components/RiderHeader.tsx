@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRider } from '../context/RiderContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { Power, Wallet, ShieldCheck, AlertCircle, LogOut, Bell, X, CheckCheck, Clock, ExternalLink, Zap, Wrench } from 'lucide-react';
+import { Power, Wallet, AlertCircle, LogOut, Bell, X, CheckCheck, Clock, ExternalLink, Zap, Wrench, CheckCircle2 } from 'lucide-react';
 
 interface RiderHeaderProps {
   onLogout?: () => void;
@@ -68,33 +68,33 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 border-b border-slate-200/80 text-slate-800 shadow-xs backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
         {/* Rider Identity */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-sm text-base">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="relative shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-sm text-sm sm:text-base">
               {user?.name ? user.name[0].toUpperCase() : 'R'}
             </div>
             <span
-              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+              className={`absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-white ${
                 isOnline ? 'bg-emerald-500 ring-2 ring-emerald-400/50 animate-pulse' : 'bg-slate-400'
               }`}
             />
           </div>
-          <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="font-bold text-sm sm:text-base text-slate-900">{user?.name || 'Delivery Partner'}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm sm:text-base text-slate-900 truncate max-w-[100px] sm:max-w-none">{user?.name || 'Delivery Partner'}</span>
               {profile?.isApproved ? (
-                <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  <ShieldCheck className="w-3 h-3" /> KYC Verified
+                <span title="KYC Verified" className="inline-flex items-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                  <AlertCircle className="w-3 h-3" /> KYC Pending
+                <span title="KYC Pending" className="inline-flex items-center shrink-0">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-[11px] sm:text-xs text-slate-500 truncate">
               {profile?.vehicleType ? `${profile.vehicleType.toUpperCase()} • ` : ''}
               Radius: {profile?.serviceRadiusKm || 25} km
             </p>
@@ -102,7 +102,7 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
         </div>
 
         {/* Center / Right: Online Status Toggle & Wallet */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* COD Cash in Hand (if holding customer cash) */}
           {cashInHand > 0 && (
             <button
@@ -254,7 +254,7 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
           {/* Online Toggle Switch */}
           <button
             onClick={toggleOnline}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all shadow-xs active:scale-95 cursor-pointer ${
+            className={`flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap ${
               isOnline
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
                 : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200'

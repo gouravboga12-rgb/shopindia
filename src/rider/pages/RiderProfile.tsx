@@ -242,13 +242,6 @@ export const RiderProfile: React.FC = () => {
               </p>
             </div>
           </div>
-
-          <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
-            <span className="text-[11px] font-bold text-slate-400">AWS Cloud Synced</span>
-            <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-              PostgreSQL RDS Active
-            </span>
-          </div>
         </div>
       </div>
 
@@ -839,7 +832,7 @@ export const RiderProfile: React.FC = () => {
       {/* Save Button Bar (Sticky at bottom of card) */}
       <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-5 shadow-xs flex items-center justify-between gap-4">
         <div className="text-xs text-slate-500 hidden sm:block">
-          All modifications are immediately synced to your AWS PostgreSQL record.
+          All modifications are updated securely in your profile.
         </div>
 
         <button
@@ -852,7 +845,7 @@ export const RiderProfile: React.FC = () => {
           ) : (
             <Save className="w-4 h-4" />
           )}
-          <span>{isSaving ? 'Saving to AWS...' : 'Save Changes'}</span>
+          <span>{isSaving ? 'Saving Changes...' : 'Save Changes'}</span>
         </button>
       </div>
 
