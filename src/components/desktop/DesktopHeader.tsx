@@ -107,15 +107,15 @@ export const DesktopHeader: React.FC = () => {
   return (
     <header className="w-full flex flex-col sticky top-0 z-50 shadow-soft select-none theme-transition transition-all duration-300 bg-white text-brand-graphite border-b border-brand-border/60">
       {/* Top Vertical Selector Bar — Highlighted Platform Cards inspired by JioHotstar & Tadka */}
-      <div className="w-full border-b flex justify-between items-center px-8 lg:px-12 py-2 transition-colors duration-300 select-none bg-slate-50/80 border-slate-200/80">
-        <div className="flex items-center gap-2">
+      <div className="w-full border-b flex flex-wrap md:flex-nowrap justify-between items-center px-4 md:px-6 lg:px-12 py-2 transition-colors duration-300 select-none bg-slate-50/80 border-slate-200/80 gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {/* Subtle guide label for customers */}
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 hidden xl:flex items-center gap-1.5 mr-1 select-none">
             <Sparkles size={12} className="text-amber-500 fill-amber-400" />
             <span>Switch Store:</span>
           </span>
 
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-slate-200/90 shadow-sm">
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
             {/* 1. ShopIndia Tab (Uses exact /logo.png) */}
             {(() => {
               const isActive = currentVertical === 'shop';
@@ -123,7 +123,7 @@ export const DesktopHeader: React.FC = () => {
                 <button
                   key="shop"
                   onClick={() => setCurrentVertical('shop')}
-                  className={`group relative flex items-center justify-center px-4 py-1.5 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
+                  className={`group relative flex items-center justify-center px-3 md:px-4 py-1.5 rounded-[12px] h-[38px] md:h-[42px] w-32 sm:w-36 md:w-40 lg:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
                     isActive
                       ? 'bg-[#1C1C1E] shadow-md shadow-slate-900/30 ring-2 ring-blue-500/50 scale-[1.02]'
                       : 'bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 shadow-xs hover:scale-[1.01]'
@@ -148,23 +148,23 @@ export const DesktopHeader: React.FC = () => {
                 <button
                   key="quick"
                   onClick={() => setCurrentVertical('quick')}
-                  className={`group relative flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none ${
+                  className={`group relative flex items-center justify-center gap-1.5 md:gap-2 px-2.5 md:px-3.5 py-1.5 rounded-[12px] h-[38px] md:h-[42px] w-32 sm:w-36 md:w-40 lg:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none ${
                     isActive
                       ? 'bg-gradient-to-r from-[#FF0055] via-[#FF5500] to-[#FFAA00] text-white shadow-lg shadow-orange-500/30 ring-2 ring-amber-300 scale-[1.02]'
                       : 'bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 text-orange-950 border border-orange-200/90 hover:border-orange-300 shadow-xs hover:scale-[1.01]'
                   }`}
                   title="Quick — Instant delivery"
                 >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                  <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
                     isActive ? 'bg-white text-orange-600 shadow-xs animate-pulse' : 'bg-orange-500 text-white shadow-xs'
                   }`}>
-                    <Zap size={12} className="fill-current" />
+                    <Zap size={11} className="fill-current" />
                   </div>
                   <div className="flex flex-col text-left leading-none">
-                    <span className={`text-xs font-black tracking-wide ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                    <span className={`text-[11px] md:text-xs font-black tracking-wide ${isActive ? 'text-white' : 'text-slate-900'}`}>
                       Quick
                     </span>
-                    <span className={`text-[10px] mt-0.5 whitespace-nowrap font-medium ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
+                    <span className={`text-[9px] md:text-[10px] mt-0.5 whitespace-nowrap font-medium ${isActive ? 'text-amber-100' : 'text-orange-700'}`}>
                       Instant delivery
                     </span>
                   </div>
@@ -179,7 +179,7 @@ export const DesktopHeader: React.FC = () => {
                 <button
                   key="services"
                   onClick={() => setCurrentVertical('services')}
-                  className={`group relative flex items-center justify-center px-3 py-1 rounded-[12px] h-[42px] w-40 md:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
+                  className={`group relative flex items-center justify-center px-2.5 md:px-3 py-1 rounded-[12px] h-[38px] md:h-[42px] w-32 sm:w-36 md:w-40 lg:w-44 transition-all duration-300 cursor-pointer select-none focus:outline-none overflow-hidden ${
                     isActive
                       ? 'bg-white shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500 border border-emerald-300 scale-[1.02]'
                       : 'bg-white hover:bg-teal-50/40 border border-slate-200/90 hover:border-teal-300 shadow-xs hover:scale-[1.01]'
@@ -189,7 +189,7 @@ export const DesktopHeader: React.FC = () => {
                   <img 
                     src={servicesImg} 
                     alt="Glacons" 
-                    className="h-[34px] w-auto max-w-[92%] object-contain select-none pointer-events-none transition-transform duration-200 group-hover:scale-105"
+                    className="h-[30px] md:h-[34px] w-auto max-w-[92%] object-contain select-none pointer-events-none transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
               );
@@ -198,16 +198,16 @@ export const DesktopHeader: React.FC = () => {
         </div>
         <button 
           onClick={() => setShowLocationModal(true)}
-          className="flex items-center gap-1.5 text-xs font-bold py-1 px-2.5 rounded-lg hover:bg-slate-100/90 border border-transparent hover:border-brand-border/60 transition-all cursor-pointer select-none group"
+          className="flex items-center gap-1.5 text-xs font-bold py-1 px-2.5 rounded-lg hover:bg-slate-100/90 border border-transparent hover:border-brand-border/60 transition-all cursor-pointer select-none group shrink-0"
         >
           <MapPin size={13} className="text-brand-blue shrink-0 group-hover:animate-bounce" />
-          <span className="text-brand-slate">Delivering to: <strong className="text-brand-graphite">{location}</strong></span>
+          <span className="text-brand-slate text-xs truncate max-w-[200px]">Delivering to: <strong className="text-brand-graphite">{location}</strong></span>
           <ChevronDown size={11} className="text-brand-slate shrink-0 ml-0.5 group-hover:text-brand-blue" />
         </button>
       </div>
 
       {/* Main Header Container */}
-      <div className="w-full flex items-center justify-between px-12 py-3.5 transition-colors duration-300 bg-transparent text-brand-graphite">
+      <div className="w-full flex items-center justify-between px-4 md:px-6 lg:px-12 py-3.5 transition-colors duration-300 bg-transparent text-brand-graphite">
         <div className="flex items-center gap-6 w-full max-w-5xl">
           {/* Highlighted Prominent Search Bar */}
           <div ref={suggestionRef} className="relative w-full max-w-2xl">
@@ -278,7 +278,7 @@ export const DesktopHeader: React.FC = () => {
         </div>
 
         {/* Right Menu Controls */}
-        <div className="flex items-center gap-8 shrink-0 text-xs font-bold">
+        <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-6 shrink-0 text-xs font-bold">
           {/* Notifications Button */}
           <button 
             onClick={() => navigateTo('notifications')}

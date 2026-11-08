@@ -12,7 +12,7 @@ export const DesktopFooter: React.FC = () => {
       isServices ? 'bg-services-bg text-services-gray border-t border-services-border' : 'bg-[#172337] text-white'
     }`}>
       {/* Upper footer links columns */}
-      <div className={`max-w-7xl mx-auto px-12 py-10 grid grid-cols-1 md:grid-cols-6 gap-6 ${
+      <div className={`max-w-7xl mx-auto px-4 md:px-8 lg:px-12 py-10 grid grid-cols-1 md:grid-cols-6 gap-6 ${
         isServices ? 'border-b border-services-border' : 'border-b border-gray-700'
       }`}>
         <div className="flex flex-col gap-2.5">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { Menu } from 'lucide-react';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminSidebar } from './AdminSidebar';
 import { Dashboard } from './pages/Dashboard';
@@ -28,9 +29,34 @@ import { CanceledOrdersPage } from './pages/CanceledOrdersPage';
 
 export interface ManagedVendor { id: string; name: string; }
 
+const TAB_TITLES: Record<string, string> = {
+  dashboard: 'Admin Dashboard',
+  finance: 'Finance Center',
+  'payouts-vendors': 'Merchant Payouts',
+  'payouts-fleet': 'Rider & Tech Payouts',
+  accounts: 'Accounts & Statements',
+  'cod-settings': 'Cash Float & COD',
+  commissions: 'Rates & Commissions',
+  'regional-admins': 'Regional Admins',
+  vendors: 'Vendors Hub',
+  riders: 'Riders Operations',
+  users: 'Users & Roles',
+  products: 'Products Catalog',
+  services: 'Services & Repairs',
+  categories: 'Categories & Brands',
+  orders: 'Orders Management',
+  'canceled-orders': 'Canceled Orders & Refunds',
+  'service-areas': 'Service Areas',
+  support: 'Support Queue',
+  promotions: 'Promotions',
+  offers: 'Offers & Coupons',
+  notifications: 'Broadcast Alerts',
+};
+
 const AdminContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [managedVendor, setManagedVendor] = useState<ManagedVendor | null>(null);
   const [statementTarget, setStatementTarget] = useState<{ partyType: string; partyId: string; name?: string } | null>(null);
 
@@ -38,6 +64,7 @@ const AdminContent: React.FC = () => {
     setStatementTarget(null);
     setManagedVendor(null);
     setTab(newTab);
+    setSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -46,10 +73,37 @@ const AdminContent: React.FC = () => {
   // When a vendor is being managed, render the vendor panel overlay
   if (managedVendor) {
     return (
-      <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
-        <AdminSidebar currentTab={tab} onTabChange={handleTabChange} />
-        <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
+      <div className="flex flex-col lg:flex-row h-screen w-screen overflow-hidden bg-[#FAF9F6]">
+        {/* Mobile Top Header */}
+        <header className="lg:hidden sticky top-0 z-40 bg-[#0F2C59] text-white px-4 py-3 flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white text-xs border border-white/20">
+              SI
+            </div>
+            <div>
+              <h1 className="text-xs font-black tracking-tight uppercase text-white font-heading">
+                Managed Vendor View
+              </h1>
+              <p className="text-[10px] text-white/60 truncate max-w-[180px]">{managedVendor.name}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            aria-label="Open Navigation Menu"
+          >
+            <Menu size={18} />
+          </button>
+        </header>
+
+        <AdminSidebar
+          currentTab={tab}
+          onTabChange={handleTabChange}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+        <main className="flex-1 h-[calc(100vh-56px)] lg:h-screen overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto w-full">
             <AdminVendorView vendor={managedVendor} onBack={() => setManagedVendor(null)} />
           </div>
         </main>
@@ -99,10 +153,41 @@ const AdminContent: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#FAF9F6]">
-      <AdminSidebar currentTab={statementTarget ? '' : tab} onTabChange={handleTabChange} />
-      <main className="flex-1 h-screen overflow-y-auto p-6 lg:p-8" key={statementTarget ? `stmt-${statementTarget.partyId}` : tab}>
-        <div className="max-w-7xl mx-auto">
+    <div className="flex flex-col lg:flex-row h-screen w-screen overflow-hidden bg-[#FAF9F6]">
+      {/* Mobile Top Header */}
+      <header className="lg:hidden sticky top-0 z-40 bg-[#0F2C59] text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white text-xs border border-white/20">
+            SI
+          </div>
+          <div>
+            <h1 className="text-xs font-black tracking-tight uppercase text-white font-heading">
+              {statementTarget ? 'Account Statement' : (TAB_TITLES[tab] || 'Super Admin')}
+            </h1>
+            <p className="text-[10px] text-white/60">ShopIndia Super Admin</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu size={18} />
+        </button>
+      </header>
+
+      <AdminSidebar
+        currentTab={statementTarget ? '' : tab}
+        onTabChange={handleTabChange}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <main
+        className="flex-1 h-[calc(100vh-56px)] lg:h-screen overflow-y-auto p-4 sm:p-6 lg:p-8"
+        key={statementTarget ? `stmt-${statementTarget.partyId}` : tab}
+      >
+        <div className="max-w-7xl mx-auto w-full">
           {renderTab()}
         </div>
       </main>

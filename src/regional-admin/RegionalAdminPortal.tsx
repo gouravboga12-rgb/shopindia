@@ -51,7 +51,7 @@ const RegionalAdminContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row">
       {/* Mobile / Tablet Sticky Header */}
-      <RegionalAdminHeader />
+      <RegionalAdminHeader currentTab={tab} onTabChange={setTab} />
 
       {/* Desktop Persistent Left Sidebar */}
       <RegionalAdminSidebar currentTab={tab} onTabChange={setTab} />
