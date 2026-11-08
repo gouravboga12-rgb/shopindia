@@ -166,7 +166,7 @@ router.get('/deals', async (req, res) => {
       const defaultShopProducts = await prisma.product.findMany({
         where: {
           status: 'active',
-          fulfillmentType: { in: ['traditional', 'shop'] }
+          fulfillmentType: 'traditional'
         },
         orderBy: [
           { mrp: 'desc' },
