@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCustomer } from '../../context/CustomerContext';
 import { PageHeader, EmptyState, Badge } from '../../components/dashboard/DashboardUI';
-import { Bell, CheckCheck, Trash2, Package, Truck, Tag, Percent, TrendingDown, PackagePlus, Mail } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Package, Truck, Tag, Percent, TrendingDown, PackagePlus } from 'lucide-react';
 import type { NotificationCategory } from '../../data/dashboardTypes';
 
 const CAT_META: Record<NotificationCategory, { label: string; icon: React.ReactNode; tone: string }> = {
@@ -18,9 +18,6 @@ const FILTERS: ('all' | NotificationCategory)[] = ['all', 'order', 'shipping', '
 export const NotificationsPage: React.FC = () => {
   const { notifications, unread, markNotificationRead, markAllNotificationsRead, removeNotification } = useCustomer();
   const [filter, setFilter] = useState<'all' | NotificationCategory>('all');
-  const [prefs, setPrefs] = useState<Record<NotificationCategory, boolean>>({
-    order: true, shipping: true, promotion: false, coupon: true, price_drop: true, stock: true,
-  });
 
   const filtered = filter === 'all' ? notifications : notifications.filter((n) => n.category === filter);
 
@@ -66,22 +63,6 @@ export const NotificationsPage: React.FC = () => {
             </div>
           );
         })}
-      </div>
-
-      {/* Preferences */}
-      <div className="bg-white border border-brand-border rounded-card shadow-premium p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Mail className="w-4 h-4 text-brand-blue" />
-          <h3 className="font-extrabold text-sm text-brand-graphite font-heading">Notification Preferences</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {(Object.keys(prefs) as NotificationCategory[]).map((c) => (
-            <label key={c} className="flex items-center justify-between px-4 py-3 border border-brand-border rounded-xl text-xs font-bold text-brand-graphite cursor-pointer hover:border-brand-blue/30">
-              <span className="flex items-center gap-2">{CAT_META[c].icon} {CAT_META[c].label}</span>
-              <input type="checkbox" checked={prefs[c]} onChange={() => setPrefs((p) => ({ ...p, [c]: !p[c] }))} className="accent-brand-blue w-4 h-4" />
-            </label>
-          ))}
-        </div>
       </div>
     </div>
   );

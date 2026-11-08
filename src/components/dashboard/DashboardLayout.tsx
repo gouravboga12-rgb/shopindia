@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCustomer } from '../../context/CustomerContext';
 import { useApp } from '../../context/AppContext';
 import {
-  LayoutDashboard, Package, Heart, ShoppingCart, Star, MapPin,
+  LayoutDashboard, Package, Heart, ShoppingCart, MapPin,
   Bell, TicketPercent, History, UserCog, ShieldCheck, Headphones, LogOut,
   Menu, X,
 } from 'lucide-react';
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export type DashboardTab =
   | 'overview' | 'orders' | 'wishlist' | 'cart' | 'addresses'
-  | 'notifications' | 'reviews' | 'coupons' | 'recently-viewed' | 'profile' | 'security' | 'support';
+  | 'notifications' | 'coupons' | 'recently-viewed' | 'profile' | 'security' | 'support';
 
 const NAV: { id: DashboardTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
@@ -21,7 +21,6 @@ const NAV: { id: DashboardTab; label: string; icon: typeof LayoutDashboard }[] =
   { id: 'recently-viewed', label: 'Recently Viewed', icon: History },
   { id: 'addresses', label: 'Addresses', icon: MapPin },
   { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'reviews', label: 'Reviews & Ratings', icon: Star },
   { id: 'coupons', label: 'Coupons & Rewards', icon: TicketPercent },
   { id: 'profile', label: 'Profile Settings', icon: UserCog },
   { id: 'security', label: 'Security', icon: ShieldCheck },
