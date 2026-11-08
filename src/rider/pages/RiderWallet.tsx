@@ -12,9 +12,7 @@ import {
   Banknote,
   ShieldAlert,
   CreditCard,
-  Building2,
   RefreshCw,
-  KeyRound,
   Smartphone
 } from 'lucide-react';
 
@@ -78,9 +76,6 @@ export const RiderWallet: React.FC = () => {
   const [codStatus, setCodStatus] = useState<CODStatus | null>(null);
   const [codLoading, setCodLoading] = useState<boolean>(true);
   const [isPayingRazorpay, setIsPayingRazorpay] = useState<boolean>(false);
-  const [isRequestingHandover, setIsRequestingHandover] = useState<boolean>(false);
-  const [handoverOtp, setHandoverOtp] = useState<string | null>(null);
-  const [handoverDetails, setHandoverDetails] = useState<{ name: string; hubName: string } | null>(null);
   const [codSuccess, setCodSuccess] = useState<string | null>(null);
   const [codError, setCodError] = useState<string | null>(null);
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
@@ -227,7 +222,6 @@ export const RiderWallet: React.FC = () => {
 
             if (verifyRes.success) {
               setCodSuccess(verifyRes.message);
-              setHandoverOtp(null);
               await refreshData();
               await fetchCODStatus();
             }
@@ -249,33 +243,6 @@ export const RiderWallet: React.FC = () => {
     } catch (err: unknown) {
       setCodError(err instanceof Error ? err.message : 'Failed to start payment');
       setIsPayingRazorpay(false);
-    }
-  };
-
-  // Physical Handover Request
-  const handleRequestHandover = async () => {
-    setIsRequestingHandover(true);
-    setCodError(null);
-    setCodSuccess(null);
-
-    try {
-      const res = await api.post<{
-        success: boolean;
-        message: string;
-        handoverOtp: string;
-        amount: number;
-        regionalAdmin: { name: string; hubName: string };
-      }>('/api/rider/cod/request-physical-handover', {});
-
-      if (res.success) {
-        setHandoverOtp(res.handoverOtp);
-        setHandoverDetails(res.regionalAdmin);
-        setCodSuccess(res.message);
-      }
-    } catch (err: unknown) {
-      setCodError(err instanceof Error ? err.message : 'Failed to request physical handover');
-    } finally {
-      setIsRequestingHandover(false);
     }
   };
 
@@ -389,110 +356,38 @@ export const RiderWallet: React.FC = () => {
                 : 'End of Day (Midnight)'}
             </span>
           </div>
-
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-              Regional Admin Support
-            </span>
-            <div className="text-sm font-black text-slate-800 mt-1">
-              {codStatus?.regionalAdminAvailable
-                ? codStatus.regionalAdmin?.name || 'Active at Hub'
-                : 'Not Available in Zone'}
-            </div>
-            <span className="text-[10px] text-slate-400 mt-1 block">
-              {codStatus?.regionalAdminAvailable ? codStatus.regionalAdmin?.hubName || 'Local Hub' : 'Online Razorpay Only'}
-            </span>
-          </div>
         </div>
 
-        {/* Clearance Handover OTP Banner (if generated) */}
-        {handoverOtp && (
-          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl space-y-2 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-2 text-blue-900 font-bold text-xs uppercase tracking-wider">
-              <KeyRound className="w-4 h-4 text-blue-600" />
-              <span>Physical Handover Verification Code</span>
-            </div>
-            <div className="text-3xl font-black font-mono tracking-widest text-blue-700">
-              {handoverOtp}
-            </div>
-            <p className="text-xs text-blue-800">
-              Please share this 4-digit code with{' '}
-              <strong>{handoverDetails?.name || 'your Regional Admin'}</strong> at{' '}
-              <strong>{handoverDetails?.hubName || 'the Hub'}</strong> when handing over ₹{floatAmount} in cash.
-            </p>
-          </div>
-        )}
-
-        {/* Clearance Action Buttons */}
+        {/* Clearance Action Buttons (Online Razorpay UPI Settle) */}
         {floatAmount > 0 ? (
           <div className="space-y-3 pt-2">
             <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Select Clearance Method
+              Voluntary Online Clearance
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
               {/* Option 1: Pay Online via Razorpay */}
               <button
                 type="button"
                 disabled={isPayingRazorpay}
                 onClick={handlePayRazorpay}
-                className="p-4 rounded-2xl border-2 border-orange-500 bg-orange-50/40 hover:bg-orange-100/60 transition-all text-left group cursor-pointer disabled:opacity-50"
+                className="w-full sm:max-w-md p-4 rounded-2xl border-2 border-orange-500 bg-orange-50/40 hover:bg-orange-100/60 transition-all text-left group cursor-pointer disabled:opacity-50"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="p-2 bg-orange-500 text-white rounded-xl shadow-xs">
                     <CreditCard className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] font-bold text-orange-700 uppercase bg-orange-100 px-2 py-0.5 rounded-full">
-                    Instant Unblock
+                    Instant Clearance
                   </span>
                 </div>
                 <div className="font-black text-slate-900 text-sm">
-                  Pay ₹{floatAmount.toLocaleString('en-IN')} via Razorpay
+                  Pay ₹{floatAmount.toLocaleString('en-IN')} via UPI / Razorpay
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  UPI, Cards, Netbanking. Instantly clears your float so you can receive orders.
+                  UPI, Cards, Netbanking. Or simply let upcoming prepaid deliveries automatically offset this cash float.
                 </p>
               </button>
-
-              {/* Option 2: Submit Physical Cash to Regional Admin */}
-              {codStatus?.regionalAdminAvailable ? (
-                <button
-                  type="button"
-                  disabled={isRequestingHandover}
-                  onClick={handleRequestHandover}
-                  className="p-4 rounded-2xl border-2 border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all text-left group cursor-pointer disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="p-2 bg-slate-800 text-white rounded-xl shadow-xs">
-                      <Building2 className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-700 uppercase bg-slate-100 px-2 py-0.5 rounded-full">
-                      Physical Handover
-                    </span>
-                  </div>
-                  <div className="font-black text-slate-900 text-sm">
-                    Submit Cash to Regional Admin
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Hand over physical cash to {codStatus.regionalAdmin?.name || 'Hub Manager'}. Generates a secure 4-digit OTP.
-                  </p>
-                </button>
-              ) : (
-                <div className="p-4 rounded-2xl border-2 border-slate-200 bg-slate-50/80 text-left opacity-80 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 text-slate-400 mb-1">
-                      <Building2 className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Physical Submission</span>
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium mt-1">
-                      No Regional Admin available in your area. Please pay through Razorpay.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-mono text-orange-600 font-bold mt-2">
-                    Online remittance mandatory
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         ) : (
@@ -509,18 +404,36 @@ export const RiderWallet: React.FC = () => {
       <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xs relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-emerald-700">
-              <div className="p-1.5 bg-emerald-50 rounded-lg">
-                <Wallet className="w-4 h-4 text-emerald-600" />
+            <div className={`flex items-center gap-2 ${
+              (liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0 ? 'text-amber-700' : 'text-emerald-700'
+            }`}>
+              <div className={`p-1.5 rounded-lg ${
+                (liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0 ? 'bg-amber-50' : 'bg-emerald-50'
+              }`}>
+                <Wallet className={`w-4 h-4 ${
+                  (liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0 ? 'text-amber-600' : 'text-emerald-600'
+                }`} />
               </div>
-              <span className="text-xs uppercase font-extrabold tracking-wider">Total Available Earnings</span>
+              <span className="text-xs uppercase font-extrabold tracking-wider">
+                {(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0 ? 'Net Wallet Auto-Offset Balance' : 'Total Available Earnings'}
+              </span>
             </div>
-            <div className="flex items-center gap-1 text-3xl sm:text-5xl font-black text-slate-900 mt-2">
-              <IndianRupee className="w-8 h-8 sm:w-11 sm:h-11 text-emerald-600 stroke-[2.5]" />
-              <span>{(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)).toLocaleString('en-IN')}</span>
+            <div className={`flex items-center gap-1 text-3xl sm:text-5xl font-black mt-2 ${
+              (liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0 ? 'text-amber-600' : 'text-slate-900'
+            }`}>
+              <IndianRupee className={`w-8 h-8 sm:w-11 sm:h-11 stroke-[2.5] ${
+                (liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0 ? 'text-amber-600' : 'text-emerald-600'
+              }`} />
+              <span>
+                {(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0
+                  ? `-${Math.abs(Math.round(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0))).toLocaleString('en-IN')}`
+                  : Math.round(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)).toLocaleString('en-IN')}
+              </span>
             </div>
             <p className="text-xs text-slate-500 mt-1.5 font-medium">
-              Credited in real time after every verified OTP customer delivery.
+              {(liveBalance !== null ? liveBalance : (profile?.walletBalance || 0)) < 0
+                ? `You hold ₹${Math.round(floatAmount).toLocaleString('en-IN')} physical cash in your pocket. Upcoming delivery fees automatically recover this negative balance.`
+                : 'Credited in real time after every verified OTP customer delivery.'}
             </p>
           </div>
 

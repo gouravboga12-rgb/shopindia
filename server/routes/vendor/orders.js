@@ -210,6 +210,24 @@ router.delete('/:id', async (req, res) => {
         }
       }
 
+      // Revert rider wallet balance if order was delivered by a rider
+      const linkedDelivery = await tx.delivery.findFirst({ where: { orderId } });
+      if (linkedDelivery && linkedDelivery.riderProfileId && existing.status === 'delivered') {
+        const fee = linkedDelivery.deliveryFee || 20;
+        const wasCash = existing.paymentMethod === 'COD' || existing.paymentMethod === 'cash';
+        const orderCash = Number(existing.total) || 0;
+        const netChange = wasCash && orderCash > 0 ? (fee - orderCash) : fee;
+
+        await tx.riderProfile.update({
+          where: { id: linkedDelivery.riderProfileId },
+          data: {
+            walletBalance: { decrement: netChange },
+            totalDeliveries: { decrement: 1 },
+            ...(wasCash && orderCash > 0 ? { codCashFloat: { decrement: orderCash } } : {}),
+          },
+        }).catch(() => {});
+      }
+
       // Purge related ledger and transaction rows so deleted order completely disappears from wallet history
       await tx.ledgerEntry.deleteMany({ where: { orderId } }).catch(() => {});
       await tx.transaction.deleteMany({ where: { orderId } }).catch(() => {});

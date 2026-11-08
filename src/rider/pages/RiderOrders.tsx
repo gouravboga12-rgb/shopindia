@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
-import { Package, CheckCircle2, Store, MapPin, Banknote, Building2, CreditCard, Clock, RefreshCw } from 'lucide-react';
+import { Package, CheckCircle2, Store, MapPin, Banknote, CreditCard, RefreshCw } from 'lucide-react';
 
 interface HistoryOrder {
   id: string;
@@ -152,7 +152,7 @@ export const RiderOrders: React.FC = () => {
               }`}
             >
               <Banknote className="w-3.5 h-3.5" />
-              <span>COD Clearance Passbook ({codHistory.length})</span>
+              <span>COD Passbook ({codHistory.length})</span>
             </button>
           </div>
 
@@ -181,110 +181,26 @@ export const RiderOrders: React.FC = () => {
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {historyOrders.map((order) => (
-                  <div key={order.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span className="px-1.5 py-0.2 bg-slate-100 text-slate-800 border border-slate-200 font-bold rounded text-[10px] font-mono">
-                          #{(order.orderNumber || '').replace(/^OD-/, '').slice(-4)}
-                        </span>
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[140px] sm:max-w-none">#{order.orderNumber}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5 truncate max-w-[200px] sm:max-w-md">
-                        {order.pickupName} ➔ {order.dropoffName}
-                      </p>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(order.deliveredAt || order.createdAt).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-sm font-black text-emerald-600">+₹{order.deliveryFee}</span>
-                      <span className="block text-[10px] text-slate-400 font-medium">Credited</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: COD CLEARANCE & HANDOVER PASSBOOK */}
-        {activeTab === 'cod_history' && (
-          <div>
-            {loadingCod ? (
-              <div className="py-8 text-center text-slate-400 text-xs">Loading cash clearance passbook...</div>
-            ) : codHistory.length === 0 ? (
-              <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <Banknote className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                <p className="text-xs text-slate-600 font-bold">No COD clearances or handovers recorded yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">When you submit cash to Regional Admin or pay via Razorpay, receipts will appear here.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {codHistory.map((item) => (
-                  <div key={item.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2.5 rounded-xl border shrink-0 ${
-                        item.clearanceMode === 'online'
-                          ? 'bg-blue-50 text-blue-600 border-blue-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>
-                        {item.clearanceMode === 'online' ? <CreditCard className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
-                      </div>
-
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-bold text-slate-900">
-                            {item.clearanceMode === 'online'
-                              ? 'Online Remittance (Razorpay UPI)'
-                              : `Hub Handover: ${item.regionalAdmin?.name || 'Regional Hub Manager'}`}
+                {historyOrders.map((order: any) => {
+                  const orderNo = order.orderNumber || order.order?.orderNumber || order.id || '';
+                  const token = orderNo.replace(/^OD-/, '').slice(-4) || '9786';
+                  return (
+                    <div key={order.id} className="py-3 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-800 border border-slate-200 font-bold rounded text-[10px] font-mono">
+                            #{token}
                           </span>
-                          
-                          {item.status === 'verified' || item.receivedByAdminAt ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Accepted by Hub
-                            </span>
-                          ) : item.clearanceMode === 'online' ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Settled Online
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                              <Clock className="w-3 h-3 animate-pulse text-amber-600" />
-                              Pending Hub Acceptance
-                            </span>
-                          )}
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[140px] sm:max-w-none">
+                            #{orderNo}
+                          </span>
                         </div>
-
-                        {item.regionalAdmin?.hubName && (
-                          <p className="text-[11px] text-slate-500 font-medium">
-                            Hub: {item.regionalAdmin.hubName} {item.regionalAdmin.phone ? `(📞 ${item.regionalAdmin.phone})` : ''}
-                          </p>
-                        )}
-
-                        {item.razorpayPaymentId && (
-                          <p className="text-[10.5px] font-mono text-blue-600">
-                            Payment ID: {item.razorpayPaymentId}
-                          </p>
-                        )}
-
-                        {item.notes && (
-                          <p className="text-[10.5px] text-slate-500 italic">
-                            Note: {item.notes}
-                          </p>
-                        )}
-
-                        <span className="text-[10px] text-slate-400 block">
-                          Submitted on {new Date(item.createdAt).toLocaleString('en-IN', {
+                        <p className="text-xs text-slate-600 mt-0.5 truncate max-w-[200px] sm:max-w-md">
+                          {order.pickupName} ➔ {order.dropoffName}
+                        </p>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(order.deliveredAt || order.createdAt).toLocaleDateString('en-IN', {
                             month: 'short',
                             day: 'numeric',
                             hour: '2-digit',
@@ -292,24 +208,129 @@ export const RiderOrders: React.FC = () => {
                           })}
                         </span>
                       </div>
-                    </div>
 
-                    <div className="text-left sm:text-right shrink-0 pl-11 sm:pl-0">
-                      <span className="text-base font-black text-slate-900 font-mono">
-                        ₹{item.amount.toLocaleString('en-IN')}
-                      </span>
-                      <span className={`block text-[10px] font-bold ${
-                        item.status === 'verified' || item.receivedByAdminAt || item.clearanceMode === 'online'
-                          ? 'text-emerald-600'
-                          : 'text-amber-600'
-                      }`}>
-                        {item.status === 'verified' || item.receivedByAdminAt || item.clearanceMode === 'online'
-                          ? 'Cash Float Decremented'
-                          : 'Awaiting Hub Approval'}
-                      </span>
+                      <div className="text-right">
+                        <span className="text-sm font-black text-emerald-600">+₹{order.deliveryFee}</span>
+                        <span className="block text-[10px] text-slate-400 font-medium">Credited</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: COD STATEMENT PASSBOOK (AUTO-OFFSET ARCHITECTURE) */}
+        {activeTab === 'cod_history' && (
+          <div>
+            {loadingCod ? (
+              <div className="py-8 text-center text-slate-400 text-xs">Loading cash on delivery statement...</div>
+            ) : codHistory.length === 0 ? (
+              <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <Banknote className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-xs text-slate-600 font-bold">No Cash on Delivery entries recorded yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">When you deliver COD orders and collect cash, your collection and auto-offset statements will appear here.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {codHistory.map((item: any) => {
+                  const isCollection = item.entryType === 'cash_collection' || item.clearanceMode === 'customer_cash';
+
+                  return (
+                    <div key={item.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2.5 rounded-xl border shrink-0 ${
+                          isCollection
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {isCollection ? <Banknote className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                        </div>
+
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-bold text-slate-900">
+                              {isCollection ? 'Customer Cash Collected' : 'Online Float Settlement (UPI)'}
+                            </span>
+
+                            {item.token && (
+                              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-900 border border-orange-300 font-black rounded text-[10px] font-mono">
+                                Token: #{item.token}
+                              </span>
+                            )}
+
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${
+                              isCollection
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            }`}>
+                              <CheckCircle2 className="w-3 h-3" />
+                              {item.displayStatus || (isCollection ? 'Cash in Pocket (Auto-Offset)' : 'Settled Online')}
+                            </span>
+                          </div>
+
+                          {item.orderNumber && (
+                            <p className="text-[11px] font-mono text-slate-600 font-bold">
+                              Order #{item.orderNumber}
+                            </p>
+                          )}
+
+                          {item.pickupName && item.dropoffName && (
+                            <p className="text-[11px] text-slate-500 truncate max-w-xs sm:max-w-md">
+                              {item.pickupName} ➔ {item.dropoffName}
+                            </p>
+                          )}
+
+                          {item.razorpayPaymentId && (
+                            <p className="text-[10.5px] font-mono text-blue-600">
+                              Razorpay ID: {item.razorpayPaymentId}
+                            </p>
+                          )}
+
+                          {isCollection && typeof item.feeEarned === 'number' && (
+                            <div className="flex items-center gap-2 text-[10.5px] text-slate-500 font-medium pt-0.5">
+                              <span className="text-emerald-700 font-bold">Fee Earned: +₹{item.feeEarned}</span>
+                              <span>•</span>
+                              <span className="text-amber-800 font-bold">Pocketed Cash: ₹{item.amount}</span>
+                            </div>
+                          )}
+
+                          <span className="text-[10px] text-slate-400 block pt-0.5">
+                            {new Date(item.createdAt).toLocaleString('en-IN', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-left sm:text-right shrink-0 pl-11 sm:pl-0">
+                        {isCollection ? (
+                          <>
+                            <span className="text-base font-black text-amber-700 font-mono">
+                              ₹{Number(item.amount).toLocaleString('en-IN')}
+                            </span>
+                            <span className="block text-[10px] font-bold text-amber-600">
+                              Net Offset: {item.netImpact > 0 ? `+₹${item.netImpact}` : `-₹${Math.abs(item.netImpact)}`}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-base font-black text-emerald-600 font-mono">
+                              +₹{Number(item.amount).toLocaleString('en-IN')}
+                            </span>
+                            <span className="block text-[10px] font-bold text-emerald-600">
+                              Float Decremented
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -211,74 +211,105 @@ router.get('/status', async (req, res) => {
 
 /**
  * GET /api/rider/cod/history
- * Returns full history of rider COD cash remittances:
- * both Online Razorpay clearances and Physical Hub Handovers with status, admin info, and receipt notes.
+ * Returns full Cash on Delivery statement history:
+ * - Customer Cash Collections from delivered COD orders (+cash in pocket, net wallet offset)
+ * - Online settlements via Razorpay UPI (+wallet credit / -float)
  */
 router.get('/history', async (req, res) => {
   try {
     const rider = await prisma.riderProfile.findUnique({
       where: { userId: req.user.userId },
-      select: { id: true },
+      select: { id: true, walletBalance: true, codCashFloat: true },
     });
 
     if (!rider) return res.status(404).json({ error: 'Rider profile not found.' });
 
-    const remittances = await prisma.cODRemittance.findMany({
-      where: { riderProfileId: rider.id },
+    // 1. Fetch all delivered COD orders where physical cash was collected from customer
+    const codDeliveries = await prisma.delivery.findMany({
+      where: {
+        riderProfileId: rider.id,
+        status: 'delivered',
+      },
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            paymentMethod: true,
+            paymentStatus: true,
+          },
+        },
+      },
+      orderBy: { deliveredAt: 'desc' },
+      take: 50,
+    });
+
+    // 2. Fetch online settlements via Razorpay
+    const onlineRemittances = await prisma.cODRemittance.findMany({
+      where: {
+        riderProfileId: rider.id,
+        clearanceMode: 'online',
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
 
-    // Resolve regional admin details if any physical submissions
-    const adminIds = [...new Set(remittances.map((r) => r.regionalAdminId).filter(Boolean))];
-    const admins = adminIds.length > 0
-      ? await prisma.regionalAdminProfile.findMany({
-          where: { id: { in: adminIds } },
-          include: {
-            user: { select: { name: true, phone: true } },
-            branch: { select: { name: true, city: true } },
-          },
-        })
-      : [];
+    // Map customer cash collections into statement items
+    const collectionItems = codDeliveries
+      .filter((d) => d.order && (d.order.paymentMethod === 'COD' || d.order.paymentMethod === 'cash'))
+      .map((d) => {
+        const orderNo = d.order?.orderNumber || d.orderId;
+        const token = orderNo.replace(/^OD-/, '').slice(-4);
+        const cashAmount = Number(d.order?.total) || 0;
+        const feeEarned = Number(d.deliveryFee) || 20;
+        const netImpact = feeEarned - cashAmount;
 
-    const adminMap = {};
-    admins.forEach((a) => {
-      adminMap[a.id] = {
-        name: a.user?.name || 'Regional Hub Admin',
-        phone: a.user?.phone || null,
-        hubName: a.branch?.name || a.regionName || 'Regional Hub',
-      };
+        return {
+          id: `col-${d.id}`,
+          entryType: 'cash_collection',
+          title: 'Customer Cash Collected',
+          orderNumber: orderNo,
+          token,
+          amount: cashAmount,
+          feeEarned,
+          netImpact,
+          clearanceMode: 'customer_cash',
+          status: 'collected',
+          displayStatus: 'Cash in Pocket (Auto-Offset)',
+          statusColor: 'amber',
+          createdAt: d.deliveredAt || d.createdAt,
+          pickupName: d.pickupName,
+          dropoffName: d.dropoffName,
+        };
+      });
+
+    // Map online Razorpay settlements into statement items
+    const onlineItems = onlineRemittances.map((r) => ({
+      id: `rem-${r.id}`,
+      entryType: 'online_settlement',
+      title: 'Online Float Clearance (Razorpay UPI)',
+      amount: r.amount,
+      clearanceMode: 'online',
+      status: 'verified',
+      displayStatus: 'Settled Online',
+      statusColor: 'emerald',
+      createdAt: r.createdAt,
+      razorpayPaymentId: r.razorpayPaymentId,
+      notes: r.notes,
+    }));
+
+    // Combine and sort chronologically (most recent first)
+    const combinedHistory = [...collectionItems, ...onlineItems].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    res.json({
+      success: true,
+      history: combinedHistory,
+      floatAmount: rider.codCashFloat || 0,
+      walletBalance: rider.walletBalance || 0,
     });
-
-    const history = remittances.map((r) => {
-      const admin = r.regionalAdminId ? adminMap[r.regionalAdminId] : null;
-      let displayStatus = 'Pending Hub Approval';
-      let statusColor = 'amber';
-
-      if (r.clearanceMode === 'online') {
-        displayStatus = 'Paid Online (Razorpay)';
-        statusColor = 'emerald';
-      } else if (r.status === 'verified' || r.receivedByAdminAt) {
-        displayStatus = 'Cash Accepted by Hub';
-        statusColor = 'emerald';
-      }
-
-      return {
-        id: r.id,
-        amount: r.amount,
-        clearanceMode: r.clearanceMode,
-        status: r.status,
-        displayStatus,
-        statusColor,
-        createdAt: r.createdAt,
-        receivedByAdminAt: r.receivedByAdminAt,
-        razorpayPaymentId: r.razorpayPaymentId,
-        notes: r.notes,
-        regionalAdmin: admin,
-      };
-    });
-
-    res.json({ success: true, history });
   } catch (err) {
     console.error('[Rider COD History] Error:', err);
     res.status(500).json({ error: err.message });

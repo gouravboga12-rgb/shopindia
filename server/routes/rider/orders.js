@@ -452,12 +452,19 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
         },
       });
 
-      // Rider Wallet Balance ALWAYS credits guaranteed delivery fee earnings.
-      // Physical cash collected from customer is tracked cleanly in codCashFloat.
+      // Unified Net Wallet Auto-Offset Architecture (Swiggy / Zomato Model):
+      // - If rider collected cash, they pocket the physical cash (e.g. ₹110).
+      //   Net wallet change is +feeToCredit - orderCash (e.g. +20 - 110 = -90).
+      // - If prepaid / Razorpay, net change is purely +feeToCredit (e.g. +30).
+      //   This automatically pays down negative wallet balances across subsequent deliveries.
+      const netWalletChange = isCollectedCash && orderCash > 0
+        ? (feeToCredit - orderCash)
+        : feeToCredit;
+
       await tx.riderProfile.update({
         where: { id: profile.id },
         data: {
-          walletBalance: { increment: feeToCredit },
+          walletBalance: { increment: netWalletChange },
           totalDeliveries: { increment: 1 },
           ...(isCollectedCash && orderCash > 0 ? { codCashFloat: { increment: orderCash } } : {}),
         },
@@ -568,7 +575,12 @@ router.get(['/history', '/orders/history'], async (req, res) => {
       take: 50,
     });
 
-    res.json({ history });
+    const formattedHistory = history.map((d) => ({
+      ...d,
+      orderNumber: d.order?.orderNumber || d.orderId,
+    }));
+
+    res.json({ history: formattedHistory });
   } catch (err) {
     console.error('Fetch order history error:', err);
     res.status(500).json({ error: err.message });

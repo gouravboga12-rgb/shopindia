@@ -914,4 +914,27 @@ router.post('/partner/toggle-suspend', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/admin/payouts/:id
+ * Permanently deletes an obsolete, rejected, or test payout request record.
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.payoutRequest.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Payout request not found.' });
+
+    await prisma.$transaction(async (tx) => {
+      // Clean up linked RiderPayout or Vendor ledger references if any
+      await tx.riderPayout.deleteMany({ where: { id } }).catch(() => {});
+      await tx.payoutRequest.delete({ where: { id } });
+    });
+
+    res.json({ success: true, message: 'Payout request deleted successfully.' });
+  } catch (err) {
+    console.error('[Admin Payout Delete] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

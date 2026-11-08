@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   Wallet, CheckCircle2, XCircle, Clock, AlertTriangle,
   RefreshCw, ShieldCheck, Zap, Calendar, Bike, Wrench, Sparkles,
-  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText
+  Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText, Trash2
 } from 'lucide-react';
 
 interface PayoutRequestItem {
@@ -188,6 +188,19 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
     } finally {
       setSuspending(false);
       setSuspendTarget(null);
+    }
+  };
+
+  const handleDeletePayout = async (id: string) => {
+    if (!window.confirm('Are you sure you want to permanently delete this payout record?')) return;
+    try {
+      const res: any = await api.delete(`/api/admin/payouts/${id}`);
+      if (res?.success) {
+        setActionMessage({ text: 'Payout record deleted successfully.' });
+        loadPayouts();
+      }
+    } catch (err: any) {
+      setActionMessage({ text: err.message || 'Failed to delete payout.', isError: true });
     }
   };
 
@@ -649,6 +662,15 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                               {user?.status === 'suspended' ? 'Reactivate' : 'Suspend'}
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePayout(req.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Payout Record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

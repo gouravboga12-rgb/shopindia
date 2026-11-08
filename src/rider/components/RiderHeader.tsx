@@ -121,11 +121,19 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
             </button>
           )}
 
-          {/* Wallet Balance Pill */}
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-emerald-200/80 shadow-2xs">
-            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
-            <span className="text-xs sm:text-sm font-black text-emerald-700">
-              ₹{(profile?.walletBalance || 0).toLocaleString('en-IN')}
+          {/* Wallet Balance Pill (Handles Auto-Offset Net Balance) */}
+          <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-2xs ${
+            (profile?.walletBalance || 0) < 0
+              ? 'bg-amber-50 border-amber-300 text-amber-800'
+              : 'bg-emerald-50 border-emerald-200/80 text-emerald-700'
+          }`}>
+            <Wallet className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+              (profile?.walletBalance || 0) < 0 ? 'text-amber-600' : 'text-emerald-600'
+            }`} />
+            <span className="text-xs sm:text-sm font-black">
+              {(profile?.walletBalance || 0) < 0
+                ? `-₹${Math.abs(Math.round(profile?.walletBalance || 0)).toLocaleString('en-IN')}`
+                : `₹${Math.round(profile?.walletBalance || 0).toLocaleString('en-IN')}`}
             </span>
           </div>
 
