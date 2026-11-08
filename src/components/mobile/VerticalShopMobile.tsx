@@ -120,7 +120,7 @@ const REFERENCE_CATEGORIES = [
 export const VerticalShopMobile: React.FC = () => {
   const { navigateTo, setSearchQuery, addToCart, setCurrentVertical } = useApp();
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [currentSlide, setCurrentSlide] = useState(0);
   const [banners, setBanners] = useState<any[]>([]);
   const [dealsConfig, setDealsConfig] = useState<{
@@ -188,10 +188,11 @@ export const VerticalShopMobile: React.FC = () => {
       }
 
       const diff = Math.max(0, targetTime - now.getTime());
-      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ hours, minutes, seconds });
+      setTimeLeft({ days, hours, minutes, seconds });
     };
 
     calculateTime();
@@ -300,7 +301,10 @@ export const VerticalShopMobile: React.FC = () => {
               {dealsConfig.showTimer !== false && (
                 <div className="flex items-center gap-1 text-[8.5px] text-brand-red font-black bg-red-50 border border-brand-red/10 px-2 py-0.5 rounded-full font-numbers">
                   <Clock size={8} />
-                  <span>{formatNumber(timeLeft.hours)}h {formatNumber(timeLeft.minutes)}m {formatNumber(timeLeft.seconds)}s</span>
+                  <span>
+                    {timeLeft.days > 0 ? `${timeLeft.days}d ` : ''}
+                    {formatNumber(timeLeft.hours)}h {formatNumber(timeLeft.minutes)}m {formatNumber(timeLeft.seconds)}s
+                  </span>
                 </div>
               )}
             </div>

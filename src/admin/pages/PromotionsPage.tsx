@@ -50,7 +50,7 @@ export const PromotionsPage: React.FC = () => {
     badge: 'Limited Offer',
     productIds: []
   });
-  const [adminCountdown, setAdminCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [adminCountdown, setAdminCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [savingDeals, setSavingDeals] = useState(false);
   const [dealsSavedSuccess, setDealsSavedSuccess] = useState(false);
@@ -70,10 +70,11 @@ export const PromotionsPage: React.FC = () => {
       }
 
       const diff = Math.max(0, targetTime - now.getTime());
-      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setAdminCountdown({ hours, minutes, seconds });
+      setAdminCountdown({ days, hours, minutes, seconds });
     };
 
     calculateRemaining();
@@ -614,6 +615,14 @@ export const PromotionsPage: React.FC = () => {
                       <span className="text-xs font-bold text-slate-700">Live Storefront Countdown Preview:</span>
                     </div>
                     <div className="flex items-center gap-2 font-mono font-black text-sm text-slate-900">
+                      {adminCountdown.days > 0 && (
+                        <>
+                          <span className="px-2 py-0.5 bg-slate-900 text-white rounded-md">
+                            {adminCountdown.days}d
+                          </span>
+                          <span>:</span>
+                        </>
+                      )}
                       <span className="px-2 py-0.5 bg-slate-900 text-white rounded-md">
                         {String(adminCountdown.hours).padStart(2, '0')}h
                       </span>

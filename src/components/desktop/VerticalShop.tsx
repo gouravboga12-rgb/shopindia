@@ -29,7 +29,7 @@ export const VerticalShop: React.FC = () => {
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
   const { products, loading: productsLoading } = useProducts();
   const { categories } = useCategories();
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHoveringCarousel, setIsHoveringCarousel] = useState(false);
   const [banners, setBanners] = useState<any[]>([]);
@@ -201,10 +201,11 @@ export const VerticalShop: React.FC = () => {
       }
 
       const diff = Math.max(0, targetTime - now.getTime());
-      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ hours, minutes, seconds });
+      setTimeLeft({ days, hours, minutes, seconds });
     };
 
     calculateTime();
@@ -640,26 +641,37 @@ export const VerticalShop: React.FC = () => {
 
               {/* Monospaced Digit blocks (rendered only if showTimer is enabled) */}
               {dealsConfig.showTimer !== false ? (
-                <div className="flex items-center gap-2 mb-7 font-numbers text-xs font-bold select-none">
+                <div className="flex items-center gap-1.5 mb-7 font-numbers text-xs font-bold select-none">
+                  {timeLeft.days > 0 && (
+                    <>
+                      <div className="flex flex-col items-center">
+                        <span className="w-8 h-8 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-xs font-bold leading-none">
+                          {formatNumber(timeLeft.days)}
+                        </span>
+                        <span className="text-[7px] uppercase font-bold tracking-wider text-brand-slate mt-1">Days</span>
+                      </div>
+                      <span className="text-brand-slate font-bold mb-3">:</span>
+                    </>
+                  )}
                   <div className="flex flex-col items-center">
-                    <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                    <span className="w-8 h-8 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-xs font-bold leading-none">
                       {formatNumber(timeLeft.hours)}
                     </span>
-                    <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Hours</span>
+                    <span className="text-[7px] uppercase font-bold tracking-wider text-brand-slate mt-1">Hours</span>
                   </div>
-                  <span className="text-brand-slate font-bold mb-4">:</span>
+                  <span className="text-brand-slate font-bold mb-3">:</span>
                   <div className="flex flex-col items-center">
-                    <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                    <span className="w-8 h-8 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-xs font-bold leading-none">
                       {formatNumber(timeLeft.minutes)}
                     </span>
-                    <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Mins</span>
+                    <span className="text-[7px] uppercase font-bold tracking-wider text-brand-slate mt-1">Mins</span>
                   </div>
-                  <span className="text-brand-slate font-bold mb-4">:</span>
+                  <span className="text-brand-slate font-bold mb-3">:</span>
                   <div className="flex flex-col items-center">
-                    <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                    <span className="w-8 h-8 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-xs font-bold leading-none">
                       {formatNumber(timeLeft.seconds)}
                     </span>
-                    <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Secs</span>
+                    <span className="text-[7px] uppercase font-bold tracking-wider text-brand-slate mt-1">Secs</span>
                   </div>
                 </div>
               ) : (
