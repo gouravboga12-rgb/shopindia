@@ -64,10 +64,17 @@ router.get('/deals-of-the-day', async (req, res) => {
 
       deals = {
         isActive: true,
+        showTimer: true,
+        timerMode: 'midnight',
+        customEndTime: '',
         title: 'Deals of the Day',
         badge: 'Limited Offer',
         productIds: defaultShopProducts.map(p => p.id)
       };
+    } else {
+      deals.showTimer = deals.showTimer !== false;
+      deals.timerMode = deals.timerMode || 'midnight';
+      deals.customEndTime = deals.customEndTime || '';
     }
     res.json({ deals });
   } catch (error) {

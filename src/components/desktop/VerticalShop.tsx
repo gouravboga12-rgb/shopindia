@@ -29,7 +29,7 @@ export const VerticalShop: React.FC = () => {
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
   const { products, loading: productsLoading } = useProducts();
   const { categories } = useCategories();
-  const [timeLeft, setTimeLeft] = useState({ hours: 14, minutes: 32, seconds: 45 });
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHoveringCarousel, setIsHoveringCarousel] = useState(false);
   const [banners, setBanners] = useState<any[]>([]);
@@ -48,11 +48,17 @@ export const VerticalShop: React.FC = () => {
   const [apiBrands, setApiBrands] = useState<Array<{ id?: string; name: string; logo: string | null; isFeatured?: boolean }>>([]);
   const [dealsConfig, setDealsConfig] = useState<{
     isActive: boolean;
+    showTimer?: boolean;
+    timerMode?: 'midnight' | 'custom';
+    customEndTime?: string;
     title: string;
     badge: string;
     productIds: string[];
   }>({
     isActive: true,
+    showTimer: true,
+    timerMode: 'midnight',
+    customEndTime: '',
     title: 'Deals of the Day',
     badge: 'Limited Offer',
     productIds: []
@@ -182,23 +188,29 @@ export const VerticalShop: React.FC = () => {
     return () => clearInterval(timer);
   }, [isHoveringCarousel, banners.length]);
 
-  // Deals countdown timer
+  // Authentic Deals countdown timer (calculates genuine real-world remaining time)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { hours: prev.hours, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        } else {
-          return { hours: 23, minutes: 59, seconds: 59 }; // reset
-        }
-      });
-    }, 1000);
+    const calculateTime = () => {
+      const now = new Date();
+      let targetTime = 0;
+      if (dealsConfig.timerMode === 'custom' && dealsConfig.customEndTime) {
+        targetTime = new Date(dealsConfig.customEndTime).getTime();
+      } else {
+        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        targetTime = midnight.getTime();
+      }
+
+      const diff = Math.max(0, targetTime - now.getTime());
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ hours, minutes, seconds });
+    };
+
+    calculateTime();
+    const timer = setInterval(calculateTime, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [dealsConfig.timerMode, dealsConfig.customEndTime]);
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
 
@@ -626,29 +638,35 @@ export const VerticalShop: React.FC = () => {
                 {dealsConfig.title || 'Deals of the Day'}
               </h3>
 
-              {/* Monospaced Digit blocks */}
-              <div className="flex items-center gap-2 mb-7 font-numbers text-xs font-bold select-none">
-                <div className="flex flex-col items-center">
-                  <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
-                    {formatNumber(timeLeft.hours)}
-                  </span>
-                  <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Hours</span>
+              {/* Monospaced Digit blocks (rendered only if showTimer is enabled) */}
+              {dealsConfig.showTimer !== false ? (
+                <div className="flex items-center gap-2 mb-7 font-numbers text-xs font-bold select-none">
+                  <div className="flex flex-col items-center">
+                    <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                      {formatNumber(timeLeft.hours)}
+                    </span>
+                    <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Hours</span>
+                  </div>
+                  <span className="text-brand-slate font-bold mb-4">:</span>
+                  <div className="flex flex-col items-center">
+                    <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                      {formatNumber(timeLeft.minutes)}
+                    </span>
+                    <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Mins</span>
+                  </div>
+                  <span className="text-brand-slate font-bold mb-4">:</span>
+                  <div className="flex flex-col items-center">
+                    <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                      {formatNumber(timeLeft.seconds)}
+                    </span>
+                    <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Secs</span>
+                  </div>
                 </div>
-                <span className="text-brand-slate font-bold mb-4">:</span>
-                <div className="flex flex-col items-center">
-                  <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
-                    {formatNumber(timeLeft.minutes)}
-                  </span>
-                  <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Mins</span>
-                </div>
-                <span className="text-brand-slate font-bold mb-4">:</span>
-                <div className="flex flex-col items-center">
-                  <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
-                    {formatNumber(timeLeft.seconds)}
-                  </span>
-                  <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Secs</span>
-                </div>
-              </div>
+              ) : (
+                <p className="text-[11px] text-brand-slate font-medium mb-7 max-w-[200px]">
+                  Curated daily offers verified directly with top brands.
+                </p>
+              )}
 
               <motion.button
                 whileTap={{ scale: 0.95 }}

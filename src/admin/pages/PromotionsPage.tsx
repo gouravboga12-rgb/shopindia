@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   Image as ImageIcon, Plus, Trash2, Power, Eye, Check, Sparkles, Award,
-  Zap, ArrowUp, ArrowDown, Search, X, CheckCircle2, ShoppingBag
+  Zap, ArrowUp, ArrowDown, Search, X, CheckCircle2, ShoppingBag, Clock
 } from 'lucide-react';
 
 export const PromotionsPage: React.FC = () => {
@@ -35,20 +35,51 @@ export const PromotionsPage: React.FC = () => {
   // Deals of the Day (Limited Offer) State
   const [dealsForm, setDealsForm] = useState<{
     isActive: boolean;
+    showTimer: boolean;
+    timerMode: 'midnight' | 'custom';
+    customEndTime: string;
     title: string;
     badge: string;
     productIds: string[];
   }>({
     isActive: true,
+    showTimer: true,
+    timerMode: 'midnight',
+    customEndTime: '',
     title: 'Deals of the Day',
     badge: 'Limited Offer',
     productIds: []
   });
+  const [adminCountdown, setAdminCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [savingDeals, setSavingDeals] = useState(false);
   const [dealsSavedSuccess, setDealsSavedSuccess] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
+
+  // Live real-time ticking timer for Super Admin preview
+  useEffect(() => {
+    const calculateRemaining = () => {
+      const now = new Date();
+      let targetTime = 0;
+      if (dealsForm.timerMode === 'custom' && dealsForm.customEndTime) {
+        targetTime = new Date(dealsForm.customEndTime).getTime();
+      } else {
+        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        targetTime = midnight.getTime();
+      }
+
+      const diff = Math.max(0, targetTime - now.getTime());
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setAdminCountdown({ hours, minutes, seconds });
+    };
+
+    calculateRemaining();
+    const interval = setInterval(calculateRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [dealsForm.timerMode, dealsForm.customEndTime]);
 
   const load = () => {
     setLoading(true);
@@ -67,6 +98,9 @@ export const PromotionsPage: React.FC = () => {
         if (dealsRes?.deals) {
           setDealsForm({
             isActive: dealsRes.deals.isActive !== false,
+            showTimer: dealsRes.deals.showTimer !== false,
+            timerMode: dealsRes.deals.timerMode || 'midnight',
+            customEndTime: dealsRes.deals.customEndTime || '',
             title: dealsRes.deals.title || 'Deals of the Day',
             badge: dealsRes.deals.badge || 'Limited Offer',
             productIds: Array.isArray(dealsRes.deals.productIds) ? dealsRes.deals.productIds : []
@@ -472,10 +506,46 @@ export const PromotionsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Carousel Controls */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-4">
-              <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Carousel Display Settings</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Carousel & Timer Controls */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Carousel & Countdown Timer Controls</h3>
+                  <p className="text-[11px] text-slate-400">Configure genuine deal timers, visibility, and section titles</p>
+                </div>
+              </div>
+
+              {/* Toggles Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100/70 rounded-2xl border border-slate-200/80 cursor-pointer transition-colors">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Display Carousel on Storefront</span>
+                    <span className="text-[10px] text-slate-400">When toggled off, the entire deals section is hidden from shoppers</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={dealsForm.isActive}
+                    onChange={e => setDealsForm({ ...dealsForm, isActive: e.target.checked })}
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100/70 rounded-2xl border border-slate-200/80 cursor-pointer transition-colors">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Display Countdown Timer</span>
+                    <span className="text-[10px] text-slate-400">When toggled off, deals are shown without an urgency countdown clock</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={dealsForm.showTimer}
+                    onChange={e => setDealsForm({ ...dealsForm, showTimer: e.target.checked })}
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                  />
+                </label>
+              </div>
+
+              {/* Title & Badge */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Section Title</label>
                   <input
@@ -483,7 +553,7 @@ export const PromotionsPage: React.FC = () => {
                     value={dealsForm.title}
                     onChange={e => setDealsForm({ ...dealsForm, title: e.target.value })}
                     placeholder="e.g. Deals of the Day / Mega Flash Sale"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
                 <div>
@@ -493,24 +563,73 @@ export const PromotionsPage: React.FC = () => {
                     value={dealsForm.badge}
                     onChange={e => setDealsForm({ ...dealsForm, badge: e.target.value })}
                     placeholder="e.g. Limited Offer / 24H Only"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <div className="flex flex-col justify-end">
-                  <label className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={dealsForm.isActive}
-                      onChange={e => setDealsForm({ ...dealsForm, isActive: e.target.checked })}
-                      className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-slate-800">Display Carousel on Storefront</span>
-                      <p className="text-[10px] text-slate-400">Uncheck to hide Deals of the Day completely</p>
-                    </div>
-                  </label>
-                </div>
               </div>
+
+              {/* Timer Settings (Visible only when showTimer is true) */}
+              {dealsForm.showTimer && (
+                <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200/70 space-y-4">
+                  <div className="flex items-center gap-2 text-orange-950 font-bold text-xs">
+                    <Clock className="w-4 h-4 text-orange-600" />
+                    <span>Real-Time Countdown Configuration</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Timer Expiry Mode</label>
+                      <select
+                        value={dealsForm.timerMode}
+                        onChange={e => setDealsForm({ ...dealsForm, timerMode: e.target.value as any })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                      >
+                        <option value="midnight">⏰ Daily Midnight Reset (Ends at 23:59:59 IST every night)</option>
+                        <option value="custom">📅 Custom End Date & Time (Specific campaign deadline)</option>
+                      </select>
+                      <span className="text-[10px] text-slate-500 mt-1 block">
+                        {dealsForm.timerMode === 'midnight'
+                          ? 'Automated 24-hour cycle. Resets authentically at midnight every day.'
+                          : 'Set an exact deadline. Countdown stops when the deadline is reached.'}
+                      </span>
+                    </div>
+
+                    {dealsForm.timerMode === 'custom' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Custom Expiry Date & Time</label>
+                        <input
+                          type="datetime-local"
+                          value={dealsForm.customEndTime}
+                          onChange={e => setDealsForm({ ...dealsForm, customEndTime: e.target.value })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Live Super Admin Timer Preview */}
+                  <div className="p-3 bg-white rounded-xl border border-orange-200/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <span className="text-xs font-bold text-slate-700">Live Storefront Countdown Preview:</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono font-black text-sm text-slate-900">
+                      <span className="px-2 py-0.5 bg-slate-900 text-white rounded-md">
+                        {String(adminCountdown.hours).padStart(2, '0')}h
+                      </span>
+                      <span>:</span>
+                      <span className="px-2 py-0.5 bg-slate-900 text-white rounded-md">
+                        {String(adminCountdown.minutes).padStart(2, '0')}m
+                      </span>
+                      <span>:</span>
+                      <span className="px-2 py-0.5 bg-slate-900 text-white rounded-md">
+                        {String(adminCountdown.seconds).padStart(2, '0')}s
+                      </span>
+                      <span className="text-[10px] font-sans font-bold text-orange-600 ml-1">remaining</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Handpicked Products List */}

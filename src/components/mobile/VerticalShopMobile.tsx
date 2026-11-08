@@ -120,16 +120,22 @@ const REFERENCE_CATEGORIES = [
 export const VerticalShopMobile: React.FC = () => {
   const { navigateTo, setSearchQuery, addToCart, setCurrentVertical } = useApp();
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
-  const [timeLeft, setTimeLeft] = useState({ hours: 12, minutes: 44, seconds: 12 });
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [currentSlide, setCurrentSlide] = useState(0);
   const [banners, setBanners] = useState<any[]>([]);
   const [dealsConfig, setDealsConfig] = useState<{
     isActive: boolean;
+    showTimer?: boolean;
+    timerMode?: 'midnight' | 'custom';
+    customEndTime?: string;
     title: string;
     badge: string;
     productIds: string[];
   }>({
     isActive: true,
+    showTimer: true,
+    timerMode: 'midnight',
+    customEndTime: '',
     title: 'Deals of the Day',
     badge: 'Limited Offer',
     productIds: []
@@ -169,18 +175,29 @@ export const VerticalShopMobile: React.FC = () => {
     return () => clearInterval(timer);
   }, [banners.length]);
 
-  // Deals countdown timer
+  // Authentic Deals countdown timer (calculates genuine real-world remaining time)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-        if (prev.minutes > 0) return { hours: prev.hours, minutes: prev.minutes - 1, seconds: 59 };
-        if (prev.hours > 0) return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        return { hours: 12, minutes: 0, seconds: 0 };
-      });
-    }, 1000);
+    const calculateTime = () => {
+      const now = new Date();
+      let targetTime = 0;
+      if (dealsConfig.timerMode === 'custom' && dealsConfig.customEndTime) {
+        targetTime = new Date(dealsConfig.customEndTime).getTime();
+      } else {
+        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        targetTime = midnight.getTime();
+      }
+
+      const diff = Math.max(0, targetTime - now.getTime());
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ hours, minutes, seconds });
+    };
+
+    calculateTime();
+    const timer = setInterval(calculateTime, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [dealsConfig.timerMode, dealsConfig.customEndTime]);
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -280,10 +297,12 @@ export const VerticalShopMobile: React.FC = () => {
               <span className="text-xs font-black text-brand-graphite uppercase tracking-wide font-heading">
                 {dealsConfig.title || 'Deals of the Day'}
               </span>
-              <div className="flex items-center gap-1 text-[8.5px] text-brand-red font-black bg-red-50 border border-brand-red/10 px-2 py-0.5 rounded-full font-numbers">
-                <Clock size={8} />
-                <span>{formatNumber(timeLeft.hours)}h {formatNumber(timeLeft.minutes)}m {formatNumber(timeLeft.seconds)}s</span>
-              </div>
+              {dealsConfig.showTimer !== false && (
+                <div className="flex items-center gap-1 text-[8.5px] text-brand-red font-black bg-red-50 border border-brand-red/10 px-2 py-0.5 rounded-full font-numbers">
+                  <Clock size={8} />
+                  <span>{formatNumber(timeLeft.hours)}h {formatNumber(timeLeft.minutes)}m {formatNumber(timeLeft.seconds)}s</span>
+                </div>
+              )}
             </div>
             <button
               onClick={() => navigateTo('search')}

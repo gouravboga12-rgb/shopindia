@@ -180,6 +180,9 @@ router.get('/deals', async (req, res) => {
 
       deals = {
         isActive: deals ? deals.isActive !== false : true,
+        showTimer: deals ? deals.showTimer !== false : true,
+        timerMode: deals?.timerMode || 'midnight',
+        customEndTime: deals?.customEndTime || '',
         title: deals?.title || 'Deals of the Day',
         badge: deals?.badge || 'Limited Offer',
         productIds: initialProductIds
@@ -197,6 +200,12 @@ router.get('/deals', async (req, res) => {
           }
         }).catch(err => console.warn('Failed to persist default deals:', err.message));
       }
+    }
+
+    if (deals) {
+      deals.showTimer = deals.showTimer !== false;
+      deals.timerMode = deals.timerMode || 'midnight';
+      deals.customEndTime = deals.customEndTime || '';
     }
 
     res.json({ deals });
