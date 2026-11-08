@@ -3,22 +3,26 @@ import { PageHeader, PrimaryButton, fieldCls, selectCls, Badge } from '../../com
 import { 
   MessageSquare, Mail, Phone, ChevronDown, LifeBuoy, 
   Send, Ticket, CheckCircle2, Bot, ArrowLeft, RefreshCw,
-  Sparkles, Package
+  Sparkles, Package, FileText, Clock
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useApp } from '../../context/AppContext';
 import { useCustomer } from '../../context/CustomerContext';
 
-const FAQS = [
-  { q: 'How do I track my order or service booking?', a: 'Head to My Orders / Bookings in your dashboard. Each order has a live tracking timeline with technician or delivery updates.' },
-  { q: 'What is your return & cancellation policy?', a: 'You can request a return for delivered items within 7 days. Service bookings can be rescheduled or cancelled free of charge up to 2 hours prior to the slot.' },
-  { q: 'How do I apply a coupon or voucher?', a: 'Add a coupon code at cart checkout. Active coupons are listed under Coupons & Rewards.' },
-  { q: 'Can I change my delivery address or booking time after ordering?', a: 'Yes — before your item ships or technician departs. Contact support from this page or raise a ticket and we will update it immediately.' },
-  { q: 'Is there a warranty on technician repairs?', a: 'Yes! All services booked on ShopIndia include a 30-Day Service Warranty with free technician revisit for complete peace of mind.' }
+const INITIAL_FAQS = [
+  { q: 'When will my Shop India order be delivered?', a: 'Standard Shop India orders are dispatched via our verified logistics partners and delivered within 2 to 5 business working days depending on your pin code. Live tracking is available in My Orders.' },
+  { q: 'How fast is Quick Shopping delivery?', a: 'Quick Shopping grocery and food orders are delivered within 10 to 20 minutes from our nearest local dark stores and vendor hubs by dedicated express riders.' },
+  { q: 'Is there a warranty or guarantee on Glacons repairs?', a: 'Yes! All services booked on ShopIndia include a 30-Day Guarantee with free technician revisit for complete peace of mind.' },
+  { q: 'How long does a refund take to reflect in my account?', a: 'Once approved, refunds are credited back to your original payment method (UPI / Cards / Netbanking) within 2 to 4 business working days.' },
+  { q: 'How do I escalate an issue to Shop India superiors?', a: 'Submit your complaint using the "Raise a Support Ticket" form on the left. Higher-level support executives and desk supervisors review all escalated tickets and resolve them within 2 to 4 business working days.' }
 ];
 
 const INITIAL_CHAT = [
-  { from: 'agent', text: 'Hi! 👋 Welcome to ShopIndia Live Support. How can we help you today?' },
+  { 
+    from: 'agent', 
+    senderLabel: 'ShopIndia Assistant',
+    text: 'Hi! 👋 Welcome to ShopIndia Support Chat.\n\nYou can select any common question below regarding Shop India (2–5 day delivery), Quick Shopping (10–20 min delivery), Glacons Services (30-day guarantee), or Refunds (2–4 business days), or raise an official support ticket directly on the left.' 
+  },
 ];
 
 export const SupportCenterPage: React.FC = () => {
@@ -54,18 +58,56 @@ export const SupportCenterPage: React.FC = () => {
   const [connectedAgentName, setConnectedAgentName] = useState<string | null>(null);
   const [liveSessionNumber, setLiveSessionNumber] = useState<string | null>(null);
 
+  // Dynamic FAQs from Backend
+  const [faqsList, setFaqsList] = useState<any[]>([]);
+  const [faqCategories, setFaqCategories] = useState<string[]>([
+    'All',
+    'Shop India',
+    'Quick Shopping',
+    'Glacons Services',
+    'Refunds & Payments',
+    'Superiors & Tickets'
+  ]);
+  const [selectedFaqCat, setSelectedFaqCat] = useState('All');
+
   // FAQ Accordion State
   const [faqOpen, setFaqOpen] = useState<string | null>(null);
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  // Form highlighting and ticket redirection state
+  const [highlightForm, setHighlightForm] = useState(false);
+  const ticketSectionRef = useRef<HTMLDivElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+
+  // Dedicated Chat container ref to eliminate window jumping
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
   const selectedOrder = orders?.find(o => o.id === ticketForm.orderId);
 
-  // Auto-scroll chat
+  // Focus Ticket Form and pre-populate if needed
+  const handleFocusTicketForm = (subject?: string, category?: string) => {
+    if (subject) {
+      setTicketForm(prev => ({ ...prev, subject }));
+    }
+    if (category) {
+      setTicketForm(prev => ({ ...prev, category }));
+    }
+    setHighlightForm(true);
+    ticketSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      subjectInputRef.current?.focus();
+    }, 350);
+    setTimeout(() => {
+      setHighlightForm(false);
+    }, 2800);
+  };
+
+  // Strictly container-scoped scroll — ZERO window jumping!
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chat, isTyping]);
 
   // Auto-scroll active ticket thread
@@ -88,6 +130,26 @@ export const SupportCenterPage: React.FC = () => {
 
   useEffect(() => {
     loadTickets();
+  }, []);
+
+  // Load dynamic FAQs from API
+  const loadFaqs = async () => {
+    try {
+      const res = await api.get<{ faqs: any[] }>('/api/support/faqs');
+      if (res?.faqs && Array.isArray(res.faqs) && res.faqs.length > 0) {
+        setFaqsList(res.faqs);
+        const categories = Array.from(new Set(res.faqs.map(f => f.category).filter(Boolean)));
+        if (categories.length > 0) {
+          setFaqCategories(['All', ...categories]);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load dynamic FAQs:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadFaqs();
   }, []);
 
   // Load persistent chat history from database
@@ -295,8 +357,8 @@ export const SupportCenterPage: React.FC = () => {
     }
   };
 
-  // Send message in Live Chat
-  const sendChat = async (e?: React.FormEvent, directQuery?: string) => {
+  // Send message in Support Chat
+  const sendChat = async (e?: React.FormEvent, directQuery?: string, instantAnswer?: string, canRaiseTicket?: boolean, _ticketSubject?: string) => {
     if (e) e.preventDefault();
     const q = (directQuery || chatInput).trim();
     if (!q) return;
@@ -304,6 +366,28 @@ export const SupportCenterPage: React.FC = () => {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setChat((c) => [...c, { from: 'me', text: q, time }]);
     setChatInput('');
+
+    // If we have an instant verified FAQ answer, show it immediately!
+    if (instantAnswer) {
+      let fullAnswer = instantAnswer;
+      if (canRaiseTicket && !fullAnswer.includes('Raise a Support Ticket') && !fullAnswer.includes('raise a ticket')) {
+        fullAnswer += `\n\n📌 Need further assistance? You can submit an official complaint on the left panel. Our superiors will review and resolve it within 2 to 4 business working days.`;
+      }
+      setChat((c) => [
+        ...c,
+        {
+          from: 'agent',
+          senderLabel: 'ShopIndia Assistant',
+          text: fullAnswer,
+          time
+        }
+      ]);
+
+      // Silently record to backend in background
+      api.post('/api/support/chat', { query: q }).catch(() => {});
+      return;
+    }
+
     setIsTyping(true);
 
     try {
@@ -321,7 +405,7 @@ export const SupportCenterPage: React.FC = () => {
         { 
           from: 'agent', 
           senderLabel: res.isEscalated ? 'Support Desk' : 'ShopIndia Assistant',
-          text: res.answer || 'Thank you for contacting ShopIndia Support. A specialist is on standby to assist.',
+          text: res.answer || 'Thank you for contacting ShopIndia Support. You can select any question below or submit a support ticket on the left.',
           time: res.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -339,7 +423,7 @@ export const SupportCenterPage: React.FC = () => {
         { 
           from: 'agent', 
           senderLabel: 'ShopIndia Assistant',
-          text: 'Thanks for reaching out! If your query requires specialized assistance, you can also Raise a Support Ticket on the left.',
+          text: 'Thanks for reaching out! You can choose any common question below or submit an official complaint using the "Raise a Support Ticket" form on the left (SLA: 2–4 business working days).',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -355,10 +439,10 @@ export const SupportCenterPage: React.FC = () => {
         {[
           { 
             icon: <MessageSquare className="w-5 h-5" />, 
-            label: 'Live Chat Support', 
-            sub: 'Instant Answers',
+            label: 'Support Chat', 
+            sub: 'Instant Answers & FAQs',
             color: 'bg-brand-blue/10 text-brand-blue',
-            action: () => chatInputRef.current?.focus() 
+            action: () => chatInputRef.current?.focus()
           },
           { 
             icon: <Mail className="w-5 h-5" />, 
@@ -401,18 +485,33 @@ export const SupportCenterPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: Raise Ticket & My Tickets */}
-        <div id="raise-ticket-section" className="bg-white border border-brand-border rounded-2xl shadow-premium p-5 flex flex-col">
+        <div 
+          ref={ticketSectionRef}
+          id="raise-ticket-section" 
+          className={`bg-white border rounded-2xl shadow-premium p-5 flex flex-col transition-all duration-500 ${
+            highlightForm ? 'ring-4 ring-indigo-500/40 border-indigo-600 shadow-xl' : 'border-brand-border'
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-brand-border pb-3 mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-brand-blue flex items-center justify-center">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                highlightForm ? 'bg-indigo-600 text-white' : 'bg-blue-50 text-brand-blue'
+              }`}>
                 <Ticket size={16} />
               </div>
               <div>
-                <h3 className="font-extrabold text-sm text-brand-graphite font-heading">
-                  {activeTicket ? 'Ticket Conversation' : 'Raise a Support Ticket'}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm text-brand-graphite font-heading">
+                    {activeTicket ? 'Ticket Conversation' : 'Raise a Support Ticket'}
+                  </h3>
+                  {!activeTicket && (
+                    <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                      2–4 Business Days SLA
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10.5px] text-brand-slate font-medium">
-                  {activeTicket ? `Ticket #${activeTicket.ticketNumber}` : 'Direct connection to our resolution desk'}
+                  {activeTicket ? `Ticket #${activeTicket.ticketNumber}` : 'Superiors & management review desk'}
                 </p>
               </div>
             </div>
@@ -588,6 +687,7 @@ export const SupportCenterPage: React.FC = () => {
               <div className="flex flex-col gap-1">
                 <label className="text-[10.5px] font-black uppercase text-brand-slate font-heading">Issue Subject</label>
                 <input 
+                  ref={subjectInputRef}
                   className={fieldCls} 
                   placeholder="e.g., Delivery delay / Service reschedule needed"
                   value={ticketForm.subject} 
@@ -712,7 +812,7 @@ export const SupportCenterPage: React.FC = () => {
           )}
         </div>
 
-        {/* Right Column: Instant Live Chat Support */}
+        {/* Right Column: Support Chat & FAQ Knowledge Base */}
         <div className="bg-white border border-brand-border rounded-2xl shadow-premium flex flex-col overflow-hidden">
           {/* Chat Header */}
           <div className="bg-gradient-to-r from-[#0F2C59] to-[#1E3E62] text-white px-5 py-4 flex items-center justify-between shadow-sm">
@@ -722,7 +822,7 @@ export const SupportCenterPage: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-extrabold font-heading tracking-wide">Live Chat Support</p>
+                  <p className="text-xs font-extrabold font-heading tracking-wide">Support Chat</p>
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Online" />
                   {liveSessionNumber && (
                     <span className="text-[9px] font-mono font-bold bg-white/15 px-1.5 py-0.5 rounded text-white/90">
@@ -731,7 +831,7 @@ export const SupportCenterPage: React.FC = () => {
                   )}
                 </div>
                 <p className="text-[10.5px] text-white/70">
-                  {isAgentConnected ? `Connected with ${connectedAgentName || 'Specialist'}` : 'Instant AI order answers & human specialist backup'}
+                  {isAgentConnected ? `Connected with ${connectedAgentName || 'Specialist'}` : 'Instant answers for Shop India, Quick & Glacons Services'}
                 </p>
               </div>
             </div>
@@ -748,59 +848,112 @@ export const SupportCenterPage: React.FC = () => {
             )}
           </div>
 
-          {/* Chat Timeline */}
-          <div className="flex-1 p-4 space-y-3 min-h-[300px] max-h-[380px] overflow-y-auto bg-slate-50/40 text-xs">
-            {chat.map((m, i) => (
-              <div key={m.id || i} className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-xs ${
-                    m.from === 'me' 
-                      ? 'bg-brand-blue text-white rounded-br-none' 
-                      : 'bg-white border border-brand-border text-brand-graphite rounded-bl-none'
-                  }`}
-                >
-                  {m.from !== 'me' && m.senderLabel && (
-                    <span className="text-[9.5px] font-black uppercase text-brand-blue block mb-1 tracking-wider">
-                      {m.senderLabel}
-                    </span>
-                  )}
-                  <p className="font-semibold whitespace-pre-wrap">{m.text}</p>
-                  {m.time && (
-                    <span className={`text-[9px] block mt-1 ${m.from === 'me' ? 'text-blue-100 text-right' : 'text-slate-400'}`}>
-                      {m.time}
-                    </span>
-                  )}
+          {/* Chat Timeline (Container-scoped scroll only) */}
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 p-4 space-y-3 min-h-[300px] max-h-[380px] overflow-y-auto bg-slate-50/40 text-xs"
+          >
+            {chat.map((m, i) => {
+              const showTicketButton = m.from !== 'me' && (
+                m.text.includes('Raise a Support Ticket') ||
+                m.text.includes('raise a ticket') ||
+                m.text.includes('support ticket') ||
+                m.text.includes('official complaint')
+              );
+
+              return (
+                <div key={m.id || i} className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-xs ${
+                      m.from === 'me' 
+                        ? 'bg-brand-blue text-white rounded-br-none' 
+                        : 'bg-white border border-brand-border text-brand-graphite rounded-bl-none'
+                    }`}
+                  >
+                    {m.from !== 'me' && m.senderLabel && (
+                      <span className="text-[9.5px] font-black uppercase text-brand-blue block mb-1 tracking-wider">
+                        {m.senderLabel}
+                      </span>
+                    )}
+                    <p className="font-semibold whitespace-pre-wrap">{m.text}</p>
+                    
+                    {/* One-click Action to Focus & Pre-populate Ticket Form */}
+                    {showTicketButton && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[9.5px] text-slate-500 font-medium flex items-center gap-1">
+                          <Clock size={11} className="text-indigo-600 shrink-0" />
+                          <span>2–4 business working days SLA</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleFocusTicketForm('Support Request from Chat', 'order_issue')}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#0F2C59] text-white rounded-lg text-[10.5px] font-bold hover:bg-[#1E3E62] transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <FileText size={11} />
+                          <span>Raise Support Ticket</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {m.time && (
+                      <span className={`text-[9px] block mt-1 ${m.from === 'me' ? 'text-blue-100 text-right' : 'text-slate-400'}`}>
+                        {m.time}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {isTyping && (
               <div className="flex items-center gap-1.5 bg-white border border-brand-border rounded-full px-3 py-1.5 w-max text-slate-400 text-[10px] shadow-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-blue animate-bounce" />
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-blue animate-bounce [animation-delay:0.2s]" />
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-blue animate-bounce [animation-delay:0.4s]" />
-                <span className="font-bold ml-1 text-slate-500">Live Assistant is typing...</span>
+                <span className="font-bold ml-1 text-slate-500">Support Assistant is typing...</span>
               </div>
             )}
-            <div ref={chatEndRef} />
           </div>
 
-          {/* Chat Quick Chips */}
-          <div className="px-3 py-2 bg-slate-100/60 border-t border-brand-border/60 flex gap-1.5 overflow-x-auto no-scrollbar">
-            {[
-              'Track my delivery',
-              'Reschedule service',
-              'Refund status',
-              'Talk to specialist'
-            ].map(chip => (
+          {/* FAQ Category Pills */}
+          <div className="px-3 pt-2 pb-1 bg-slate-50 border-t border-brand-border flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 mr-1 shrink-0">Topics:</span>
+            {faqCategories.map(cat => (
               <button
-                key={chip}
-                onClick={() => sendChat(undefined, chip)}
-                className="shrink-0 text-[10.5px] font-bold bg-white hover:bg-blue-50 text-brand-slate hover:text-brand-blue border border-brand-border px-2.5 py-1 rounded-full shadow-2xs transition-colors cursor-pointer"
+                key={cat}
+                type="button"
+                onClick={() => setSelectedFaqCat(cat)}
+                className={`shrink-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full transition-all cursor-pointer ${
+                  selectedFaqCat === cat
+                    ? 'bg-[#0F2C59] text-white shadow-2xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+                }`}
               >
-                {chip}
+                {cat}
               </button>
             ))}
+          </div>
+
+          {/* Interactive Question Chips */}
+          <div className="px-3 py-2 bg-slate-100/70 border-t border-brand-border/60 flex gap-1.5 overflow-x-auto no-scrollbar">
+            {(faqsList.length > 0 ? faqsList : [
+              { question: 'When will my Shop India order be delivered?', answer: 'Standard Shop India orders are dispatched via our verified logistics partners and delivered within 2 to 5 business working days depending on your pin code.', category: 'Shop India' },
+              { question: 'How fast is Quick Shopping delivery?', answer: 'Quick Shopping grocery and food orders are delivered within 10 to 20 minutes from our nearest local dark stores and vendor hubs by dedicated express delivery partners.', category: 'Quick Shopping' },
+              { question: 'Is there a warranty or guarantee on Glacons repairs?', answer: 'Yes! All appliance and home services booked through ShopIndia include a complete 30-Day Guarantee. If you experience any issues with the serviced appliance within 30 days, we provide a 100% free technician revisit.', category: 'Glacons Services' },
+              { question: 'How long does a refund take to reach my bank account?', answer: 'Once approved, refunds are credited back to your original payment method (UPI / Cards / Netbanking) within 2 to 4 business working days. UPI and wallet refunds typically reflect within 2 to 4 hours.', category: 'Refunds & Payments', canRaiseTicket: true },
+              { question: 'How do I escalate an issue to Shop India superiors?', answer: 'To ensure formal management tracking and priority review, please submit your complaint using the "Raise a Support Ticket" form on the left. Higher-level support executives and desk supervisors review all escalated tickets and resolve them within 2 to 4 business working days.', category: 'Superiors & Tickets', canRaiseTicket: true }
+            ])
+              .filter(f => selectedFaqCat === 'All' || f.category === selectedFaqCat)
+              .map(faq => (
+                <button
+                  key={faq.id || faq.question}
+                  type="button"
+                  onClick={() => sendChat(undefined, faq.question, faq.answer, faq.canRaiseTicket, faq.ticketSubject)}
+                  className="shrink-0 text-[10.5px] font-semibold bg-white hover:bg-blue-50 text-brand-slate hover:text-brand-blue border border-brand-border px-3 py-1 rounded-full shadow-2xs transition-colors cursor-pointer"
+                >
+                  {faq.question}
+                </button>
+              ))}
           </div>
 
           {/* Chat Input Form */}
@@ -831,7 +984,7 @@ export const SupportCenterPage: React.FC = () => {
           <span>Frequently Asked Questions</span>
         </h3>
         <div className="divide-y divide-brand-border/50">
-          {FAQS.map((f) => (
+          {(faqsList.length > 0 ? faqsList.map(f => ({ q: f.question, a: f.answer })) : INITIAL_FAQS).map((f) => (
             <div key={f.q}>
               <button 
                 onClick={() => setFaqOpen(faqOpen === f.q ? null : f.q)} 

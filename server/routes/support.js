@@ -48,45 +48,191 @@ const getOptionalUserId = (req) => {
   return null;
 };
 
-// FAQ Knowledgebase for Smart Assistance
-const SERVICE_FAQS = [
+// Comprehensive Support FAQ Knowledge Base across Verticals
+const DEFAULT_SUPPORT_FAQS = [
+  // ── Shop India Ecommerce ──
   {
-    id: 'book-service',
-    keywords: ['book', 'booking', 'service', 'ac', 'repair', 'schedule', 'hire', 'technician'],
-    question: 'How do I book an AC, Plumbing, or Electrical service?',
-    answer: 'You can select any service package from our Services catalog, choose your preferred date and time slot, and click "Book Service Now". A certified expert technician will be assigned to your doorstep.'
+    id: 'shopindia_delivery_time',
+    category: 'Shop India',
+    vertical: 'shop',
+    question: 'When will my Shop India order be delivered?',
+    answer: 'Standard Shop India orders are dispatched via our verified logistics partners and delivered within 2 to 5 business working days depending on your pin code. You will receive live SMS and tracking updates as soon as your package is dispatched.',
+    canRaiseTicket: false
   },
   {
-    id: 'reschedule',
-    keywords: ['reschedule', 'change time', 'slot', 'delay', 'cancel slot'],
-    question: 'Can I reschedule or change my booked service slot?',
-    answer: 'Yes! You can reschedule your booking free of charge up to 2 hours before the scheduled time by visiting "My Orders / Bookings" or by requesting our support team.'
+    id: 'shopindia_cancel_modify',
+    category: 'Shop India',
+    vertical: 'shop',
+    question: 'Can I cancel or modify my Shop India order?',
+    answer: 'Yes! You can cancel your order directly from "Orders > Order Details > Cancel Order" before it is packed or dispatched. Once dispatched, you can initiate a return or exchange upon delivery.',
+    canRaiseTicket: true,
+    ticketSubject: 'Request to Cancel / Modify Shop India Order'
   },
   {
-    id: 'pricing',
-    keywords: ['price', 'pricing', 'charges', 'cost', 'estimate', 'rate', 'inspection fee'],
-    question: 'What are the inspection and service charges?',
-    answer: 'We provide transparent upfront pricing on all packages with no hidden costs. A standard inspection fee of ₹199 applies only if you decide not to proceed with the recommended repair.'
+    id: 'shopindia_damaged_wrong_item',
+    category: 'Shop India',
+    vertical: 'shop',
+    question: 'What if an item is damaged or wrong product delivered?',
+    answer: 'We sincerely apologize if you received a defective or incorrect item. Please submit a support ticket on the left panel within 48 hours of delivery with item details. Our superiors and resolution team will review and arrange a free replacement or full refund within 2 to 4 business working days.',
+    canRaiseTicket: true,
+    ticketSubject: 'Damaged or Wrong Item Received'
+  },
+
+  // ── Quick Shopping (10-20 Min Express) ──
+  {
+    id: 'quick_delivery_time',
+    category: 'Quick Shopping',
+    vertical: 'quick',
+    question: 'How fast is Quick Shopping delivery?',
+    answer: 'Quick Shopping grocery and food orders are delivered within 10 to 20 minutes from our nearest local dark stores and vendor hubs by dedicated express delivery partners.',
+    canRaiseTicket: false
   },
   {
-    id: 'warranty',
-    keywords: ['warranty', 'guarantee', 'revisit', 'issue after repair', 'cover'],
-    question: 'Is there a warranty on service repairs?',
-    answer: 'Yes! All services booked through ShopIndia come with a 30-day service warranty. If you face any issues after the repair, we provide a free technician revisit.'
+    id: 'quick_missing_item',
+    category: 'Quick Shopping',
+    vertical: 'quick',
+    question: 'An item is missing or spoiled in my Quick order?',
+    answer: 'We sincerely apologize. For express grocery and food orders, please raise a ticket using the "Raise a Support Ticket" form on the left. Our support desk will review and issue an instant refund or arrange a priority re-dispatch.',
+    canRaiseTicket: true,
+    ticketSubject: 'Missing or Spoiled Item in Quick Order'
   },
   {
-    id: 'safety-checks',
-    keywords: ['safety', 'verified', 'background', 'police verification', 'expert'],
-    question: 'Are service professionals verified and background checked?',
-    answer: 'Every technician on ShopIndia is certified, background-verified, and follows strict safety protocols with genuine parts and standardized pricing.'
+    id: 'quick_change_address',
+    category: 'Quick Shopping',
+    vertical: 'quick',
+    question: 'Can I change delivery address after placing Quick order?',
+    answer: 'Because Quick orders are packed and dispatched in under 3 minutes, addresses cannot be changed once confirmed. If your rider has already picked up the order, you can contact the rider directly via the order tracking screen.',
+    canRaiseTicket: true,
+    ticketSubject: 'Address Issue on Express Delivery'
+  },
+
+  // ── Glacons Services ──
+  {
+    id: 'glacons_warranty',
+    category: 'Glacons Services',
+    vertical: 'services',
+    question: 'Is there a warranty or guarantee on Glacons repairs?',
+    answer: 'Yes! All appliance and home services booked through ShopIndia include a complete 30-Day Guarantee. If you experience any issues with the serviced appliance within 30 days, we provide a 100% free technician revisit.',
+    canRaiseTicket: false
+  },
+  {
+    id: 'glacons_reschedule',
+    category: 'Glacons Services',
+    vertical: 'services',
+    question: 'How do I reschedule a technician service slot?',
+    answer: 'You can reschedule your technician booking free of charge up to 2 hours before the scheduled appointment. Contact your assigned service professional directly or raise a ticket on the left with your preferred new date and time slot.',
+    canRaiseTicket: true,
+    ticketSubject: 'Reschedule Glacons Service Appointment'
+  },
+  {
+    id: 'glacons_pricing_charges',
+    category: 'Glacons Services',
+    vertical: 'services',
+    question: 'How are Glacons technician charges calculated?',
+    answer: 'We follow transparent, standardized rate cards. Standard inspection charges are clearly shown upfront. Any additional spare parts or special requirements will be quoted and approved by you before the technician begins work.',
+    canRaiseTicket: false
+  },
+
+  // ── Payments & Refunds ──
+  {
+    id: 'refund_timeline',
+    category: 'Refunds & Payments',
+    vertical: 'general',
+    question: 'How long does a refund take to reach my bank account?',
+    answer: 'Once approved, refunds are credited back to your original payment method (UPI / Cards / Netbanking) within 2 to 4 business working days. UPI and wallet refunds typically reflect within 2 to 4 hours.',
+    canRaiseTicket: true,
+    ticketSubject: 'Refund Inquiry / Delay'
+  },
+  {
+    id: 'payment_debited_order_failed',
+    category: 'Refunds & Payments',
+    vertical: 'general',
+    question: 'Payment was debited but order shows failed / not placed?',
+    answer: 'Do not worry! In case of a bank network timeout, the amount is automatically reversed by your bank within 24 to 48 hours. If the amount is not credited after 48 hours, please raise a ticket on the left with your payment reference / UTR number.',
+    canRaiseTicket: true,
+    ticketSubject: 'Payment Debited but Order Not Placed'
+  },
+
+  // ── Ticket Escalation & Management ──
+  {
+    id: 'escalate_to_superiors',
+    category: 'Superiors & Tickets',
+    vertical: 'general',
+    question: 'How do I escalate an issue to Shop India superiors or management?',
+    answer: 'To ensure formal management tracking and priority review, please submit your complaint using the "Raise a Support Ticket" form on the left. Higher-level support executives and desk supervisors review all escalated tickets and resolve them within 2 to 4 business working days.',
+    canRaiseTicket: true,
+    ticketSubject: 'Escalation to Management / Senior Desk'
   }
 ];
 
+// Helper to get active FAQs from DB (or fallback)
+async function getStoredSupportFaqs() {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: 'support_chat_faqs' }
+    });
+    if (row?.value) {
+      const parsed = JSON.parse(row.value);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[SUPPORT] Could not read support_chat_faqs from appSetting:', err.message);
+  }
+  return DEFAULT_SUPPORT_FAQS;
+}
+
 /**
- * GET /api/support/faqs - Retrieve default questions and answers
+ * GET /api/support/faqs - Retrieve active support chat questions and answers
  */
-router.get('/faqs', (_req, res) => {
-  res.json({ faqs: SERVICE_FAQS });
+router.get('/faqs', async (_req, res) => {
+  try {
+    const faqs = await getStoredSupportFaqs();
+    res.json({ faqs });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve FAQs' });
+  }
+});
+
+/**
+ * GET /api/admin/support/faqs - Super Admin view of all FAQs
+ */
+router.get('/admin/faqs', async (_req, res) => {
+  try {
+    const faqs = await getStoredSupportFaqs();
+    res.json({ faqs });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve admin FAQs' });
+  }
+});
+
+/**
+ * PUT /api/admin/support/faqs - Super Admin update of FAQs
+ */
+router.put('/admin/faqs', async (req, res) => {
+  try {
+    const { faqs } = req.body;
+    if (!Array.isArray(faqs)) {
+      return res.status(400).json({ error: 'faqs must be an array' });
+    }
+
+    const jsonStr = JSON.stringify(faqs);
+    await prisma.appSetting.upsert({
+      where: { key: 'support_chat_faqs' },
+      update: { value: jsonStr, updatedAt: new Date() },
+      create: {
+        key: 'support_chat_faqs',
+        value: jsonStr,
+        description: 'Support Chat FAQ Knowledge Base and Category QA'
+      }
+    });
+
+    res.json({ success: true, count: faqs.length });
+  } catch (err) {
+    console.error('[SUPPORT] Failed to save FAQs:', err);
+    res.status(500).json({ error: 'Failed to save FAQs to database' });
+  }
 });
 
 /**
@@ -339,16 +485,22 @@ router.post('/chat', async (req, res) => {
     } else if (lowerQuery.includes('thank')) {
       answer = 'You are welcome! 😊 Let me know if you need any other assistance, or click "Talk to specialist" if you have any questions.';
     } else {
-      // Find best match in FAQs
-      const matchedFaq = SERVICE_FAQS.find(faq => 
-        faq.keywords.some(k => lowerQuery.includes(k)) ||
-        lowerQuery.includes(faq.question.toLowerCase())
-      );
+      // Find best match in dynamic stored FAQs
+      const allFaqs = await getStoredSupportFaqs();
+      const matchedFaq = allFaqs.find(faq => {
+        const qLower = (faq.question || '').toLowerCase();
+        return lowerQuery.includes(qLower) || qLower.includes(lowerQuery) ||
+          (faq.id && lowerQuery.includes(faq.id.toLowerCase())) ||
+          (faq.keywords && Array.isArray(faq.keywords) && faq.keywords.some(k => lowerQuery.includes(k.toLowerCase())));
+      });
 
       if (matchedFaq) {
         answer = matchedFaq.answer;
+        if (matchedFaq.canRaiseTicket) {
+          answer += `\n\n📌 Need further assistance? You can submit an official complaint on the left panel. Our superiors will resolve it within 2 to 4 business working days.`;
+        }
       } else {
-        answer = `Thank you for reaching out! Our Live Assistant is on standby. If you need personalized one-on-one help with this request, click "Talk to specialist" below and an agent will join immediately.`;
+        answer = `Thank you for reaching out! For any specific issues with orders, deliveries, or payments, please choose one of the common questions below or raise a ticket using the form on the left. Our superiors and support desk resolve tickets within 2 to 4 business working days.`;
       }
     }
 
@@ -369,7 +521,7 @@ router.post('/chat', async (req, res) => {
       sessionId: liveTicket?.id,
       sessionNumber: liveTicket?.ticketNumber,
       isEscalated,
-      suggestTicket: !isEscalated,
+      suggestTicket: true,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   } catch (err) {

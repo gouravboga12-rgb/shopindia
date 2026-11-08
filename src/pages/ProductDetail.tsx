@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
   const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart, userCoords, addNotification } = useApp();
-  const { reviews, wishlist, toggleWishlist } = useCustomer();
+  const { reviews, wishlist, toggleWishlist, recordView } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
   const [isNotified, setIsNotified] = useState(false);
@@ -22,12 +22,15 @@ export const ProductDetailPage: React.FC = () => {
   const discount = product ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
   const isServices = currentVertical === 'services' || product?.vertical === 'services';
 
-  // Automatically scroll to top of page whenever a product is selected/opened
+  // Automatically scroll to top of page whenever a product is selected/opened and record view
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-  }, [selectedProductId]);
+    if (product?.id) {
+      recordView(product.id);
+    }
+  }, [selectedProductId, product?.id, recordView]);
 
   const handleAddToCart = () => {
     if (!requireCustomerAuth('add this item to your cart')) return;

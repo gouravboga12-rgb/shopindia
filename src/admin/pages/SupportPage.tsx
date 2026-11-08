@@ -55,6 +55,113 @@ export const SupportPage: React.FC = () => {
   const [refundAdminNotes, setRefundAdminNotes] = useState('');
   const [processingRefund, setProcessingRefund] = useState(false);
 
+  // View Mode: Ticket Queue vs Support Chat FAQ Knowledge Base
+  const [viewMode, setViewMode] = useState<'tickets' | 'faqs'>('tickets');
+  const [adminFaqs, setAdminFaqs] = useState<any[]>([]);
+  const [loadingFaqs, setLoadingFaqs] = useState(false);
+  const [faqModalOpen, setFaqModalOpen] = useState(false);
+  const [editingFaq, setEditingFaq] = useState<any | null>(null);
+  const [faqForm, setFaqForm] = useState({
+    id: '',
+    category: 'Shop India',
+    question: '',
+    answer: '',
+    canRaiseTicket: false,
+    active: true
+  });
+  const [savingFaq, setSavingFaq] = useState(false);
+  const [faqCategoryFilter, setFaqCategoryFilter] = useState('All');
+  const [faqSearch, setFaqSearch] = useState('');
+
+  const loadAdminFaqs = async () => {
+    setLoadingFaqs(true);
+    try {
+      const res = await api.get<{ faqs: any[] }>('/api/support/admin/faqs');
+      if (res?.faqs) {
+        setAdminFaqs(res.faqs);
+      }
+    } catch (err) {
+      console.error('Failed to load admin FAQs:', err);
+    } finally {
+      setLoadingFaqs(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdminFaqs();
+  }, []);
+
+  const openAddFaqModal = () => {
+    setEditingFaq(null);
+    setFaqForm({
+      id: '',
+      category: 'Shop India',
+      question: '',
+      answer: '',
+      canRaiseTicket: false,
+      active: true
+    });
+    setFaqModalOpen(true);
+  };
+
+  const openEditFaqModal = (faq: any) => {
+    setEditingFaq(faq);
+    setFaqForm({
+      id: faq.id || '',
+      category: faq.category || 'Shop India',
+      question: faq.question || '',
+      answer: faq.answer || '',
+      canRaiseTicket: Boolean(faq.canRaiseTicket),
+      active: faq.active !== false
+    });
+    setFaqModalOpen(true);
+  };
+
+  const saveFaq = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!faqForm.question.trim() || !faqForm.answer.trim()) return;
+    setSavingFaq(true);
+    try {
+      let updatedList = [...adminFaqs];
+      if (editingFaq) {
+        updatedList = updatedList.map(f => f.id === editingFaq.id ? { ...f, ...faqForm } : f);
+      } else {
+        const newId = 'faq_' + Date.now();
+        updatedList.push({ ...faqForm, id: newId });
+      }
+
+      await api.put('/api/support/admin/faqs', { faqs: updatedList });
+      setAdminFaqs(updatedList);
+      setFaqModalOpen(false);
+      setEditingFaq(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save FAQ.');
+    } finally {
+      setSavingFaq(false);
+    }
+  };
+
+  const deleteFaq = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this FAQ question?')) return;
+    try {
+      const updatedList = adminFaqs.filter(f => f.id !== id);
+      await api.put('/api/support/admin/faqs', { faqs: updatedList });
+      setAdminFaqs(updatedList);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete FAQ.');
+    }
+  };
+
+  const toggleFaqActive = async (id: string) => {
+    try {
+      const updatedList = adminFaqs.map(f => f.id === id ? { ...f, active: f.active === false ? true : false } : f);
+      await api.put('/api/support/admin/faqs', { faqs: updatedList });
+      setAdminFaqs(updatedList);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update FAQ status.');
+    }
+  };
+
   const load = () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -269,45 +376,73 @@ export const SupportPage: React.FC = () => {
             <span>Support &amp; Partner Help Desk Queue</span>
           </h1>
           <p className="text-sm text-gray-500">
-            Unified support queue with pending, active, and closed lifecycle filtering, live chat, and dispute resolution
+            Unified support queue with pending, active, and closed lifecycle filtering, support chat FAQs, and dispute resolution
           </p>
         </div>
 
-        <button
-          onClick={load}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh Queue</span>
-        </button>
-      </div>
-
-      {/* Unified Primary Status & Queue Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1.5">
-        {TABS.map(tab => {
-          const active = filterTab === tab.id;
-          return (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="bg-gray-100 p-1 rounded-xl flex items-center gap-1 border border-gray-200">
             <button
-              key={tab.id}
-              onClick={() => setFilterTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                active
-                  ? 'bg-[#0F2C59] text-white shadow-sm'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200/70'
+              onClick={() => setViewMode('tickets')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'tickets' ? 'bg-[#0F2C59] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              <span>{tab.label}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-numbers font-bold ${
-                tab.alert
-                  ? 'bg-red-500 text-white animate-pulse'
-                  : active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+              🎫 Tickets Queue ({counts.all})
+            </button>
+            <button
+              onClick={() => setViewMode('faqs')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'faqs' ? 'bg-[#0F2C59] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              💬 Support Chat FAQs
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                viewMode === 'faqs' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
               }`}>
-                {tab.count}
+                {adminFaqs.length}
               </span>
             </button>
-          );
-        })}
+          </div>
+
+          <button
+            onClick={viewMode === 'tickets' ? load : loadAdminFaqs}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading || loadingFaqs ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
+
+      {viewMode === 'tickets' ? (
+        <>
+          {/* Unified Primary Status & Queue Tabs */}
+          <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1.5">
+            {TABS.map(tab => {
+              const active = filterTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilterTab(tab.id)}
+                  className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    active
+                      ? 'bg-[#0F2C59] text-white shadow-sm'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200/70'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-numbers font-bold ${
+                    tab.alert
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
       {/* Compact Search & Day-wise Filter Toolbar */}
       <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-3">
@@ -463,7 +598,7 @@ export const SupportPage: React.FC = () => {
                         {t.subject?.includes('[LIVE CHAT') && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Live Chat
+                            Support Chat
                           </span>
                         )}
                         <span>{t.subject}</span>
@@ -545,6 +680,121 @@ export const SupportPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+    </>
+  ) : (
+    /* Support Chat FAQs & Knowledge Base Manager */
+    <div className="space-y-4">
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-gray-500 mr-1">Topic:</span>
+          {['All', 'Shop India', 'Quick Shopping', 'Glacons Services', 'Refunds & Payments', 'Superiors & Tickets'].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFaqCategoryFilter(cat)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                faqCategoryFilter === cat ? 'bg-[#0F2C59] text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              value={faqSearch}
+              onChange={e => setFaqSearch(e.target.value)}
+              placeholder="Search questions or answers..."
+              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none"
+            />
+          </div>
+
+          <button
+            onClick={openAddFaqModal}
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            <span>+ Add Question</span>
+          </button>
+        </div>
+      </div>
+
+      {/* FAQ List Cards / Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-sm text-gray-900">Active Support Chat Questions &amp; Answers</h3>
+            <p className="text-xs text-gray-500">
+              These questions and verified answers are displayed in the Customer Support Chat timeline and quick chips.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full">
+            {adminFaqs.filter(f => (faqCategoryFilter === 'All' || f.category === faqCategoryFilter) && (!faqSearch || f.question?.toLowerCase().includes(faqSearch.toLowerCase()) || f.answer?.toLowerCase().includes(faqSearch.toLowerCase()))).length} Questions
+          </span>
+        </div>
+
+        <div className="divide-y divide-gray-100">
+          {adminFaqs
+            .filter(f => (faqCategoryFilter === 'All' || f.category === faqCategoryFilter) && (!faqSearch || f.question?.toLowerCase().includes(faqSearch.toLowerCase()) || f.answer?.toLowerCase().includes(faqSearch.toLowerCase())))
+            .map((faq, idx) => (
+              <div key={faq.id || idx} className="p-4 hover:bg-slate-50/60 transition-colors flex flex-col md:flex-row md:items-start justify-between gap-3">
+                <div className="space-y-1.5 max-w-2xl">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      {faq.category || 'Shop India'}
+                    </span>
+                    {faq.canRaiseTicket && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                        <Clock size={10} />
+                        <span>2–4 Days Ticket Action</span>
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      faq.active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {faq.active !== false ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-xs text-gray-900">{faq.question}</h4>
+                  <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{faq.answer}</p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 pt-2 md:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleFaqActive(faq.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer border ${
+                      faq.active !== false 
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {faq.active !== false ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openEditFaqModal(faq)}
+                    className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Edit2 size={12} />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteFaq(faq.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                    title="Delete Question"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  )}
 
       {/* Ticket Details & Action Modal (Clean, Professional Chat Interface with Edit & Delete) */}
       {selectedTicket && (
@@ -925,6 +1175,106 @@ export const SupportPage: React.FC = () => {
                 {processingRefund ? 'Executing...' : `Approve & Refund ₹${refundAmount.toLocaleString('en-IN')}`}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* FAQ Add / Edit Modal */}
+      {faqModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-base text-gray-900">
+                  {editingFaq ? 'Edit Support Chat Question' : 'Add New Support Chat Question'}
+                </h3>
+                <p className="text-xs text-gray-500">Configure questions and answers for customer support chat</p>
+              </div>
+              <button onClick={() => setFaqModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={saveFaq} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Topic / Category</label>
+                <select
+                  value={faqForm.category}
+                  onChange={e => setFaqForm(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-xl bg-gray-50 focus:bg-white text-gray-800 text-xs font-semibold"
+                >
+                  <option value="Shop India">Shop India (Ecommerce 2–5 days delivery)</option>
+                  <option value="Quick Shopping">Quick Shopping (10–20 min instant delivery)</option>
+                  <option value="Glacons Services">Glacons Services (30-day guarantee & slots)</option>
+                  <option value="Refunds & Payments">Refunds & Payments (2–4 business days)</option>
+                  <option value="Superiors & Tickets">Superiors & Tickets (Escalations)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Question</label>
+                <input
+                  type="text"
+                  required
+                  value={faqForm.question}
+                  onChange={e => setFaqForm(prev => ({ ...prev, question: e.target.value }))}
+                  placeholder="e.g. When will my Shop India order be delivered?"
+                  className="w-full px-3.5 py-2 border rounded-xl bg-gray-50 focus:bg-white text-gray-800 text-xs font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Answer</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={faqForm.answer}
+                  onChange={e => setFaqForm(prev => ({ ...prev, answer: e.target.value }))}
+                  placeholder="Provide a clear, accurate explanation with exact timelines..."
+                  className="w-full px-3.5 py-2 border rounded-xl bg-gray-50 focus:bg-white text-gray-800 text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-purple-50/60 border border-purple-200/70 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="canRaiseTicket"
+                  checked={faqForm.canRaiseTicket}
+                  onChange={e => setFaqForm(prev => ({ ...prev, canRaiseTicket: e.target.checked }))}
+                  className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+                />
+                <label htmlFor="canRaiseTicket" className="font-semibold text-purple-900 cursor-pointer">
+                  Display "Raise a Support Ticket" button in chat (with 2–4 business days resolution SLA)
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="faqActive"
+                  checked={faqForm.active}
+                  onChange={e => setFaqForm(prev => ({ ...prev, active: e.target.checked }))}
+                  className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                />
+                <label htmlFor="faqActive" className="font-semibold text-gray-700 cursor-pointer">
+                  Active (visible in customer chat timeline and quick chips)
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setFaqModalOpen(false)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingFaq}
+                  className="flex-1 py-2.5 bg-[#0F2C59] hover:bg-[#1E3E62] text-white rounded-xl font-bold text-xs cursor-pointer disabled:opacity-50"
+                >
+                  {savingFaq ? 'Saving...' : 'Save Question'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -311,6 +311,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const navigateTo = (path: PathType, productId?: string) => {
     if (productId) {
       setSelectedProductId(productId);
+      try {
+        const raw = localStorage.getItem('shopindia_customer_recently_viewed');
+        const list = raw ? JSON.parse(raw) : [];
+        const next = [productId, ...list.filter((id: string) => id !== productId)].slice(0, 24);
+        localStorage.setItem('shopindia_customer_recently_viewed', JSON.stringify(next));
+      } catch {}
     }
     setHistory(prev => [...prev, path]);
     setCurrentPath(path);

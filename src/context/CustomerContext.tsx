@@ -126,7 +126,14 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch {}
   }, [wishlist]);
   const [savedForLater, setSavedForLater] = useState<string[]>([]);
-  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('shopindia_customer_recently_viewed');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [profile, setProfile] = useState<CustomerProfile>(() => {
     const localUser = getCustomerUser();
@@ -392,10 +399,23 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const removeSaved = useCallback((productId: string) => setSavedForLater((prev) => prev.filter((id) => id !== productId)), []);
 
   const recordView = useCallback((productId: string) => {
-    setRecentlyViewed((prev) => [productId, ...prev.filter((id) => id !== productId)].slice(0, 12));
+    if (!productId) return;
+    setRecentlyViewed((prev) => {
+      const next = [productId, ...prev.filter((id) => id !== productId)].slice(0, 24);
+      try {
+        localStorage.setItem('shopindia_customer_recently_viewed', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     logActivity('PRODUCT_VIEWED', { entityId: productId, entityType: 'product' });
   }, [logActivity]);
-  const clearRecentlyViewed = useCallback(() => setRecentlyViewed([]), []);
+
+  const clearRecentlyViewed = useCallback(() => {
+    setRecentlyViewed([]);
+    try {
+      localStorage.removeItem('shopindia_customer_recently_viewed');
+    } catch {}
+  }, []);
 
   const updateProfile = useCallback(async (p: Partial<CustomerProfile>) => {
     try {
