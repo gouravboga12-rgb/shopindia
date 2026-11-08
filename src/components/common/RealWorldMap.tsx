@@ -261,15 +261,15 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
         const fallbackPath: L.LatLngExpression[] =
           viewerRole === 'customer'
             ? [
-                [pLat, pLng],
-                [dLat, dLng],
-              ]
+              [pLat, pLng],
+              [dLat, dLng],
+            ]
             : currentStage === 'assigned'
-            ? [
+              ? [
                 [rLat, rLng],
                 [pLat, pLng],
               ]
-            : [
+              : [
                 [rLat, rLng],
                 [dLat, dLng],
               ];
@@ -294,15 +294,15 @@ export const RealWorldMap: React.FC<RealWorldMapProps> = ({
       const boundsPoints: [number, number][] =
         viewerRole === 'customer'
           ? [
-              [(rLat && !isNaN(rLat)) ? rLat : pLat, (rLng && !isNaN(rLng)) ? rLng : pLng],
-              [dLat, dLng],
-            ]
+            [(rLat && !isNaN(rLat)) ? rLat : pLat, (rLng && !isNaN(rLng)) ? rLng : pLng],
+            [dLat, dLng],
+          ]
           : currentStage === 'assigned'
-          ? [
+            ? [
               [rLat, rLng],
               [pLat, pLng],
             ]
-          : [
+            : [
               [rLat, rLng],
               [dLat, dLng],
             ];
