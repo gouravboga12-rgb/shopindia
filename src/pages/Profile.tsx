@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useApp } from '../context/AppContext';
 import {
   User, ShieldCheck, Mail, Sparkles, LogIn, LogOut, Loader2,
-  KeyRound, RefreshCw, CheckCircle2, Lock, X, Eye, EyeOff, ArrowLeft
+  KeyRound, RefreshCw, CheckCircle2, Lock, X, Eye, EyeOff, ArrowLeft,
+  Phone, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CustomerUser } from '../lib/customerAuth';
@@ -18,7 +19,12 @@ import {
   verifySignupOtp,
   setCustomerSession,
   clearCustomerSession,
+  loginWithGoogle,
+  signupWithGoogle,
+  decodeGoogleCredential,
 } from '../lib/customerAuth';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '482642194862-kn4jbg81h2rcgq7l77usa1f33av9re9a.apps.googleusercontent.com';
 
 export const ProfilePage: React.FC = () => {
   const isMobile = useIsMobile();
@@ -52,6 +58,180 @@ export const ProfilePage: React.FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  // ── Google Auth State ──
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  const [googleProfileModal, setGoogleProfileModal] = useState(false);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<{
+    credential: string;
+    email: string;
+    name: string;
+    picture?: string;
+  } | null>(null);
+  const [googlePhone, setGooglePhone] = useState('');
+  const [googleName, setGoogleName] = useState('');
+  const [googleError, setGoogleError] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // ── GOOGLE AUTH HANDLERS ──────────────────────────────────────────────────
+  const handleGoogleSuccess = async (credential: string) => {
+    setAError('');
+    setAuthLoading(true);
+
+    if (authMode === 'login') {
+      try {
+        const data = await loginWithGoogle(credential);
+        setCustomerSession(data.token, data.user);
+        setAuthUser(data.user);
+        const redirectUrl = sessionStorage.getItem('shopindia_auth_redirect');
+        sessionStorage.removeItem('shopindia_auth_redirect');
+        sessionStorage.removeItem('shopindia_auth_prompt_message');
+        window.location.href = redirectUrl && redirectUrl !== '/profile' ? redirectUrl : '/dashboard';
+      } catch (err: any) {
+        if (err.notFound) {
+          // Detect unregistered Google email: seamlessly transition to profile completion!
+          const decoded = decodeGoogleCredential(credential);
+          setPendingGoogleUser({
+            credential,
+            email: err.email || decoded?.email || '',
+            name: err.name || decoded?.name || '',
+            picture: err.picture || decoded?.picture || '',
+          });
+          setGoogleName(err.name || decoded?.name || '');
+          setGooglePhone('');
+          setGoogleError('');
+          setGoogleProfileModal(true);
+          setAError(err.message || 'No account found with this Google email. Please complete your registration below.');
+        } else {
+          setAError(err.message || 'Google login failed.');
+        }
+      } finally {
+        setAuthLoading(false);
+      }
+    } else {
+      // Sign up with Google mode
+      const decoded = decodeGoogleCredential(credential);
+      if (!decoded) {
+        setAError('Failed to read Google profile data.');
+        setAuthLoading(false);
+        return;
+      }
+      setPendingGoogleUser({
+        credential,
+        email: decoded.email,
+        name: decoded.name,
+        picture: decoded.picture,
+      });
+      setGoogleName(decoded.name || '');
+      setGooglePhone('');
+      setGoogleError('');
+      setGoogleProfileModal(true);
+      setAuthLoading(false);
+    }
+  };
+
+  const handleCompleteGoogleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingGoogleUser) return;
+    const cleanPhone = googlePhone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      setGoogleError('Please enter a valid 10-digit mobile number (+91).');
+      return;
+    }
+
+    setGoogleError('');
+    setGoogleLoading(true);
+    try {
+      const data = await signupWithGoogle(
+        pendingGoogleUser.credential,
+        cleanPhone,
+        googleName.trim()
+      );
+      setCustomerSession(data.token, data.user);
+      setAuthUser(data.user);
+      setGoogleProfileModal(false);
+      setPendingGoogleUser(null);
+      const redirectUrl = sessionStorage.getItem('shopindia_auth_redirect');
+      sessionStorage.removeItem('shopindia_auth_redirect');
+      sessionStorage.removeItem('shopindia_auth_prompt_message');
+      window.location.href = redirectUrl && redirectUrl !== '/profile' ? redirectUrl : '/dashboard';
+    } catch (err: any) {
+      if (err.alreadyExists) {
+        setGoogleError('This Google email is already registered! Attempting login...');
+        try {
+          const loginData = await loginWithGoogle(pendingGoogleUser.credential);
+          setCustomerSession(loginData.token, loginData.user);
+          setAuthUser(loginData.user);
+          setGoogleProfileModal(false);
+          window.location.href = '/dashboard';
+          return;
+        } catch {
+          setGoogleError(err.message || 'Account already exists. Please log in.');
+        }
+      } else {
+        setGoogleError(err.message || 'Registration failed. Please try again.');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // ── GIS INITIALIZATION ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (authMode === 'verify-otp') return;
+    let cancelled = false;
+
+    const initGsi = () => {
+      if (cancelled) return;
+      if (!(window as any).google?.accounts?.id) return;
+      try {
+        (window as any).google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response: any) => {
+            if (response.credential) {
+              handleGoogleSuccess(response.credential);
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        if (googleBtnRef.current) {
+          googleBtnRef.current.innerHTML = '';
+          (window as any).google.accounts.id.renderButton(googleBtnRef.current, {
+            theme: 'outline',
+            size: 'large',
+            type: 'standard',
+            shape: 'rectangular',
+            text: authMode === 'login' ? 'signin_with' : 'signup_with',
+            width: googleBtnRef.current.offsetWidth || 320,
+            logo_alignment: 'left',
+          });
+        }
+      } catch (err) {
+        console.warn('GIS init warning:', err);
+      }
+    };
+
+    if ((window as any).google?.accounts?.id) {
+      initGsi();
+    } else {
+      const interval = setInterval(() => {
+        if ((window as any).google?.accounts?.id) {
+          initGsi();
+          clearInterval(interval);
+        }
+      }, 250);
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+      };
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authMode]);
 
   // ── LOGIN ─────────────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
@@ -514,6 +694,35 @@ export const ProfilePage: React.FC = () => {
                 </motion.button>
               </form>
             )}
+
+            {/* ── GOOGLE AUTHENTICATION DIVIDER & BUTTON ── */}
+            {authMode !== 'verify-otp' && (
+              <div className="mt-5 pt-4 border-t border-slate-200/80 flex flex-col gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-3 font-bold text-slate-400">
+                      Or {authMode === 'login' ? 'continue with' : 'sign up with'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Google Identity Services Container */}
+                <div className="flex flex-col items-center justify-center w-full">
+                  <div ref={googleBtnRef} className="w-full flex justify-center min-h-[44px]" />
+                  <p className="text-[11px] text-slate-400 font-semibold text-center mt-2 flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-brand-orange shrink-0" />
+                    <span>
+                      {authMode === 'login'
+                        ? 'Sign in securely with your verified Google account.'
+                        : 'Quick registration via Google with mobile number verification.'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -522,6 +731,162 @@ export const ProfilePage: React.FC = () => {
           onClose={() => setShowForgotPassword(false)}
           initialEmail={aEmail}
         />
+
+        {/* ── GOOGLE REGISTRATION / MOBILE NUMBER MODAL ── */}
+        <AnimatePresence>
+          {googleProfileModal && pendingGoogleUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative overflow-hidden text-left"
+              >
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoogleProfileModal(false);
+                    setPendingGoogleUser(null);
+                    setGoogleError('');
+                  }}
+                  className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+
+                {/* Header with Google Avatar & Identity */}
+                <div className="flex flex-col items-center text-center mb-6">
+                  <div className="relative mb-3">
+                    {pendingGoogleUser.picture ? (
+                      <img
+                        src={pendingGoogleUser.picture}
+                        alt={pendingGoogleUser.name}
+                        className="w-16 h-16 rounded-full border-2 border-brand-blue shadow-md object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-brand-blue/10 text-brand-blue font-black flex items-center justify-center text-xl border-2 border-brand-blue/30 shadow-md">
+                        {pendingGoogleUser.name?.[0] || 'U'}
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-md border border-slate-100">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-extrabold text-slate-900 font-heading">Complete Your Profile</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                    Almost done! Enter your mobile number for real-time delivery tracking and OTP verification.
+                  </p>
+                </div>
+
+                {/* Error notification */}
+                {googleError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                    <span>{googleError}</span>
+                  </div>
+                )}
+
+                {/* Registration Form */}
+                <form onSubmit={handleCompleteGoogleSignup} className="space-y-4">
+                  {/* Verified Google Email */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>Google Account</span>
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                        <Check size={10} /> Verified
+                      </span>
+                    </label>
+                    <div className="px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 truncate">
+                      {pendingGoogleUser.email}
+                    </div>
+                  </div>
+
+                  {/* Full Name */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-700">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={googleName}
+                      onChange={(e) => setGoogleName(e.target.value)}
+                      placeholder="Your full name"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+                    />
+                  </div>
+
+                  {/* Mandatory Indian Mobile Number */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Phone size={12} className="text-slate-500" />
+                        <span>Mobile Phone Number *</span>
+                      </span>
+                      <span className="text-[10px] text-amber-600 font-bold">Required for Deliveries</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shrink-0 select-none">
+                        🇮🇳 +91
+                      </div>
+                      <input
+                        type="tel"
+                        required
+                        maxLength={10}
+                        value={googlePhone}
+                        onChange={(e) => setGooglePhone(e.target.value.replace(/\D/g, ''))}
+                        placeholder="10-digit mobile number"
+                        autoFocus
+                        className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue placeholder:font-normal placeholder:tracking-normal"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      We send doorstep delivery OTPs and order tracking status to this number.
+                    </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="pt-2 space-y-2">
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={googleLoading}
+                      className="w-full py-3 bg-brand-blue hover:bg-blue-600 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[0_4px_14px_rgba(14,165,233,0.3)] flex items-center justify-center gap-2 disabled:opacity-70 transition-all cursor-pointer min-h-[44px]"
+                    >
+                      {googleLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Creating Account...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={16} />
+                          <span>Complete Sign Up &amp; Continue</span>
+                        </>
+                      )}
+                    </motion.button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGoogleProfileModal(false);
+                        setPendingGoogleUser(null);
+                        setGoogleError('');
+                      }}
+                      className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer text-center"
+                    >
+                      Cancel &amp; Return
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   };

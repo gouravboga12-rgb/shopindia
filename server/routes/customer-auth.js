@@ -1,11 +1,14 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const customerAuth = require('../middleware/customerAuth');
 const { sendPasswordResetEmail, sendSignupOtpEmail } = require('../lib/mailer');
 
 const router = express.Router();
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '482642194862-kn4jbg81h2rcgq7l77usa1f33av9re9a.apps.googleusercontent.com';
 
 const sign = (u) =>
   jwt.sign(
@@ -301,6 +304,165 @@ router.post('/reset-password', async (req, res) => {
   } catch (err) {
     console.error('Customer reset password error:', err);
     res.status(500).json({ error: err.message || 'Failed to reset password.' });
+  }
+});
+
+/** Helper to securely verify Google ID token with Google's tokeninfo API */
+async function verifyGoogleIdToken(idToken) {
+  if (!idToken || typeof idToken !== 'string') {
+    throw new Error('Google credential token is missing or invalid.');
+  }
+
+  const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error_description || 'Invalid or expired Google token.');
+  }
+
+  const payload = await res.json();
+
+  // Validate audience matches our Google Client ID
+  if (payload.aud !== GOOGLE_CLIENT_ID) {
+    console.error(`Google token aud mismatch: expected ${GOOGLE_CLIENT_ID}, received ${payload.aud}`);
+    throw new Error('Google token audience mismatch.');
+  }
+
+  // Validate issuer is Google
+  if (!['accounts.google.com', 'https://accounts.google.com'].includes(payload.iss)) {
+    throw new Error('Invalid token issuer.');
+  }
+
+  // Validate email exists and is verified
+  if (!payload.email) {
+    throw new Error('No email found in Google account.');
+  }
+  if (payload.email_verified !== 'true' && payload.email_verified !== true) {
+    throw new Error('Google email is not verified.');
+  }
+
+  return {
+    email: payload.email.toLowerCase().trim(),
+    name: payload.name || payload.given_name || 'Customer',
+    picture: payload.picture || null,
+    sub: payload.sub,
+  };
+}
+
+/** POST /api/customer/google/login — Authenticate existing customer via Google */
+router.post('/google/login', async (req, res) => {
+  try {
+    const { credential } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential token is required.' });
+    }
+
+    const googleUser = await verifyGoogleIdToken(credential);
+    const user = await prisma.user.findUnique({
+      where: { email: googleUser.email },
+    });
+
+    // STRICT CHECK: User does NOT exist in database
+    if (!user) {
+      return res.status(404).json({
+        error: `No Shop India account found for "${googleUser.email}". Please register using "Sign up with Google".`,
+        notFound: true,
+        email: googleUser.email,
+        name: googleUser.name,
+        picture: googleUser.picture,
+      });
+    }
+
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        error: user.status === 'blocked'
+          ? 'This account has been deactivated or blocked.'
+          : `Account is currently ${user.status}. Please contact support.`,
+      });
+    }
+
+    // Background update avatar if missing
+    if (!user.avatar && googleUser.picture) {
+      prisma.user.update({ where: { id: user.id }, data: { avatar: googleUser.picture } }).catch(() => {});
+    }
+
+    res.json({
+      token: sign(user),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        avatar: user.avatar || googleUser.picture,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error('Google login error:', err);
+    res.status(400).json({ error: err.message || 'Google authentication failed.' });
+  }
+});
+
+/** POST /api/customer/google/signup — Register new customer via Google with mandatory mobile number */
+router.post('/google/signup', async (req, res) => {
+  try {
+    const { credential, phone, name } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential token is required.' });
+    }
+
+    const googleUser = await verifyGoogleIdToken(credential);
+
+    // Check if user already exists
+    const existing = await prisma.user.findUnique({
+      where: { email: googleUser.email },
+    });
+    if (existing) {
+      return res.status(409).json({
+        error: `An account with "${googleUser.email}" already exists. Please log in instead.`,
+        alreadyExists: true,
+      });
+    }
+
+    // Validate mandatory phone number
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ error: 'Mobile phone number is required for order delivery & tracking.' });
+    }
+    const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json({ error: 'Please enter a valid 10-digit Indian mobile number.' });
+    }
+
+    // Generate random secure password for database integrity
+    const randomPass = crypto.randomBytes(16).toString('hex');
+    const hashedPassword = await bcrypt.hash(randomPass, 10);
+    const finalName = (name && name.trim()) || googleUser.name || 'Valued Customer';
+
+    const user = await prisma.user.create({
+      data: {
+        name: finalName,
+        email: googleUser.email,
+        phone: cleanPhone,
+        avatar: googleUser.picture || null,
+        password: hashedPassword,
+        role: 'customer',
+        status: 'active',
+      },
+    });
+
+    res.status(201).json({
+      token: sign(user),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        avatar: user.avatar,
+        role: 'customer',
+      },
+    });
+  } catch (err) {
+    console.error('Google signup error:', err);
+    res.status(400).json({ error: err.message || 'Google registration failed.' });
   }
 });
 

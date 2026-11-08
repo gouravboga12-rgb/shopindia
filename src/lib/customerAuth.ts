@@ -3,6 +3,8 @@ export interface CustomerUser {
   name: string;
   email: string;
   role: string;
+  phone?: string | null;
+  avatar?: string | null;
 }
 
 const TOKEN_KEY = 'shopindia_customer_token';
@@ -108,6 +110,66 @@ export async function fetchCustomerOrders(email?: string) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data.orders || [];
+}
+
+// ─── Google Identity Services (GIS) Auth ──────────────────────────────────
+export interface DecodedGoogleUser {
+  email: string;
+  name: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  sub: string;
+}
+
+export function decodeGoogleCredential(credential: string): DecodedGoogleUser | null {
+  try {
+    const base64Url = credential.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode Google credential:', e);
+    return null;
+  }
+}
+
+export async function loginWithGoogle(credential: string) {
+  const res = await fetch(`${API_BASE}/api/customer/google/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credential }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err: any = new Error(data.error || `HTTP ${res.status}`);
+    err.notFound = data.notFound;
+    err.email = data.email;
+    err.name = data.name;
+    err.picture = data.picture;
+    throw err;
+  }
+  return data;
+}
+
+export async function signupWithGoogle(credential: string, phone: string, name?: string) {
+  const res = await fetch(`${API_BASE}/api/customer/google/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credential, phone, name }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err: any = new Error(data.error || `HTTP ${res.status}`);
+    err.alreadyExists = data.alreadyExists;
+    throw err;
+  }
+  return data;
 }
 
 // ─── Password Reset OTP Flow ──────────────────────────────────────────────────
