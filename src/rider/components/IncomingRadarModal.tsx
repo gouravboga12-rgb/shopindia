@@ -103,11 +103,11 @@ export const IncomingRadarModal: React.FC = () => {
   const totalItemQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white border-2 border-orange-500 rounded-3xl shadow-2xl overflow-hidden text-slate-800 relative animate-in slide-in-from-bottom-8 duration-300">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
+      <div className="w-full max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col bg-white border-2 border-orange-500 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-800 relative animate-in slide-in-from-bottom-6 duration-300">
         
         {/* Top Radial Countdown Bar (Smooth 30s linear transition) */}
-        <div className="w-full bg-slate-100 h-2">
+        <div className="w-full bg-slate-100 h-2 shrink-0">
           <div
             className={`h-full transition-all duration-1000 ease-linear ${
               secondsLeft <= 8 ? 'bg-red-500' : 'bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500'
@@ -116,8 +116,8 @@ export const IncomingRadarModal: React.FC = () => {
           />
         </div>
 
-        {/* Modal Header */}
-        <div className="p-4 sm:p-5 pb-3 flex items-center justify-between border-b border-slate-100">
+        {/* Pinned Modal Header (Always 100% visible on mobile) */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex items-center justify-between border-b border-slate-100 bg-white shrink-0 z-10">
           <div className="flex items-center gap-2">
             <span className="flex h-3 w-3 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
@@ -128,7 +128,7 @@ export const IncomingRadarModal: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <span className={`flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1 rounded-full border ${
               secondsLeft <= 8 ? 'bg-red-50 text-red-700 border-red-300 animate-pulse' : 'bg-amber-50 text-amber-800 border-amber-200'
             }`}>
@@ -144,19 +144,20 @@ export const IncomingRadarModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Earnings & Trip Overview Summary Card */}
-        <div className="p-4 sm:p-6 bg-white space-y-4">
-          <div className="flex items-center justify-between bg-gradient-to-br from-slate-900 to-slate-850 text-white rounded-2xl p-4 shadow-md">
+        {/* Scrollable Middle Body (Fits comfortably on all mobile viewports without pushing header off-screen) */}
+        <div className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-5 space-y-3.5 bg-white">
+          {/* Earnings & Trip Overview Summary Card */}
+          <div className="flex items-center justify-between bg-gradient-to-br from-slate-900 to-slate-850 text-white rounded-2xl p-3.5 sm:p-4 shadow-md">
             <div>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Your Guaranteed Earning</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Your Guaranteed Earning</p>
               <div className="flex items-center gap-1 text-2xl sm:text-3xl font-black text-emerald-400 mt-0.5 font-numbers">
-                <IndianRupee className="w-6 h-6 stroke-[2.5]" />
+                <IndianRupee className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
                 <span>{incomingBroadcast.deliveryFee}</span>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Total Round Trip</p>
-              <p className="text-base sm:text-lg font-black text-white mt-0.5 flex items-center justify-end gap-1.5">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Total Round Trip</p>
+              <p className="text-sm sm:text-base font-black text-white mt-0.5 flex items-center justify-end gap-1.5">
                 <Navigation className="w-4 h-4 text-orange-400" />
                 <span>{routeMetrics.totalDist} km</span>
                 <span className="text-xs text-slate-400 font-medium font-sans">({routeMetrics.totalMins} mins)</span>
@@ -165,55 +166,55 @@ export const IncomingRadarModal: React.FC = () => {
           </div>
 
           {/* Rapido-Style Two-Leg Route Breakdown */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-4">
-            <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
+          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 space-y-3 sm:space-y-4">
+            <div className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
               <span>Trip Route Breakdown (2-Legs)</span>
               <span className="text-orange-600 font-bold font-mono">Live Distance</span>
             </div>
 
             {/* Leg 1: Rider to Store (Pickup) */}
-            <div className="flex items-start gap-3 relative">
-              <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 border border-orange-200 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs font-bold text-xs">
+            <div className="flex items-start gap-2.5 sm:gap-3 relative">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-orange-100 text-orange-700 border border-orange-200 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs font-bold text-xs">
                 1
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-700 flex items-center gap-1">
+                  <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-orange-700 flex items-center gap-1">
                     <Store className="w-3 h-3" /> Pickup from Merchant
                   </span>
-                  <span className="text-[11px] font-black text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
+                  <span className="text-[10px] sm:text-[11px] font-black text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
                     {routeMetrics.pickupDist} km • ~{routeMetrics.pickupMins}m
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-slate-900 truncate mt-0.5">{incomingBroadcast.pickupName}</h4>
-                <p className="text-xs text-slate-500 truncate">{incomingBroadcast.pickupAddress}</p>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate mt-0.5">{incomingBroadcast.pickupName}</h4>
+                <p className="text-[11px] sm:text-xs text-slate-500 truncate">{incomingBroadcast.pickupAddress}</p>
               </div>
             </div>
 
             {/* Connecting Step Line */}
-            <div className="pl-4 -my-2 flex items-center gap-2">
-              <div className="w-0.5 h-6 bg-slate-300 ml-[-1px]" />
-              <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1 italic">
+            <div className="pl-3.5 sm:pl-4 -my-2 flex items-center gap-2">
+              <div className="w-0.5 h-5 sm:h-6 bg-slate-300 ml-[-1px]" />
+              <span className="text-[9.5px] sm:text-[10px] text-slate-400 font-medium flex items-center gap-1 italic">
                 <ArrowRight className="w-3 h-3" /> Pickup & proceed to customer
               </span>
             </div>
 
             {/* Leg 2: Store to Customer (Delivery) */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs font-bold text-xs">
+            <div className="flex items-start gap-2.5 sm:gap-3">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs font-bold text-xs">
                 2
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 flex items-center gap-1">
+                  <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 flex items-center gap-1">
                     <MapPin className="w-3 h-3" /> Deliver to Customer
                   </span>
-                  <span className="text-[11px] font-black text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
+                  <span className="text-[10px] sm:text-[11px] font-black text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
                     {routeMetrics.dropDist} km • ~{routeMetrics.dropMins}m
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-slate-900 truncate mt-0.5">{incomingBroadcast.dropoffName}</h4>
-                <p className="text-xs text-slate-500 truncate">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate mt-0.5">{incomingBroadcast.dropoffName}</h4>
+                <p className="text-[11px] sm:text-xs text-slate-500 truncate">
                   {incomingBroadcast.dropoffAddress && incomingBroadcast.dropoffAddress.replace(/[,\s]/g, '').length > 0
                     ? incomingBroadcast.dropoffAddress
                     : 'Customer Doorstep'}
@@ -223,71 +224,71 @@ export const IncomingRadarModal: React.FC = () => {
           </div>
 
           {/* Package Contents Overview (No internal prices exposed) */}
-          <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5 text-xs text-slate-700 space-y-1.5">
+          <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3 sm:p-3.5 text-xs text-slate-700 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-amber-900 flex items-center gap-1.5">
-                <Package className="w-4 h-4 text-amber-600" />
+              <span className="font-bold text-amber-900 flex items-center gap-1.5 text-xs">
+                <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
                 <span>Package Contents {totalItemQty > 0 ? `(${totalItemQty} items)` : ''}</span>
               </span>
-              <span className="text-[11px] text-amber-700 font-semibold font-mono">
+              <span className="text-[10px] sm:text-[11px] text-amber-700 font-semibold font-mono">
                 Order #{incomingBroadcast.order?.orderNumber || 'QUICK'}
               </span>
             </div>
 
             {items.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 pt-1">
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {items.map((item, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-amber-200/70 text-slate-800 text-[11px] font-medium shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-amber-200/70 text-slate-800 text-[10.5px] sm:text-[11px] font-medium shadow-2xs"
                   >
                     <span className="font-bold text-amber-700">{item.quantity}x</span>
-                    <span className="truncate max-w-[200px]">{item.name}</span>
+                    <span className="truncate max-w-[180px] sm:max-w-[200px]">{item.name}</span>
                   </span>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-slate-500 italic">Quick-commerce prepared order ready at store counter.</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 italic">Quick-commerce prepared order ready at store counter.</p>
             )}
           </div>
 
           {/* Conflict Error Message if taken by another partner */}
           {claimError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+            <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
               <X className="w-4 h-4 text-red-500 shrink-0" />
               <span>{claimError}</span>
             </div>
           )}
+        </div>
 
-          {/* Action Buttons */}
-          <div className="pt-2 flex gap-3">
-            <button
-              type="button"
-              onClick={() => declineOrder(incomingBroadcast.id)}
-              disabled={isClaiming}
-              className="flex-1 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-xs sm:text-sm text-slate-700 transition-colors cursor-pointer"
-            >
-              Pass Offer
-            </button>
-            <button
-              type="button"
-              onClick={handleAccept}
-              disabled={isClaiming}
-              className="flex-2 py-3 px-5 sm:px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
-            >
-              {isClaiming ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Accepting Order...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                  <span>ACCEPT DELIVERY (₹{incomingBroadcast.deliveryFee})</span>
-                </>
-              )}
-            </button>
-          </div>
+        {/* Pinned Sticky Action Footer */}
+        <div className="shrink-0 p-3 sm:p-4 bg-white border-t border-slate-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex gap-2.5 z-10">
+          <button
+            type="button"
+            onClick={() => declineOrder(incomingBroadcast.id)}
+            disabled={isClaiming}
+            className="flex-1 py-3 px-3 sm:px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-xs sm:text-sm text-slate-700 transition-colors cursor-pointer"
+          >
+            Pass Offer
+          </button>
+          <button
+            type="button"
+            onClick={handleAccept}
+            disabled={isClaiming}
+            className="flex-2 py-3 px-4 sm:px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+          >
+            {isClaiming ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Accepting Order...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                <span>ACCEPT DELIVERY (₹{incomingBroadcast.deliveryFee})</span>
+              </>
+            )}
+          </button>
         </div>
 
       </div>
