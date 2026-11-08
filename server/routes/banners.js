@@ -36,6 +36,32 @@ router.get('/spotlight', async (req, res) => {
   }
 });
 
+// Get active deals of the day for frontend
+router.get('/deals-of-the-day', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'deals_of_the_day' }
+    });
+    let deals = null;
+    if (setting && setting.value) {
+      try {
+        deals = JSON.parse(setting.value);
+      } catch (e) {}
+    }
+    if (!deals) {
+      deals = {
+        isActive: true,
+        title: 'Deals of the Day',
+        badge: 'Limited Offer',
+        productIds: []
+      };
+    }
+    res.json({ deals });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get active banners for frontend
 router.get('/', async (req, res) => {
   try {

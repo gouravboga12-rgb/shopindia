@@ -123,15 +123,54 @@ export const VerticalShopMobile: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState({ hours: 12, minutes: 44, seconds: 12 });
   const [currentSlide, setCurrentSlide] = useState(0);
   const [banners, setBanners] = useState<any[]>([]);
+  const [dealsConfig, setDealsConfig] = useState<{
+    isActive: boolean;
+    title: string;
+    badge: string;
+    productIds: string[];
+  }>({
+    isActive: true,
+    title: 'Deals of the Day',
+    badge: 'Limited Offer',
+    productIds: []
+  });
 
   useEffect(() => {
     api.get<{ banners: any[] }>('/api/banners')
       .then(d => setBanners(d.banners || []))
       .catch(console.error);
+
+    api.get<{ deals: any }>('/api/banners/deals-of-the-day')
+      .then(d => {
+        if (d?.deals) setDealsConfig(d.deals);
+      })
+      .catch(console.error);
   }, []);
 
   const { products } = useProducts();
   const shopProducts = products.filter(p => p.vertical === 'shop');
+
+  // Curated Deals of the Day (Super Admin Handpicked with High-Discount Fallback)
+  const dealsProducts = React.useMemo(() => {
+    if (dealsConfig.productIds && dealsConfig.productIds.length > 0) {
+      const curated = dealsConfig.productIds
+        .map(id => products.find(p => p.id === id))
+        .filter(Boolean) as typeof shopProducts;
+      if (curated.length > 0) return curated;
+    }
+    const withDiscount = shopProducts.filter(p => p.originalPrice > p.price);
+    if (withDiscount.length > 0) {
+      return withDiscount
+        .slice()
+        .sort((a, b) => {
+          const discA = (a.originalPrice - a.price) / a.originalPrice;
+          const discB = (b.originalPrice - b.price) / b.originalPrice;
+          return discB - discA;
+        })
+        .slice(0, 8);
+    }
+    return shopProducts.slice(0, 6);
+  }, [dealsConfig, products, shopProducts]);
 
   // Autoplay for Hero Carousel
   useEffect(() => {
@@ -246,57 +285,61 @@ export const VerticalShopMobile: React.FC = () => {
       </div>
 
       {/* 4. Mobile Deals of the Day Box */}
-      <div className="w-full bg-white rounded-[20px] p-5 shadow-soft border border-brand-border flex flex-col gap-4">
-        <div className="flex justify-between items-center border-b border-brand-border pb-3 leading-none select-none">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-brand-graphite uppercase tracking-wide font-heading">Deals of the Day</span>
-            <div className="flex items-center gap-1 text-[8.5px] text-brand-red font-black bg-red-50 border border-brand-red/10 px-2 py-0.5 rounded-full font-numbers">
-              <Clock size={8} />
-              <span>{formatNumber(timeLeft.hours)}h {formatNumber(timeLeft.minutes)}m {formatNumber(timeLeft.seconds)}s</span>
-            </div>
-          </div>
-          <button
-            onClick={() => navigateTo('search')}
-            className="text-xs font-black text-brand-blue uppercase tracking-widest flex items-center gap-0.5"
-          >
-            <span>See All</span>
-            <ChevronRight size={10} />
-          </button>
-        </div>
-
-        {/* Scrollable Deals list */}
-        <div className="w-full flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
-          {shopProducts.map(product => {
-            const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-            const isWishlisted = wishlist.includes(product.id);
-            return (
-              <div
-                key={product.id}
-                onClick={() => navigateTo('detail', product.id)}
-                className="w-full max-w-[110px] shrink-0 flex flex-col text-left cursor-pointer group relative isolate"
-              >
-                {/* Wishlist Heart */}
-                <motion.button
-                  whileTap={{ scale: 0.8 }}
-                  onClick={(e) => toggleWishlist(product.id, e)}
-                  className="absolute top-1 right-1 p-1 rounded-full bg-white/95 text-zinc-400 hover:text-brand-red shadow-soft border border-brand-border transition-colors z-10"
-                >
-                  <Heart size={10} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
-                </motion.button>
-
-                <div className="w-full max-w-[110px] aspect-[5/4] border border-brand-border/60 rounded-[16px] flex items-center justify-center p-1 bg-white mb-2 overflow-hidden shadow-sm">
-                  <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain" />
-                </div>
-                <h4 className="text-xs font-bold text-brand-graphite line-clamp-1 leading-snug font-heading px-1">{product.title}</h4>
-                <span className="text-xs font-extrabold text-brand-graphite mt-0.5 font-numbers px-1">₹{product.price.toLocaleString('en-IN')}</span>
-                {product.originalPrice > product.price && (
-                  <span className="text-[8.5px] font-black text-brand-orange uppercase tracking-wider font-numbers px-1 mt-0.5">{discount}% OFF</span>
-                )}
+      {dealsConfig.isActive !== false && dealsProducts.length > 0 && (
+        <div className="w-full bg-white rounded-[20px] p-5 shadow-soft border border-brand-border flex flex-col gap-4">
+          <div className="flex justify-between items-center border-b border-brand-border pb-3 leading-none select-none">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-brand-graphite uppercase tracking-wide font-heading">
+                {dealsConfig.title || 'Deals of the Day'}
+              </span>
+              <div className="flex items-center gap-1 text-[8.5px] text-brand-red font-black bg-red-50 border border-brand-red/10 px-2 py-0.5 rounded-full font-numbers">
+                <Clock size={8} />
+                <span>{formatNumber(timeLeft.hours)}h {formatNumber(timeLeft.minutes)}m {formatNumber(timeLeft.seconds)}s</span>
               </div>
-            );
-          })}
+            </div>
+            <button
+              onClick={() => navigateTo('search')}
+              className="text-xs font-black text-brand-blue uppercase tracking-widest flex items-center gap-0.5"
+            >
+              <span>See All</span>
+              <ChevronRight size={10} />
+            </button>
+          </div>
+
+          {/* Scrollable Deals list */}
+          <div className="w-full flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
+            {dealsProducts.map(product => {
+              const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+              const isWishlisted = wishlist.includes(product.id);
+              return (
+                <div
+                  key={product.id}
+                  onClick={() => navigateTo('detail', product.id)}
+                  className="w-full max-w-[110px] shrink-0 flex flex-col text-left cursor-pointer group relative isolate"
+                >
+                  {/* Wishlist Heart */}
+                  <motion.button
+                    whileTap={{ scale: 0.8 }}
+                    onClick={(e) => toggleWishlist(product.id, e)}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-white/95 text-zinc-400 hover:text-brand-red shadow-soft border border-brand-border transition-colors z-10"
+                  >
+                    <Heart size={10} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
+                  </motion.button>
+
+                  <div className="w-full max-w-[110px] aspect-[5/4] border border-brand-border/60 rounded-[16px] flex items-center justify-center p-1 bg-white mb-2 overflow-hidden shadow-sm">
+                    <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <h4 className="text-xs font-bold text-brand-graphite line-clamp-1 leading-snug font-heading px-1">{product.title}</h4>
+                  <span className="text-xs font-extrabold text-brand-graphite mt-0.5 font-numbers px-1">₹{product.price.toLocaleString('en-IN')}</span>
+                  {product.originalPrice > product.price && (
+                    <span className="text-[8.5px] font-black text-brand-orange uppercase tracking-wider font-numbers px-1 mt-0.5">{discount}% OFF</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 4.5. Trust Badges Row (Zepto / Blinkit style) */}
       <div className="w-full bg-white rounded-[20px] p-3.5 border border-brand-border shadow-soft grid grid-cols-4 gap-1 select-none">

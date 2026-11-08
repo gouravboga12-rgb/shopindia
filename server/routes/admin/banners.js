@@ -149,4 +149,49 @@ router.post('/spotlight', async (req, res) => {
   }
 });
 
+// GET /api/admin/banners/deals
+router.get('/deals', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'deals_of_the_day' }
+    });
+    let deals = null;
+    if (setting && setting.value) {
+      try { deals = JSON.parse(setting.value); } catch (e) {}
+    }
+    if (!deals) {
+      deals = {
+        isActive: true,
+        title: 'Deals of the Day',
+        badge: 'Limited Offer',
+        productIds: []
+      };
+    }
+    res.json({ deals });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/banners/deals
+router.post('/deals', async (req, res) => {
+  try {
+    const data = req.body;
+    const value = JSON.stringify(data);
+    await prisma.appSetting.upsert({
+      where: { key: 'deals_of_the_day' },
+      update: { value, updatedAt: new Date(), updatedBy: req.user?.id || req.user?.userId },
+      create: {
+        key: 'deals_of_the_day',
+        value,
+        description: 'Homepage Deals of the Day / Limited Offers curated products',
+        updatedBy: req.user?.id || req.user?.userId
+      }
+    });
+    res.json({ success: true, deals: data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

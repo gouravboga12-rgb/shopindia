@@ -46,6 +46,17 @@ export const VerticalShop: React.FC = () => {
     isActive: true
   });
   const [apiBrands, setApiBrands] = useState<Array<{ id?: string; name: string; logo: string | null; isFeatured?: boolean }>>([]);
+  const [dealsConfig, setDealsConfig] = useState<{
+    isActive: boolean;
+    title: string;
+    badge: string;
+    productIds: string[];
+  }>({
+    isActive: true,
+    title: 'Deals of the Day',
+    badge: 'Limited Offer',
+    productIds: []
+  });
 
   const normalizeBrand = (str: string) => str.trim().toLowerCase().replace(/[’']/g, "'");
 
@@ -91,7 +102,7 @@ export const VerticalShop: React.FC = () => {
       .then(d => {
         if (d.spotlight) setSpotlightPromo(d.spotlight);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // 3. Fetch active brands curated by Admin
     api.get<{ brands: any[] }>('/api/brands')
@@ -100,7 +111,14 @@ export const VerticalShop: React.FC = () => {
           setApiBrands(d.brands);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
+
+    // 4. Fetch dynamic Deals of the Day (Limited Offers) curated by Super Admin
+    api.get<{ deals: any }>('/api/banners/deals-of-the-day')
+      .then(d => {
+        if (d?.deals) setDealsConfig(d.deals);
+      })
+      .catch(() => { });
   }, []);
 
   // Filter products for this vertical
@@ -142,6 +160,30 @@ export const VerticalShop: React.FC = () => {
 
     return result.slice(0, 8);
   }, [apiBrands, shopProducts]);
+
+  // Curated Deals of the Day (Super Admin Handpicked with High-Discount Fallback)
+  const dealsProducts = React.useMemo(() => {
+    if (dealsConfig.productIds && dealsConfig.productIds.length > 0) {
+      const curated = dealsConfig.productIds
+        .map(id => products.find(p => p.id === id))
+        .filter(Boolean) as typeof shopProducts;
+      if (curated.length > 0) return curated;
+    }
+
+    // Fallback: Products with genuine discounts, sorted from highest discount % to lowest
+    const withDiscount = shopProducts.filter(p => p.originalPrice > p.price);
+    if (withDiscount.length > 0) {
+      return withDiscount
+        .slice()
+        .sort((a, b) => {
+          const discA = (a.originalPrice - a.price) / a.originalPrice;
+          const discB = (b.originalPrice - b.price) / b.originalPrice;
+          return discB - discA;
+        })
+        .slice(0, 8);
+    }
+    return shopProducts.slice(0, 5);
+  }, [dealsConfig, products, shopProducts]);
 
   const justForYou = shopProducts.length > 5 ? shopProducts.slice().sort(() => 0.5 - Math.random()).slice(0, 6) : shopProducts.slice(0, 6);
 
@@ -583,120 +625,124 @@ export const VerticalShop: React.FC = () => {
         )}
 
         {/* 2. Deals of the Day (Polished details, luxury monospaced countdown timer, horizontal carousel buttons) */}
-        <div className="w-full bg-white rounded-card flex flex-col md:flex-row shadow-premium overflow-hidden border border-brand-border relative">
-          {/* Left Side: Editorial timer and badge */}
-          <div
-            className="w-full md:w-full max-w-[280px] p-8 border-b md:border-b-0 md:border-r border-brand-border flex flex-col items-center justify-center text-center shrink-0 bg-cover bg-bottom bg-no-repeat relative"
-            style={{ backgroundImage: `linear-gradient(to top, rgba(255,255,255,0.98), rgba(255,255,255,0.95)), url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format')` }}
-          >
-            <div className="flex items-center gap-1.5 text-brand-orange bg-orange-50/80 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3.5 border border-brand-orange/10">
-              <Clock size={10} className="animate-spin-slow" />
-              <span>Limited Offer</span>
-            </div>
-            <h3 className="text-sm font-bold mb-4 tracking-wider text-brand-graphite uppercase font-heading">Deals of the Day</h3>
-
-            {/* Monospaced Digit blocks */}
-            <div className="flex items-center gap-2 mb-7 font-numbers text-xs font-bold select-none">
-              <div className="flex flex-col items-center">
-                <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
-                  {formatNumber(timeLeft.hours)}
-                </span>
-                <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Hours</span>
-              </div>
-              <span className="text-brand-slate font-bold mb-4">:</span>
-              <div className="flex flex-col items-center">
-                <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
-                  {formatNumber(timeLeft.minutes)}
-                </span>
-                <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Mins</span>
-              </div>
-              <span className="text-brand-slate font-bold mb-4">:</span>
-              <div className="flex flex-col items-center">
-                <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
-                  {formatNumber(timeLeft.seconds)}
-                </span>
-                <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Secs</span>
-              </div>
-            </div>
-
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigateTo('search')}
-              className="px-6 py-2.5 bg-brand-blue hover:bg-blue-600 text-white font-bold text-xs tracking-wider rounded-button shadow-premium transition-colors uppercase"
-            >
-              Explore All Deals
-            </motion.button>
-          </div>
-
-          {/* Right Side: Horizontal products list with slider arrows */}
-          <div className="flex-1 relative flex items-center">
-            {/* Scroll Navigation Arrows */}
-            <button
-              onClick={() => scrollDeals('left')}
-              className="absolute left-3 w-8 h-8 rounded-full bg-white border border-brand-border/60 hover:border-brand-border shadow-soft flex items-center justify-center text-brand-slate hover:text-brand-graphite hover:scale-105 active:scale-95 transition-all z-10"
-              aria-label="Scroll left"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => scrollDeals('right')}
-              className="absolute right-3 w-8 h-8 rounded-full bg-white border border-brand-border/60 hover:border-brand-border shadow-soft flex items-center justify-center text-brand-slate hover:text-brand-graphite hover:scale-105 active:scale-95 transition-all z-10"
-              aria-label="Scroll right"
-            >
-              <ChevronRight size={16} />
-            </button>
-
-            {/* Horizontal Grid Content */}
+        {dealsConfig.isActive !== false && dealsProducts.length > 0 && (
+          <div className="w-full bg-white rounded-card flex flex-col md:flex-row shadow-premium overflow-hidden border border-brand-border relative">
+            {/* Left Side: Editorial timer and badge */}
             <div
-              ref={dealsScrollRef}
-              className="w-full flex gap-6 overflow-x-auto p-8 scroll-smooth no-scrollbar"
+              className="w-full md:w-full max-w-[280px] p-8 border-b md:border-b-0 md:border-r border-brand-border flex flex-col items-center justify-center text-center shrink-0 bg-cover bg-bottom bg-no-repeat relative"
+              style={{ backgroundImage: `linear-gradient(to top, rgba(255,255,255,0.98), rgba(255,255,255,0.95)), url('https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format')` }}
             >
-              {shopProducts.slice(0, 5).map(product => {
-                const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-                const isWishlisted = wishlist.includes(product.id);
-                return (
-                  <div
-                    key={product.id}
-                    onClick={() => navigateTo('detail', product.id)}
-                    className="w-full max-w-[160px] flex-shrink-0 flex flex-col items-center text-center group cursor-pointer relative"
-                  >
-                    {/* Wishlist Heart Animation */}
-                    <motion.button
-                      whileTap={{ scale: 0.8 }}
-                      onClick={(e) => toggleWishlist(product.id, e)}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white text-zinc-400 hover:text-brand-red shadow-soft transition-colors z-10"
-                    >
-                      <Heart size={12} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
-                    </motion.button>
+              <div className="flex items-center gap-1.5 text-brand-orange bg-orange-50/80 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3.5 border border-brand-orange/10">
+                <Clock size={10} className="animate-spin-slow" />
+                <span>{dealsConfig.badge || 'Limited Offer'}</span>
+              </div>
+              <h3 className="text-sm font-bold mb-4 tracking-wider text-brand-graphite uppercase font-heading">
+                {dealsConfig.title || 'Deals of the Day'}
+              </h3>
 
-                    {/* Editorial zoom wrapper */}
-                    <div className="w-full max-w-[120px] h-[120px] flex items-center justify-center mb-3 bg-slate-50/50 rounded-full p-4 relative overflow-hidden group-hover:bg-slate-100/50 transition-colors">
-                      <img
-                        src={product.image}
-                        alt={product.title}
-                        className="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-500 ease-out mix-blend-multiply"
-                      />
-                    </div>
-                    <h4 className="text-xs font-semibold text-brand-graphite line-clamp-1 group-hover:text-brand-blue transition-colors px-2 leading-tight font-heading">
-                      {product.title}
-                    </h4>
-                    <div className="flex items-center gap-1.5 mt-2 justify-center leading-none font-numbers text-xs">
-                      <span className="font-semibold text-brand-graphite">₹{product.price.toLocaleString('en-IN')}</span>
+              {/* Monospaced Digit blocks */}
+              <div className="flex items-center gap-2 mb-7 font-numbers text-xs font-bold select-none">
+                <div className="flex flex-col items-center">
+                  <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                    {formatNumber(timeLeft.hours)}
+                  </span>
+                  <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Hours</span>
+                </div>
+                <span className="text-brand-slate font-bold mb-4">:</span>
+                <div className="flex flex-col items-center">
+                  <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                    {formatNumber(timeLeft.minutes)}
+                  </span>
+                  <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Mins</span>
+                </div>
+                <span className="text-brand-slate font-bold mb-4">:</span>
+                <div className="flex flex-col items-center">
+                  <span className="w-9 h-9 flex items-center justify-center bg-brand-graphite text-white rounded-sm shadow-soft text-sm font-bold leading-none">
+                    {formatNumber(timeLeft.seconds)}
+                  </span>
+                  <span className="text-[7.5px] uppercase font-bold tracking-wider text-brand-slate mt-1.5">Secs</span>
+                </div>
+              </div>
+
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigateTo('search')}
+                className="px-6 py-2.5 bg-brand-blue hover:bg-blue-600 text-white font-bold text-xs tracking-wider rounded-button shadow-premium transition-colors uppercase"
+              >
+                Explore All Deals
+              </motion.button>
+            </div>
+
+            {/* Right Side: Horizontal products list with slider arrows */}
+            <div className="flex-1 relative flex items-center">
+              {/* Scroll Navigation Arrows */}
+              <button
+                onClick={() => scrollDeals('left')}
+                className="absolute left-3 w-8 h-8 rounded-full bg-white border border-brand-border/60 hover:border-brand-border shadow-soft flex items-center justify-center text-brand-slate hover:text-brand-graphite hover:scale-105 active:scale-95 transition-all z-10"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => scrollDeals('right')}
+                className="absolute right-3 w-8 h-8 rounded-full bg-white border border-brand-border/60 hover:border-brand-border shadow-soft flex items-center justify-center text-brand-slate hover:text-brand-graphite hover:scale-105 active:scale-95 transition-all z-10"
+                aria-label="Scroll right"
+              >
+                <ChevronRight size={16} />
+              </button>
+
+              {/* Horizontal Grid Content */}
+              <div
+                ref={dealsScrollRef}
+                className="w-full flex gap-6 overflow-x-auto p-8 scroll-smooth no-scrollbar"
+              >
+                {dealsProducts.map(product => {
+                  const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+                  const isWishlisted = wishlist.includes(product.id);
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => navigateTo('detail', product.id)}
+                      className="w-full max-w-[160px] flex-shrink-0 flex flex-col items-center text-center group cursor-pointer relative"
+                    >
+                      {/* Wishlist Heart Animation */}
+                      <motion.button
+                        whileTap={{ scale: 0.8 }}
+                        onClick={(e) => toggleWishlist(product.id, e)}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white text-zinc-400 hover:text-brand-red shadow-soft transition-colors z-10"
+                      >
+                        <Heart size={12} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
+                      </motion.button>
+
+                      {/* Editorial zoom wrapper */}
+                      <div className="w-full max-w-[120px] h-[120px] flex items-center justify-center mb-3 bg-slate-50/50 rounded-full p-4 relative overflow-hidden group-hover:bg-slate-100/50 transition-colors">
+                        <img
+                          src={product.image}
+                          alt={product.title}
+                          className="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-500 ease-out mix-blend-multiply"
+                        />
+                      </div>
+                      <h4 className="text-xs font-semibold text-brand-graphite line-clamp-1 group-hover:text-brand-blue transition-colors px-2 leading-tight font-heading">
+                        {product.title}
+                      </h4>
+                      <div className="flex items-center gap-1.5 mt-2 justify-center leading-none font-numbers text-xs">
+                        <span className="font-semibold text-brand-graphite">₹{product.price.toLocaleString('en-IN')}</span>
+                        {product.originalPrice > product.price && (
+                          <span className="text-xs text-brand-slate line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
+                        )}
+                      </div>
                       {product.originalPrice > product.price && (
-                        <span className="text-xs text-brand-slate line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
+                        <span className="text-xs text-brand-orange font-bold mt-2 bg-orange-50 border border-brand-orange/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-numbers">
+                          {discount}% OFF
+                        </span>
                       )}
                     </div>
-                    {product.originalPrice > product.price && (
-                      <span className="text-xs text-brand-orange font-bold mt-2 bg-orange-50 border border-brand-orange/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-numbers">
-                        {discount}% OFF
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 3. Main Multi-Column Product Display Grids (Polished visual borders, shadows, image-zooms & consistent rhythm spacing) */}
         <div className="w-full grid grid-cols-1 lg:grid-cols-4 gap-8 text-left items-start select-none">
@@ -860,7 +906,7 @@ export const VerticalShop: React.FC = () => {
             {spotlightPromo && spotlightPromo.isActive !== false && (
               <div className="w-full bg-brand-card p-6 rounded-card shadow-premium flex flex-col gap-4 border border-brand-border">
                 <span className="font-bold text-xs tracking-widest text-brand-slate uppercase font-heading">Spotlight Brand</span>
-                <div 
+                <div
                   className="relative aspect-[3/4] rounded-card overflow-hidden shadow-inner group cursor-pointer bg-neutral-900"
                   onClick={() => {
                     if (spotlightPromo.actionLink) {
