@@ -310,7 +310,8 @@ export const PricingSettingsPage: React.FC = () => {
     try {
       const mergedSettings: AppSettings = { ...settings, ...bundleSettings };
 
-      const payload: any = { settings: mergedSettings };
+      // Strictly send only the specific keys being updated so saving one schedule never overwrites another!
+      const payload: any = { settings: bundleSettings };
       if (bundleDeliveryRule) {
         payload.deliveryRule = {
           ...bundleDeliveryRule,
@@ -1117,7 +1118,7 @@ export const PricingSettingsPage: React.FC = () => {
               ) : settings.midnight_blackout_enabled === 'true' ? (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  SCHEDULED ({settings.midnight_blackout_start || '23:00'} to {settings.midnight_blackout_end || '07:00'})
+                  SCHEDULED ({liveOperatingStatus?.midnightBlackout?.formattedStart || '11:00 PM'} to {liveOperatingStatus?.midnightBlackout?.formattedEnd || '07:00 AM'})
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold">
@@ -1136,7 +1137,7 @@ export const PricingSettingsPage: React.FC = () => {
               ) : settings.friday_break_enabled === 'true' ? (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  SCHEDULED (Fridays {settings.friday_break_start || '12:00'} to {settings.friday_break_end || '14:00'})
+                  SCHEDULED (Fridays {liveOperatingStatus?.fridayBreak?.formattedStart || '12:00 PM'} to {liveOperatingStatus?.fridayBreak?.formattedEnd || '02:00 PM'})
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold">
