@@ -182,18 +182,18 @@ export const RiderOrders: React.FC = () => {
             ) : (
               <div className="divide-y divide-slate-100">
                 {historyOrders.map((order: any) => {
-                  const orderNo = order.orderNumber || order.order?.orderNumber || order.id || '';
-                  const token = orderNo.replace(/^OD-/, '').slice(-4) || '9786';
+                  const rawOrderNo = order.orderNumber || order.order?.orderNumber || (order.orderId ? order.orderId.slice(0, 8) : '') || (order.id ? order.id.slice(0, 8) : '');
+                  const token = (order.orderNumber || order.order?.orderNumber || '').replace(/^OD-/, '').slice(-4) || (rawOrderNo ? rawOrderNo.slice(-4) : '9786');
                   return (
                     <div key={order.id} className="py-3 flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-800 border border-slate-200 font-bold rounded text-[10px] font-mono">
-                            #{token}
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="px-1.5 py-0.5 bg-orange-100 text-orange-900 border border-orange-300 font-black rounded text-[10px] font-mono">
+                            Token: #{token}
                           </span>
                           <span className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[140px] sm:max-w-none">
-                            #{orderNo}
+                            Order #{rawOrderNo}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 mt-0.5 truncate max-w-[200px] sm:max-w-md">

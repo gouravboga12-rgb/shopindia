@@ -22,7 +22,6 @@ interface RiderNotification {
 export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => {
   const { profile, isOnline, toggleOnline } = useRider();
   const { user, logout } = useAuth();
-  const cashInHand = profile?.codCashFloat ?? 0;
 
   const [notifications, setNotifications] = useState<RiderNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -103,30 +102,17 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
 
         {/* Center / Right: Online Status Toggle & Wallet */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* COD Cash in Hand (if holding customer cash) */}
-          {cashInHand > 0 && (
-            <button
-              type="button"
-              onClick={() => onNavigateToTab?.('wallet')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border text-xs sm:text-sm font-black transition-all cursor-pointer ${
-                cashInHand >= (profile?.codFloatLimit || 3000)
-                  ? 'bg-red-50 text-red-700 border-red-300 animate-pulse'
-                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-              }`}
-              title="Click to remit customer cash to Admin"
-            >
-              <span className="text-[10px] uppercase font-bold text-amber-600 hidden md:inline">COD Cash:</span>
-              <span>₹{cashInHand.toLocaleString('en-IN')}</span>
-              <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.2 rounded font-bold">PAY</span>
-            </button>
-          )}
-
           {/* Wallet Balance Pill (Handles Auto-Offset Net Balance) */}
-          <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-2xs ${
-            (profile?.walletBalance || 0) < 0
-              ? 'bg-amber-50 border-amber-300 text-amber-800'
-              : 'bg-emerald-50 border-emerald-200/80 text-emerald-700'
-          }`}>
+          <button
+            type="button"
+            onClick={() => onNavigateToTab?.('wallet')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-2xs cursor-pointer hover:opacity-90 transition-opacity ${
+              (profile?.walletBalance || 0) < 0
+                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                : 'bg-emerald-50 border-emerald-200/80 text-emerald-700'
+            }`}
+            title="Wallet Balance"
+          >
             <Wallet className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
               (profile?.walletBalance || 0) < 0 ? 'text-amber-600' : 'text-emerald-600'
             }`} />
@@ -135,7 +121,7 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
                 ? `-₹${Math.abs(Math.round(profile?.walletBalance || 0)).toLocaleString('en-IN')}`
                 : `₹${Math.round(profile?.walletBalance || 0).toLocaleString('en-IN')}`}
             </span>
-          </div>
+          </button>
 
           {/* Notification Bell with Unread Badge */}
           <div className="relative">

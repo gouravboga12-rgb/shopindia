@@ -485,7 +485,7 @@ export const ActiveDeliveryView: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-xs text-emerald-800 font-medium">
-                  Physical cash confirmed. This amount is added to your COD cash float. OTP verification is now unlocked.
+                  Physical cash confirmed. This amount is kept with you and deducted from your wallet balance. OTP verification is now unlocked.
                 </p>
               </div>
             ) : (
@@ -573,7 +573,7 @@ export const ActiveDeliveryView: React.FC = () => {
                     Have you collected <strong className="text-slate-900 font-extrabold font-mono">₹{activeDelivery.order?.total?.toLocaleString('en-IN')}</strong> physical cash in hand from the customer?
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    This amount will be added to your COD cash float for remittance.
+                    This amount is collected and kept by you, and will be deducted from your wallet balance.
                   </p>
                 </div>
                 <div className="flex gap-2.5 pt-2">

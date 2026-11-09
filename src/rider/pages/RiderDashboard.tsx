@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useRider } from '../context/RiderContext';
-import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { ActiveDeliveryView } from './ActiveDeliveryView';
 import {
@@ -15,10 +14,6 @@ import {
   RefreshCw,
   AlertCircle,
   Banknote,
-  ArrowUpRight,
-  ShieldAlert,
-  Loader2,
-  X,
   Bell
 } from 'lucide-react';
 
@@ -28,13 +23,8 @@ interface RiderDashboardProps {
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
   const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation, refreshData } = useRider();
-  const { user } = useAuth();
   const [locating, setLocating] = useState(false);
   const [locFeedback, setLocFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const [isPayingRazorpay, setIsPayingRazorpay] = useState(false);
-  const [remitFeedback, setRemitFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
 
   useEffect(() => {
@@ -50,99 +40,6 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
     };
     fetchAlerts();
   }, []);
-
-  const handlePayCODOnline = async () => {
-    const floatAmt = profile?.codCashFloat || 0;
-    if (floatAmt <= 0) return;
-    setIsPayingRazorpay(true);
-    setRemitFeedback(null);
-
-    try {
-      const orderRes = await api.post<{
-        success: boolean;
-        orderId: string;
-        amount: number;
-        currency: string;
-        keyId: string;
-        rider: { name: string; email: string; phone: string };
-      }>('/api/rider/cod/create-razorpay-order', {});
-
-      if (!orderRes.success) throw new Error('Could not initiate remittance order');
-
-      const Razorpay = (window as any).Razorpay;
-      if (!Razorpay) {
-        alert('Payment gateway is loading. Please try again in a few moments.');
-        setIsPayingRazorpay(false);
-        return;
-      }
-
-      const options = {
-        key: orderRes.keyId,
-        amount: orderRes.amount,
-        currency: orderRes.currency,
-        name: 'ShopIndia COD Clearance',
-        description: `Clearance of ₹${floatAmt} offline cash float`,
-        order_id: orderRes.orderId,
-        prefill: {
-          name: orderRes.rider?.name || user?.name || 'Rider',
-          email: orderRes.rider?.email || user?.email || '',
-          contact: orderRes.rider?.phone || '',
-        },
-        theme: {
-          color: '#EA580C',
-        },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id: string;
-          razorpay_signature: string;
-        }) => {
-          try {
-            const verifyRes = await api.post<{ success: boolean; message: string; clearedAmount: number }>(
-              '/api/rider/cod/verify-razorpay-remittance',
-              {
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-              }
-            );
-
-            if (verifyRes.success) {
-              setRemitFeedback({ type: 'success', text: verifyRes.message || 'Payment cleared successfully! Cash float reset.' });
-              if (refreshData) await refreshData();
-            }
-          } catch (verr: unknown) {
-            setRemitFeedback({
-              type: 'error',
-              text: verr instanceof Error ? verr.message : 'Payment verification failed',
-            });
-          } finally {
-            setIsPayingRazorpay(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setIsPayingRazorpay(false);
-          },
-        },
-      };
-
-      const rzp = new Razorpay(options);
-      rzp.on('payment.failed', (failResp: any) => {
-        setIsPayingRazorpay(false);
-        setRemitFeedback({
-          type: 'error',
-          text: failResp?.error?.description || 'Payment was cancelled or failed.',
-        });
-      });
-      rzp.open();
-    } catch (err: unknown) {
-      setRemitFeedback({
-        type: 'error',
-        text: err instanceof Error ? err.message : 'Failed to initiate remittance.',
-      });
-      setIsPayingRazorpay(false);
-    }
-  };
 
   const handleUpdateLocation = async () => {
     setLocating(true);
@@ -244,88 +141,38 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
         </div>
       )}
 
-      {/* Floating Cash in Hand Alert Banner (Unified Auto-Offset Model) */}
-      {((profile?.codCashFloat ?? 0) > 0 || (profile?.walletBalance ?? 0) < 0) && (
-        <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 flex flex-col gap-3 shadow-sm ${
-          (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-            ? 'bg-red-50 border-red-300 text-red-900'
-            : 'bg-gradient-to-r from-amber-50 to-orange-50 border-orange-300 text-orange-950'
-        }`}>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex items-start sm:items-center gap-3.5">
-              <div className={`p-3 rounded-2xl border shadow-xs shrink-0 ${
-                (profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000)
-                  ? 'bg-red-500 text-white border-red-600'
-                  : 'bg-orange-500 text-white border-orange-600'
-              }`}>
-                <Banknote className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm sm:text-base font-black uppercase tracking-tight">
-                    Cash in Pocket: ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
-                  </span>
-                  {(profile?.codCashFloat ?? 0) >= (profile?.codFloatLimit || 3000) ? (
-                    <span className="text-[10px] bg-red-200 text-red-900 font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-red-300">
-                      <ShieldAlert className="w-3 h-3" /> RADAR PAUSED (LIMIT REACHED)
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-amber-200/90 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300">
-                      Auto-Offset Active (Limit ₹{(profile?.codFloatLimit || 3000).toLocaleString('en-IN')})
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  {(profile?.walletBalance ?? 0) < 0
-                    ? `Current net wallet balance is -₹${Math.abs(Math.round(profile?.walletBalance || 0)).toLocaleString('en-IN')}. Delivery fees from upcoming trips automatically recover this balance, or you can clear online anytime.`
-                    : 'Customer COD cash collected and pocketed. Net earnings auto-offset seamlessly across deliveries.'}
-                </p>
-              </div>
+      {/* Cash in Hand Statement Card */}
+      {(profile?.codCashFloat ?? 0) > 0 && (
+        <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-orange-300 text-orange-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-3 rounded-2xl border shadow-xs shrink-0 bg-orange-500 text-white border-orange-600">
+              <Banknote className="w-6 h-6" />
             </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
-              <button
-                type="button"
-                disabled={isPayingRazorpay || (profile?.codCashFloat ?? 0) <= 0}
-                onClick={handlePayCODOnline}
-                className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-              >
-                {isPayingRazorpay ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processing Gateway...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Pay Online via UPI Now</span>
-                    <ArrowUpRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-              {onNavigateToTab && (
-                <button
-                  type="button"
-                  onClick={() => onNavigateToTab('deliveries')}
-                  className="px-3 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-                  title="View COD Statement & History"
-                >
-                  <Clock className="w-3.5 h-3.5 text-orange-600" />
-                  <span>Passbook Statement</span>
-                </button>
-              )}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm sm:text-base font-black uppercase tracking-tight">
+                  Offline Cash Kept: ₹{(profile?.codCashFloat ?? 0).toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] bg-amber-200/90 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Kept in Pocket
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">
+                You collected this offline cash on deliveries and kept it with yourself. It is automatically deducted from your wallet balance.
+              </p>
             </div>
           </div>
 
-          {/* Transient Remit Feedback (Success/Error) */}
-          {remitFeedback && (
-            <div className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 ${
-              remitFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-800 border border-red-300'
-            }`}>
-              <span>{remitFeedback.text}</span>
-              <button onClick={() => setRemitFeedback(null)} className="opacity-60 hover:opacity-100 cursor-pointer">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          {onNavigateToTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateToTab('deliveries')}
+              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 shrink-0 self-start sm:self-center"
+              title="View COD Statement"
+            >
+              <Clock className="w-3.5 h-3.5 text-orange-600" />
+              <span>View Statement</span>
+            </button>
           )}
         </div>
       )}
