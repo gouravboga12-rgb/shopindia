@@ -854,7 +854,9 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
       });
 
       // Credit Vendor Wallet (Vendor Net Model: Vendor receives 100% of product price)
-      if (delivery.order?.vendorId) {
+      // Service jobs (Glacons technicians) are credited to the technician partner, NEVER to a retail vendor
+      const isServiceJob = delivery.orderType === 'hvac_service' || delivery.order?.type === 'hvac_service';
+      if (delivery.order?.vendorId && !isServiceJob) {
         const orderForVendor = await tx.order.findUnique({
           where: { id: delivery.orderId },
           include: { items: true }

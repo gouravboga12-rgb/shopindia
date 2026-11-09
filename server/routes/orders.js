@@ -598,6 +598,7 @@ router.post('/', async (req, res) => {
     const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
 
     const isQuickOrder = fulfillmentType === 'quick_commerce';
+    const isServiceOrder = fulfillmentType === 'hvac_service' || resolvedVertical === 'services';
     const itemsList = Array.isArray(items) ? items : [];
     const firstServiceItem = itemsList.find(i => i.deliveryTime || i.specs?.['Scheduled Slot']) || itemsList[0] || null;
     const scheduledSlotInfo = req.body?.notes || firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || null;
@@ -606,7 +607,7 @@ router.post('/', async (req, res) => {
       data: {
         orderNumber,
         customerId,
-        vendorId: resolved.length ? resolved[0].vendorId : null,
+        vendorId: isServiceOrder ? null : (resolved.length ? resolved[0].vendorId : null),
         branchId,
         type: fulfillmentType,
         status: isQuickOrder ? 'confirmed' : 'placed',
@@ -625,7 +626,7 @@ router.post('/', async (req, res) => {
         items: {
           create: resolved.map((it) => ({
             productId: it.productId,
-            vendorId: it.vendorId,
+            vendorId: isServiceOrder ? null : it.vendorId,
             name: it.name,
             price: it.price,
             quantity: it.quantity,
