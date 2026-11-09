@@ -24,12 +24,23 @@ interface RiderDashboardProps {
 }
 
 function parseSlotStartHour(timeSlotStr: string): number {
-  const match = timeSlotStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!timeSlotStr) return 9;
+  const raw = timeSlotStr.trim();
+  const match = raw.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?(?:\s*-\s*(\d{1,2}):?(\d{2})?\s*(AM|PM)?)?/i);
   if (!match) return 9;
+
   let hour = parseInt(match[1], 10);
-  const period = match[3].toUpperCase();
-  if (period === 'PM' && hour < 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
+  const startMeridiem = (match[3] || '').toUpperCase();
+  const endMeridiem = (match[6] || '').toUpperCase();
+  const meridiem = startMeridiem || endMeridiem;
+
+  if (meridiem === 'PM') {
+    if (hour < 12 && (hour >= 1 && hour <= 6)) {
+      hour += 12;
+    }
+  } else if (meridiem === 'AM' && hour === 12) {
+    hour = 0;
+  }
   return hour;
 }
 

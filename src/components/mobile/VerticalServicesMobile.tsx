@@ -8,7 +8,7 @@ import {
   Clock, Bell, MapPin
 } from 'lucide-react';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
-import { TimeSlotWheelPickerModal } from '../common/TimeSlotWheelPickerModal';
+import { TimeSlotWheelPickerModal, type SlotConfirmationData } from '../common/TimeSlotWheelPickerModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 import type { Product } from '../../data/types';
 
@@ -123,17 +123,28 @@ export const VerticalServicesMobile: React.FC = () => {
   };
 
 
-  const confirmBooking = (slotData?: { date: string; time: string }) => {
+  const confirmBooking = (slotData?: SlotConfirmationData) => {
     if (!requireCustomerAuth('book a service appointment')) return;
     if (!bookingService) return;
-    const date = slotData?.date || selectedDate;
-    const time = slotData?.time || selectedTime;
+
+    const isInstant = slotData?.mode === 'instant';
+    const dateStr = isInstant ? 'Today' : (slotData?.date || selectedDate);
+    const timeStr = isInstant ? 'Instant Match (15–30 Min ETA)' : (slotData?.time || selectedTime);
+    const formattedSlot = isInstant
+      ? '⚡ Instant Match (15–30 Min ETA)'
+      : `${dateStr} at ${timeStr}`;
+
     const bookingDetails: Product = {
       ...bookingService,
-      deliveryTime: `${date} at ${time}`,
+      deliveryTime: formattedSlot,
       specs: {
         ...bookingService.specs,
-        'Scheduled Slot': `${date}, ${time}`,
+        'Scheduled Slot': formattedSlot,
+        'Booking Mode': isInstant ? 'instant' : 'scheduled',
+        'Address Details': slotData?.addressDetails || '',
+        'Customer Phone': slotData?.contactPhone || '',
+        'Customer WhatsApp': slotData?.whatsappPhone || '',
+        'Special Notes': slotData?.notes || '',
         'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : `Vehicle Services (${selectedVehicle?.brand} ${selectedVehicle?.model})`,
         'Technician': 'Certified Professional Assigned',
       },
@@ -367,6 +378,13 @@ export const VerticalServicesMobile: React.FC = () => {
         serviceTitle={bookingService?.title || ''}
         price={bookingService?.price || 0}
         availableSlots={bookingService?.serviceSlots}
+        supportedBookingModes={
+          bookingService?.tags?.includes('instant_only')
+            ? 'instant'
+            : bookingService?.tags?.includes('scheduled_only')
+            ? 'scheduled'
+            : 'both'
+        }
         onConfirm={confirmBooking}
       />
 

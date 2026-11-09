@@ -65,7 +65,7 @@ const RiderContent: React.FC = () => {
       <RiderBottomNav currentTab={tab === 'deliveries' ? 'orders' : tab} onTabChange={handleNavigate} />
 
       {/* Global Real-time 30s Countdown Incoming Dispatch Modal */}
-      <IncomingRadarModal />
+      <IncomingRadarModal onNavigateToTab={handleNavigate} />
     </div>
   );
 };

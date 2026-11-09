@@ -87,6 +87,20 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
     setIsSubmitting(true);
     const selectedAddrObj = addresses.find(a => a.id === selectedAddress);
 
+    // Preserve Glacons service booking details (Instant vs Scheduled, arrival window, notes)
+    const serviceCartItem = cart.find(
+      item => item.product.deliveryTime || item.product.specs?.['Scheduled Slot'] || item.product.vertical === 'services'
+    );
+    const scheduledSlotInfo = serviceCartItem?.product.deliveryTime || serviceCartItem?.product.specs?.['Scheduled Slot'] || null;
+    const bookingMode = serviceCartItem?.product.specs?.['Booking Mode'] || (scheduledSlotInfo?.includes('Instant') ? 'instant' : 'scheduled');
+    const addressDetailsNote = serviceCartItem?.product.specs?.['Address Details'] || '';
+    const specialProblemNote = serviceCartItem?.product.specs?.['Special Notes'] || '';
+    const combinedNotes = [
+      scheduledSlotInfo,
+      addressDetailsNote ? `Landmark/Unit: ${addressDetailsNote}` : null,
+      specialProblemNote ? `Note: ${specialProblemNote}` : null
+    ].filter(Boolean).join(' | ');
+
     const payload = {
       addressId: selectedAddress,
       paymentMethodId: selectedPayment,
@@ -94,9 +108,13 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
       items: cart.map(item => ({
         productId: item.product.id,
         quantity: item.quantity,
-        price: item.product.price
+        price: item.product.price,
+        deliveryTime: item.product.deliveryTime,
+        specs: item.product.specs,
       })),
       total,
+      notes: combinedNotes || scheduledSlotInfo || undefined,
+      bookingMode: bookingMode || undefined,
       latitude: selectedAddrObj?.latitude || detectedCoords?.latitude,
       longitude: selectedAddrObj?.longitude || detectedCoords?.longitude,
     };

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
-import { TimeSlotWheelPickerModal } from '../common/TimeSlotWheelPickerModal';
+import { TimeSlotWheelPickerModal, type SlotConfirmationData } from '../common/TimeSlotWheelPickerModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 import type { Product } from '../../data/types';
 
@@ -130,17 +130,28 @@ export const VerticalServices: React.FC = () => {
     setSelectedTime(slots[0] || '10:00 AM');
   };
 
-  const confirmBooking = (slotData?: { date: string; time: string }) => {
+  const confirmBooking = (slotData?: SlotConfirmationData) => {
     if (!requireCustomerAuth('book a service appointment')) return;
     if (!selectedServiceForBooking) return;
-    const date = slotData?.date || selectedDate;
-    const time = slotData?.time || selectedTime;
+
+    const isInstant = slotData?.mode === 'instant';
+    const dateStr = isInstant ? 'Today' : (slotData?.date || selectedDate);
+    const timeStr = isInstant ? 'Instant Match (15–30 Min ETA)' : (slotData?.time || selectedTime);
+    const formattedSlot = isInstant
+      ? '⚡ Instant Match (15–30 Min ETA)'
+      : `${dateStr} at ${timeStr}`;
+
     const bookingDetails: Product = {
       ...selectedServiceForBooking,
-      deliveryTime: `${date} at ${time}`,
+      deliveryTime: formattedSlot,
       specs: {
         ...selectedServiceForBooking.specs,
-        'Scheduled Slot': `${date}, ${time}`,
+        'Scheduled Slot': formattedSlot,
+        'Booking Mode': isInstant ? 'instant' : 'scheduled',
+        'Address Details': slotData?.addressDetails || '',
+        'Customer Phone': slotData?.contactPhone || '',
+        'Customer WhatsApp': slotData?.whatsappPhone || '',
+        'Special Notes': slotData?.notes || '',
         'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : `Vehicle Services (${selectedVehicle?.brand} ${selectedVehicle?.model})`,
         'Technician': 'Certified Professional Assigned',
       },
@@ -467,6 +478,13 @@ export const VerticalServices: React.FC = () => {
         serviceTitle={selectedServiceForBooking?.title || ''}
         price={selectedServiceForBooking?.price || 0}
         availableSlots={selectedServiceForBooking?.serviceSlots}
+        supportedBookingModes={
+          selectedServiceForBooking?.tags?.includes('instant_only')
+            ? 'instant'
+            : selectedServiceForBooking?.tags?.includes('scheduled_only')
+            ? 'scheduled'
+            : 'both'
+        }
         onConfirm={confirmBooking}
       />
 

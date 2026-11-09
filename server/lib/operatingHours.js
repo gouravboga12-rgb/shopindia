@@ -50,14 +50,28 @@ function formatMinutesTo12Hour(minutes) {
 
 function getPlatformOperatingStatus(settings = {}) {
   const now = new Date();
-  // Compute current date & time in Indian Standard Time (Asia/Kolkata)
-  const istString = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-  const istDate = new Date(istString);
-  const dayOfWeek = istDate.getDay(); // 0 = Sunday, 5 = Friday
-  const currentHours = istDate.getHours();
-  const currentMinutes = istDate.getMinutes();
+  // Robustly extract Indian Standard Time (Asia/Kolkata) date and time parts regardless of host server OS timezone
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour12: false,
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).formatToParts(now).map(p => [p.type, p.value])
+  );
+
+  const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  const dayOfWeek = dayMap[parts.weekday] ?? 0;
+  let currentHours = parseInt(parts.hour, 10);
+  if (currentHours === 24) currentHours = 0; // Handle midnight 24:00 edge case
+  const currentMinutes = parseInt(parts.minute, 10);
+  const currentSeconds = parseInt(parts.second, 10);
   const currentTimeMinutes = currentHours * 60 + currentMinutes;
-  const currentSeconds = istDate.getSeconds();
 
   // 1. Friday Prayer Break
   const fridayEnabled = String(settings['friday_break_enabled']) === 'true';
@@ -108,8 +122,14 @@ function getPlatformOperatingStatus(settings = {}) {
     }
   }
 
+  // Format month name and day for IST display
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthIdx = parseInt(parts.month, 10) - 1;
+  const monthName = monthNames[monthIdx] || 'Nov';
+  const dayNameFull = { 'Sun': 'Sunday', 'Mon': 'Monday', 'Tue': 'Tuesday', 'Wed': 'Wednesday', 'Thu': 'Thursday', 'Fri': 'Friday', 'Sat': 'Saturday' }[parts.weekday] || 'Monday';
+
   return {
-    serverIstTime: `${istDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}, ${formatMinutesTo12Hour(currentTimeMinutes)}`,
+    serverIstTime: `${dayNameFull}, ${monthName} ${parseInt(parts.day, 10)}, ${parts.year}, ${formatMinutesTo12Hour(currentTimeMinutes)}`,
     fridayBreak: {
       isEnabled: fridayEnabled,
       isActive: isFridayBreakActive,

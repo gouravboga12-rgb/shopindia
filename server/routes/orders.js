@@ -46,6 +46,9 @@ router.get(['/operating-status', '/platform/operating-status'], async (req, res)
 /** GET /api/orders/pricing-config — Public dynamic checkout settings */
 router.get('/pricing-config', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     const { settings } = await getCachedRules();
     const operatingStatus = getPlatformOperatingStatus(settings);
     res.json({
@@ -531,7 +534,7 @@ router.post('/', async (req, res) => {
     const isQuickOrder = fulfillmentType === 'quick_commerce';
     const itemsList = Array.isArray(items) ? items : [];
     const firstServiceItem = itemsList.find(i => i.deliveryTime || i.specs?.['Scheduled Slot']) || itemsList[0] || null;
-    const scheduledSlotInfo = firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || req.body?.notes || null;
+    const scheduledSlotInfo = req.body?.notes || firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || null;
 
     const order = await prisma.order.create({
       data: {
@@ -683,6 +686,14 @@ router.post('/', async (req, res) => {
       const serviceLng = orderLng || 78.486671;
       const technicianGuaranteedFee = riderFee > 0 ? riderFee : (firstServiceItem?.vendorPrice || Math.round(order.total * 0.8) || 400);
 
+      const isInstantService = req.body?.bookingMode === 'instant' || (scheduledSlotInfo && scheduledSlotInfo.toLowerCase().includes('instant'));
+      const formattedPickupName = isInstantService
+        ? `⚡ Instant Match: ${serviceTitle}`
+        : `Glacons Service: ${serviceTitle}`;
+      const formattedPickupAddress = isInstantService
+        ? `⚡ INSTANT MATCH (15–30 Min ETA) | Site: ${serviceAddress}`
+        : (scheduledSlotInfo ? `🗓️ Scheduled: ${scheduledSlotInfo} | Site: ${serviceAddress}` : `Site: ${serviceAddress}`);
+
       await prisma.delivery.create({
         data: {
           orderId: order.id,
@@ -690,8 +701,8 @@ router.post('/', async (req, res) => {
           deliveryFee: technicianGuaranteedFee, // Guaranteed technician payout (80% or admin configured pay)
           distanceKm: orderDistKm || 3.5,
           deliveryOtp: masterDeliveryPin,
-          pickupName: `Glacons Service: ${serviceTitle}`,
-          pickupAddress: scheduledSlotInfo ? `Scheduled: ${scheduledSlotInfo} | Site: ${serviceAddress}` : `Site: ${serviceAddress}`,
+          pickupName: formattedPickupName,
+          pickupAddress: formattedPickupAddress,
           pickupLat: serviceLat,
           pickupLng: serviceLng,
           pickupPhone: customerRecord?.phone || null,
@@ -706,8 +717,8 @@ router.post('/', async (req, res) => {
       await prisma.serviceJob.create({
         data: {
           orderId: order.id,
-          status: 'scheduled',
-          notes: scheduledSlotInfo || 'Scheduled Doorstep Service',
+          status: isInstantService ? 'dispatched' : 'scheduled',
+          notes: scheduledSlotInfo || (isInstantService ? '⚡ Instant Match Service' : 'Scheduled Doorstep Service'),
           originalAmount: order.total,
         }
       }).catch(err => console.error('Auto-create ServiceJob error:', err.message));

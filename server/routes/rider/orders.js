@@ -358,20 +358,13 @@ router.get('/active-job', async (req, res) => {
       if (activeJob.order?.type === 'hvac_service') {
         const isAlreadyEnRoute = activeJob.status === 'picked_up' || activeJob.status === 'arrived_customer';
         if (!isAlreadyEnRoute) {
-          // If still in 'assigned' state, check if appointment is for Tomorrow or future day
           const notes = (activeJob.order?.notes || activeJob.pickupAddress || '').toLowerCase();
-          const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
-          const todayStr = nowIST.toISOString().split('T')[0];
+          const isInstant = notes.includes('instant');
 
-          const isTomorrow = notes.includes('tomorrow');
-          const isExplicitFuture =
-            !notes.includes('today') &&
-            !notes.includes(todayStr) &&
-            (isTomorrow || notes.includes('wed') || notes.includes('thu') || notes.includes('fri') || notes.includes('sat') || notes.includes('sun') || notes.includes('mon') || notes.includes('tue'));
-
-          if (isTomorrow || isExplicitFuture) {
-            // Future scheduled appointment stays peacefully in Scheduled Services tab
-            return res.json({ activeJob: null, activeDelivery: null, isScheduledUpcoming: true });
+          // If NOT an emergency instant match, scheduled appointments stay in the Scheduled Services roster
+          // until the technician explicitly taps "Start Trip" (which advances status to picked_up)
+          if (!isInstant) {
+            return res.json({ activeJob: null, activeDelivery: null, isScheduledUpcoming: true, scheduledDelivery: activeJob });
           }
         }
       }

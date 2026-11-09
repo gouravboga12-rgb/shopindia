@@ -45,11 +45,22 @@ router.get('/sales', async (req, res) => {
       select: {
         id: true,
         orderNumber: true,
+        type: true,
         total: true,
         status: true,
+        notes: true,
         createdAt: true,
         branch: { select: { name: true } },
-        vendor: { select: { businessName: true } }
+        vendor: { select: { businessName: true } },
+        serviceJobs: {
+          select: {
+            id: true,
+            status: true,
+            scheduledDate: true,
+            scheduledTimeSlot: true,
+          },
+          take: 1
+        }
       },
       orderBy: { createdAt: 'desc' },
       take: 500
@@ -100,28 +111,49 @@ router.get('/export', async (req, res) => {
       where,
       select: {
         orderNumber: true,
+        type: true,
         total: true,
         discount: true,
         commission: true,
+        notes: true,
         createdAt: true,
         status: true,
         customer: { select: { name: true, email: true } },
         branch: { select: { name: true } },
-        vendor: { select: { businessName: true } }
+        vendor: { select: { businessName: true } },
+        serviceJobs: {
+          select: {
+            status: true,
+            scheduledDate: true,
+            scheduledTimeSlot: true,
+          },
+          take: 1
+        }
       }
     });
 
-    const csvData = orders.map(o => ({
-      Order_ID: o.orderNumber,
-      Date: o.createdAt.toISOString().split('T')[0],
-      Customer: o.customer?.name || 'N/A',
-      Customer_Email: o.customer?.email || 'N/A',
-      Vendor: o.vendor?.businessName || 'N/A',
-      Branch: o.branch?.name || 'Online',
-      Amount: o.total || 0,
-      Platform_Commission: o.commission || 0,
-      Status: o.status
-    }));
+    const csvData = orders.map(o => {
+      const isService = o.type === 'hvac_service' || (o.serviceJobs && o.serviceJobs.length > 0);
+      const isInstant = isService && (o.notes?.toLowerCase().includes('instant') || !o.notes?.toLowerCase().includes('scheduled'));
+      let bookingType = 'Retail / Quick Delivery';
+      if (isService) {
+        bookingType = isInstant ? 'Glacons: Instant Match (15–30m)' : 'Glacons: Scheduled Appointment';
+      }
+      return {
+        Order_ID: o.orderNumber,
+        Date: o.createdAt.toISOString().split('T')[0],
+        Customer: o.customer?.name || 'N/A',
+        Customer_Email: o.customer?.email || 'N/A',
+        Vendor: o.vendor?.businessName || 'N/A',
+        Branch: o.branch?.name || 'Online',
+        Fulfillment_Type: o.type,
+        Booking_Type: bookingType,
+        Scheduled_Slot: o.serviceJobs?.[0]?.scheduledTimeSlot || o.notes || 'N/A',
+        Amount: o.total || 0,
+        Platform_Commission: o.commission || 0,
+        Status: o.status
+      };
+    });
 
     res.json({ data: csvData });
   } catch (error) {

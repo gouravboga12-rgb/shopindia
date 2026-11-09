@@ -106,7 +106,7 @@ interface RiderContextType {
   uploadRiderDoc: (file: File, docType: string) => Promise<{ success: boolean; url?: string; error?: string }>;
   activeDelivery: ActiveDeliveryData | null;
   incomingBroadcast: BroadcastDelivery | null;
-  acceptOrder: (deliveryId: string) => Promise<{ success: boolean; isScheduled?: boolean; error?: string }>;
+  acceptOrder: (deliveryId: string) => Promise<{ success: boolean; isScheduled?: boolean; isInstant?: boolean; error?: string; delivery?: any }>;
   declineOrder: (deliveryId: string) => void;
   advanceStage: (nextStage: 'arrived_pickup' | 'picked_up' | 'arrived_customer') => Promise<void>;
   startServiceJob: (deliveryId: string) => Promise<{ success: boolean; error?: string }>;
@@ -367,16 +367,17 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok && data.success) {
         const isService = data.delivery?.order?.type === 'hvac_service';
         const notes = (data.delivery?.order?.notes || data.delivery?.pickupAddress || '').toLowerCase();
-        const isTomorrowOrFuture = notes.includes('tomorrow') || (!notes.includes('today') && isService);
+        const isInstant = notes.includes('instant');
+        const isScheduledService = isService && !isInstant;
 
-        // If future scheduled service, do NOT set activeDelivery so tomorrow's job doesn't hijack screen
-        if (isService && isTomorrowOrFuture) {
+        // If scheduled service, do NOT set activeDelivery so advance appointments don't hijack the screen
+        if (isScheduledService) {
           setActiveDelivery(null);
         } else {
           setActiveDelivery(data.delivery);
         }
         setIncomingBroadcast(null);
-        return { success: true, isScheduled: isService && isTomorrowOrFuture, delivery: data.delivery };
+        return { success: true, isScheduled: isScheduledService, isInstant, delivery: data.delivery };
       } else {
         dismissedOrderIds.current.add(deliveryId);
         setIncomingBroadcast(null);

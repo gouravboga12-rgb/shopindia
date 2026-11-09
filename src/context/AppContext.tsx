@@ -85,7 +85,7 @@ interface AppContextType {
   clearCart: () => void;
   getCartTotal: () => number;
   orders: Order[];
-  placeOrder: (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => Promise<any>;
+  placeOrder: (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; notes?: string; bookingMode?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => Promise<any>;
   cancelOrder: (orderId: string) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<void>;
   notifications: Notification[];
@@ -467,7 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Order placement (persists to the backend API)
-  const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => {
+  const placeOrder = async (payload: { addressId: string; paymentMethodId: string; items: any[]; total: number; vertical?: VerticalType; paymentMethod?: string; notes?: string; bookingMode?: string; latitude?: number; longitude?: number; razorpayPayment?: { orderId: string; paymentId: string; signature: string } }) => {
     try {
       const created = await api.post<any>('/api/orders', {
         ...payload,

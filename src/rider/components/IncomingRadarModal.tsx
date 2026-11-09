@@ -17,7 +17,11 @@ function calculateHaversineKm(lat1?: number | null, lon1?: number | null, lat2?:
   return Math.round(R * c * 10) / 10;
 }
 
-export const IncomingRadarModal: React.FC = () => {
+interface IncomingRadarModalProps {
+  onNavigateToTab?: (targetTab: string, subTab?: 'trips' | 'cod_history' | 'scheduled_services') => void;
+}
+
+export const IncomingRadarModal: React.FC<IncomingRadarModalProps> = ({ onNavigateToTab }) => {
   const { incomingBroadcast, acceptOrder, declineOrder, profile } = useRider();
   const [secondsLeft, setSecondsLeft] = useState(66);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -28,6 +32,7 @@ export const IncomingRadarModal: React.FC = () => {
   const isServiceJob = incomingBroadcast?.order?.type === 'hvac_service';
   const isUrgentReplacement = incomingBroadcast?.pickupName?.includes('[URGENT REPLACEMENT]');
   const slotTimeStr = incomingBroadcast?.order?.notes || incomingBroadcast?.pickupAddress || '';
+  const isInstantMatch = isServiceJob && (incomingBroadcast?.pickupName?.toLowerCase().includes('instant') || slotTimeStr.toLowerCase().includes('instant'));
 
   // Lock countdown timer to the unique broadcast ID to prevent polling resets
   const currentBroadcastId = incomingBroadcast?.id;
@@ -103,10 +108,13 @@ export const IncomingRadarModal: React.FC = () => {
         declineOrder(incomingBroadcast.id);
       }, 2500);
     } else if (result.isScheduled) {
-      setScheduledSuccessNotice('Appointment reserved in your Scheduled Services tab! You do not need to head out now.');
+      setScheduledSuccessNotice('Appointment reserved in your Scheduled Services roster! Redirecting...');
       setTimeout(() => {
         declineOrder(incomingBroadcast.id);
-      }, 2200);
+        if (onNavigateToTab) {
+          onNavigateToTab('orders', 'scheduled_services');
+        }
+      }, 1400);
     }
   };
 
@@ -136,26 +144,47 @@ export const IncomingRadarModal: React.FC = () => {
           />
         </div>
 
-        {/* Big Prominent Advance Scheduled Service Tag (Glacons Doorstep Appointments) */}
+        {/* Glacons Service Mode Header (Instant Match vs. Advance Scheduled) */}
         {isServiceJob && (
-          <div className="bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800 text-white px-4 py-2.5 flex items-center justify-between border-b border-teal-500/40 shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 bg-white/20 rounded-xl shrink-0">
-                <Calendar className="w-4 h-4 text-white" />
+          isInstantMatch ? (
+            <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 text-white px-4 py-2.5 flex items-center justify-between border-b border-orange-400/40 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-1.5 bg-white/20 rounded-xl shrink-0">
+                  <Zap className="w-4 h-4 text-white fill-white" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-orange-200 block">
+                    ⚡ URGENT INSTANT MATCH
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-white truncate block">
+                    15–30 Min Arrival Requested • Start Navigation Upon Accept
+                  </span>
+                </div>
               </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-black uppercase tracking-wider text-teal-200 block">
-                  🗓️ ADVANCE SCHEDULED SERVICE
-                </span>
-                <span className="text-xs sm:text-sm font-black text-white truncate block">
-                  {slotTimeStr || 'Future Service Booking'}
-                </span>
-              </div>
+              <span className="px-2 py-0.5 bg-white text-orange-950 font-black text-[10px] rounded-full uppercase tracking-wider shadow-2xs shrink-0 ml-2">
+                Emergency Job
+              </span>
             </div>
-            <span className="px-2 py-0.5 bg-white text-teal-900 font-black text-[10px] rounded-full uppercase tracking-wider shadow-2xs shrink-0 ml-2">
-              Advance Roster
-            </span>
-          </div>
+          ) : (
+            <div className="bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800 text-white px-4 py-2.5 flex items-center justify-between border-b border-teal-500/40 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-1.5 bg-white/20 rounded-xl shrink-0">
+                  <Calendar className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-teal-200 block">
+                    🗓️ ADVANCE SCHEDULED SERVICE
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-white truncate block">
+                    {slotTimeStr || 'Future Service Booking'}
+                  </span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 bg-white text-teal-900 font-black text-[10px] rounded-full uppercase tracking-wider shadow-2xs shrink-0 ml-2">
+                Advance Roster
+              </span>
+            </div>
+          )
         )}
 
         {/* Pinned Modal Header (Always 100% visible on mobile) */}
@@ -461,9 +490,11 @@ export const IncomingRadarModal: React.FC = () => {
               <>
                 <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 <span>
-                  {isServiceJob
-                    ? `ACCEPT & RESERVE APPOINTMENT (₹${incomingBroadcast.deliveryFee})`
-                    : `ACCEPT DELIVERY (₹${incomingBroadcast.deliveryFee})`}
+                  {isInstantMatch
+                    ? `ACCEPT & START TRIP (+₹${incomingBroadcast.deliveryFee})`
+                    : isServiceJob
+                    ? `ACCEPT & RESERVE APPOINTMENT (+₹${incomingBroadcast.deliveryFee})`
+                    : `ACCEPT DELIVERY (+₹${incomingBroadcast.deliveryFee})`}
                 </span>
               </>
             )}

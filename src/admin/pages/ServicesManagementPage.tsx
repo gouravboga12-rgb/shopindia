@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   Wrench, Search, Plus, Edit2, Trash2, Clock, CheckCircle2,
-  X, AlertCircle, Sparkles, RefreshCw, ShieldCheck, Save
+  X, AlertCircle, Sparkles, RefreshCw, ShieldCheck, Save, Zap, Calendar
 } from 'lucide-react';
 
 interface Category {
@@ -65,6 +65,7 @@ export const ServicesManagementPage: React.FC = () => {
   const [technicianGuaranteedPay, setTechnicianGuaranteedPay] = useState('400'); // Technician Guaranteed Pay (₹)
   const [mrp, setMrp] = useState('699');
   const [duration, setDuration] = useState('60 mins');
+  const [supportedBookingModes, setSupportedBookingModes] = useState<'both' | 'instant' | 'scheduled'>('both');
   const [slots, setSlots] = useState<string[]>([...DEFAULT_SLOTS]);
   const [newCustomSlot, setNewCustomSlot] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -136,6 +137,7 @@ export const ServicesManagementPage: React.FC = () => {
     setTechnicianGuaranteedPay(String(Math.round(499 * (1 - commRate / 100))));
     setMrp('699');
     setDuration('60 mins');
+    setSupportedBookingModes('both');
     setSlots([...DEFAULT_SLOTS]);
     setNewCustomSlot('');
     setImageUrl('');
@@ -155,6 +157,14 @@ export const ServicesManagementPage: React.FC = () => {
     );
     setMrp(service.mrp ? String(service.mrp) : '');
     setDuration(service.durationEstimate || '60 mins');
+
+    // Parse supported booking mode from tags
+    const existingTags = service.tags || [];
+    let bMode: 'both' | 'instant' | 'scheduled' = 'both';
+    if (existingTags.includes('instant_only')) bMode = 'instant';
+    else if (existingTags.includes('scheduled_only')) bMode = 'scheduled';
+    setSupportedBookingModes(bMode);
+
     setSlots(service.serviceSlots && service.serviceSlots.length > 0 ? service.serviceSlots : [...DEFAULT_SLOTS]);
     setNewCustomSlot('');
     setImageUrl(service.images?.[0]?.url || '');
@@ -197,6 +207,11 @@ export const ServicesManagementPage: React.FC = () => {
     setFormError(null);
 
     try {
+      const tagList = ['doorstep_service', 'home_service'];
+      if (supportedBookingModes === 'instant') tagList.push('instant_only');
+      else if (supportedBookingModes === 'scheduled') tagList.push('scheduled_only');
+      else tagList.push('dual_mode');
+
       const payload: any = {
         name: name.trim(),
         basePrice: parseFloat(doorstepVisitCharge),
@@ -208,7 +223,7 @@ export const ServicesManagementPage: React.FC = () => {
         fulfillmentType: 'hvac_service',
         stock: 999,
         categoryId: categoryId || undefined,
-        tags: ['doorstep_service', 'home_service'],
+        tags: tagList,
       };
 
       if (imageUrl.trim()) {
@@ -568,19 +583,39 @@ export const ServicesManagementPage: React.FC = () => {
                     </span>
                   </td>
 
-                  {/* Available Time Slots */}
+                  {/* Available Time Slots & Booking Mode */}
                   <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-1 max-w-[180px]">
-                      {(s.serviceSlots && s.serviceSlots.length > 0 ? s.serviceSlots : DEFAULT_SLOTS.slice(0, 3)).slice(0, 2).map((sl, i) => (
-                        <span key={i} className="text-[10px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                          {sl}
-                        </span>
-                      ))}
-                      {(s.serviceSlots?.length || 0) > 2 && (
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                          +{s.serviceSlots.length - 2} more
-                        </span>
-                      )}
+                    <div className="space-y-1.5">
+                      <div>
+                        {s.tags?.includes('instant_only') ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            <Zap className="w-2.5 h-2.5 fill-amber-500 text-amber-600" />
+                            <span>⚡ Instant Only (15-30m)</span>
+                          </span>
+                        ) : s.tags?.includes('scheduled_only') ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                            <Calendar className="w-2.5 h-2.5 text-teal-600" />
+                            <span>📅 Scheduled Only</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                            <Sparkles className="w-2.5 h-2.5 text-indigo-600" />
+                            <span>⚡ Dual (Instant + Slot)</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-w-[180px]">
+                        {(s.serviceSlots && s.serviceSlots.length > 0 ? s.serviceSlots : DEFAULT_SLOTS.slice(0, 3)).slice(0, 2).map((sl, i) => (
+                          <span key={i} className="text-[10px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                            {sl}
+                          </span>
+                        ))}
+                        {(s.serviceSlots?.length || 0) > 2 && (
+                          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                            +{s.serviceSlots.length - 2} more
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
 
@@ -835,6 +870,78 @@ export const ServicesManagementPage: React.FC = () => {
                   placeholder="https://images.unsplash.com/photo-..."
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
+              </div>
+
+              {/* Supported Booking Options (Parrow Skills Dual-Mode Architecture) */}
+              <div className="p-4 bg-orange-50/50 border border-orange-200/80 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-orange-600 fill-orange-500" />
+                    <span>Customer Booking Modes Supported</span>
+                  </label>
+                  <span className="text-[10px] font-extrabold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full">
+                    Customer Experience
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Choose which booking options appear on the customer storefront for this doorstep service.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setSupportedBookingModes('both')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      supportedBookingModes === 'both'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-sm shadow-orange-600/30'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="text-xs font-black">⚡ Dual Mode</span>
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${supportedBookingModes === 'both' ? 'text-white' : 'text-slate-300'}`} />
+                    </div>
+                    <span className={`text-[10px] leading-tight ${supportedBookingModes === 'both' ? 'text-orange-100' : 'text-slate-500'}`}>
+                      Both Instant Match (15–30m) &amp; Scheduled Advance Slots
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSupportedBookingModes('instant')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      supportedBookingModes === 'instant'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-sm shadow-orange-600/30'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="text-xs font-black">⚡ Instant Only</span>
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${supportedBookingModes === 'instant' ? 'text-white' : 'text-slate-300'}`} />
+                    </div>
+                    <span className={`text-[10px] leading-tight ${supportedBookingModes === 'instant' ? 'text-orange-100' : 'text-slate-500'}`}>
+                      Emergency fixes only (15–30 min immediate arrival)
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSupportedBookingModes('scheduled')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      supportedBookingModes === 'scheduled'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-sm shadow-orange-600/30'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="text-xs font-black">📅 Scheduled Only</span>
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${supportedBookingModes === 'scheduled' ? 'text-white' : 'text-slate-300'}`} />
+                    </div>
+                    <span className={`text-[10px] leading-tight ${supportedBookingModes === 'scheduled' ? 'text-orange-100' : 'text-slate-500'}`}>
+                      Advance 2-hour window appointments only
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {/* Appointment Time Slots */}
