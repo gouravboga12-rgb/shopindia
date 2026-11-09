@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Wallet,
   IndianRupee,
@@ -72,6 +73,15 @@ export const RiderWallet: React.FC = () => {
   useEffect(() => {
     fetchWallet();
   }, [token]);
+
+  // Real-time wallet balance and payout status synchronization
+  useSocketEvent('wallet:updated', () => {
+    fetchWallet();
+  });
+
+  useSocketEvent('payout:updated', () => {
+    fetchWallet();
+  });
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();

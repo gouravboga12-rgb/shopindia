@@ -260,6 +260,11 @@ const handleStatusToggle = async (req, res) => {
       },
     });
 
+    try {
+      const { notifyVendorStatus } = require('../../lib/socket');
+      notifyVendorStatus(vendorId, { isOnline: updated.isOnline, businessName: updated.businessName });
+    } catch (_) {}
+
     res.json({
       success: true,
       isOnline: updated.isOnline,

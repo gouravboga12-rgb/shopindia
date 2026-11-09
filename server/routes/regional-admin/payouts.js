@@ -148,6 +148,11 @@ router.post('/:id/verify', async (req, res) => {
       },
     });
 
+    try {
+      const { notifyPayoutStatus } = require('../../lib/socket');
+      notifyPayoutStatus(updated);
+    } catch (_) {}
+
     const statusMsg = action === 'approve'
       ? 'Payout verified and forwarded to Super Admin for disbursal.'
       : action === 'escalate'

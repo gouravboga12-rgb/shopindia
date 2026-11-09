@@ -251,6 +251,16 @@ router.post('/:id/complete', requireRole('super_admin'), async (req, res) => {
       return completedRequest;
     });
 
+    try {
+      const { notifyPayoutStatus, notifyWalletUpdate } = require('../../lib/socket');
+      notifyPayoutStatus(result);
+      if (request.partyType === 'VENDOR' && request.vendorId) {
+        notifyWalletUpdate('VENDOR', request.vendorId, null, { payoutId: id, amount: request.amount });
+      } else if (request.partyType === 'RIDER' && request.riderProfileId) {
+        notifyWalletUpdate('RIDER', request.riderProfileId, null, { payoutId: id, amount: request.amount });
+      }
+    } catch (_) {}
+
     res.json({
       success: true,
       message: `Payout of ₹${request.amount.toLocaleString('en-IN')} marked as completed via ${finalMode}${finalUtr ? ` (UTR: ${finalUtr})` : ''}.`,

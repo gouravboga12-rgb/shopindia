@@ -294,6 +294,11 @@ router.post('/withdraw', async (req, res) => {
       }
     });
 
+    try {
+      const { notifyPayoutRequest } = require('../../lib/socket');
+      notifyPayoutRequest({ ...payout, vendor });
+    } catch (_) {}
+
     res.json({
       success: true,
       message: `Payout request for ₹${withdrawAmount.toLocaleString('en-IN')} submitted to Shop India.`,

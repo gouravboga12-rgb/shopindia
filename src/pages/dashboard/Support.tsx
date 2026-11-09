@@ -8,6 +8,7 @@ import {
 import { api } from '../../lib/api';
 import { useApp } from '../../context/AppContext';
 import { useCustomer } from '../../context/CustomerContext';
+import { useSocketEvent } from '../../lib/socket';
 
 const INITIAL_FAQS = [
   { q: 'When will my Shop India order be delivered?', a: 'Standard Shop India orders are dispatched via our verified logistics partners and delivered within 2 to 5 business working days depending on your pin code. Live tracking is available in My Orders.' },
@@ -180,87 +181,19 @@ export const SupportCenterPage: React.FC = () => {
     loadChatHistory();
   }, []);
 
-  // Real-time polling for Live Chat messages & agent replies (every 3.5s)
-  useEffect(() => {
-    const timer = setInterval(async () => {
-      try {
-        const res = await api.get<{
-          messages: any[];
-          isAgentConnected: boolean;
-          agentName: string | null;
-          sessionNumber: string | null;
-        }>('/api/support/chat/history');
-        if (res && Array.isArray(res.messages) && res.messages.length > 0) {
-          setChat(prev => {
-            if (res.messages.length > prev.length) {
-              return res.messages;
-            }
-            return prev;
-          });
-        }
-        if (res.isAgentConnected) {
-          setIsAgentConnected(true);
-          setConnectedAgentName(res.agentName || 'Support Specialist');
-        }
-        if (res.sessionNumber) {
-          setLiveSessionNumber(res.sessionNumber);
-        }
-      } catch {
-        // Silent poll error
+  // Real-time synchronization via WebSockets (zero background polling)
+  useSocketEvent('ticket:updated', async (payload: any) => {
+    loadTickets();
+    if (activeTicket) {
+      const ticketId = activeTicket.id || activeTicket.ticketNumber;
+      if (payload?.ticketId && (payload.ticketId === activeTicket.id || payload.ticketId === activeTicket.ticketNumber)) {
+        try {
+          const res = await api.get<{ ticket: any }>(`/api/support/tickets/${ticketId}`);
+          if (res?.ticket) setActiveTicket(res.ticket);
+        } catch {}
       }
-    }, 3500);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Real-time polling for active ticket conversation (every 3s)
-  useEffect(() => {
-    if (!activeTicket) return;
-    const ticketId = activeTicket.id || activeTicket.ticketNumber;
-    const timer = setInterval(async () => {
-      try {
-        const res = await api.get<{ ticket: any }>(`/api/support/tickets/${ticketId}`);
-        if (res.ticket && res.ticket.messages) {
-          setActiveTicket((prev: any) => {
-            if (!prev) return res.ticket;
-            const prevLen = prev.messages?.length || 0;
-            const newLen = res.ticket.messages.length;
-            if (newLen > prevLen) {
-              const lastMsg = res.ticket.messages[newLen - 1];
-              if (lastMsg && lastMsg.senderRole !== 'customer') {
-                const roleTitle = lastMsg.senderRole === 'regional_admin' ? 'Regional Support' : lastMsg.senderRole === 'vendor' ? 'Store Merchant' : 'Support Specialist';
-                addNotification({
-                  type: 'order',
-                  title: `New Reply on Ticket #${res.ticket.ticketNumber} 💬`,
-                  message: `${roleTitle}: "${lastMsg.text.slice(0, 80)}${lastMsg.text.length > 80 ? '...' : ''}"`,
-                  actionText: 'View',
-                  icon: MessageSquare,
-                  color: 'text-brand-blue',
-                  bg: 'bg-blue-50'
-                });
-                if (addCustomerNotification) {
-                  addCustomerNotification({
-                    category: 'order',
-                    title: `New Reply on Ticket #${res.ticket.ticketNumber} 💬`,
-                    message: `${roleTitle}: "${lastMsg.text.slice(0, 80)}${lastMsg.text.length > 80 ? '...' : ''}"`
-                  });
-                }
-              }
-              return res.ticket;
-            }
-            if (prev.status !== res.ticket.status) {
-              return res.ticket;
-            }
-            return prev;
-          });
-        }
-      } catch {
-        // Silently catch background sync errors
-      }
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, [activeTicket?.id, activeTicket?.ticketNumber, addNotification, addCustomerNotification]);
+    }
+  });
 
   // Submit real ticket directly to PostgreSQL API
   const submitTicket = async (e: React.FormEvent) => {

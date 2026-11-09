@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   ShieldCheck, RefreshCw, Zap, Phone, MessageCircle, Info,
   UserX, UserCheck, ExternalLink, Store, Bike, CheckCircle2, Clock, FileText
@@ -60,6 +61,15 @@ export const RegionalPayouts: React.FC<RegionalPayoutsProps> = ({ onOpenStatemen
   useEffect(() => {
     loadTerritoryPayouts();
   }, []);
+
+  // Real-time synchronization when territory partners submit or update payouts
+  useSocketEvent('payout:created', () => {
+    loadTerritoryPayouts();
+  });
+
+  useSocketEvent('payout:updated', () => {
+    loadTerritoryPayouts();
+  });
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();

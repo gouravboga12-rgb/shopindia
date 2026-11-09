@@ -5,6 +5,7 @@ const RAW_API = import.meta.env.VITE_API_URL || '';
 const API_BASE = RAW_API.replace(/\/api\/?$/, '').replace(/\/$/, '');
 import { api } from '../lib/api';
 import { getCustomerToken, requireCustomerAuth } from '../lib/customerAuth';
+import { useSocketEvent } from '../lib/socket';
 
 export type VerticalType = 'shop' | 'quick' | 'services';
 export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category' | 'wishlist';
@@ -358,16 +359,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Real-time synchronization when order status changes or a new order is confirmed
+  // (Zero background polling)
+  useSocketEvent('order:status_changed', (payload: any) => {
+    if (payload?.orderId) {
+      setOrders(prev => prev.map(o => (o.id === payload.orderId || (o as any)._id === payload.orderId) ? { ...o, status: payload.status } : o));
+    }
+  });
+
+  useSocketEvent('order:created', () => {
+    const token = getCustomerToken();
+    if (token) {
+      api.get<{ orders: Order[] }>('/api/orders').then(res => {
+        if (res?.orders) setOrders(res.orders);
+      }).catch(() => {});
+    }
+  });
+
   // Custom Navigation function
   const navigateTo = (path: PathType, productId?: string) => {
     if (productId) {
       setSelectedProductId(productId);
-      try {
-        const raw = localStorage.getItem('shopindia_customer_recently_viewed');
-        const list = raw ? JSON.parse(raw) : [];
-        const next = [productId, ...list.filter((id: string) => id !== productId)].slice(0, 24);
-        localStorage.setItem('shopindia_customer_recently_viewed', JSON.stringify(next));
-      } catch { }
     }
     setHistory(prev => [...prev, path]);
     setCurrentPath(path);

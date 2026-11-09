@@ -6,6 +6,7 @@ const customerAuth = require('../middleware/customerAuth');
 const { calculateItemPricing, calculateDeliveryPricing, calculateCartTotals, getCachedRules } = require('../lib/pricing');
 const { verifyPaymentSignature } = require('../lib/razorpay');
 const { getPlatformOperatingStatus } = require('../lib/operatingHours');
+const { notifyNewOrder, notifyOrderStatus } = require('../lib/socket');
 
 const router = express.Router();
 
@@ -649,6 +650,13 @@ router.post('/', async (req, res) => {
         }
       },
     });
+
+    // Real-time WebSocket announcement across panels
+    try {
+      notifyNewOrder(order);
+    } catch (_wsErr) {
+      console.warn('WebSocket notifyNewOrder error:', _wsErr.message);
+    }
 
     await Promise.all(
       resolved.map(async (it) => {

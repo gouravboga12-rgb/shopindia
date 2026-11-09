@@ -124,6 +124,11 @@ router.post('/payout-request', async (req, res) => {
       }),
     ]);
 
+    try {
+      const { notifyPayoutRequest } = require('../../lib/socket');
+      notifyPayoutRequest({ ...payout, riderProfile: profile });
+    } catch (_) {}
+
     res.json({
       success: true,
       message: `Withdrawal request for ₹${withdrawAmount} submitted via ${method === 'upi' ? 'UPI' : 'Bank'}! Funds will arrive within 24 hours.`,

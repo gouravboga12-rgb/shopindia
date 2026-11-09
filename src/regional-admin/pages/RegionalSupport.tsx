@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Headphones, MessageSquare, Clock, AlertTriangle, Send,
   User, CheckCircle2, ArrowUpRight,
@@ -89,9 +90,12 @@ export const RegionalSupport: React.FC = () => {
 
   useEffect(() => {
     loadTickets();
-    const interval = setInterval(loadTickets, 5000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Real-time synchronization when tickets or replies are updated
+  useSocketEvent('ticket:updated', () => {
+    loadTickets();
+  });
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();

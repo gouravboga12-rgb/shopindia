@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Package, CheckCircle2, Store, MapPin, Banknote, CreditCard, RefreshCw,
   Wrench, Calendar, Clock, AlertTriangle, X, Phone, Navigation, AlertCircle,
@@ -175,22 +176,34 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
     }
   };
 
+  const fetchHistory = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await api.get<{ history: HistoryOrder[] }>('/api/rider/orders/history');
+      setHistoryOrders(data.history || []);
+    } catch (e) {
+      console.error('Failed to fetch rider order history', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
-    const fetchHistory = async () => {
-      setLoading(true);
-      try {
-        const data = await api.get<{ history: HistoryOrder[] }>('/api/rider/orders/history');
-        setHistoryOrders(data.history || []);
-      } catch (e) {
-        console.error('Failed to fetch rider order history', e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchHistory();
     fetchScheduledServices();
   }, [token]);
+
+  // Real-time synchronization for new dispatches or stage transitions
+  useSocketEvent('radar:new_dispatch', () => {
+    fetchScheduledServices();
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    fetchScheduledServices();
+    fetchHistory();
+  });
 
   useEffect(() => {
     if (activeTab === 'cod_history' && codHistory.length === 0) {

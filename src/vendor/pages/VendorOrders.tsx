@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import { Search, RefreshCw, Phone, MessageSquare, Mail, ExternalLink, Trash2, FileText, AlertTriangle, X, Loader2, CheckCircle2, Copy, Check, Bike, Truck, Zap, Box } from 'lucide-react';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
 import { LiveOrderTrackingModal } from '../../components/common/LiveOrderTrackingModal';
@@ -33,14 +34,20 @@ export const VendorOrders: React.FC = () => {
 
   useEffect(() => {
     load();
-    const interval = setInterval(() => {
-      // Background silent sync without flashing full-page spinner
-      api.get<{ orders: any[] }>('/api/vendor/orders')
-        .then(d => setOrders(d.orders || []))
-        .catch(() => {});
-    }, 10000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Instant real-time updates without polling
+  useSocketEvent('order:created', () => {
+    load();
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.play().catch(() => {});
+    } catch (_) {}
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    load();
+  });
 
   // Auto-dismiss success toast
   useEffect(() => {

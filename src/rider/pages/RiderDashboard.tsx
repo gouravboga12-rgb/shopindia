@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRider } from '../context/RiderContext';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import { ActiveDeliveryView } from './ActiveDeliveryView';
 import {
   Radar,
@@ -53,50 +54,59 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
   const [totalScheduledCount, setTotalScheduledCount] = useState<number>(0);
   const [startingServiceId, setStartingServiceId] = useState<string | null>(null);
 
+  const fetchScheduled = useCallback(async () => {
+    try {
+      const res: any = await api.get('/api/rider/orders/scheduled-services').catch(() => api.get('/api/rider/scheduled-services'));
+      if (res?.success) {
+        const allServices = res.services || [];
+        setTotalScheduledCount(res.totalCount ?? allServices.length);
+        const todayList = res.grouped?.today || [];
+
+        // Current IST time calculation
+        const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
+        const currentHour = nowIST.getUTCHours();
+        const currentMinutes = nowIST.getUTCMinutes();
+        const currentTimeDec = currentHour + currentMinutes / 60;
+
+        // Find if any job today is starting in ~1-2 hours or already underway
+        const imminent = todayList.find((srv: any) => {
+          const slotStr = srv.order?.notes || srv.pickupAddress || '';
+          const startHour = parseSlotStartHour(slotStr);
+          const hoursUntil = startHour - currentTimeDec;
+          return hoursUntil <= 2.5 && hoursUntil >= -2.0;
+        }) || (todayList.length > 0 ? todayList[0] : null);
+
+        setImminentService(imminent || null);
+      }
+    } catch {}
+  }, []);
+
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res: any = await api.get('/api/rider/notifications');
+      if (res?.success && Array.isArray(res.notifications)) {
+        const unread = res.notifications.filter((n: any) => !n.isRead);
+        setActiveAlerts(unread.slice(0, 2));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (refreshData) refreshData();
-    const fetchAlerts = async () => {
-      try {
-        const res: any = await api.get('/api/rider/notifications');
-        if (res?.success && Array.isArray(res.notifications)) {
-          const unread = res.notifications.filter((n: any) => !n.isRead);
-          setActiveAlerts(unread.slice(0, 2));
-        }
-      } catch {}
-    };
-
-    const fetchScheduled = async () => {
-      try {
-        const res: any = await api.get('/api/rider/orders/scheduled-services').catch(() => api.get('/api/rider/scheduled-services'));
-        if (res?.success) {
-          const allServices = res.services || [];
-          setTotalScheduledCount(res.totalCount ?? allServices.length);
-          const todayList = res.grouped?.today || [];
-
-          // Current IST time calculation
-          const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
-          const currentHour = nowIST.getUTCHours();
-          const currentMinutes = nowIST.getUTCMinutes();
-          const currentTimeDec = currentHour + currentMinutes / 60;
-
-          // Find if any job today is starting in ~1-2 hours or already underway
-          const imminent = todayList.find((srv: any) => {
-            const slotStr = srv.order?.notes || srv.pickupAddress || '';
-            const startHour = parseSlotStartHour(slotStr);
-            const hoursUntil = startHour - currentTimeDec;
-            return hoursUntil <= 2.5 && hoursUntil >= -2.0;
-          }) || (todayList.length > 0 ? todayList[0] : null);
-
-          setImminentService(imminent || null);
-        }
-      } catch {}
-    };
-
     fetchAlerts();
     fetchScheduled();
-    const interval = setInterval(fetchScheduled, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [fetchAlerts, fetchScheduled, refreshData]);
+
+  // Real-time WebSocket triggers for instant dashboard sync
+  useSocketEvent('radar:new_dispatch', () => {
+    if (refreshData) refreshData();
+    fetchScheduled();
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    if (refreshData) refreshData();
+    fetchScheduled();
+  });
 
   const handleUpdateLocation = async () => {
     setLocating(true);

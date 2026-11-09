@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Headphones, Send, CheckCircle2, Mail, Copy,
   Phone, Clock, MessageSquareText, X, Trash2, Lock,
@@ -64,18 +65,17 @@ export const VendorSupport: React.FC = () => {
     loadTickets();
   }, []);
 
-  // Poll for replies if chat modal is open
-  useEffect(() => {
-    if (!selectedTicket) return;
-    const interval = setInterval(() => {
+  // Real-time synchronization when support ticket updates arrive (zero polling)
+  useSocketEvent('ticket:updated', (payload: any) => {
+    loadTickets();
+    if (selectedTicket && (selectedTicket.id === payload?.ticketId || (selectedTicket as any)._id === payload?.ticketId)) {
       api.get<any>(`/api/vendor/support/tickets/${selectedTicket.id}`)
         .then((res: any) => {
           if (res?.ticket) setSelectedTicket(res.ticket);
         })
         .catch(() => {});
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [selectedTicket?.id]);
+    }
+  });
 
   const handleSubmitInquiry = async (e: React.FormEvent) => {
     e.preventDefault();

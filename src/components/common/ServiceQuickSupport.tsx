@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 
 interface Message {
   id: string;
@@ -217,42 +218,24 @@ export const ServiceQuickSupport: React.FC = () => {
   };
 
   // Live polling for Active Ticket Thread (Instant 2-way sync every 2s)
-  useEffect(() => {
-    if (!activeTicketThread) return;
-    const ticketId = activeTicketThread.id || activeTicketThread.ticketNumber;
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get<{ ticket: any }>(`/api/support/tickets/${ticketId}`);
-        if (res.ticket && res.ticket.messages) {
-          setActiveTicketThread((prev: any) => {
-            if (!prev || (prev.messages?.length !== res.ticket.messages?.length) || (prev.status !== res.ticket.status)) {
-              return res.ticket;
-            }
-            return prev;
-          });
-        }
-      } catch {
-        // Silently ignore background polling errors
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [activeTicketThread?.id, activeTicketThread?.ticketNumber]);
-
-  // Live polling for My Tickets list
-  useEffect(() => {
-    if (activeTab !== 'my_tickets' || activeTicketThread) return;
-    const interval = setInterval(async () => {
+  // Real-time synchronization via WebSockets (zero background polling)
+  useSocketEvent('ticket:updated', async (payload: any) => {
+    if (activeTab === 'my_tickets') {
       try {
         const res = await api.get<{ tickets: any[] }>('/api/support/tickets');
         if (res.tickets) setMyTickets(res.tickets);
-      } catch {
-        // Ignore
+      } catch {}
+    }
+    if (activeTicketThread) {
+      const ticketId = activeTicketThread.id || activeTicketThread.ticketNumber;
+      if (payload?.ticketId && (payload.ticketId === activeTicketThread.id || payload.ticketId === activeTicketThread.ticketNumber)) {
+        try {
+          const res = await api.get<{ ticket: any }>(`/api/support/tickets/${ticketId}`);
+          if (res.ticket) setActiveTicketThread(res.ticket);
+        } catch {}
       }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [activeTab, activeTicketThread]);
+    }
+  });
 
   const handleOpenThread = async (ticketId: string) => {
     try {

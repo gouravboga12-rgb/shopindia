@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRider } from '../context/RiderContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import { Power, Wallet, AlertCircle, LogOut, Bell, X, CheckCheck, Clock, ExternalLink, Zap, Wrench, CheckCircle2 } from 'lucide-react';
 
 interface RiderHeaderProps {
@@ -45,9 +46,15 @@ export const RiderHeader: React.FC<RiderHeaderProps> = ({ onNavigateToTab }) => 
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, []);
+
+  useSocketEvent('radar:new_dispatch', () => {
+    fetchNotifications();
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    fetchNotifications();
+  });
 
   const handleMarkAsRead = async (id: string) => {
     try {

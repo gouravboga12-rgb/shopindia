@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSocketEvent } from '../../lib/socket';
 import { Store, Phone, Package, MapPin, MessageCircle, ExternalLink, Zap, ShoppingBag, FileText } from 'lucide-react';
 import { VendorLedgerModal } from '../../admin/components/VendorLedgerModal';
 
@@ -38,26 +39,32 @@ export const RegionalVendors: React.FC<RegionalVendorsProps> = ({ onOpenStatemen
   const [loading, setLoading] = useState(true);
   const [vendorLedgerId, setVendorLedgerId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchVendors = useCallback(async () => {
     if (!token) return;
-    const fetchVendors = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch('/api/regional-admin/vendors', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setVendors(data.vendors || []);
-        }
-      } catch (e) {
-        console.error('Failed to fetch regional vendors', e);
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/regional-admin/vendors', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVendors(data.vendors || []);
       }
-    };
-    fetchVendors();
+    } catch (e) {
+      console.error('Failed to fetch regional vendors', e);
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    fetchVendors();
+  }, [fetchVendors]);
+
+  // Real-time synchronization when vendor status changes (e.g. online/offline toggle)
+  useSocketEvent('vendor:status_changed', () => {
+    fetchVendors();
+  });
 
   return (
     <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">

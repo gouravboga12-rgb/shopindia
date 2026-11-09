@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Wallet, CheckCircle2, XCircle, Clock, AlertTriangle,
   RefreshCw, ShieldCheck, Zap, Calendar, Bike, Wrench, Sparkles,
@@ -104,6 +105,15 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
   useEffect(() => {
     loadPayouts();
   }, [roleFilter, statusFilter, dateFilter, customStart, customEnd]);
+
+  // Real-time synchronization when fleet payouts are requested or updated
+  useSocketEvent('payout:created', () => {
+    loadPayouts();
+  });
+
+  useSocketEvent('payout:updated', () => {
+    loadPayouts();
+  });
 
   const handleApprove = async (id: string) => {
     try {

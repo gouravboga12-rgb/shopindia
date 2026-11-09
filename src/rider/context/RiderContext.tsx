@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { detectCurrentLocationWithMapbox } from '../../lib/mapbox';
+import { useSocketEvent } from '../../lib/socket';
 
 export interface RiderProfileData {
   id: string;
@@ -321,39 +322,54 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Radar polling for incoming broadcast deliveries
-  useEffect(() => {
+  // Broadcast feed fetcher
+  const pollBroadcasts = useCallback(async () => {
     if (!isOnline || activeDelivery || !token) return;
+    try {
+      const res = await fetch('/api/rider/orders/broadcast-feed', { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const list: BroadcastDelivery[] = data.deliveries || [];
+        const candidate = list.find((d) => !dismissedOrderIds.current.has(d.id));
 
-    const pollBroadcasts = async () => {
-      try {
-        const res = await fetch('/api/rider/orders/broadcast-feed', { headers: authHeaders() });
-        if (res.ok) {
-          const data = await res.json();
-          const list: BroadcastDelivery[] = data.deliveries || [];
-          const candidate = list.find((d) => !dismissedOrderIds.current.has(d.id));
-
-          if (candidate) {
-            setIncomingBroadcast((prev) => {
-              if (prev?.id !== candidate.id) {
-                playDispatchChime();
-                return candidate;
-              }
-              return prev; // Maintain stable reference to prevent countdown timer resets
-            });
-          } else {
-            setIncomingBroadcast(null);
-          }
+        if (candidate) {
+          setIncomingBroadcast((prev) => {
+            if (prev?.id !== candidate.id) {
+              playDispatchChime();
+              return candidate;
+            }
+            return prev; // Maintain stable reference to prevent countdown timer resets
+          });
+        } else {
+          setIncomingBroadcast(null);
         }
-      } catch (err) {
-        console.error('Broadcast feed poll error:', err);
       }
-    };
-
-    pollBroadcasts();
-    const interval = setInterval(pollBroadcasts, 6000);
-    return () => clearInterval(interval);
+    } catch (err) {
+      console.error('Broadcast feed fetch error:', err);
+    }
   }, [isOnline, activeDelivery, token, authHeaders]);
+
+  useEffect(() => {
+    pollBroadcasts();
+  }, [pollBroadcasts]);
+
+  // Real-time WebSocket triggers (0ms latency, zero background polling)
+  useSocketEvent('radar:new_dispatch', () => {
+    pollBroadcasts();
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    pollBroadcasts();
+    refreshData();
+  });
+
+  useSocketEvent('wallet:updated', () => {
+    refreshData();
+  });
+
+  useSocketEvent('payout:updated', () => {
+    refreshData();
+  });
 
   // Atomic claim
   const acceptOrder = async (deliveryId: string) => {

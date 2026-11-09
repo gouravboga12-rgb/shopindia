@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Send, X, AlertTriangle,
   DollarSign, Store, User, Clock,
@@ -183,40 +184,18 @@ export const SupportPage: React.FC = () => {
 
   useEffect(load, [filterTab, dateRange, startDate, endDate]);
 
-  // Live polling for table
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const params = new URLSearchParams();
-      if (filterTab !== 'all') params.set('filter', filterTab);
-      if (dateRange !== 'all') params.set('dateRange', dateRange);
-      if (dateRange === 'custom') {
-        if (startDate) params.set('startDate', startDate);
-        if (endDate) params.set('endDate', endDate);
-      }
-      const query = params.toString() ? `?${params.toString()}` : '';
-      api.get<{ tickets: any[]; counts: any }>(`/api/admin/support/tickets${query}`)
-        .then(d => {
-          if (d.tickets) setTickets(d.tickets);
-          if (d.counts) setCounts(d.counts);
-        })
-        .catch(() => {});
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [filterTab, dateRange, startDate, endDate]);
-
-  // Live polling for open modal thread
-  useEffect(() => {
-    if (!selectedTicket) return;
-    const ticketId = selectedTicket.id || selectedTicket._id;
-    const timer = setInterval(() => {
+  // Real-time synchronization via WebSockets (zero background polling)
+  useSocketEvent('ticket:updated', (payload: any) => {
+    load();
+    if (selectedTicket && (selectedTicket.id === payload?.ticketId || selectedTicket._id === payload?.ticketId)) {
+      const ticketId = selectedTicket.id || selectedTicket._id;
       api.get<any>(`/api/admin/support/tickets/${ticketId}`)
         .then(updated => {
           if (updated) setSelectedTicket(updated);
         })
         .catch(() => {});
-    }, 2500);
-    return () => clearInterval(timer);
-  }, [selectedTicket?.id, selectedTicket?._id]);
+    }
+  });
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {

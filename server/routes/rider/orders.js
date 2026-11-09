@@ -300,6 +300,16 @@ router.post(['/:id/accept', '/orders/:id/accept'], async (req, res) => {
       data: { status: isServiceJob ? 'confirmed' : 'in_transit' },
     }).catch(() => {});
 
+    try {
+      const { notifyOrderStatus } = require('../../lib/socket');
+      notifyOrderStatus(delivery.orderId, isServiceJob ? 'confirmed' : 'in_transit', {
+        deliveryId: delivery.id,
+        customerId: delivery.order?.customer?.id,
+        vendorId: delivery.order?.vendor?.id,
+        riderProfileId: profile.id,
+      });
+    } catch (_) {}
+
     res.json({
       success: true,
       message: isServiceJob
@@ -497,6 +507,16 @@ router.patch(['/:id/stage', '/orders/:id/stage'], async (req, res) => {
     });
 
     emitDeliveryStageChange(req.params.id, { stage: updated.status });
+
+    try {
+      const { notifyOrderStatus } = require('../../lib/socket');
+      notifyOrderStatus(updated.orderId, updated.status, {
+        deliveryId: updated.id,
+        customerId: updated.order?.customer?.id,
+        vendorId: updated.order?.vendor?.id,
+        riderProfileId: profile.id,
+      });
+    } catch (_) {}
 
     res.json({ success: true, stage: updated.status, delivery: updated });
   } catch (err) {
@@ -896,6 +916,20 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
 
     emitDeliveryStageChange(req.params.id, { stage: 'delivered' });
     cleanDeliveryTracking(req.params.id);
+
+    try {
+      const { notifyOrderStatus, notifyWalletUpdate } = require('../../lib/socket');
+      notifyOrderStatus(delivery.orderId, 'delivered', {
+        deliveryId: delivery.id,
+        customerId: delivery.order?.customerId,
+        vendorId: delivery.order?.vendorId,
+        riderProfileId: profile.id,
+      });
+      notifyWalletUpdate('RIDER', profile.id, null, { delta: feeToCredit });
+      if (delivery.order?.vendorId) {
+        notifyWalletUpdate('VENDOR', delivery.order.vendorId, null);
+      }
+    } catch (_) {}
 
     res.json({
       success: true,

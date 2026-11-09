@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   ArrowDownRight,
   Calendar,
@@ -66,11 +67,12 @@ export const VendorWallet: React.FC = () => {
 
   useEffect(() => {
     loadWallet(true);
-    const interval = setInterval(() => {
-      loadWallet(false);
-    }, 10000);
-    return () => clearInterval(interval);
   }, [datePreset, customStart, customEnd]);
+
+  // Instant real-time updates via WebSockets when payouts change, orders finish, or wallet updates
+  useSocketEvent('wallet:updated', () => loadWallet(false));
+  useSocketEvent('payout:updated', () => loadWallet(false));
+  useSocketEvent('order:status_changed', () => loadWallet(false));
 
   useEffect(() => {
     if (wallet?.bankDetails) {

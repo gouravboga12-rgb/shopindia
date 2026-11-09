@@ -102,14 +102,7 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
 
   useEffect(() => {
     fetchTracking();
-    // Poll every 8 seconds if dispatch is pending or order is still in transit
-    const interval = setInterval(() => {
-      if (orderStatus !== 'delivered' && orderStatus !== 'completed' && orderStatus !== 'cancelled') {
-        fetchTracking();
-      }
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [orderId, orderStatus]);
+  }, [orderId]);
 
   // Connect to live WebSocket room for telemetry
   useEffect(() => {

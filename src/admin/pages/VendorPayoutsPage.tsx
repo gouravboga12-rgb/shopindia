@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Wallet, CheckCircle2, XCircle, Clock, AlertTriangle,
   RefreshCw, ShieldCheck, Zap, Calendar, Store,
@@ -107,6 +108,15 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
   useEffect(() => {
     loadPayouts();
   }, [statusFilter, dateFilter, customStart, customEnd]);
+
+  // Real-time synchronization when payouts are submitted or status changes
+  useSocketEvent('payout:created', () => {
+    loadPayouts();
+  });
+
+  useSocketEvent('payout:updated', () => {
+    loadPayouts();
+  });
 
   const handleApprove = async (id: string) => {
     try {

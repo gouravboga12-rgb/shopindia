@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import { Search, RefreshCw, Eye, Download, Calendar } from 'lucide-react';
 import { OrderDetailsModal } from '../components/OrderDetailsModal';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
@@ -27,6 +28,15 @@ export const OrdersPage: React.FC = () => {
   };
 
   useEffect(load, []);
+
+  // Real-time updates on incoming orders and status changes
+  useSocketEvent('order:created', () => {
+    load();
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    load();
+  });
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setUpdatingId(orderId);

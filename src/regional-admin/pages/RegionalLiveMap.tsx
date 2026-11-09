@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSocketEvent } from '../../lib/socket';
 import {
   MapPin,
   Bike,
@@ -38,9 +39,16 @@ export const RegionalLiveMap: React.FC = () => {
 
   useEffect(() => {
     fetchLive();
-    const interval = setInterval(fetchLive, 10000); // Polling every 10s
-    return () => clearInterval(interval);
   }, [token]);
+
+  // Real-time updates via WebSockets when new dispatches or stage changes occur
+  useSocketEvent('radar:new_dispatch', () => {
+    fetchLive();
+  });
+
+  useSocketEvent('order:status_changed', () => {
+    fetchLive();
+  });
 
   const handleEmergencyReassign = async (deliveryId: string) => {
     if (!token) return;

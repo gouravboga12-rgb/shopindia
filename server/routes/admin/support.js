@@ -3,6 +3,7 @@ const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/rbac');
 const { postLedgerEntries } = require('../../lib/ledger');
+const { notifyTicketUpdate } = require('../../lib/socket');
 
 const router = express.Router();
 router.use(verifyToken, requirePermission('manage_support'));
@@ -309,6 +310,7 @@ router.patch('/tickets/:id/status', async (req, res) => {
       data,
       include: { messages: true },
     });
+    notifyTicketUpdate(ticket.id, { status: ticket.status });
     res.json(ticket);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -349,6 +351,7 @@ router.post('/tickets/:id/reply', async (req, res) => {
       }).catch(err => console.error('Admin reply userNotification error:', err));
     }
 
+    notifyTicketUpdate(ticket.id, { hasNewMessage: true });
     res.json(ticket);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
