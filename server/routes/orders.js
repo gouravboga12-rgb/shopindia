@@ -421,10 +421,17 @@ router.post('/', async (req, res) => {
       const { settings: cachedSettings } = await getCachedRules();
       const opStatus = getPlatformOperatingStatus(cachedSettings);
 
-      const isBlockedVertical = (target) =>
-        target === 'both' ||
-        (target === 'quick' && (resolvedVertical === 'quick' || resolvedVertical === 'quick_commerce')) ||
-        (target === 'services' && (resolvedVertical === 'services' || resolvedVertical === 'hvac_service'));
+      const isQuick = resolvedVertical === 'quick' || resolvedVertical === 'quick_commerce';
+      const isServices = resolvedVertical === 'services' || resolvedVertical === 'hvac_service';
+
+      const isBlockedVertical = (target) => {
+        // Shop India (standard e-commerce, 2-5 days) is 24/7 — only Quick Commerce and Glacons Services are paused
+        if (resolvedVertical === 'shop' || resolvedVertical === 'ecommerce') return false;
+        if (target === 'both') return isQuick || isServices;
+        if (target === 'quick') return isQuick;
+        if (target === 'services') return isServices;
+        return false;
+      };
 
       if (opStatus.fridayBreak.isActive && isBlockedVertical(opStatus.fridayBreak.verticals)) {
         return res.status(400).json({

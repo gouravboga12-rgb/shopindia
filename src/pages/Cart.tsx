@@ -111,10 +111,22 @@ export const CartPage: React.FC = () => {
 
   const isOperatingBlocked = () => {
     if (!operatingStatus) return false;
-    const isTarget = (target: string) =>
-      target === 'both' ||
-      (target === 'quick' && (currentVertical === 'quick' || !currentVertical)) ||
-      (target === 'services' && currentVertical === 'services');
+
+    // Detect whether the current cart or active context contains Quick Commerce items or Glacons Services
+    const hasQuick = cart.some(item => item.product?.vertical === 'quick') || currentVertical === 'quick';
+    const hasServices = cart.some(item => item.product?.vertical === 'services' || (item.product as any)?.type === 'hvac_service') || currentVertical === 'services';
+
+    // Shop India (standard e-commerce, 2-5 day delivery) operates 24/7 and is NEVER blocked by night or prayer hours
+    if (!hasQuick && !hasServices) {
+      return false;
+    }
+
+    const isTarget = (target: string) => {
+      if (target === 'both') return hasQuick || hasServices;
+      if (target === 'quick') return hasQuick;
+      if (target === 'services') return hasServices;
+      return false;
+    };
 
     if (operatingStatus.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals)) {
       return true;
