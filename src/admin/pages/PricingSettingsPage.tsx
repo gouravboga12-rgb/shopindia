@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
-  ShoppingBag, Zap, Wrench, ShieldCheck, History,
+  ShoppingBag, Zap, ShieldCheck, History,
   Save, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw,
-  ArrowRight, Info, Sparkles, Moon, Clock, Calendar
+  Sparkles, Moon, Clock, Calendar
 } from 'lucide-react';
 
 interface PricingRule {
@@ -59,11 +59,119 @@ interface AppSettings {
   [key: string]: any;
 }
 
+// 12-Hour AM/PM Time Selector Component
+const Time12HourPicker: React.FC<{
+  label: string;
+  helperText?: string;
+  value: string; // "23:00" or "11:00 PM"
+  accentColor?: 'indigo' | 'emerald';
+  onChange: (time24: string) => void;
+}> = ({ label, helperText, value, accentColor = 'indigo', onChange }) => {
+  const parseVal = (str: string) => {
+    if (!str) return { hour: '11', min: '00', period: 'PM' };
+    const raw = str.trim().toUpperCase();
+    const isPM = raw.includes('PM');
+    const isAM = raw.includes('AM');
+    const clean = raw.replace(/[^\d:]/g, '');
+    const [hStr, mStr] = clean.split(':');
+    let h = parseInt(hStr || '12', 10);
+    const m = mStr ? mStr.padStart(2, '0') : '00';
+    let p = 'AM';
+    if (isPM) {
+      p = 'PM';
+    } else if (isAM) {
+      p = 'AM';
+    } else {
+      p = h >= 12 ? 'PM' : 'AM';
+      if (h > 12) h -= 12;
+      if (h === 0) h = 12;
+    }
+    const h12 = h % 12 === 0 ? '12' : String(h % 12).padStart(2, '0');
+    return { hour: h12, min: m, period: p };
+  };
+
+  const current = parseVal(value);
+
+  const update = (h: string, m: string, p: string) => {
+    let hourNum = parseInt(h, 10);
+    if (p === 'PM' && hourNum < 12) hourNum += 12;
+    if (p === 'AM' && hourNum === 12) hourNum = 0;
+    const h24 = String(hourNum).padStart(2, '0');
+    onChange(`${h24}:${m}`);
+  };
+
+  const activeBtnClass = accentColor === 'emerald'
+    ? 'bg-emerald-600 text-white shadow-xs'
+    : 'bg-indigo-600 text-white shadow-xs';
+
+  return (
+    <div>
+      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+        {label}
+      </label>
+      <div className="flex items-center gap-2">
+        <select
+          value={current.hour}
+          onChange={e => update(e.target.value, current.min, current.period)}
+          className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-600 transition-all cursor-pointer"
+        >
+          {['01','02','03','04','05','06','07','08','09','10','11','12'].map(hh => (
+            <option key={hh} value={hh}>{hh}</option>
+          ))}
+        </select>
+        <span className="font-bold text-gray-400">:</span>
+        <select
+          value={current.min}
+          onChange={e => update(current.hour, e.target.value, current.period)}
+          className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-600 transition-all cursor-pointer"
+        >
+          {['00','15','30','45'].map(mm => (
+            <option key={mm} value={mm}>{mm}</option>
+          ))}
+        </select>
+        <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200">
+          <button
+            type="button"
+            onClick={() => update(current.hour, current.min, 'AM')}
+            className={`px-3 py-2 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+              current.period === 'AM'
+                ? activeBtnClass
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            AM
+          </button>
+          <button
+            type="button"
+            onClick={() => update(current.hour, current.min, 'PM')}
+            className={`px-3 py-2 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+              current.period === 'PM'
+                ? activeBtnClass
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            PM
+          </button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
+          accentColor === 'emerald' ? 'text-emerald-700 bg-emerald-50' : 'text-indigo-700 bg-indigo-50'
+        }`}>
+          {current.hour}:{current.min} {current.period}
+        </span>
+        {helperText && <span className="text-[11px] text-gray-400">{helperText}</span>}
+      </div>
+    </div>
+  );
+};
+
 export const PricingSettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'shop' | 'quick' | 'services' | 'taxes' | 'blackout' | 'audit'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'quick' | 'taxes' | 'blackout' | 'audit'>('shop');
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [liveOperatingStatus, setLiveOperatingStatus] = useState<any>(null);
 
   // Core Data
   const [rules, setRules] = useState<PricingRule[]>([]);
@@ -121,13 +229,21 @@ export const PricingSettingsPage: React.FC = () => {
 
   // Interactive Live Previews
   const [quickSimDistance, setQuickSimDistance] = useState<number>(4);
-  const [serviceSimPrice, setServiceSimPrice] = useState<number>(500);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
       setToast(null);
     }, 4500);
+  };
+
+  const loadOperatingStatus = async () => {
+    try {
+      const res: any = await api.get('/api/orders/pricing-config');
+      if (res?.operatingStatus) {
+        setLiveOperatingStatus(res.operatingStatus);
+      }
+    } catch (_err) {}
   };
 
   const loadData = async () => {
@@ -140,6 +256,8 @@ export const PricingSettingsPage: React.FC = () => {
         api.get('/api/categories').catch(() => ({ categories: [] })),
         api.get('/api/admin/vendors').catch(() => ({ vendors: [] }))
       ]);
+
+      loadOperatingStatus();
 
       if (rRes?.rules) setRules(rRes.rules);
       if (dRes?.rules && dRes.rules.length > 0) {
@@ -214,6 +332,7 @@ export const PricingSettingsPage: React.FC = () => {
       }
 
       showToast(successMsg, 'success');
+      loadOperatingStatus();
     } catch (err: any) {
       showToast(err.message || 'Failed to save settings', 'error');
     } finally {
@@ -288,11 +407,6 @@ export const PricingSettingsPage: React.FC = () => {
   const simRiderPay = Math.round(qRiderBase + (extraKm * qRiderPerKm));
   const simQuickMargin = simCustomerPay - simRiderPay;
 
-  // Glacons Calculations
-  const serviceCommPct = parseFloat(settings.service_commission_pct) || 15;
-  const simPlatformCommission = Math.round((serviceSimPrice * (serviceCommPct / 100)) * 100) / 100;
-  const simTechnicianEarning = Math.max(0, Math.round((serviceSimPrice - simPlatformCommission) * 100) / 100);
-
   return (
     <div className="space-y-6 pb-24 font-sans text-gray-900">
       {/* Toast Alert Notification */}
@@ -347,7 +461,6 @@ export const PricingSettingsPage: React.FC = () => {
         {[
           { id: 'shop', label: 'Shop India (E-Commerce)', icon: ShoppingBag },
           { id: 'quick', label: 'Quick Shopping & Riders', icon: Zap },
-          { id: 'services', label: 'Glacons Services & Techs', icon: Wrench },
           { id: 'blackout', label: 'Operating Hours & Blackouts', icon: Moon },
           { id: 'taxes', label: 'Platform Fees & GST', icon: ShieldCheck },
           { id: 'audit', label: 'Change History', icon: History }
@@ -843,152 +956,7 @@ export const PricingSettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: GLACONS SERVICES & TECHNICIANS */}
-      {activeTab === 'services' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Section Info Banner */}
-          <div className="bg-emerald-50/70 border border-emerald-200 rounded-3xl p-5 flex items-start gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5">
-              <Wrench className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-emerald-950">
-                Glacons Doorstep Services & Technicians
-              </h3>
-              <p className="text-xs text-emerald-900/80 mt-1 leading-relaxed">
-                Customers book home services at the exact price listed in the Services Catalog and pay online via Razorpay.
-                The Admin retains the dynamic commission % configured below, and the technician partner receives the remaining payout
-                in their wallet upon completing the job.
-              </p>
-            </div>
-          </div>
-
-          {/* Clarity Notice */}
-          <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-2xl flex items-center gap-3 text-xs text-blue-900">
-            <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
-            <span>
-              <strong>Zero Hidden Inspection Fees:</strong> The old ₹199 inspection fee and visit guarantees have been completely removed.
-              Customers only pay the transparent price configured for that service.
-            </span>
-          </div>
-
-          {/* Dynamic Commission Split Card */}
-          <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-gray-900">Platform Service Commission Rate</h3>
-                <p className="text-xs text-gray-500">
-                  Percentage retained by the platform from every completed service booking.
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  saveSettingsBundle(
-                    { service_commission_pct: settings.service_commission_pct },
-                    undefined,
-                    'services_commission',
-                    'Glacons service commission updated successfully!'
-                  )
-                }
-                disabled={savingKey === 'services_commission'}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                <span>{savingKey === 'services_commission' ? 'Saving...' : 'Save Commission Rate'}</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-              <div className="space-y-4">
-                <label className="block text-xs font-bold text-gray-700">
-                  Admin Commission Percentage (%)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="60"
-                    step="0.5"
-                    value={settings.service_commission_pct}
-                    onChange={e => setSettings({ ...settings, service_commission_pct: e.target.value })}
-                    className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
-                </div>
-
-                {/* Visual Ratio Bar */}
-                <div className="space-y-2 pt-2">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-indigo-600">Admin Commission: {serviceCommPct}%</span>
-                    <span className="text-emerald-600">Technician Share: {Math.max(0, 100 - serviceCommPct)}%</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden flex">
-                    <div
-                      className="bg-indigo-600 h-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, serviceCommPct)}%` }}
-                    />
-                    <div
-                      className="bg-emerald-500 h-full transition-all duration-300"
-                      style={{ width: `${Math.max(0, 100 - serviceCommPct)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Real-World Live Example Card */}
-              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-700">Real-Time Payout Example</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-400">Service Price: ₹</span>
-                    <input
-                      type="number"
-                      value={serviceSimPrice}
-                      onChange={e => setServiceSimPrice(Number(e.target.value) || 0)}
-                      className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 text-center"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-gray-100">
-                    <span className="text-gray-600">Customer Pays (Online via Razorpay):</span>
-                    <span className="font-extrabold text-gray-900">₹{serviceSimPrice}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
-                    <span className="text-indigo-900 font-medium">Admin Commission Retained ({serviceCommPct}%):</span>
-                    <span className="font-extrabold text-indigo-700">₹{simPlatformCommission}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">
-                    <span className="text-emerald-900 font-bold">Technician Credited to Wallet ({100 - serviceCommPct}%):</span>
-                    <span className="font-extrabold text-emerald-700">₹{simTechnicianEarning}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Link to Services Catalog */}
-          <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-bold text-gray-900">Individual Service Catalog Rates</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Each service rate (e.g. AC Deep Clean ₹499, Fan Repair ₹249) is configured directly inside the Services Catalog.
-              </p>
-            </div>
-            <a
-              href="/admin?tab=services"
-              className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all"
-            >
-              <span>Open Services Catalog</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: TAXES & PLATFORM FEES */}
+      {/* TAB 3: TAXES & PLATFORM FEES */}
       {activeTab === 'taxes' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Section Info Banner */}
@@ -1116,7 +1084,7 @@ export const PricingSettingsPage: React.FC = () => {
                 <span className="text-xs text-slate-400 font-medium">Real-Time Checkout Interceptor</span>
               </div>
               <h2 className="text-xl md:text-2xl font-black tracking-tight text-white">
-                Platform Operating Hours & Scheduled Blackouts
+                Platform Operating Hours &amp; Scheduled Blackouts
               </h2>
               <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
                 Configure midnight closing hours to give riders rest, and weekly Friday prayer breaks to pause customer bookings in Quick Commerce and Glacons Services with live countdown alerts.
@@ -1127,6 +1095,54 @@ export const PricingSettingsPage: React.FC = () => {
                 <Clock className="w-4 h-4 text-amber-400" />
                 <span>Indian Standard Time (IST)</span>
               </div>
+            </div>
+          </div>
+
+          {/* LIVE SYSTEM STATUS BAR */}
+          <div className="bg-slate-900 text-white p-5 rounded-3xl border border-slate-800 shadow-lg grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Server IST Clock</span>
+              <p className="text-sm font-black font-mono text-emerald-400">
+                {liveOperatingStatus?.serverIstTime || 'Active IST Node Synchronized'}
+              </p>
+            </div>
+
+            <div className="space-y-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-4">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Midnight Blackout Status</span>
+              {liveOperatingStatus?.midnightBlackout?.isActive ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-extrabold animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  SHUTTER CLOSED (Active Now)
+                </div>
+              ) : settings.midnight_blackout_enabled === 'true' ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  SCHEDULED ({settings.midnight_blackout_start || '23:00'} to {settings.midnight_blackout_end || '07:00'})
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold">
+                  24/7 ROUND-THE-CLOCK (Disabled)
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-4">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Friday Prayer Break Status</span>
+              {liveOperatingStatus?.fridayBreak?.isActive ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-extrabold animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  PAUSED FOR PRAYER (Active Now)
+                </div>
+              ) : settings.friday_break_enabled === 'true' ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  SCHEDULED (Fridays {settings.friday_break_start || '12:00'} to {settings.friday_break_end || '14:00'})
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold">
+                  PRAYER PAUSE DISABLED
+                </div>
+              )}
             </div>
           </div>
 
@@ -1176,31 +1192,21 @@ export const PricingSettingsPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Shutdown Time (Start)
-                    </label>
-                    <input
-                      type="time"
-                      value={settings.midnight_blackout_start || '23:00'}
-                      onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_start: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-600 transition-all"
-                    />
-                    <span className="text-[11px] text-gray-400 mt-1 block">Platform shuts down at this hour</span>
-                  </div>
+                  <Time12HourPicker
+                    label="Shutdown Time (Start)"
+                    helperText="Platform shuts down at this hour"
+                    value={settings.midnight_blackout_start || '23:00'}
+                    accentColor="indigo"
+                    onChange={val => setSettings(prev => ({ ...prev, midnight_blackout_start: val }))}
+                  />
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Resumption Time (End)
-                    </label>
-                    <input
-                      type="time"
-                      value={settings.midnight_blackout_end || '07:00'}
-                      onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_end: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-600 transition-all"
-                    />
-                    <span className="text-[11px] text-gray-400 mt-1 block">Normal operations reopen at this hour</span>
-                  </div>
+                  <Time12HourPicker
+                    label="Resumption Time (End)"
+                    helperText="Normal operations reopen at this hour"
+                    value={settings.midnight_blackout_end || '07:00'}
+                    accentColor="indigo"
+                    onChange={val => setSettings(prev => ({ ...prev, midnight_blackout_end: val }))}
+                  />
                 </div>
 
                 <div>
@@ -1212,9 +1218,9 @@ export const PricingSettingsPage: React.FC = () => {
                     onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_verticals: e.target.value }))}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800"
                   >
-                    <option value="both">Both (Quick Commerce & Glacons Services)</option>
+                    <option value="both">Both (Quick Commerce &amp; Glacons Services)</option>
                     <option value="quick">Quick Commerce Only (10-15 Min Delivery)</option>
-                    <option value="services">Glacons Services Only (HVAC & Home Services)</option>
+                    <option value="services">Glacons Services Only (HVAC &amp; Home Services)</option>
                   </select>
                 </div>
 
@@ -1282,7 +1288,7 @@ export const PricingSettingsPage: React.FC = () => {
                     )
                   }
                   disabled={savingKey === 'midnight_blackout'}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-md transition-all active:scale-95"
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   <span>{savingKey === 'midnight_blackout' ? 'Saving Schedule...' : 'Save Midnight Schedule'}</span>
@@ -1335,31 +1341,21 @@ export const PricingSettingsPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Break Starts At
-                    </label>
-                    <input
-                      type="time"
-                      value={settings.friday_break_start || '12:00'}
-                      onChange={e => setSettings(prev => ({ ...prev, friday_break_start: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-600 transition-all"
-                    />
-                    <span className="text-[11px] text-gray-400 mt-1 block">Usually 12:00 PM before Jummah</span>
-                  </div>
+                  <Time12HourPicker
+                    label="Break Starts At"
+                    helperText="Usually 12:00 PM before Jummah"
+                    value={settings.friday_break_start || '12:00'}
+                    accentColor="emerald"
+                    onChange={val => setSettings(prev => ({ ...prev, friday_break_start: val }))}
+                  />
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Break Resumes At
-                    </label>
-                    <input
-                      type="time"
-                      value={settings.friday_break_end || '14:00'}
-                      onChange={e => setSettings(prev => ({ ...prev, friday_break_end: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-600 transition-all"
-                    />
-                    <span className="text-[11px] text-gray-400 mt-1 block">Usually 02:00 PM after prayers</span>
-                  </div>
+                  <Time12HourPicker
+                    label="Break Resumes At"
+                    helperText="Usually 02:00 PM after prayers"
+                    value={settings.friday_break_end || '14:00'}
+                    accentColor="emerald"
+                    onChange={val => setSettings(prev => ({ ...prev, friday_break_end: val }))}
+                  />
                 </div>
 
                 <div>

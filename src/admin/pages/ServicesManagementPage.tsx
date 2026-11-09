@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   Wrench, Search, Plus, Edit2, Trash2, Clock, CheckCircle2,
-  X, AlertCircle, Sparkles, RefreshCw, ShieldCheck
+  X, AlertCircle, Sparkles, RefreshCw, ShieldCheck, Save
 } from 'lucide-react';
 
 interface Category {
@@ -52,23 +52,31 @@ export const ServicesManagementPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Commission Settings State
+  const [commissionPct, setCommissionPct] = useState('20');
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [simPrice, setSimPrice] = useState(500);
+  const [commissionToast, setCommissionToast] = useState<string | null>(null);
+
   // Form Fields
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [doorstepVisitCharge, setDoorstepVisitCharge] = useState('499'); // Standard Doorstep Visit Charge (₹)
-  const [technicianGuaranteedPay, setTechnicianGuaranteedPay] = useState('350'); // Technician Guaranteed Pay (₹)
+  const [technicianGuaranteedPay, setTechnicianGuaranteedPay] = useState('400'); // Technician Guaranteed Pay (₹)
   const [mrp, setMrp] = useState('699');
   const [duration, setDuration] = useState('60 mins');
   const [slots, setSlots] = useState<string[]>([...DEFAULT_SLOTS]);
+  const [newCustomSlot, setNewCustomSlot] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [status, setStatus] = useState('active');
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, catRes, setRes]: any = await Promise.all([
         api.get<{ products: ServiceItem[] }>('/api/admin/products?vertical=services&limit=100'),
-        api.get<Category[] | { categories: Category[] }>('/api/admin/categories')
+        api.get<Category[] | { categories: Category[] }>('/api/admin/categories'),
+        api.get('/api/admin/pricing/settings').catch(() => ({ settings: {} }))
       ]);
 
       const prodList = (prodRes as any).products || [];
@@ -79,6 +87,10 @@ export const ServicesManagementPage: React.FC = () => {
         c.vertical?.includes('service') || c.vertical === 'services' || c.vertical === 'services_home' || c.vertical === 'services_vehicle'
       );
       setCategories(serviceCats);
+
+      if (setRes?.settings?.service_commission_pct) {
+        setCommissionPct(String(setRes.settings.service_commission_pct));
+      }
     } catch (err: any) {
       console.error('Failed to load services data:', err);
     } finally {
@@ -86,19 +98,46 @@ export const ServicesManagementPage: React.FC = () => {
     }
   };
 
+  const handleSaveCommissionRate = async () => {
+    setSavingCommission(true);
+    try {
+      await api.post('/api/admin/pricing/settings', {
+        settings: { service_commission_pct: commissionPct }
+      });
+      setCommissionToast('Platform service commission updated successfully!');
+      setTimeout(() => setCommissionToast(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update commission rate');
+    } finally {
+      setSavingCommission(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleDoorstepChargeChange = (val: string) => {
+    setDoorstepVisitCharge(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      const commRate = parseFloat(commissionPct) || 20;
+      const techPay = Math.round(num * (1 - commRate / 100));
+      setTechnicianGuaranteedPay(String(techPay));
+    }
+  };
 
   const openCreateModal = () => {
     setEditingService(null);
     setName('');
     setCategoryId(categories[0]?.id || '');
     setDoorstepVisitCharge('499');
-    setTechnicianGuaranteedPay('350');
+    const commRate = parseFloat(commissionPct) || 20;
+    setTechnicianGuaranteedPay(String(Math.round(499 * (1 - commRate / 100))));
     setMrp('699');
     setDuration('60 mins');
-    setSlots(['09:00 - 11:00 AM', '11:00 - 01:00 PM', '02:00 - 04:00 PM', '04:00 - 06:00 PM']);
+    setSlots([...DEFAULT_SLOTS]);
+    setNewCustomSlot('');
     setImageUrl('');
     setStatus('active');
     setFormError(null);
@@ -110,18 +149,35 @@ export const ServicesManagementPage: React.FC = () => {
     setName(service.name);
     setCategoryId(service.category?.id || '');
     setDoorstepVisitCharge(String(service.basePrice || '499'));
-    setTechnicianGuaranteedPay(String(service.vendorPrice ?? Math.round((service.basePrice || 499) * 0.7)));
+    const commRate = parseFloat(commissionPct) || 20;
+    setTechnicianGuaranteedPay(
+      String(service.vendorPrice ?? Math.round((service.basePrice || 499) * (1 - commRate / 100)))
+    );
     setMrp(service.mrp ? String(service.mrp) : '');
     setDuration(service.durationEstimate || '60 mins');
     setSlots(service.serviceSlots && service.serviceSlots.length > 0 ? service.serviceSlots : [...DEFAULT_SLOTS]);
+    setNewCustomSlot('');
     setImageUrl(service.images?.[0]?.url || '');
     setStatus(service.status || 'active');
     setFormError(null);
     setModalOpen(true);
   };
 
-  const handleToggleSlot = (slot: string) => {
-    setSlots(prev => prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot]);
+  const handleAddCustomSlot = () => {
+    const trimmed = newCustomSlot.trim();
+    if (!trimmed) return;
+    if (!slots.includes(trimmed)) {
+      setSlots(prev => [...prev, trimmed]);
+    }
+    setNewCustomSlot('');
+  };
+
+  const handleRemoveSlot = (slotToRemove: string) => {
+    setSlots(prev => prev.filter(s => s !== slotToRemove));
+  };
+
+  const handleRestoreDefaultSlots = () => {
+    setSlots([...DEFAULT_SLOTS]);
   };
 
   const handleSaveService = async (e: React.FormEvent) => {
@@ -238,6 +294,127 @@ export const ServicesManagementPage: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             OTP Verified
           </span>
+        </div>
+      </div>
+
+      {/* Platform Commission Rate & Payout Economics Bar */}
+      <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-premium space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-lg">
+              %
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-gray-900">Platform Service Commission Rate</h3>
+              <p className="text-xs text-gray-500">
+                Percentage retained by ShopIndia from completed doorstep bookings. The technician partner receives the remaining share.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {commissionToast && (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 animate-in fade-in">
+                {commissionToast}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSaveCommissionRate}
+              disabled={savingCommission}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+            >
+              <Save className="w-4 h-4" />
+              <span>{savingCommission ? 'Saving...' : 'Save Commission Rate'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                Admin Commission Percentage (%)
+              </label>
+              <span className="text-sm font-black text-indigo-600 font-mono">{commissionPct}%</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="0"
+                max="50"
+                step="1"
+                value={commissionPct}
+                onChange={e => setCommissionPct(e.target.value)}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+              />
+              <div className="relative w-24">
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={commissionPct}
+                  onChange={e => setCommissionPct(e.target.value)}
+                  className="w-full pl-3 pr-7 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 text-center"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">%</span>
+              </div>
+            </div>
+
+            {/* Visual Ratio Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-indigo-600">Admin Platform: {commissionPct}%</span>
+                <span className="text-emerald-600">Technician Share: {Math.max(0, 100 - Number(commissionPct))}%</span>
+              </div>
+              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-indigo-600 h-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, Number(commissionPct))}%` }}
+                />
+                <div
+                  className="bg-emerald-500 h-full transition-all duration-300"
+                  style={{ width: `${Math.max(0, 100 - Number(commissionPct))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Real-Time Live Example Simulator */}
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-gray-700">Real-Time Payout Simulator</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400 font-bold">Sample Price: ₹</span>
+                <input
+                  type="number"
+                  value={simPrice}
+                  onChange={e => setSimPrice(Number(e.target.value) || 0)}
+                  className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-900 text-center"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center p-2 bg-white rounded-xl border border-gray-100">
+                <span className="text-gray-600 font-medium">Customer Pays (Online via Razorpay):</span>
+                <span className="font-black text-gray-900">₹{simPrice}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-indigo-50 rounded-xl border border-indigo-100">
+                <span className="text-indigo-900 font-semibold">Admin Retained ({commissionPct}%):</span>
+                <span className="font-black text-indigo-700">
+                  ₹{Math.round((simPrice * (Number(commissionPct) / 100)) * 100) / 100}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-emerald-50 rounded-xl border border-emerald-100">
+                <span className="text-emerald-900 font-bold">Technician Credited to Wallet ({100 - Number(commissionPct)}%):</span>
+                <span className="font-black text-emerald-700">
+                  ₹{Math.max(0, simPrice - Math.round((simPrice * (Number(commissionPct) / 100)) * 100) / 100)}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -542,7 +719,7 @@ export const ServicesManagementPage: React.FC = () => {
                       required
                       min="1"
                       value={doorstepVisitCharge}
-                      onChange={e => setDoorstepVisitCharge(e.target.value)}
+                      onChange={e => handleDoorstepChargeChange(e.target.value)}
                       placeholder="499"
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-numbers font-bold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                     />
@@ -661,29 +838,75 @@ export const ServicesManagementPage: React.FC = () => {
               </div>
 
               {/* Appointment Time Slots */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-2">
-                  Customer Appointment Time Slots
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {DEFAULT_SLOTS.map(slot => {
-                    const isChecked = slots.includes(slot);
-                    return (
-                      <button
-                        type="button"
-                        key={slot}
-                        onClick={() => handleToggleSlot(slot)}
-                        className={`p-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
-                          isChecked
-                            ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
-                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        {slot}
-                      </button>
-                    );
-                  })}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Customer Appointment Time Slots ({slots.length} Active)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultSlots}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                  >
+                    Restore Standard 2-Hr Slots
+                  </button>
                 </div>
+
+                {/* Slot Tags Grid */}
+                {slots.length === 0 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs text-amber-800 font-medium">
+                    No time slots configured. Add custom slots below so customers can book this service.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {slots.map(slot => (
+                      <div
+                        key={slot}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-extrabold shadow-2xs group"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{slot}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSlot(slot)}
+                          className="ml-1 w-4 h-4 rounded-full bg-indigo-200/70 hover:bg-rose-500 hover:text-white text-indigo-700 flex items-center justify-center text-[10px] transition-colors cursor-pointer"
+                          title="Remove Slot"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Custom Slot Input */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={newCustomSlot}
+                    onChange={e => setNewCustomSlot(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomSlot();
+                      }
+                    }}
+                    placeholder="e.g. 07:00 - 09:00 AM or 08:00 - 10:00 PM"
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:bg-white focus:border-indigo-600 focus:outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomSlot}
+                    disabled={!newCustomSlot.trim()}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1 shadow-sm transition-all disabled:opacity-40 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Slot</span>
+                  </button>
+                </div>
+                <span className="text-[10px] text-gray-400 block">
+                  Add custom timing intervals or remove slots to restrict bookings to specific hours.
+                </span>
               </div>
 
               {/* Submit Buttons */}

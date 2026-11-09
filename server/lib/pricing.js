@@ -324,6 +324,7 @@ async function calculateCartTotals({
   const { settings } = await getCachedRules();
   let subtotal = 0;
   let totalVendorPayout = 0;
+  let totalTechnicianPayout = 0;
   let totalAdminCommission = 0;
   const processedItems = [];
 
@@ -347,12 +348,22 @@ async function calculateCartTotals({
 
     if (isService) {
       // In Glacons Services, admin commission is DEDUCTED from the catalog price
+      // Customer pays the flat catalog price; technician receives the guaranteed technician pay
       const itemSubtotal = basePrice * qty;
-      const commissionAmount = Math.round((basePrice * (itemPricing.commissionPct / 100)) * 100) / 100 * qty;
-      const technicianPayout = Math.max(0, itemSubtotal - commissionAmount);
+      let technicianPayout = 0;
+      let commissionAmount = 0;
+
+      if (Number(item.vendorPrice) > 0) {
+        technicianPayout = Number(item.vendorPrice) * qty;
+        commissionAmount = Math.max(0, itemSubtotal - technicianPayout);
+      } else {
+        commissionAmount = Math.round((basePrice * (itemPricing.commissionPct / 100)) * 100) / 100 * qty;
+        technicianPayout = Math.max(0, itemSubtotal - commissionAmount);
+      }
 
       subtotal += itemSubtotal;
-      totalVendorPayout += technicianPayout;
+      totalVendorPayout += 0; // Services are handled by technicians, not product vendors
+      totalTechnicianPayout += technicianPayout;
       totalAdminCommission += commissionAmount;
 
       processedItems.push({
@@ -360,7 +371,7 @@ async function calculateCartTotals({
         quantity: qty,
         customerUnitPrice: basePrice,
         vendorUnitPrice: Math.round((technicianPayout / qty) * 100) / 100,
-        commissionAmountPerUnit: itemPricing.commissionAmount,
+        commissionAmountPerUnit: Math.round((commissionAmount / qty) * 100) / 100,
         itemSubtotal,
         itemVendorTotal: technicianPayout
       });
@@ -398,22 +409,31 @@ async function calculateCartTotals({
   const discount = Math.min(subtotal, Math.max(0, Number(couponDiscount) || 0));
   const deliveryFee = delivery.customerDeliveryFee || 0;
 
-  // Base Total before independent 3% platform charge
-  const baseTotal = Math.max(0, (subtotal - discount + deliveryFee + totalAdminCommission));
+  // Base Total before platform charge
+  // For Glacons Services: Customer pays exactly the catalog price (subtotal - discount). Commission is deducted internally.
+  // For E-commerce & Quick Commerce: Base total includes subtotal + delivery + admin commission markup
+  const baseTotal = isService
+    ? Math.max(0, subtotal - discount)
+    : Math.max(0, (subtotal - discount + deliveryFee + totalAdminCommission));
 
   // Independent 3% Platform Charge on overall order value (to eliminate gateway fees & avoid losses)
+  // For services, the 20% platform commission already covers payment processing and profit
   const platformChargeRate = parseFloat(settings['platform_charge_pct'] || 3.0) / 100;
-  const platformProtectionFee = Math.round((baseTotal * platformChargeRate) * 100) / 100;
+  const platformProtectionFee = isService
+    ? 0
+    : Math.round((baseTotal * platformChargeRate) * 100) / 100;
 
   // Final Total charged to customer (via Razorpay or COD)
   const finalCustomerTotal = Math.round((baseTotal + platformProtectionFee) * 100) / 100;
 
   // Customer Platform Fee on receipt (cleanly bundles the admin markup + 3% charge; zero mention of 3% or security)
-  const customerPlatformFee = Math.round((totalAdminCommission + platformProtectionFee) * 100) / 100;
+  const customerPlatformFee = isService
+    ? 0
+    : Math.round((totalAdminCommission + platformProtectionFee) * 100) / 100;
 
-  // Admin Margins
+  // Admin Margins & Rider/Technician Payout
   const deliveryMargin = delivery.adminMargin || 0;
-  const totalRiderPayout = delivery.riderPay || 0;
+  const totalRiderPayout = isService ? totalTechnicianPayout : (delivery.riderPay || 0);
   const platformNetProfit = Math.round(
     (totalAdminCommission + deliveryMargin + platformProtectionFee) * 100
   ) / 100;

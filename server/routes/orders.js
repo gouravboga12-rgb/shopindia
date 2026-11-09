@@ -681,12 +681,13 @@ router.post('/', async (req, res) => {
       const serviceAddress = [order.deliveryLine1, order.deliveryCity, order.deliveryState, order.deliveryPincode].filter(Boolean).join(', ') || 'Customer Service Address';
       const serviceLat = orderLat || 17.385044;
       const serviceLng = orderLng || 78.486671;
+      const technicianGuaranteedFee = riderFee > 0 ? riderFee : (firstServiceItem?.vendorPrice || Math.round(order.total * 0.8) || 400);
 
       await prisma.delivery.create({
         data: {
           orderId: order.id,
           status: 'broadcasted',
-          deliveryFee: riderFee || 150, // Guaranteed technician payout
+          deliveryFee: technicianGuaranteedFee, // Guaranteed technician payout (80% or admin configured pay)
           distanceKm: orderDistKm || 3.5,
           deliveryOtp: masterDeliveryPin,
           pickupName: `Glacons Service: ${serviceTitle}`,

@@ -801,37 +801,70 @@ export const ActiveDeliveryView: React.FC = () => {
               </div>
 
               {/* Execution Quality Checklist */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-1.5">
-                <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500 block mb-1">
-                  Execution Quality Checklist
-                </span>
-                {[
-                  { id: 'inspection', label: '1. Initial safety & electrical check' },
-                  { id: 'filterClean', label: '2. High-pressure jet cleaning / filter wash' },
-                  { id: 'coilWash', label: '3. Evaporator & outdoor coil deep clean' },
-                  { id: 'gasCheck', label: '4. Gas pressure & airflow test' },
-                  { id: 'finalRunTest', label: '5. Post-service run test with customer' },
-                ].map((chk) => {
-                  const isChecked = !!serviceChecklist[chk.id];
-                  return (
-                    <button
-                      key={chk.id}
-                      type="button"
-                      onClick={() => setServiceChecklist(prev => ({ ...prev, [chk.id]: !prev[chk.id] }))}
-                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/70 text-left transition-colors cursor-pointer"
-                    >
-                      <span className={`text-xs ${isChecked ? 'line-through text-slate-400' : 'text-slate-800 font-semibold'}`}>
-                        {chk.label}
-                      </span>
-                      {isChecked ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <Square className="w-4 h-4 text-slate-400 shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              {(() => {
+                const titleLower = (activeDelivery.order?.items?.[0]?.name || activeDelivery.pickupName || '').toLowerCase();
+                let checklistItems = [
+                  { id: 'siteInspection', label: '1. Initial on-site inspection & problem diagnosis' },
+                  { id: 'safetySetup', label: '2. Safety precautions & work area setup' },
+                  { id: 'coreService', label: '3. Execution of requested doorstep service/repair' },
+                  { id: 'qualityCheck', label: '4. Quality verification & functional testing' },
+                  { id: 'customerDemo', label: '5. Work area cleanup & customer sign-off' },
+                ];
+
+                if (titleLower.includes('plumb')) {
+                  checklistItems = [
+                    { id: 'plumb_inspect', label: '1. Site inspection & leak/blockage diagnosis' },
+                    { id: 'plumb_valve', label: '2. Main valve shut-off & water pressure check' },
+                    { id: 'plumb_repair', label: '3. Pipe fitting / fixture repair or replacement' },
+                    { id: 'plumb_seal', label: '4. Joint sealant & leakage testing' },
+                    { id: 'plumb_demo', label: '5. Clean work area & operation demo to customer' },
+                  ];
+                } else if (titleLower.includes('electr')) {
+                  checklistItems = [
+                    { id: 'elec_safe', label: '1. MCB / circuit safety isolation & earthing test' },
+                    { id: 'elec_volt', label: '2. Voltage, socket & wiring continuity check' },
+                    { id: 'elec_repair', label: '3. Switch, appliance or wiring repair/replacement' },
+                    { id: 'elec_load', label: '4. Load test & thermal inspection' },
+                    { id: 'elec_demo', label: '5. Final testing & customer handover' },
+                  ];
+                } else if (titleLower.includes('ac') || titleLower.includes('hvac') || titleLower.includes('cool')) {
+                  checklistItems = [
+                    { id: 'ac_safe', label: '1. Initial safety & electrical check' },
+                    { id: 'ac_filter', label: '2. High-pressure jet cleaning / filter wash' },
+                    { id: 'ac_coil', label: '3. Evaporator & outdoor coil deep clean' },
+                    { id: 'ac_gas', label: '4. Gas pressure & airflow test' },
+                    { id: 'ac_demo', label: '5. Post-service cooling run test with customer' },
+                  ];
+                }
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-1.5">
+                    <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                      Execution Quality Checklist
+                    </span>
+                    {checklistItems.map((chk) => {
+                      const isChecked = !!serviceChecklist[chk.id];
+                      return (
+                        <button
+                          key={chk.id}
+                          type="button"
+                          onClick={() => setServiceChecklist(prev => ({ ...prev, [chk.id]: !prev[chk.id] }))}
+                          className="w-full flex items-center justify-between p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/70 text-left transition-colors cursor-pointer"
+                        >
+                          <span className={`text-xs ${isChecked ? 'line-through text-slate-400' : 'text-slate-800 font-semibold'}`}>
+                            {chk.label}
+                          </span>
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -846,7 +879,7 @@ export const ActiveDeliveryView: React.FC = () => {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Payment Verified</span>
                     <h4 className="text-base font-black text-slate-900">
-                      ₹{activeDelivery.order.total.toLocaleString('en-IN')} Paid via Razorpay
+                      {isService ? 'Paid Online via Razorpay' : `₹${activeDelivery.order.total.toLocaleString('en-IN')} Paid via Razorpay`}
                     </h4>
                   </div>
                 </div>
