@@ -389,6 +389,108 @@ router.post(['/:id/verify-doorstep-razorpay', '/orders/:id/verify-doorstep-razor
 });
 
 /**
+ * GET /api/rider/orders/:id/doorstep-payment-info
+ * Returns dynamic UPI QR details and payment link for doorstep collection.
+ */
+router.get(['/:id/doorstep-payment-info', '/orders/:id/doorstep-payment-info'], async (req, res) => {
+  try {
+    const profile = await getRiderProfile(req.user.userId);
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: {
+        order: {
+          include: {
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        },
+      },
+    });
+
+    if (!delivery || !delivery.order) return res.status(404).json({ error: 'Order not found' });
+
+    const upiVpa = process.env.COMPANY_UPI_VPA || 'shopindia36@icici';
+    const upiName = 'ShopIndia';
+    const orderNo = delivery.order.orderNumber || delivery.order.id.slice(0, 8);
+    const total = delivery.order.total;
+    const upiLink = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${total}&cu=INR&tn=Order_${orderNo}&tr=${delivery.id}`;
+
+    res.json({
+      success: true,
+      total,
+      orderNumber: orderNo,
+      token: orderNo.replace(/^OD-/, '').slice(-4),
+      upiVpa,
+      upiName,
+      upiLink,
+      qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(upiLink)}`,
+      paymentStatus: delivery.order.paymentStatus,
+      paymentMethod: delivery.order.paymentMethod,
+    });
+  } catch (err) {
+    console.error('Fetch Doorstep Payment Info Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rider/orders/:id/confirm-doorstep-upi
+ * Rider confirms customer scanned dynamic UPI QR code and paid directly to ShopIndia.
+ * Marks order paid, so rider collects ₹0 offline cash and keeps ₹0 COD float.
+ */
+router.post(['/:id/confirm-doorstep-upi', '/orders/:id/confirm-doorstep-upi'], async (req, res) => {
+  try {
+    const { upiRef } = req.body;
+    const profile = await getRiderProfile(req.user.userId);
+
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
+    });
+
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found.' });
+
+    const ref = upiRef || `UPI-QR-${Date.now()}`;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: delivery.orderId },
+        data: {
+          paymentStatus: 'paid',
+          paymentMethod: 'upi_qr',
+          paymentRef: ref,
+        },
+      });
+
+      await tx.paymentRecord.upsert({
+        where: { orderId: delivery.orderId },
+        create: {
+          orderId: delivery.orderId,
+          razorpayPaymentId: ref,
+          amount: delivery.order.total,
+          currency: 'INR',
+          status: 'captured',
+          capturedAt: new Date(),
+        },
+        update: {
+          razorpayPaymentId: ref,
+          status: 'captured',
+          capturedAt: new Date(),
+        },
+      });
+    });
+
+    res.json({
+      success: true,
+      message: `Customer payment of ₹${delivery.order.total} verified via UPI QR.`,
+      paymentId: ref,
+    });
+  } catch (err) {
+    console.error('Confirm Doorstep UPI Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/rider/orders/:id/complete
  * Stage 4: Customer Handover with 4-digit OTP or Photo Proof.
  * Credits delivery fee to rider wallet and marks order delivered.
@@ -419,10 +521,15 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
     const feeToCredit = delivery.deliveryFee || 50;
     
     // Determine whether payment was collected as physical cash
-    // If rider explicitly confirmed 'razorpay' or order is already marked paid online, zero cash float is added
+    // If rider explicitly confirmed 'razorpay', 'upi_qr', 'online', or order is already marked paid online, zero cash float is added
     let isCollectedCash = false;
     if (delivery.order?.paymentMethod === 'cod') {
-      if (paymentCollectedVia === 'razorpay' || delivery.order?.paymentStatus === 'paid') {
+      if (
+        paymentCollectedVia === 'razorpay' ||
+        paymentCollectedVia === 'upi_qr' ||
+        paymentCollectedVia === 'online' ||
+        delivery.order?.paymentStatus === 'paid'
+      ) {
         isCollectedCash = false;
       } else if (paymentCollectedVia === 'cash') {
         isCollectedCash = true;

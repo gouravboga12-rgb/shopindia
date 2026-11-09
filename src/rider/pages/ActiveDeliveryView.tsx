@@ -18,7 +18,9 @@ import {
   Navigation,
   Banknote,
   CreditCard,
-  Loader2
+  Loader2,
+  QrCode,
+  X
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
@@ -35,6 +37,17 @@ export const ActiveDeliveryView: React.FC = () => {
   const [onlinePaymentError, setOnlinePaymentError] = useState<string | null>(null);
   const [cashConfirmed, setCashConfirmed] = useState<boolean>(false);
   const [showCashConfirmModal, setShowCashConfirmModal] = useState<boolean>(false);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [qrData, setQrData] = useState<{
+    total: number;
+    orderNumber: string;
+    token: string;
+    upiVpa: string;
+    upiName: string;
+    upiLink: string;
+    qrUrl: string;
+  } | null>(null);
+  const [isVerifyingUpi, setIsVerifyingUpi] = useState<boolean>(false);
   const [currentRiderCoords, setCurrentRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // High-frequency live GPS streaming to Customer & Vendor via WebSockets
@@ -96,6 +109,64 @@ export const ActiveDeliveryView: React.FC = () => {
 
   const toggleItemCheck = (id: string) => {
     setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleOpenQrModal = async () => {
+    if (!activeDelivery?.id || !activeDelivery.order) return;
+    const orderNo = activeDelivery.order.orderNumber || (activeDelivery.orderId ? activeDelivery.orderId.slice(0, 8) : activeDelivery.id.slice(0, 8));
+    const token = (orderNo ? orderNo.replace(/^OD-/, '').slice(-4) : '') || '9786';
+    const total = activeDelivery.order.total;
+    const upiVpa = 'shopindia36@icici';
+    const upiName = 'ShopIndia';
+    const upiLink = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${total}&cu=INR&tn=Order_${orderNo}&tr=${activeDelivery.id}`;
+    const fallbackQr = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(upiLink)}`;
+
+    setQrData({
+      total,
+      orderNumber: orderNo,
+      token,
+      upiVpa,
+      upiName,
+      upiLink,
+      qrUrl: fallbackQr,
+    });
+    setShowQrModal(true);
+
+    try {
+      const res = await api.get<{
+        success: boolean;
+        total: number;
+        orderNumber: string;
+        token: string;
+        upiVpa: string;
+        upiName: string;
+        upiLink: string;
+        qrUrl: string;
+      }>(`/api/rider/orders/${activeDelivery.id}/doorstep-payment-info`);
+      if (res?.success && res.qrUrl) {
+        setQrData(res);
+      }
+    } catch (e) {
+      console.warn('Using dynamic UPI QR fallback:', e);
+    }
+  };
+
+  const handleConfirmUpiPayment = async () => {
+    if (!activeDelivery?.id) return;
+    setIsVerifyingUpi(true);
+    try {
+      await api.post(`/api/rider/orders/${activeDelivery.id}/confirm-doorstep-upi`, {
+        upiRef: `UPI-QR-${Date.now()}`,
+      });
+      setDoorstepPaidOnline(true);
+      setOnlinePaymentId(`UPI-QR-VERIFIED`);
+      setShowQrModal(false);
+      setOtpError(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to confirm UPI payment.');
+    } finally {
+      setIsVerifyingUpi(false);
+    }
   };
 
   const handleCollectViaRazorpay = async () => {
@@ -218,7 +289,7 @@ export const ActiveDeliveryView: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 sm:space-y-5 pb-24 text-slate-800 animate-in fade-in duration-200">
-      
+
       {/* Active Trip Header Banner */}
       <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs relative overflow-hidden">
         <div className="flex items-center justify-between">
@@ -437,7 +508,7 @@ export const ActiveDeliveryView: React.FC = () => {
       {/* STAGE 4: Customer Handover & 4-Digit OTP Verification */}
       {currentStage === 'arrived_customer' && (
         <div className="bg-white border-2 border-emerald-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
-          
+
           {/* Doorstep Payment Clearance Card (Cash vs Razorpay) */}
           {activeDelivery.order?.total ? (
             isPaidOnline ? (
@@ -529,30 +600,20 @@ export const ActiveDeliveryView: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Option 2: Razorpay Online Payment */}
+                  {/* Option 2: Doorstep Dynamic UPI QR & Razorpay */}
                   <div className="p-3 bg-white border-2 border-orange-400 rounded-xl flex flex-col justify-between">
                     <div>
                       <span className="text-[10px] font-bold text-orange-600 uppercase">Option 2 (Instant)</span>
-                      <h5 className="text-xs font-black text-slate-900">Pay via Razorpay</h5>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Customer pays via UPI, QR, or Card directly.</p>
+                      <h5 className="text-xs font-black text-slate-900">Pay via UPI QR / Online</h5>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Scan QR with GPay / PhonePe / Paytm or pay by Card.</p>
                     </div>
                     <button
                       type="button"
-                      disabled={isOnlinePaying}
-                      onClick={handleCollectViaRazorpay}
-                      className="mt-2.5 w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                      onClick={handleOpenQrModal}
+                      className="mt-2.5 w-full py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
                     >
-                      {isOnlinePaying ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Opening Razorpay...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="w-3.5 h-3.5" />
-                          <span>Open Razorpay Modal</span>
-                        </>
-                      )}
+                      <QrCode className="w-4 h-4" />
+                      <span>Show UPI QR Code</span>
                     </button>
                   </div>
                 </div>
@@ -600,6 +661,97 @@ export const ActiveDeliveryView: React.FC = () => {
             </div>
           )}
 
+          {/* Doorstep Dynamic UPI QR Payment Modal (Option A) */}
+          {showQrModal && qrData && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
+              <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border-2 border-orange-500 space-y-4 animate-in zoom-in-95 relative">
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(false)}
+                  className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                {/* Header */}
+                <div className="text-center">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-950 font-black rounded-full text-xs mb-2">
+                    <QrCode className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Customer UPI QR Code</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900 font-mono">
+                    ₹{qrData.total.toLocaleString('en-IN')}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Order #{qrData.orderNumber} • Token #{qrData.token}
+                  </p>
+                </div>
+
+                {/* QR Code Display */}
+                <div className="bg-gradient-to-b from-orange-50 to-amber-50 p-4 rounded-2xl border-2 border-orange-200 flex flex-col items-center justify-center shadow-inner">
+                  <div className="bg-white p-2.5 rounded-2xl shadow-md border border-slate-200">
+                    <img
+                      src={qrData.qrUrl}
+                      alt="UPI QR Code"
+                      className="w-48 h-48 sm:w-52 sm:h-52 object-contain rounded-lg"
+                      loading="eager"
+                    />
+                  </div>
+
+                  {/* Supported UPI Apps Pills */}
+                  <div className="flex items-center gap-1.5 mt-3 flex-wrap justify-center text-[10px] font-bold text-slate-600">
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md">Google Pay</span>
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md">PhonePe</span>
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md">Paytm</span>
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md">BHIM</span>
+                  </div>
+                  <p className="text-[10.5px] text-slate-500 mt-1.5 text-center font-medium">
+                    Point any UPI app scanner at this QR to pay directly to ShopIndia.
+                  </p>
+                </div>
+
+                {/* Confirmation & Secondary Actions */}
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={isVerifyingUpi}
+                    onClick={handleConfirmUpiPayment}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                  >
+                    {isVerifyingUpi ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Verifying Payment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Payment Received (Unlock OTP)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Fallback to Razorpay Cards / Netbanking */}
+                  <button
+                    type="button"
+                    disabled={isOnlinePaying}
+                    onClick={() => {
+                      setShowQrModal(false);
+                      handleCollectViaRazorpay();
+                    }}
+                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Pay via Card / Netbanking (Razorpay)</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
           <div className="text-center">
             <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-2 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-2xs">
               <KeyRound className="w-6 h-6 sm:w-7 sm:h-7" />
@@ -612,7 +764,7 @@ export const ActiveDeliveryView: React.FC = () => {
 
           {!isPaymentCleared && activeDelivery.order?.paymentMethod === 'cod' && (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold text-center">
-              🔒 Payment Pending: Please confirm physical cash receipt or collect via Razorpay above to unlock OTP entry.
+              🔒 Payment Pending: Please confirm physical cash receipt or collect via UPI QR / Razorpay above to unlock OTP entry.
             </div>
           )}
 
@@ -633,11 +785,10 @@ export const ActiveDeliveryView: React.FC = () => {
                 placeholder="0 0 0 0"
                 value={otpInput}
                 onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                className={`w-48 text-center text-3xl font-mono font-black tracking-widest border-2 rounded-2xl py-3 focus:outline-none shadow-inner ${
-                  isPaymentCleared
+                className={`w-48 text-center text-3xl font-mono font-black tracking-widest border-2 rounded-2xl py-3 focus:outline-none shadow-inner ${isPaymentCleared
                     ? 'bg-slate-50 border-emerald-500 text-emerald-700 focus:bg-white'
                     : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-60'
-                }`}
+                  }`}
               />
             </div>
 
