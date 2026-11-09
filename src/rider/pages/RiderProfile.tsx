@@ -780,6 +780,26 @@ export const RiderProfile: React.FC = () => {
             {/* Multi-Select Service Skills */}
             {(partnerType === 'service' || partnerType === 'both') && (
               <div className="space-y-4 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">Choose Individual Trades to Accept:</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSkills([])}
+                      className="text-[11px] font-bold text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSkills([...homeSkills, ...vehicleSkills].map(s => s.id))}
+                      className="text-[11px] font-bold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[...homeSkills, ...vehicleSkills].map((skill) => {
                     const isChecked = skills.includes(skill.id);

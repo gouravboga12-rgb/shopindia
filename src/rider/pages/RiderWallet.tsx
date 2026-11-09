@@ -194,26 +194,28 @@ export const RiderWallet: React.FC = () => {
       {/* ─────────────────────────────────────────────────────────────
           SECTION 2: OFFLINE CASH KEPT IN POCKET (NO REMITTANCE NEEDED)
       ───────────────────────────────────────────────────────────── */}
-      <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-orange-200 text-orange-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-start sm:items-center gap-3.5">
-          <div className="p-3 rounded-2xl border shadow-xs shrink-0 bg-orange-500 text-white border-orange-600">
-            <Banknote className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm sm:text-base font-black uppercase tracking-tight">
-                Cash in Pocket: ₹{Math.round(pocketCash).toLocaleString('en-IN')}
-              </span>
-              <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
-                Kept with Rider
-              </span>
+      {pocketCash > 0 && (
+        <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-orange-200 text-orange-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-3 rounded-2xl border shadow-xs shrink-0 bg-orange-500 text-white border-orange-600">
+              <Banknote className="w-6 h-6" />
             </div>
-            <p className="text-xs text-slate-600 mt-1">
-              All physical cash collected on Cash on Delivery orders stays with you. No cash submission or online remittance to admin is required.
-            </p>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm sm:text-base font-black uppercase tracking-tight">
+                  Cash in Pocket: ₹{Math.round(pocketCash).toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Kept with Rider
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">
+                All physical cash collected on Cash on Delivery orders stays with you. No cash submission or online remittance to admin is required.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           SECTION 3: INSTANT BANK / UPI WITHDRAWAL FORM

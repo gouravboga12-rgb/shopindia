@@ -17,10 +17,13 @@ type ServiceSubVertical = 'home' | 'vehicle';
 const HOME_CATEGORIES = [
   'All',
   'AC Repair & Service',
-  'Deep House Cleaning',
-  'Electrician & Plumber',
+  'Electrician & Home Wiring',
+  'Plumber & Sanitary Care',
+  'Deep House Cleaning & Pest',
   'Appliance Maintenance',
   'Salon & Grooming at Home',
+  'Carpentry & Woodwork',
+  'Painting & Waterproofing',
 ];
 
 const VEHICLE_CATEGORIES = [
@@ -83,13 +86,30 @@ export const VerticalServicesMobile: React.FC = () => {
     const fromProds = services.map((p) => p.category).filter(Boolean);
     const fallback = activeSubVertical === 'home' ? HOME_CATEGORIES : VEHICLE_CATEGORIES;
 
-    const merged = Array.from(new Set([...fromApi, ...fromProds, ...fallback.slice(1)]));
+    const merged = Array.from(new Set([...fromApi, ...fromProds, ...fallback.slice(1)]))
+      .filter((cat) => cat !== 'Electrician & Plumber' && cat !== 'Carpentry & Painting');
     return ['All', ...merged];
   }, [apiCategories, activeSubVertical, services]);
 
   const currentServices = !selectedCategory || selectedCategory === 'All'
     ? services
-    : services.filter((p) => p.category === selectedCategory || (p.tags && p.tags.includes(selectedCategory)));
+    : services.filter((p) => {
+        if (p.category === selectedCategory || (p.tags && p.tags.includes(selectedCategory))) return true;
+        const catLower = (p.category || '').toLowerCase();
+        const titleLower = (p.title || '').toLowerCase();
+        const selLower = selectedCategory.toLowerCase();
+
+        if (selLower.includes('electrician') && (catLower.includes('electric') || titleLower.includes('electric') || titleLower.includes('wiring'))) return true;
+        if (selLower.includes('plumber') && (catLower.includes('plumb') || titleLower.includes('plumb') || titleLower.includes('pipe') || titleLower.includes('leak') || titleLower.includes('tap'))) return true;
+        if (selLower.includes('ac') && (catLower.includes('ac') || titleLower.includes('ac') || titleLower.includes('cooling'))) return true;
+        if (selLower.includes('cleaning') && (catLower.includes('clean') || titleLower.includes('clean') || titleLower.includes('pest'))) return true;
+        if (selLower.includes('carpentry') && (catLower.includes('carpent') || titleLower.includes('carpent') || titleLower.includes('wood') || titleLower.includes('furniture'))) return true;
+        if (selLower.includes('painting') && (catLower.includes('paint') || titleLower.includes('paint'))) return true;
+        if (selLower.includes('salon') && (catLower.includes('salon') || titleLower.includes('salon') || titleLower.includes('groom') || titleLower.includes('hair'))) return true;
+        if (selLower.includes('appliance') && (catLower.includes('appliance') || titleLower.includes('appliance') || titleLower.includes('machine') || titleLower.includes('refrigerator'))) return true;
+
+        return false;
+      });
 
   const handleBookClick = (service: Product, e: React.MouseEvent) => {
     e.stopPropagation();

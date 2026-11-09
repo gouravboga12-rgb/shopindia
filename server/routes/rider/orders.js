@@ -6,6 +6,23 @@ const { emitDeliveryStageChange, cleanDeliveryTracking } = require('../../lib/so
 const { recordRiderCredit } = require('../../lib/ledger');
 const { createOrder: createRazorpayOrder, verifyPaymentSignature } = require('../../lib/razorpay');
 
+// Comprehensive dictionary of skill IDs to matching keywords, product synonyms, and stems
+const SKILL_KEYWORDS = {
+  plumbing: ['plumb', 'plumber', 'pipe', 'leak', 'tap', 'sink', 'drain', 'sanitary', 'faucet', 'motor', 'geyser', 'flush', 'water'],
+  electrician: ['electr', 'wire', 'wiring', 'switch', 'light', 'fan', 'fuse', 'mcb', 'inverter', 'short circuit', 'appliance install', 'bulb', 'power'],
+  ac_service: ['ac', 'air condition', 'hvac', 'cooling', 'compressor', 'gas refill', 'filter clean', 'jet wash', 'duct', 'split ac', 'window ac'],
+  cleaning: ['clean', 'deep clean', 'disinfect', 'pest', 'pest control', 'sanitize', 'wash', 'mopping', 'sofa clean', 'kitchen clean', 'bathroom clean'],
+  appliance_repair: ['appliance', 'washing machine', 'refrigerator', 'fridge', 'microwave', 'ro', 'purifier', 'water purifier', 'oven', 'chimney', 'dishwasher'],
+  carpentry: ['carpent', 'wood', 'furniture', 'door', 'lock', 'hinge', 'bed', 'cabinet', 'shelf', 'drill'],
+  painting: ['paint', 'painter', 'wall', 'waterproof', 'seepage', 'texture', 'distemper', 'primer'],
+  salon_grooming: ['salon', 'groom', 'haircut', 'facial', 'massage', 'styling', 'beauty', 'spa', 'makeup', 'waxing', 'shave'],
+  vehicle_care: ['car service', 'bike service', 'motorcycle', 'engine', 'oil change', 'tuning', 'vehicle periodic', 'periodic service', 'auto service', 'mechanic', 'brake oil'],
+  vehicle_wash: ['wash', 'foam wash', 'car wash', 'bike wash', 'detailing', 'spa', 'pressure wash', 'vacuum'],
+  vehicle_breakdown: ['tow', 'towing', 'breakdown', 'recovery', 'rsa', 'roadside', 'flatbed'],
+  vehicle_battery: ['battery', 'jumpstart', 'jump start', 'voltage', 'car battery', 'bike battery'],
+  vehicle_tyres: ['tyre', 'tire', 'wheel', 'brake', 'balancing', 'puncture', 'alignment'],
+};
+
 const router = express.Router();
 router.use(verifyToken, requireRole('rider'));
 
@@ -116,10 +133,16 @@ router.get('/broadcast-feed', async (req, res) => {
       if (isService && profile.skills && profile.skills.length > 0) {
         const itemNames = (del.order?.items || []).map(i => (i.name || '').toLowerCase()).join(' ');
         const pickupStr = (del.pickupName || '').toLowerCase();
+        const notesStr = (del.order?.notes || '').toLowerCase();
+        const combinedText = `${pickupStr} ${itemNames} ${notesStr}`;
+
         const hasSkillMatch = profile.skills.some(skill => {
-          const s = (skill || '').toLowerCase();
-          return s === 'all' || s === 'all_round' || itemNames.includes(s) || pickupStr.includes(s);
+          const s = (skill || '').toLowerCase().trim();
+          if (s === 'all' || s === 'all_round' || s === 'general') return true;
+          const keywords = SKILL_KEYWORDS[s] || [s];
+          return keywords.some(kw => combinedText.includes(kw));
         });
+
         if (!hasSkillMatch && !profile.skills.includes('general') && !profile.skills.includes('all')) {
           return false;
         }
@@ -789,21 +812,14 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
         },
       });
 
-      // Unified Net Wallet Auto-Offset Architecture (Swiggy / Zomato Model):
-      // - If rider collected cash, they pocket the physical cash (e.g. ₹110).
-      //   Net wallet change is +feeToCredit - orderCash (e.g. +20 - 110 = -90).
-      // - If prepaid / Razorpay, net change is purely +feeToCredit (e.g. +30).
-      //   This automatically pays down negative wallet balances across subsequent deliveries.
-      const netWalletChange = isCollectedCash && orderCash > 0
-        ? (feeToCredit - orderCash)
-        : feeToCredit;
-
+      // Rider Pure Delivery Wage Architecture:
+      // The rider always earns and receives their guaranteed delivery fee (+feeToCredit).
+      // Customer product prices are NEVER deducted from the partner's earned delivery wages.
       await tx.riderProfile.update({
         where: { id: profile.id },
         data: {
-          walletBalance: { increment: netWalletChange },
+          walletBalance: { increment: feeToCredit },
           totalDeliveries: { increment: 1 },
-          ...(isCollectedCash && orderCash > 0 ? { codCashFloat: { increment: orderCash } } : {}),
         },
       });
 
