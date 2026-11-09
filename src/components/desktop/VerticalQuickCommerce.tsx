@@ -13,6 +13,7 @@ import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
 import { PrescriptionUploadModal } from '../common/PrescriptionUploadModal';
 import { PlatformOperatingHoursModal } from '../common/PlatformOperatingHoursModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
+import { api } from '../../lib/api';
 
 type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
 
@@ -65,14 +66,18 @@ export const VerticalQuickCommerce: React.FC = () => {
   const [operatingModalOpen, setOperatingModalOpen] = useState(false);
 
   React.useEffect(() => {
-    fetch('/api/orders/pricing-config')
-      .then(r => r.json())
-      .then(d => {
-        if (d?.operatingStatus) {
-          setOperatingStatus(d.operatingStatus);
-        }
-      })
-      .catch(() => {});
+    const fetchStatus = () => {
+      api.get<any>('/api/orders/pricing-config')
+        .then(d => {
+          if (d?.operatingStatus) {
+            setOperatingStatus(d.operatingStatus);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchStatus();
+    const timer = setInterval(fetchStatus, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const isTarget = (target: string) => target === 'both' || target === 'quick';
@@ -474,6 +479,10 @@ export const VerticalQuickCommerce: React.FC = () => {
                             whileTap={{ scale: 0.95 }}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (isShuttersDown) {
+                                setOperatingModalOpen(true);
+                                return;
+                              }
                               if (!requireCustomerAuth('buy this item')) return;
                               addToCart(product);
                               navigateTo('cart');

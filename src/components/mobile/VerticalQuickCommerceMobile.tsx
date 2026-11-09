@@ -12,6 +12,7 @@ import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
 import { PrescriptionUploadModal } from '../common/PrescriptionUploadModal';
 import { PlatformOperatingHoursModal } from '../common/PlatformOperatingHoursModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
+import { api } from '../../lib/api';
 
 type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
 
@@ -40,14 +41,18 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
   const [operatingModalOpen, setOperatingModalOpen] = useState(false);
 
   React.useEffect(() => {
-    fetch('/api/orders/pricing-config')
-      .then(r => r.json())
-      .then(d => {
-        if (d?.operatingStatus) {
-          setOperatingStatus(d.operatingStatus);
-        }
-      })
-      .catch(() => {});
+    const fetchStatus = () => {
+      api.get<any>('/api/orders/pricing-config')
+        .then(d => {
+          if (d?.operatingStatus) {
+            setOperatingStatus(d.operatingStatus);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchStatus();
+    const timer = setInterval(fetchStatus, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const isTarget = (target: string) => target === 'both' || target === 'quick';

@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Calendar, Clock, CheckCircle2, Sparkles, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '../../lib/api';
 
 interface TimeSlotWheelPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   serviceTitle: string;
   price: number;
+  availableSlots?: string[];
   onConfirm: (slotData: { date: string; time: string }) => void;
 }
 
@@ -25,13 +27,64 @@ interface SlotOption {
   startHour: number;
 }
 
+function parseSlotString(rawSlot: string, index: number): SlotOption {
+  const trimmed = rawSlot.trim();
+  let startHour = 8;
+  const match = trimmed.match(/^(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const meridiem = (match[3] || '').toUpperCase();
+    if (meridiem === 'PM' && h < 12) h += 12;
+    if (meridiem === 'AM' && h === 12) h = 0;
+    if (!meridiem) {
+      if (trimmed.toUpperCase().includes('PM')) {
+        if (h === 12) {
+          // 12 PM
+        } else if (h < 12 && (h === 1 || h === 2 || h === 3 || h === 4 || h === 5 || h === 6 || h >= 12)) {
+          h += 12;
+        }
+      }
+    }
+    startHour = h;
+  }
+
+  let period: 'morning' | 'afternoon' | 'evening' = 'morning';
+  if (startHour >= 12 && startHour < 17) {
+    period = 'afternoon';
+  } else if (startHour >= 17) {
+    period = 'evening';
+  }
+
+  return {
+    id: `slot-${index}-${startHour}`,
+    timeRange: trimmed,
+    period,
+    startHour,
+  };
+}
+
 export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> = ({
   isOpen,
   onClose,
   serviceTitle,
   price,
+  availableSlots,
   onConfirm,
 }) => {
+  // Fetch real-time platform operating status (respecting Super Admin Friday break toggle)
+  const [operatingStatus, setOperatingStatus] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api.get<any>('/api/orders/pricing-config')
+      .then(res => {
+        if (res?.operatingStatus) {
+          setOperatingStatus(res.operatingStatus);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen]);
+
   // Generate 6 upcoming days
   const dateOptions: DateOption[] = useMemo(() => {
     const list: DateOption[] = [];
@@ -61,7 +114,6 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
   }, []);
 
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(0);
-  const [selectedSlot, setSelectedSlot] = useState<string>('02:00 PM - 04:00 PM');
 
   const standardSlots: SlotOption[] = [
     { id: 'm1', timeRange: '08:00 AM - 10:00 AM', period: 'morning', startHour: 8 },
@@ -72,13 +124,37 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
     { id: 'e1', timeRange: '06:00 PM - 08:00 PM', period: 'evening', startHour: 18 },
   ];
 
+  // Dynamic slots configured by Super Admin on the service, or standard 2-hr fallback
+  const activeSlots: SlotOption[] = useMemo(() => {
+    if (availableSlots && availableSlots.length > 0) {
+      return availableSlots.map((raw, idx) => parseSlotString(raw, idx));
+    }
+    return standardSlots;
+  }, [availableSlots]);
+
+  const [selectedSlot, setSelectedSlot] = useState<string>('');
+
+  useEffect(() => {
+    if (activeSlots.length > 0) {
+      // Pick first non-disabled slot or first slot
+      setSelectedSlot(activeSlots[0].timeRange);
+    }
+  }, [activeSlots]);
+
   const currentDateOption = dateOptions[selectedDateIdx] || dateOptions[0];
 
-  // Check if slot is unavailable
+  // Check if slot is unavailable dynamically
   const isSlotDisabled = (slot: SlotOption) => {
-    // 1. Friday Prayer Break check: 12 PM - 2 PM is paused
-    if (currentDateOption.isFriday && slot.startHour === 12) {
-      return { disabled: true, reason: 'Friday Prayer Break 🕌' };
+    // 1. Dynamic Friday Prayer Break check: ONLY disable if enabled in Admin settings
+    const isFridayBreakEnabled = Boolean(operatingStatus?.fridayBreak?.isEnabled);
+    if (currentDateOption.isFriday && isFridayBreakEnabled) {
+      // Check if slot overlaps with afternoon Friday break (typically 12:00 PM - 2:00 PM)
+      if (slot.startHour >= 12 && slot.startHour < 14) {
+        return {
+          disabled: true,
+          reason: operatingStatus?.fridayBreak?.title || 'Friday Prayer Break 🕌',
+        };
+      }
     }
 
     // 2. If Today, check if slot has already passed
@@ -93,11 +169,15 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
     return { disabled: false, reason: '' };
   };
 
+  const morningSlots = activeSlots.filter(s => s.period === 'morning');
+  const afternoonSlots = activeSlots.filter(s => s.period === 'afternoon');
+  const eveningSlots = activeSlots.filter(s => s.period === 'evening');
+
   const handleConfirm = () => {
     const formattedDate = `${currentDateOption.label} (${currentDateOption.subLabel})`;
     onConfirm({
       date: formattedDate,
-      time: selectedSlot,
+      time: selectedSlot || activeSlots[0]?.timeRange || '10:00 AM - 12:00 PM',
     });
   };
 
@@ -194,15 +274,14 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
                 <span>Select 2-Hour Arrival Window</span>
               </span>
 
-              {/* Morning */}
-              <div>
-                <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Morning
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {standardSlots
-                    .filter((s) => s.period === 'morning')
-                    .map((slot) => {
+              {/* Morning Slots */}
+              {morningSlots.length > 0 && (
+                <div>
+                  <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Morning
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {morningSlots.map((slot) => {
                       const check = isSlotDisabled(slot);
                       const isSelected = selectedSlot === slot.timeRange;
                       return (
@@ -228,18 +307,18 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
                         </button>
                       );
                     })}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Afternoon */}
-              <div>
-                <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Afternoon
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {standardSlots
-                    .filter((s) => s.period === 'afternoon')
-                    .map((slot) => {
+              {/* Afternoon Slots */}
+              {afternoonSlots.length > 0 && (
+                <div>
+                  <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Afternoon
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {afternoonSlots.map((slot) => {
                       const check = isSlotDisabled(slot);
                       const isSelected = selectedSlot === slot.timeRange;
                       return (
@@ -265,18 +344,18 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
                         </button>
                       );
                     })}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Evening */}
-              <div>
-                <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Evening
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {standardSlots
-                    .filter((s) => s.period === 'evening')
-                    .map((slot) => {
+              {/* Evening Slots */}
+              {eveningSlots.length > 0 && (
+                <div>
+                  <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Evening
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {eveningSlots.map((slot) => {
                       const check = isSlotDisabled(slot);
                       const isSelected = selectedSlot === slot.timeRange;
                       return (
@@ -302,8 +381,15 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
                         </button>
                       );
                     })}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {activeSlots.length === 0 && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center text-xs text-amber-800 font-medium">
+                  No appointment time slots currently available for this service.
+                </div>
+              )}
             </div>
 
             {/* Appointment Summary Box */}

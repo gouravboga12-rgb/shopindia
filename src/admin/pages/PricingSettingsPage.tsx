@@ -1162,15 +1162,30 @@ export const PricingSettingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Toggle Button */}
+                  {/* Toggle Button with Instant Auto-Save */}
                   <button
-                    onClick={() => {
+                    disabled={savingKey === 'midnight_blackout'}
+                    onClick={async () => {
                       const next = settings.midnight_blackout_enabled === 'true' ? 'false' : 'true';
                       setSettings(prev => ({ ...prev, midnight_blackout_enabled: next }));
+                      await saveSettingsBundle(
+                        {
+                          midnight_blackout_enabled: next,
+                          midnight_blackout_start: settings.midnight_blackout_start,
+                          midnight_blackout_end: settings.midnight_blackout_end,
+                          midnight_blackout_verticals: settings.midnight_blackout_verticals,
+                          midnight_blackout_title: settings.midnight_blackout_title,
+                          midnight_blackout_message: settings.midnight_blackout_message,
+                        },
+                        undefined,
+                        'midnight_blackout',
+                        next === 'true' ? 'Midnight blackout activated!' : 'Midnight blackout disabled (24/7 round-the-clock)'
+                      );
                     }}
+                    title="Click to toggle Midnight Blackout immediately"
                     className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       settings.midnight_blackout_enabled === 'true' ? 'bg-indigo-600' : 'bg-gray-200'
-                    }`}
+                    } ${savingKey === 'midnight_blackout' ? 'opacity-60 cursor-wait' : ''}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
@@ -1311,15 +1326,32 @@ export const PricingSettingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Toggle Button */}
+                  {/* Toggle Button with Instant Auto-Save */}
                   <button
-                    onClick={() => {
+                    disabled={savingKey === 'friday_break'}
+                    onClick={async () => {
                       const next = settings.friday_break_enabled === 'true' ? 'false' : 'true';
                       setSettings(prev => ({ ...prev, friday_break_enabled: next }));
+                      await saveSettingsBundle(
+                        {
+                          friday_break_enabled: next,
+                          friday_break_day: settings.friday_break_day,
+                          friday_break_start: settings.friday_break_start,
+                          friday_break_end: settings.friday_break_end,
+                          friday_break_verticals: settings.friday_break_verticals,
+                          friday_break_title: settings.friday_break_title,
+                          friday_break_subtitle: settings.friday_break_subtitle,
+                          friday_break_message: settings.friday_break_message,
+                        },
+                        undefined,
+                        'friday_break',
+                        next === 'true' ? 'Friday prayer pause activated!' : 'Friday prayer pause disabled'
+                      );
                     }}
+                    title="Click to toggle Friday Prayer Break immediately"
                     className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       settings.friday_break_enabled === 'true' ? 'bg-emerald-600' : 'bg-gray-200'
-                    }`}
+                    } ${savingKey === 'friday_break' ? 'opacity-60 cursor-wait' : ''}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${

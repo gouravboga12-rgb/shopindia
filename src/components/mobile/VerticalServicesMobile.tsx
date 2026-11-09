@@ -366,6 +366,7 @@ export const VerticalServicesMobile: React.FC = () => {
         onClose={() => setBookingService(null)}
         serviceTitle={bookingService?.title || ''}
         price={bookingService?.price || 0}
+        availableSlots={bookingService?.serviceSlots}
         onConfirm={confirmBooking}
       />
 
