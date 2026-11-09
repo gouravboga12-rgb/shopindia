@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShieldCheck, Ticket } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShieldCheck, Ticket, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CheckoutDrawer } from '../components/common/CheckoutDrawer';
 import { requireCustomerAuth } from '../lib/customerAuth';
+import { PlatformOperatingHoursModal, type OperatingHoursStatus } from '../components/common/PlatformOperatingHoursModal';
 
 export const CartPage: React.FC = () => {
   const { cart, updateQuantity, removeFromCart, getCartTotal, navigateTo, currentVertical } = useApp();
@@ -13,6 +14,8 @@ export const CartPage: React.FC = () => {
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [operatingStatus, setOperatingStatus] = useState<OperatingHoursStatus | null>(null);
+  const [showOperatingModal, setShowOperatingModal] = useState<boolean>(false);
 
   const [pricingConfig, setPricingConfig] = useState<any>({
     shiprocket_base_fee: 49,
@@ -35,6 +38,9 @@ export const CartPage: React.FC = () => {
       .then(d => {
         if (d?.settings) {
           setPricingConfig(d.settings);
+        }
+        if (d?.operatingStatus) {
+          setOperatingStatus(d.operatingStatus);
         }
       })
       .catch(() => {});
@@ -103,7 +109,27 @@ export const CartPage: React.FC = () => {
     }
   };
 
+  const isOperatingBlocked = () => {
+    if (!operatingStatus) return false;
+    const isTarget = (target: string) =>
+      target === 'both' ||
+      (target === 'quick' && (currentVertical === 'quick' || !currentVertical)) ||
+      (target === 'services' && currentVertical === 'services');
+
+    if (operatingStatus.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals)) {
+      return true;
+    }
+    if (operatingStatus.midnightBlackout?.isActive && isTarget(operatingStatus.midnightBlackout.verticals)) {
+      return true;
+    }
+    return false;
+  };
+
   const handleCheckout = () => {
+    if (isOperatingBlocked()) {
+      setShowOperatingModal(true);
+      return;
+    }
     if (!requireCustomerAuth('proceed to checkout and place an order')) return;
     setIsCheckoutOpen(true);
   };
@@ -276,12 +302,26 @@ export const CartPage: React.FC = () => {
                 </div>
 
                 <div className="border-t border-brand-border pt-4 flex flex-col gap-3">
+                  {isOperatingBlocked() && (
+                    <div
+                      onClick={() => setShowOperatingModal(true)}
+                      className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-amber-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                        <Clock size={15} className="text-amber-600 flex-shrink-0" />
+                        <span>Ordering is temporarily paused. Tap to see resume time.</span>
+                      </div>
+                      <span className="text-[11px] font-black text-amber-700 underline">Details</span>
+                    </div>
+                  )}
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={handleCheckout}
-                    className="w-full py-3.5 bg-brand-green hover:bg-emerald-650 text-white rounded-button text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-premium"
+                    className={`w-full py-3.5 ${
+                      isOperatingBlocked() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-brand-green hover:bg-emerald-650'
+                    } text-white rounded-button text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-premium`}
                   >
-                    <span>Proceed to Checkout</span>
+                    <span>{isOperatingBlocked() ? 'Ordering Paused — View Hours' : 'Proceed to Checkout'}</span>
                     <ArrowRight size={14} />
                   </motion.button>
                   <div className="flex gap-2.5 items-center justify-center text-xs text-brand-slate font-extrabold select-none">
@@ -431,19 +471,35 @@ export const CartPage: React.FC = () => {
 
         {/* Mobile checkout floating bar */}
         {cart.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/80 px-5 py-4 pb-safe flex items-center justify-between z-50 select-none shadow-[0_-8px_25px_-4px_rgba(0,0,0,0.12)]">
-            <div className="flex flex-col leading-none font-numbers">
-              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 font-sans">Total Payable</span>
-              <span className="text-[22px] font-black text-zinc-900 tracking-tighter">₹{finalTotal.toLocaleString('en-IN')}</span>
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/80 px-5 py-4 pb-safe flex flex-col gap-2 z-50 select-none shadow-[0_-8px_25px_-4px_rgba(0,0,0,0.12)]">
+            {isOperatingBlocked() && (
+              <div
+                onClick={() => setShowOperatingModal(true)}
+                className="w-full py-1.5 px-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between text-[11px] font-bold text-amber-900"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Clock size={12} className="text-amber-600" />
+                  Ordering paused. Tap to see resume time.
+                </span>
+                <span className="underline font-black text-amber-700">Details</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col leading-none font-numbers">
+                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 font-sans">Total Payable</span>
+                <span className="text-[22px] font-black text-zinc-900 tracking-tighter">₹{finalTotal.toLocaleString('en-IN')}</span>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleCheckout}
+                className={`px-7 py-3.5 ${
+                  isOperatingBlocked() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-[#17B169] hover:bg-emerald-600'
+                } active:scale-95 text-white rounded-full text-[13px] font-black uppercase tracking-wider shadow-[0_4px_14px_rgba(23,177,105,0.35)] flex items-center gap-2 font-heading transition-all`}
+              >
+                <span>{isOperatingBlocked() ? 'Ordering Paused' : 'Proceed to Checkout'}</span>
+                <ArrowRight size={16} strokeWidth={2.5} />
+              </motion.button>
             </div>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={handleCheckout}
-              className="px-7 py-3.5 bg-[#17B169] hover:bg-emerald-600 active:scale-95 text-white rounded-full text-[13px] font-black uppercase tracking-wider shadow-[0_4px_14px_rgba(23,177,105,0.35)] flex items-center gap-2 font-heading transition-all"
-            >
-              <span>Proceed to Checkout</span>
-              <ArrowRight size={16} strokeWidth={2.5} />
-            </motion.button>
           </div>
         )}
       </div>
@@ -461,6 +517,12 @@ export const CartPage: React.FC = () => {
         delivery={deliveryCharges}
         platformFee={platformFee}
         total={finalTotal}
+      />
+      <PlatformOperatingHoursModal
+        isOpen={showOperatingModal}
+        onClose={() => setShowOperatingModal(false)}
+        status={operatingStatus}
+        vertical={currentVertical as any}
       />
     </>
   );

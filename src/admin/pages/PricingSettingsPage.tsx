@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   ShoppingBag, Zap, Wrench, ShieldCheck, History,
   Save, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw,
-  ArrowRight, Info, Sparkles
+  ArrowRight, Info, Sparkles, Moon, Clock, Calendar
 } from 'lucide-react';
 
 interface PricingRule {
@@ -42,11 +42,25 @@ interface AppSettings {
   gst_percent: string;
   cgst_percent: string;
   sgst_percent: string;
+  midnight_blackout_enabled?: string;
+  midnight_blackout_start?: string;
+  midnight_blackout_end?: string;
+  midnight_blackout_verticals?: string;
+  midnight_blackout_title?: string;
+  midnight_blackout_message?: string;
+  friday_break_enabled?: string;
+  friday_break_day?: string;
+  friday_break_start?: string;
+  friday_break_end?: string;
+  friday_break_verticals?: string;
+  friday_break_title?: string;
+  friday_break_subtitle?: string;
+  friday_break_message?: string;
   [key: string]: any;
 }
 
 export const PricingSettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'shop' | 'quick' | 'services' | 'taxes' | 'audit'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'quick' | 'services' | 'taxes' | 'blackout' | 'audit'>('shop');
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -74,7 +88,21 @@ export const PricingSettingsPage: React.FC = () => {
     platform_charge_pct: '3.0',
     gst_percent: '18',
     cgst_percent: '9',
-    sgst_percent: '9'
+    sgst_percent: '9',
+    midnight_blackout_enabled: 'false',
+    midnight_blackout_start: '23:00',
+    midnight_blackout_end: '07:00',
+    midnight_blackout_verticals: 'both',
+    midnight_blackout_title: 'Closed for the night! 🌙',
+    midnight_blackout_message: "We're currently offline for the night to let our riders & partners rest. We'll be back at 7:00 AM!",
+    friday_break_enabled: 'false',
+    friday_break_day: '5',
+    friday_break_start: '12:00',
+    friday_break_end: '14:00',
+    friday_break_verticals: 'both',
+    friday_break_title: 'Friday Prayer Break 🕌',
+    friday_break_subtitle: 'Jummah Mubarak! Services temporarily paused.',
+    friday_break_message: 'Our deliveries and field services are on a brief break for Friday Jummah prayers. We will resume immediately at 2:00 PM.'
   });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -320,6 +348,7 @@ export const PricingSettingsPage: React.FC = () => {
           { id: 'shop', label: 'Shop India (E-Commerce)', icon: ShoppingBag },
           { id: 'quick', label: 'Quick Shopping & Riders', icon: Zap },
           { id: 'services', label: 'Glacons Services & Techs', icon: Wrench },
+          { id: 'blackout', label: 'Operating Hours & Blackouts', icon: Moon },
           { id: 'taxes', label: 'Platform Fees & GST', icon: ShieldCheck },
           { id: 'audit', label: 'Change History', icon: History }
         ].map(tab => {
@@ -1068,6 +1097,375 @@ export const PricingSettingsPage: React.FC = () => {
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: OPERATING HOURS & BLACKOUT CONTROLS */}
+      {activeTab === 'blackout' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Section Info Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-slate-800">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-amber-400/20 text-amber-300 font-black text-[11px] rounded-full uppercase tracking-wider border border-amber-400/30">
+                  Automated Shutdown Protocol
+                </span>
+                <span className="text-xs text-slate-400 font-medium">Real-Time Checkout Interceptor</span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-black tracking-tight text-white">
+                Platform Operating Hours & Scheduled Blackouts
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Configure midnight closing hours to give riders rest, and weekly Friday prayer breaks to pause customer bookings in Quick Commerce and Glacons Services with live countdown alerts.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 self-start md:self-center">
+              <div className="px-4 py-2.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 text-xs font-bold text-slate-200 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Indian Standard Time (IST)</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* CARD 1: MIDNIGHT BLACKOUT (Reference Image 54) */}
+            <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm flex flex-col justify-between space-y-6">
+              <div className="space-y-6">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                      <Moon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900">Midnight Operations Blackout</h3>
+                      <p className="text-xs text-gray-500">Shut down ordering overnight (e.g. 11:00 PM – 7:00 AM)</p>
+                    </div>
+                  </div>
+
+                  {/* Toggle Button */}
+                  <button
+                    onClick={() => {
+                      const next = settings.midnight_blackout_enabled === 'true' ? 'false' : 'true';
+                      setSettings(prev => ({ ...prev, midnight_blackout_enabled: next }));
+                    }}
+                    className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.midnight_blackout_enabled === 'true' ? 'bg-indigo-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        settings.midnight_blackout_enabled === 'true' ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full ${
+                      settings.midnight_blackout_enabled === 'true'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}
+                  >
+                    {settings.midnight_blackout_enabled === 'true' ? '● BLACKOUT ACTIVE AT NIGHT' : '○ 24/7 ROUND-THE-CLOCK'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Shutdown Time (Start)
+                    </label>
+                    <input
+                      type="time"
+                      value={settings.midnight_blackout_start || '23:00'}
+                      onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_start: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-600 transition-all"
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">Platform shuts down at this hour</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Resumption Time (End)
+                    </label>
+                    <input
+                      type="time"
+                      value={settings.midnight_blackout_end || '07:00'}
+                      onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_end: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-600 transition-all"
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">Normal operations reopen at this hour</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Target Verticals Affected
+                  </label>
+                  <select
+                    value={settings.midnight_blackout_verticals || 'both'}
+                    onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_verticals: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800"
+                  >
+                    <option value="both">Both (Quick Commerce & Glacons Services)</option>
+                    <option value="quick">Quick Commerce Only (10-15 Min Delivery)</option>
+                    <option value="services">Glacons Services Only (HVAC & Home Services)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Customer Alert Title
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.midnight_blackout_title || 'Closed for the day!'}
+                    onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_title: e.target.value }))}
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Customer Shutter Announcement Note
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={settings.midnight_blackout_message || ''}
+                    onChange={e => setSettings(prev => ({ ...prev, midnight_blackout_message: e.target.value }))}
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs"
+                    placeholder="Message displayed to customers when ordering is blocked..."
+                  />
+                </div>
+
+                {/* Zepto/Blinkit Shutters-Down Live Preview (Image 54) */}
+                <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-inner space-y-3">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-400 font-black block">
+                    Customer App Experience Preview
+                  </span>
+                  <div className="flex items-center gap-4 bg-slate-800/80 p-4 rounded-xl border border-slate-700">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl flex-shrink-0">
+                      🔒
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white">
+                        {settings.midnight_blackout_title || "Closed for the day! We'll be back at 7 AM"}
+                      </h4>
+                      <p className="text-[11px] text-slate-300 mt-0.5 leading-snug">
+                        {settings.midnight_blackout_message || "We're currently offline for the night to let our riders & partners rest. We'll be back at 7:00 AM!"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={() =>
+                    saveSettingsBundle(
+                      {
+                        midnight_blackout_enabled: settings.midnight_blackout_enabled,
+                        midnight_blackout_start: settings.midnight_blackout_start,
+                        midnight_blackout_end: settings.midnight_blackout_end,
+                        midnight_blackout_verticals: settings.midnight_blackout_verticals,
+                        midnight_blackout_title: settings.midnight_blackout_title,
+                        midnight_blackout_message: settings.midnight_blackout_message,
+                      },
+                      undefined,
+                      'midnight_blackout',
+                      'Midnight blackout schedule updated successfully!'
+                    )
+                  }
+                  disabled={savingKey === 'midnight_blackout'}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-md transition-all active:scale-95"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{savingKey === 'midnight_blackout' ? 'Saving Schedule...' : 'Save Midnight Schedule'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* CARD 2: FRIDAY PRAYER BREAK (Reference Image 55) */}
+            <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm flex flex-col justify-between space-y-6">
+              <div className="space-y-6">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900">Friday Prayer Break (Jummah)</h3>
+                      <p className="text-xs text-gray-500">Every Friday pause orders (e.g. 12:00 PM – 2:00 PM)</p>
+                    </div>
+                  </div>
+
+                  {/* Toggle Button */}
+                  <button
+                    onClick={() => {
+                      const next = settings.friday_break_enabled === 'true' ? 'false' : 'true';
+                      setSettings(prev => ({ ...prev, friday_break_enabled: next }));
+                    }}
+                    className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.friday_break_enabled === 'true' ? 'bg-emerald-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        settings.friday_break_enabled === 'true' ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full ${
+                      settings.friday_break_enabled === 'true'
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}
+                  >
+                    {settings.friday_break_enabled === 'true' ? '● RECURRING FRIDAY PRAYER PAUSE ACTIVE' : '○ PRAYER PAUSE DISABLED'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Break Starts At
+                    </label>
+                    <input
+                      type="time"
+                      value={settings.friday_break_start || '12:00'}
+                      onChange={e => setSettings(prev => ({ ...prev, friday_break_start: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-600 transition-all"
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">Usually 12:00 PM before Jummah</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Break Resumes At
+                    </label>
+                    <input
+                      type="time"
+                      value={settings.friday_break_end || '14:00'}
+                      onChange={e => setSettings(prev => ({ ...prev, friday_break_end: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-600 transition-all"
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">Usually 02:00 PM after prayers</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Target Verticals Affected
+                  </label>
+                  <select
+                    value={settings.friday_break_verticals || 'both'}
+                    onChange={e => setSettings(prev => ({ ...prev, friday_break_verticals: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800"
+                  >
+                    <option value="both">Both (Quick Commerce & Glacons Services)</option>
+                    <option value="quick">Quick Commerce Only</option>
+                    <option value="services">Glacons Services Only</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Card Title
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.friday_break_title || 'Friday Prayer Break 🕌'}
+                      onChange={e => setSettings(prev => ({ ...prev, friday_break_title: e.target.value }))}
+                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Card Subtitle
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.friday_break_subtitle || 'Jummah Mubarak!'}
+                      onChange={e => setSettings(prev => ({ ...prev, friday_break_subtitle: e.target.value }))}
+                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Announcement Details
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={settings.friday_break_message || ''}
+                    onChange={e => setSettings(prev => ({ ...prev, friday_break_message: e.target.value }))}
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs"
+                    placeholder="Details shown to customer regarding the Friday prayer break..."
+                  />
+                </div>
+
+                {/* Friday Prayer Break Live Card Preview (Image 55) */}
+                <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white p-5 rounded-2xl border border-emerald-800 shadow-inner space-y-3">
+                  <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-black block">
+                    Customer App Experience Preview
+                  </span>
+                  <div className="bg-emerald-900/60 p-4 rounded-xl border border-emerald-700/60 flex flex-col items-center text-center space-y-2">
+                    <div className="w-12 h-12 rounded-full bg-emerald-800 text-amber-300 flex items-center justify-center text-2xl shadow-md">
+                      🕌
+                    </div>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                      {settings.friday_break_title || 'Friday Prayer Break'}
+                    </h4>
+                    <span className="text-xs font-bold text-amber-300">
+                      {settings.friday_break_subtitle || 'Jummah Mubarak!'}
+                    </span>
+                    <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-black/40 rounded-full border border-emerald-600/50 text-[11px] font-mono text-emerald-200 font-bold">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>SERVICES RESUME IN: 01:24:35</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-100/80 max-w-sm mt-1">
+                      {settings.friday_break_message || 'Our deliveries and field services are on a brief break for Friday Jummah prayers.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={() =>
+                    saveSettingsBundle(
+                      {
+                        friday_break_enabled: settings.friday_break_enabled,
+                        friday_break_day: settings.friday_break_day,
+                        friday_break_start: settings.friday_break_start,
+                        friday_break_end: settings.friday_break_end,
+                        friday_break_verticals: settings.friday_break_verticals,
+                        friday_break_title: settings.friday_break_title,
+                        friday_break_subtitle: settings.friday_break_subtitle,
+                        friday_break_message: settings.friday_break_message,
+                      },
+                      undefined,
+                      'friday_break',
+                      'Friday prayer break schedule updated successfully!'
+                    )
+                  }
+                  disabled={savingKey === 'friday_break'}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-md transition-all active:scale-95"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{savingKey === 'friday_break' ? 'Saving Schedule...' : 'Save Friday Schedule'}</span>
+                </button>
               </div>
             </div>
           </div>

@@ -292,7 +292,25 @@ router.get('/settings', async (req, res) => {
       gst_percent: '18',
       cgst_percent: '9',
       sgst_percent: '9',
-      platform_charge_pct: '3.0'
+      platform_charge_pct: '3.0',
+
+      // Midnight Blackout Defaults (Image 54)
+      midnight_blackout_enabled: 'false',
+      midnight_blackout_start: '23:00',
+      midnight_blackout_end: '07:00',
+      midnight_blackout_verticals: 'both', // 'quick', 'services', 'both'
+      midnight_blackout_title: "Closed for the day! We'll be back at 7 AM.",
+      midnight_blackout_message: "We are currently closed for the night. You can browse products and services; orders will reopen at 7:00 AM.",
+
+      // Friday Prayer Break Defaults (Image 55)
+      friday_break_enabled: 'false',
+      friday_break_day: '5', // 5 = Friday
+      friday_break_start: '12:00',
+      friday_break_end: '14:00',
+      friday_break_verticals: 'both',
+      friday_break_title: 'Friday Prayer Break',
+      friday_break_subtitle: "We're briefly closed for Friday Prayer (12:00 PM – 2:00 PM)",
+      friday_break_message: 'Our services will resume shortly.'
     };
 
     rows.forEach(r => {

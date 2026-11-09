@@ -14,7 +14,7 @@ import { RiderProfile } from './pages/RiderProfile';
 const RiderContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('radar');
-  const [ordersSubTab, setOrdersSubTab] = useState<'trips' | 'cod_history'>('trips');
+  const [ordersSubTab, setOrdersSubTab] = useState<'trips' | 'cod_history' | 'scheduled_services'>('trips');
 
   if (!isAuthenticated) {
     const registerRequested =
@@ -22,7 +22,7 @@ const RiderContent: React.FC = () => {
     return <RiderLogin initialRegister={registerRequested} />;
   }
 
-  const handleNavigate = (targetTab: string, subTab?: 'trips' | 'cod_history') => {
+  const handleNavigate = (targetTab: string, subTab?: 'trips' | 'cod_history' | 'scheduled_services') => {
     if (subTab) {
       setOrdersSubTab(subTab);
     }

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 interface RiderDashboardProps {
-  onNavigateToTab?: (tab: string, subTab?: 'trips' | 'cod_history') => void;
+  onNavigateToTab?: (tab: string, subTab?: 'trips' | 'cod_history' | 'scheduled_services') => void;
 }
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
@@ -171,9 +171,9 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
           {onNavigateToTab && (
             <button
               type="button"
-              onClick={() => onNavigateToTab('orders', 'cod_history')}
+              onClick={() => onNavigateToTab('deliveries', 'trips')}
               className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 shrink-0 self-start sm:self-center"
-              title="View COD Statement & Trips"
+              title="View Delivery Trips & Statements"
             >
               <Clock className="w-3.5 h-3.5 text-orange-600" />
               <span>View Statement</span>

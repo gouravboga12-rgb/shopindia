@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
-import { Package, CheckCircle2, Store, MapPin, Banknote, CreditCard, RefreshCw } from 'lucide-react';
+import {
+  Package, CheckCircle2, Store, MapPin, Banknote, CreditCard, RefreshCw,
+  Wrench, Calendar, Clock, AlertTriangle, X, Phone, Navigation, AlertCircle
+} from 'lucide-react';
 
 interface HistoryOrder {
   id: string;
@@ -33,18 +36,68 @@ interface CODHistoryItem {
   } | null;
 }
 
+interface ScheduledServiceItem {
+  id: string;
+  orderId: string;
+  status: string;
+  deliveryFee: number;
+  distanceKm: number;
+  deliveryOtp?: string;
+  pickupName: string;
+  pickupAddress: string;
+  dropoffName: string;
+  dropoffAddress: string;
+  dropoffPhone?: string;
+  order?: {
+    id: string;
+    orderNumber: string;
+    total: number;
+    notes?: string;
+    customer?: {
+      id: string;
+      name: string;
+      phone: string;
+    };
+    items?: Array<{ id: string; name: string; quantity: number }>;
+  };
+}
+
 interface RiderOrdersProps {
-  initialTab?: 'trips' | 'cod_history';
+  initialTab?: 'trips' | 'cod_history' | 'scheduled_services';
 }
 
 export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }) => {
   const { token } = useAuth();
   const { activeDelivery } = useRider();
-  const [activeTab, setActiveTab] = useState<'trips' | 'cod_history'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'trips' | 'cod_history' | 'scheduled_services'>(initialTab);
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [codHistory, setCodHistory] = useState<CODHistoryItem[]>([]);
+  const [scheduledServices, setScheduledServices] = useState<ScheduledServiceItem[]>([]);
+  const [groupedServices, setGroupedServices] = useState<{
+    today: ScheduledServiceItem[];
+    tomorrow: ScheduledServiceItem[];
+    upcoming: ScheduledServiceItem[];
+  }>({
+    today: [],
+    tomorrow: [],
+    upcoming: [],
+  });
+
   const [loading, setLoading] = useState(true);
   const [loadingCod, setLoadingCod] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(false);
+
+  // Cancellation Modal State
+  const [serviceToCancel, setServiceToCancel] = useState<ScheduledServiceItem | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isSlotExpired, setIsSlotExpired] = useState(false);
+  const [submittingCancel, setSubmittingCancel] = useState(false);
+  const [toastMsg, setToastMsg] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg({ message, type });
+    setTimeout(() => setToastMsg(null), 4500);
+  };
 
   useEffect(() => {
     if (initialTab) {
@@ -83,14 +136,79 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
     }
   };
 
+  const fetchScheduledServices = async () => {
+    if (!token) return;
+    setLoadingServices(true);
+    try {
+      const res: any = await api.get('/api/rider/scheduled-services');
+      if (res?.success) {
+        setScheduledServices(res.services || []);
+        if (res.grouped) {
+          setGroupedServices(res.grouped);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch scheduled services', e);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'cod_history' && codHistory.length === 0) {
       fetchCODHistory();
+    } else if (activeTab === 'scheduled_services') {
+      fetchScheduledServices();
     }
   }, [activeTab]);
 
+  const handleCancelService = async () => {
+    if (!serviceToCancel) return;
+    if (!cancelReason || cancelReason.trim().length < 5) {
+      alert('Please enter a specific explanation (at least 5 characters). This is transparently shared with the customer.');
+      return;
+    }
+    setSubmittingCancel(true);
+    try {
+      const res: any = await api.post(`/api/rider/orders/${serviceToCancel.id}/cancel-service`, {
+        reason: cancelReason,
+        isExpired: isSlotExpired,
+      });
+      if (res?.success) {
+        showToast(res.message || 'Service appointment cancelled. Automatically re-broadcasted for a replacement technician.');
+        setServiceToCancel(null);
+        setCancelReason('');
+        setIsSlotExpired(false);
+        fetchScheduledServices();
+      } else {
+        alert(res?.error || 'Failed to cancel appointment.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel service appointment.');
+    } finally {
+      setSubmittingCancel(false);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-5 pb-24 text-slate-800 animate-in fade-in duration-200">
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 ${
+            toastMsg.type === 'success'
+              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              : 'bg-rose-50 text-rose-900 border-rose-200'
+          }`}
+        >
+          {toastMsg.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          )}
+          <span>{toastMsg.message}</span>
+        </div>
+      )}
       
       {/* Page Title */}
       <div className="flex items-center justify-between">
@@ -164,6 +282,20 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
               <Banknote className="w-3.5 h-3.5" />
               <span>COD Passbook ({codHistory.length})</span>
             </button>
+
+            {/* Dedicated Scheduled Services Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('scheduled_services')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'scheduled_services'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>Scheduled Services ({scheduledServices.length})</span>
+            </button>
           </div>
 
           {activeTab === 'cod_history' && (
@@ -175,6 +307,18 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
               title="Refresh COD History"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingCod ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+
+          {activeTab === 'scheduled_services' && (
+            <button
+              type="button"
+              onClick={fetchScheduledServices}
+              disabled={loadingServices}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              title="Refresh Scheduled Services"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingServices ? 'animate-spin' : ''}`} />
             </button>
           )}
         </div>
@@ -346,7 +490,300 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
           </div>
         )}
 
+        {/* TAB 3: SCHEDULED SERVICES (TODAY, TOMORROW, UPCOMING) */}
+        {activeTab === 'scheduled_services' && (
+          <div className="space-y-6">
+            {/* Header info banner */}
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-teal-950">Scheduled Service Roster</h4>
+                  <p className="text-xs text-teal-800">
+                    Glacons doorstep appointments accepted by you. Organized by schedule.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {loadingServices ? (
+              <div className="py-12 text-center text-slate-400 text-xs">Loading scheduled service roster...</div>
+            ) : scheduledServices.length === 0 ? (
+              <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                <Wrench className="w-10 h-10 mx-auto text-slate-300" />
+                <p className="text-xs font-bold text-slate-600">No scheduled service appointments yet.</p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                  When customers book Glacons home & HVAC services nearby, claim them on your Radar!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* 1. TODAY'S APPOINTMENTS */}
+                {groupedServices.today.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800">
+                        Today's Appointments ({groupedServices.today.length})
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {groupedServices.today.map((srv) => (
+                        <div
+                          key={srv.id}
+                          className="bg-white border-2 border-emerald-300/80 rounded-2xl p-4 shadow-xs space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 rounded-lg text-xs font-bold flex items-center gap-1.5 font-numbers">
+                              <Clock className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>{srv.order?.notes || srv.pickupAddress || 'Today'}</span>
+                            </span>
+                            <span className="text-emerald-700 font-black text-base font-numbers">
+                              +₹{srv.deliveryFee}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h5 className="font-extrabold text-sm text-slate-900">{srv.pickupName}</h5>
+                            <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                              <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                            <div className="text-slate-600 font-medium">
+                              Customer: <span className="font-bold text-slate-900">{srv.dropoffName}</span>
+                            </div>
+                            {srv.dropoffPhone && (
+                              <a
+                                href={`tel:${srv.dropoffPhone}`}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <Phone className="w-3 h-3 text-emerald-600" />
+                                <span>Call</span>
+                              </a>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2 pt-1">
+                            <a
+                              href={`https://maps.google.com/?q=${encodeURIComponent(srv.dropoffAddress)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                            >
+                              <Navigation className="w-3.5 h-3.5" />
+                              <span>Navigate Site</span>
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => setServiceToCancel(srv)}
+                              className="px-3.5 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors"
+                            >
+                              Cancel Service
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. TOMORROW'S APPOINTMENTS */}
+                {groupedServices.tomorrow.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-blue-800">
+                        Tomorrow's Appointments ({groupedServices.tomorrow.length})
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {groupedServices.tomorrow.map((srv) => (
+                        <div
+                          key={srv.id}
+                          className="bg-white border border-blue-200 rounded-2xl p-4 shadow-xs space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 rounded-lg text-xs font-bold flex items-center gap-1.5 font-numbers">
+                              <Calendar className="w-3.5 h-3.5 text-blue-700" />
+                              <span>{srv.order?.notes || srv.pickupAddress || 'Tomorrow'}</span>
+                            </span>
+                            <span className="text-emerald-700 font-black text-base font-numbers">
+                              +₹{srv.deliveryFee}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h5 className="font-extrabold text-sm text-slate-900">{srv.pickupName}</h5>
+                            <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                              <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                            <div className="text-slate-600 font-medium">
+                              Customer: <span className="font-bold text-slate-900">{srv.dropoffName}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setServiceToCancel(srv)}
+                              className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-colors"
+                            >
+                              Cancel Service
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. UPCOMING APPOINTMENTS */}
+                {groupedServices.upcoming.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                        Upcoming Future Dates ({groupedServices.upcoming.length})
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {groupedServices.upcoming.map((srv) => (
+                        <div
+                          key={srv.id}
+                          className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 bg-slate-100 text-slate-800 rounded-lg text-xs font-bold flex items-center gap-1.5 font-numbers">
+                              <Clock className="w-3.5 h-3.5 text-slate-600" />
+                              <span>{srv.order?.notes || srv.pickupAddress || 'Upcoming Slot'}</span>
+                            </span>
+                            <span className="text-emerald-700 font-black text-base font-numbers">
+                              +₹{srv.deliveryFee}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h5 className="font-extrabold text-sm text-slate-900">{srv.pickupName}</h5>
+                            <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                              <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                            <div className="text-slate-600 font-medium">
+                              Customer: <span className="font-bold text-slate-900">{srv.dropoffName}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setServiceToCancel(srv)}
+                              className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-colors"
+                            >
+                              Cancel Service
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
+
+      {/* MANDATORY CANCELLATION REASON PROMPT MODAL */}
+      {serviceToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-black text-sm sm:text-base text-slate-950">Cancel Service Appointment</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setServiceToCancel(null);
+                  setCancelReason('');
+                  setIsSlotExpired(false);
+                }}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Transparent Notice */}
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 space-y-1.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-rose-800 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                Reason is Mandatory & Transparent
+              </span>
+              <p className="text-xs text-rose-900 leading-relaxed font-medium">
+                The customer will see the exact explanation you write here. If cancelled before the appointment time, our automated system will immediately re-broadcast this job to find a replacement technician.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                Reason for Cancellation (Min. 5 characters) *
+              </label>
+              <textarea
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. My bike broke down on the main road, or urgent family emergency..."
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-rose-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            <label className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSlotExpired}
+                onChange={(e) => setIsSlotExpired(e.target.checked)}
+                className="mt-0.5 rounded text-rose-600 focus:ring-rose-500"
+              />
+              <span className="text-[11px] text-slate-600 font-medium">
+                Appointment time slot has already passed / customer was not reachable (triggers automated customer refund)
+              </span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setServiceToCancel(null);
+                  setCancelReason('');
+                  setIsSlotExpired(false);
+                }}
+                className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors"
+              >
+                Keep Appointment
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelService}
+                disabled={submittingCancel || cancelReason.trim().length < 5}
+                className="py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                {submittingCancel ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -5,6 +5,7 @@ const prisma = require('../lib/prisma');
 const customerAuth = require('../middleware/customerAuth');
 const { calculateItemPricing, calculateDeliveryPricing, calculateCartTotals, getCachedRules } = require('../lib/pricing');
 const { verifyPaymentSignature } = require('../lib/razorpay');
+const { getPlatformOperatingStatus } = require('../lib/operatingHours');
 
 const router = express.Router();
 
@@ -31,12 +32,25 @@ function mapType(vertical) {
   }
 }
 
+/** GET /api/orders/operating-status — Public live schedule, midnight blackout, and Friday prayer break status */
+router.get(['/operating-status', '/platform/operating-status'], async (req, res) => {
+  try {
+    const { settings } = await getCachedRules();
+    const operatingStatus = getPlatformOperatingStatus(settings);
+    res.json({ success: true, operatingStatus });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** GET /api/orders/pricing-config — Public dynamic checkout settings */
 router.get('/pricing-config', async (req, res) => {
   try {
     const { settings } = await getCachedRules();
+    const operatingStatus = getPlatformOperatingStatus(settings);
     res.json({
       success: true,
+      operatingStatus,
       settings: {
         shiprocket_base_fee: parseFloat(settings['shiprocket_base_fee'] || 49),
         shiprocket_free_delivery_enabled: String(settings['shiprocket_free_delivery_enabled']) === 'true',
@@ -393,6 +407,35 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Check Operating Hours (Midnight Blackout & Friday Prayer Break)
+    try {
+      const { settings: cachedSettings } = await getCachedRules();
+      const opStatus = getPlatformOperatingStatus(cachedSettings);
+
+      const isBlockedVertical = (target) =>
+        target === 'both' ||
+        (target === 'quick' && (resolvedVertical === 'quick' || resolvedVertical === 'quick_commerce')) ||
+        (target === 'services' && (resolvedVertical === 'services' || resolvedVertical === 'hvac_service'));
+
+      if (opStatus.fridayBreak.isActive && isBlockedVertical(opStatus.fridayBreak.verticals)) {
+        return res.status(400).json({
+          error: `${opStatus.fridayBreak.title}: ${opStatus.fridayBreak.subtitle}. Orders are temporarily paused.`,
+          code: 'FRIDAY_PRAYER_BREAK',
+          remainingSeconds: opStatus.fridayBreak.remainingSeconds,
+        });
+      }
+
+      if (opStatus.midnightBlackout.isActive && isBlockedVertical(opStatus.midnightBlackout.verticals)) {
+        return res.status(400).json({
+          error: `${opStatus.midnightBlackout.title} Orders are temporarily closed for the night.`,
+          code: 'MIDNIGHT_BLACKOUT',
+          remainingSeconds: opStatus.midnightBlackout.remainingSeconds,
+        });
+      }
+    } catch (_opErr) {
+      // Non-blocking fallback
+    }
+
     // Disallow COD for ShopIndia standard courier delivery
     const isOnlinePayment = paymentMethod === 'razorpay' || paymentMethod === 'online' || paymentMethodId === 'razorpay';
     const isCodPayment = paymentMethod === 'cod' || paymentMethod === 'COD' || paymentMethodId === 'COD';
@@ -486,6 +529,8 @@ router.post('/', async (req, res) => {
     const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
 
     const isQuickOrder = fulfillmentType === 'quick_commerce';
+    const firstServiceItem = rawItems.find(i => i.deliveryTime || i.specs?.['Scheduled Slot']) || rawItems[0];
+    const scheduledSlotInfo = firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || req.body.notes || null;
 
     const order = await prisma.order.create({
       data: {
@@ -506,6 +551,7 @@ router.post('/', async (req, res) => {
         deliveryPincode,
         deliveryLat: orderLat,
         deliveryLng: orderLng,
+        notes: scheduledSlotInfo || req.body.notes || null,
         items: {
           create: resolved.map((it) => ({
             productId: it.productId,
@@ -626,6 +672,43 @@ router.post('/', async (req, res) => {
           },
         }).catch(err => console.error('Auto-broadcast delivery error:', err.message));
       }
+    }
+
+    // Auto-create Delivery record and broadcast to nearby technicians for Glacons / HVAC Services
+    if (order.type === 'hvac_service') {
+      const serviceTitle = order.items?.[0]?.name || firstServiceItem?.name || 'Glacons Technician Service';
+      const serviceAddress = [order.deliveryLine1, order.deliveryCity, order.deliveryState, order.deliveryPincode].filter(Boolean).join(', ') || 'Customer Service Address';
+      const serviceLat = orderLat || 17.385044;
+      const serviceLng = orderLng || 78.486671;
+
+      await prisma.delivery.create({
+        data: {
+          orderId: order.id,
+          status: 'broadcasted',
+          deliveryFee: riderFee || 150, // Guaranteed technician payout
+          distanceKm: orderDistKm || 3.5,
+          deliveryOtp: masterDeliveryPin,
+          pickupName: `Glacons Service: ${serviceTitle}`,
+          pickupAddress: scheduledSlotInfo ? `Scheduled: ${scheduledSlotInfo} | Site: ${serviceAddress}` : `Site: ${serviceAddress}`,
+          pickupLat: serviceLat,
+          pickupLng: serviceLng,
+          pickupPhone: customerRecord?.phone || null,
+          dropoffName: customerRecord?.name || 'Customer',
+          dropoffAddress: serviceAddress,
+          dropoffLat: serviceLat,
+          dropoffLng: serviceLng,
+          dropoffPhone: customerRecord?.phone || '9999999999',
+        },
+      }).catch(err => console.error('Auto-broadcast service delivery error:', err.message));
+
+      await prisma.serviceJob.create({
+        data: {
+          orderId: order.id,
+          status: 'scheduled',
+          notes: scheduledSlotInfo || 'Scheduled Doorstep Service',
+          originalAmount: order.total,
+        }
+      }).catch(err => console.error('Auto-create ServiceJob error:', err.message));
     }
 
     // Save notification to PostgreSQL for the customer

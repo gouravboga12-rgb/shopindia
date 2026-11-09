@@ -10,6 +10,24 @@ const router = express.Router();
 router.use(verifyToken, requireRole('rider'));
 
 /**
+ * Helper to calculate Haversine distance in km between two GPS coordinates
+ */
+function calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 3.5;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
+/**
  * Helper to fetch the rider profile for the authenticated user
  */
 async function getRiderProfile(userId) {
@@ -20,7 +38,8 @@ async function getRiderProfile(userId) {
 
 /**
  * GET /api/rider/broadcast-feed
- * Fetch all unclaimed quick-commerce delivery opportunities currently broadcasted.
+ * Fetch delivery & service opportunities broadcasted to this partner.
+ * Isolated strictly by partnerType ('delivery' | 'service' | 'both'), skills, and service radius.
  */
 router.get('/broadcast-feed', async (req, res) => {
   try {
@@ -29,7 +48,7 @@ router.get('/broadcast-feed', async (req, res) => {
 
     // Only return broadcast feed if rider is online
     if (!profile.isOnline) {
-      return res.json({ deliveries: [], message: 'Rider is currently offline.' });
+      return res.json({ deliveries: [], message: 'Partner is currently offline.' });
     }
 
     // Fetch unclaimed deliveries
@@ -44,6 +63,14 @@ router.get('/broadcast-feed', async (req, res) => {
             orderNumber: true,
             total: true,
             type: true,
+            notes: true,
+            deliveryLine1: true,
+            customer: {
+              select: {
+                name: true,
+                phone: true,
+              },
+            },
             items: {
               select: {
                 id: true,
@@ -67,10 +94,47 @@ router.get('/broadcast-feed', async (req, res) => {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 40,
     });
 
-    res.json({ deliveries });
+    const partnerType = profile.partnerType || 'delivery';
+    const riderLat = profile.currentLat;
+    const riderLng = profile.currentLng;
+    const maxRadius = profile.serviceRadiusKm || 25;
+
+    // Filter by capability, skills, and geographic proximity
+    const filteredDeliveries = deliveries.filter(del => {
+      const isService = del.order?.type === 'hvac_service';
+
+      // 1. Strict Vertical isolation:
+      // Quick commerce riders NEVER see service jobs (delivery flow undisturbed)
+      if (partnerType === 'delivery' && isService) return false;
+      // Dedicated service technicians NEVER see grocery/shop deliveries
+      if (partnerType === 'service' && !isService) return false;
+
+      // 2. Skill Qualification for Technicians (if technician has skills defined)
+      if (isService && profile.skills && profile.skills.length > 0) {
+        const itemNames = (del.order?.items || []).map(i => (i.name || '').toLowerCase()).join(' ');
+        const pickupStr = (del.pickupName || '').toLowerCase();
+        const hasSkillMatch = profile.skills.some(skill => {
+          const s = (skill || '').toLowerCase();
+          return s === 'all' || s === 'all_round' || itemNames.includes(s) || pickupStr.includes(s);
+        });
+        if (!hasSkillMatch && !profile.skills.includes('general') && !profile.skills.includes('all')) {
+          return false;
+        }
+      }
+
+      // 3. Proximity / Service Radius Check
+      if (riderLat && riderLng && del.pickupLat && del.pickupLng) {
+        const dist = calculateHaversineDistanceKm(riderLat, riderLng, del.pickupLat, del.pickupLng);
+        if (dist > maxRadius) return false;
+      }
+
+      return true;
+    });
+
+    res.json({ deliveries: filteredDeliveries });
   } catch (err) {
     console.error('Fetch broadcast feed error:', err);
     res.status(500).json({ error: err.message });
@@ -79,32 +143,92 @@ router.get('/broadcast-feed', async (req, res) => {
 
 /**
  * POST /api/rider/orders/:id/accept
- * ATOMIC CLAIM: Lock order to this rider.
- * If another rider tapped milliseconds earlier, returns ALREADY_ASSIGNED.
+ * ATOMIC CLAIM: Lock order to this rider/technician.
+ * - Prevents multiple ongoing quick-commerce deliveries
+ * - Prevents time-slot conflicts for scheduled services ("You already got a service order for tomorrow at this particular time. We can't accept this.")
  */
 router.post(['/:id/accept', '/orders/:id/accept'], async (req, res) => {
   try {
     const profile = await getRiderProfile(req.user.userId);
     if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
 
-    // Check if rider already has an active ongoing delivery
-    const existingActive = await prisma.delivery.findFirst({
-      where: {
-        riderProfileId: profile.id,
-        status: { in: ['assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'] },
+    // Fetch target delivery to inspect fulfillment type
+    const targetDelivery = await prisma.delivery.findUnique({
+      where: { id: req.params.id },
+      include: {
+        order: {
+          select: {
+            id: true,
+            type: true,
+            notes: true,
+          },
+        },
       },
     });
 
-    if (existingActive) {
-      return res.status(400).json({
-        success: false,
-        code: 'HAS_ACTIVE_DELIVERY',
-        message: 'You already have an active ongoing delivery! Complete it before taking another.',
+    if (!targetDelivery) {
+      return res.status(404).json({ success: false, error: 'Delivery job not found.' });
+    }
+
+    const isServiceJob = targetDelivery.order?.type === 'hvac_service';
+
+    if (!isServiceJob) {
+      // Check if rider already has an active ongoing quick delivery
+      const existingActive = await prisma.delivery.findFirst({
+        where: {
+          riderProfileId: profile.id,
+          status: { in: ['assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'] },
+          order: { type: { not: 'hvac_service' } },
+        },
       });
+
+      if (existingActive) {
+        return res.status(400).json({
+          success: false,
+          code: 'HAS_ACTIVE_DELIVERY',
+          message: 'You already have an active ongoing delivery! Complete it before taking another.',
+        });
+      }
+    } else {
+      // Time-Slot Conflict Check for Service Jobs
+      const targetSlot = (targetDelivery.order?.notes || targetDelivery.pickupAddress || '').toLowerCase();
+
+      const existingServiceJobs = await prisma.delivery.findMany({
+        where: {
+          riderProfileId: profile.id,
+          status: { in: ['assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'] },
+          order: { type: 'hvac_service' },
+        },
+        include: { order: true },
+      });
+
+      const hasConflict = existingServiceJobs.some(job => {
+        const existingSlot = (job.order?.notes || job.pickupAddress || '').toLowerCase();
+        if (!targetSlot || !existingSlot) return false;
+        if (targetSlot.trim() === existingSlot.trim()) return true;
+
+        const targetParts = targetSlot.split('at');
+        const existingParts = existingSlot.split('at');
+        if (targetParts.length > 1 && existingParts.length > 1) {
+          const tDate = targetParts[0].trim();
+          const eDate = existingParts[0].trim();
+          const tTime = targetParts[1].trim().slice(0, 5);
+          const eTime = existingParts[1].trim().slice(0, 5);
+          if (tDate === eDate && tTime === eTime) return true;
+        }
+        return false;
+      });
+
+      if (hasConflict) {
+        return res.status(400).json({
+          success: false,
+          code: 'SLOT_CONFLICT',
+          message: "You already got a service order for tomorrow at this particular time. We can't accept this.",
+        });
+      }
     }
 
     // ATOMIC FIRST-COME-FIRST-SERVED CLAIM
-    // We update only if current status is exactly 'broadcasted'
     const result = await prisma.delivery.updateMany({
       where: {
         id: req.params.id,
@@ -118,12 +242,19 @@ router.post(['/:id/accept', '/orders/:id/accept'], async (req, res) => {
     });
 
     if (result.count === 0) {
-      // 0 rows updated means another rider accepted first or order was cancelled
       return res.status(409).json({
         success: false,
         code: 'ALREADY_ASSIGNED',
-        message: 'Sorry! Another rider accepted this delivery first.',
+        message: 'Sorry! Another technician/rider accepted this opportunity first.',
       });
+    }
+
+    // Update ServiceJob status if applicable
+    if (isServiceJob) {
+      await prisma.serviceJob.updateMany({
+        where: { orderId: targetDelivery.orderId },
+        data: { status: 'scheduled' },
+      }).catch(() => {});
     }
 
     // Fetch the updated delivery with full details
@@ -140,15 +271,17 @@ router.post(['/:id/accept', '/orders/:id/accept'], async (req, res) => {
       },
     });
 
-    // Update order status to in_transit
+    // Update order status
     await prisma.order.update({
       where: { id: delivery.orderId },
-      data: { status: 'in_transit' },
+      data: { status: isServiceJob ? 'confirmed' : 'in_transit' },
     }).catch(() => {});
 
     res.json({
       success: true,
-      message: 'Delivery successfully assigned to you! Proceed to vendor store.',
+      message: isServiceJob
+        ? 'Service job scheduled and assigned to your roster!'
+        : 'Delivery successfully assigned to you! Proceed to vendor store.',
       delivery,
     });
   } catch (err) {
@@ -690,6 +823,160 @@ router.get(['/history', '/orders/history'], async (req, res) => {
     res.json({ history: formattedHistory });
   } catch (err) {
     console.error('Fetch order history error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/rider/scheduled-services
+ * Returns upcoming scheduled service bookings accepted by this technician.
+ * Grouped into TODAY, TOMORROW, and UPCOMING.
+ */
+router.get(['/scheduled-services', '/orders/scheduled-services'], async (req, res) => {
+  try {
+    const profile = await getRiderProfile(req.user.userId);
+    if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    const deliveries = await prisma.delivery.findMany({
+      where: {
+        riderProfileId: profile.id,
+        status: { in: ['assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'] },
+        order: { type: 'hvac_service' },
+      },
+      include: {
+        order: {
+          include: {
+            items: true,
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
+    const todayStr = nowIST.toISOString().split('T')[0];
+    const tomorrowIST = new Date(nowIST.getTime() + 24 * 3600 * 1000);
+    const tomorrowStr = tomorrowIST.toISOString().split('T')[0];
+
+    const todayList = [];
+    const tomorrowList = [];
+    const upcomingList = [];
+
+    deliveries.forEach((del) => {
+      const notes = (del.order?.notes || del.pickupAddress || '').toLowerCase();
+      if (notes.includes('today') || notes.includes(todayStr)) {
+        todayList.push(del);
+      } else if (notes.includes('tomorrow') || notes.includes(tomorrowStr)) {
+        tomorrowList.push(del);
+      } else {
+        upcomingList.push(del);
+      }
+    });
+
+    res.json({
+      success: true,
+      services: deliveries,
+      grouped: {
+        today: todayList,
+        tomorrow: tomorrowList,
+        upcoming: upcomingList,
+      },
+    });
+  } catch (err) {
+    console.error('Fetch scheduled services error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rider/orders/:id/cancel-service
+ * Mandatory cancellation reason prompt.
+ * If cancelled before scheduled time: automatically re-broadcasts with [URGENT REPLACEMENT] tag.
+ * If slot expired / unreached: cancels and initiates customer refund.
+ */
+router.post(['/:id/cancel-service', '/orders/:id/cancel-service'], async (req, res) => {
+  try {
+    const { reason, isExpired } = req.body;
+    if (!reason || String(reason).trim().length < 5) {
+      return res.status(400).json({
+        error: 'A specific explanation/reason (at least 5 characters) is mandatory to cancel a service appointment.',
+      });
+    }
+
+    const profile = await getRiderProfile(req.user.userId);
+    if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
+    });
+
+    if (!delivery) {
+      return res.status(404).json({ error: 'Assigned service appointment not found.' });
+    }
+
+    const cleanReason = String(reason).trim();
+    const cancellationLog = `[Technician Cancellation - ${new Date().toLocaleDateString('en-IN')}]: ${cleanReason}`;
+    const updatedNotes = delivery.order?.notes ? `${delivery.order.notes}\n${cancellationLog}` : cancellationLog;
+
+    if (isExpired) {
+      // Mark as unreached / expired slot -> initiate customer refund
+      await prisma.$transaction([
+        prisma.order.update({
+          where: { id: delivery.orderId },
+          data: {
+            status: 'cancelled',
+            refundReason: `Service Member Unavailable (Slot Expired): ${cleanReason}`,
+            refundAmount: delivery.order?.total || 0,
+            refundedAt: new Date(),
+            notes: updatedNotes,
+          },
+        }),
+        prisma.delivery.update({
+          where: { id: delivery.id },
+          data: { status: 'cancelled' },
+        }),
+      ]);
+
+      return res.json({
+        success: true,
+        message: 'Service appointment cancelled. Customer refund has been registered.',
+        status: 'cancelled',
+      });
+    } else {
+      // Automatic Re-Broadcast for replacement technician
+      const urgentPickupName = delivery.pickupName.startsWith('[URGENT REPLACEMENT]')
+        ? delivery.pickupName
+        : `[URGENT REPLACEMENT] ${delivery.pickupName}`;
+
+      await prisma.$transaction([
+        prisma.delivery.update({
+          where: { id: delivery.id },
+          data: {
+            riderProfileId: null,
+            status: 'broadcasted',
+            pickupName: urgentPickupName,
+            assignedAt: null,
+          },
+        }),
+        prisma.order.update({
+          where: { id: delivery.orderId },
+          data: {
+            notes: updatedNotes,
+            status: 'placed',
+          },
+        }),
+      ]);
+
+      return res.json({
+        success: true,
+        message: 'Service appointment cancelled. Order has been automatically re-broadcasted for a replacement technician.',
+        status: 'broadcasted',
+      });
+    }
+  } catch (err) {
+    console.error('Cancel service appointment error:', err);
     res.status(500).json({ error: err.message });
   }
 });

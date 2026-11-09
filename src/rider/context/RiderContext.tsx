@@ -89,6 +89,7 @@ export interface BroadcastDelivery {
     orderNumber: string;
     total: number;
     type: string;
+    notes?: string;
     items?: DeliveryItem[];
     vendor?: { businessName: string; phone?: string; street?: string; city?: string };
   };
