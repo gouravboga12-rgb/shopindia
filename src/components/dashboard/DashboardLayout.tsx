@@ -3,7 +3,7 @@ import { useCustomer } from '../../context/CustomerContext';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard, Package, Heart, ShoppingCart, MapPin,
-  Bell, History, UserCog, ShieldCheck, Headphones, LogOut,
+  Bell, UserCog, ShieldCheck, Headphones, LogOut,
   Menu, X,
 } from 'lucide-react';
 import { clearCustomerSession } from '../../lib/customerAuth';
@@ -11,14 +11,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export type DashboardTab =
   | 'overview' | 'orders' | 'wishlist' | 'cart' | 'addresses'
-  | 'notifications' | 'recently-viewed' | 'profile' | 'security' | 'support';
+  | 'notifications' | 'profile' | 'security' | 'support';
 
 const NAV: { id: DashboardTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'orders', label: 'Orders', icon: Package },
   { id: 'wishlist', label: 'Wishlist', icon: Heart },
   { id: 'cart', label: 'Cart', icon: ShoppingCart },
-  { id: 'recently-viewed', label: 'Recently Viewed', icon: History },
   { id: 'addresses', label: 'Addresses', icon: MapPin },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'profile', label: 'Profile Settings', icon: UserCog },

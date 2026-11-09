@@ -6,7 +6,6 @@ import { OverviewPage } from './Overview';
 import { OrdersPage } from './Orders';
 import { WishlistPage } from './Wishlist';
 import { CartPage } from './Cart';
-import { RecentlyViewedPage } from './RecentlyViewed';
 import { AddressesPage } from './Addresses';
 import { NotificationsPage } from './Notifications';
 import { ProfileSettingsPage } from './ProfileSettings';
@@ -19,7 +18,6 @@ const Content: React.FC<{ tab: DashboardTab; onNavigate: (t: DashboardTab) => vo
     case 'orders': return <OrdersPage />;
     case 'wishlist': return <WishlistPage />;
     case 'cart': return <CartPage />;
-    case 'recently-viewed': return <RecentlyViewedPage />;
     case 'addresses': return <AddressesPage />;
     case 'notifications': return <NotificationsPage />;
     case 'profile': return <ProfileSettingsPage onNavigate={onNavigate} />;
