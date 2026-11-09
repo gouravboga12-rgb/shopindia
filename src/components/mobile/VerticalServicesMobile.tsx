@@ -377,7 +377,6 @@ export const VerticalServicesMobile: React.FC = () => {
         onClose={() => setBookingService(null)}
         serviceTitle={bookingService?.title || ''}
         price={bookingService?.price || 0}
-        availableSlots={bookingService?.serviceSlots}
         supportedBookingModes={
           bookingService?.tags?.includes('instant_only')
             ? 'instant'

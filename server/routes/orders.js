@@ -435,6 +435,60 @@ router.post('/', async (req, res) => {
           remainingSeconds: opStatus.midnightBlackout.remainingSeconds,
         });
       }
+
+      // Check future scheduled appointment times for Glacons against operating hours
+      const rawSlotNote = String(req.body?.notes || req.body?.items?.[0]?.deliveryTime || '');
+      const isScheduledBooking = rawSlotNote.toLowerCase().includes('scheduled') || rawSlotNote.includes(' at ');
+
+      if (isScheduledBooking && (fulfillmentType === 'hvac_service' || resolvedVertical === 'services' || resolvedVertical === 'hvac_service')) {
+        const timeMatch = rawSlotNote.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (timeMatch) {
+          let h = parseInt(timeMatch[1], 10);
+          const m = parseInt(timeMatch[2], 10);
+          const p = timeMatch[3].toUpperCase();
+          if (p === 'PM' && h < 12) h += 12;
+          if (p === 'AM' && h === 12) h = 0;
+          const slotMinutes = h * 60 + m;
+
+          // 1. Check Friday Prayer Break
+          const isFridayMentioned = rawSlotNote.toLowerCase().includes('fri') || rawSlotNote.toLowerCase().includes('friday');
+          if (isFridayMentioned && opStatus.fridayBreak.isEnabled && isBlockedVertical(opStatus.fridayBreak.verticals)) {
+            const fStart = (opStatus.fridayBreak.start || '12:00').split(':').map(Number);
+            const fEnd = (opStatus.fridayBreak.end || '14:00').split(':').map(Number);
+            const fStartMin = fStart[0] * 60 + (fStart[1] || 0);
+            const fEndMin = fEnd[0] * 60 + (fEnd[1] || 0);
+
+            if (slotMinutes >= fStartMin && slotMinutes < fEndMin) {
+              return res.status(400).json({
+                error: `Requested appointment time falls during the Friday Prayer Break (${opStatus.fridayBreak.formattedStart} – ${opStatus.fridayBreak.formattedEnd}). Please choose an alternative arrival time.`,
+                code: 'FRIDAY_PRAYER_BREAK'
+              });
+            }
+          }
+
+          // 2. Check Midnight Blackout
+          if (opStatus.midnightBlackout.isEnabled && isBlockedVertical(opStatus.midnightBlackout.verticals)) {
+            const mStart = (opStatus.midnightBlackout.start || '23:00').split(':').map(Number);
+            const mEnd = (opStatus.midnightBlackout.end || '07:00').split(':').map(Number);
+            const mStartMin = mStart[0] * 60 + (mStart[1] || 0);
+            const mEndMin = mEnd[0] * 60 + (mEnd[1] || 0);
+
+            let inBlackout = false;
+            if (mStartMin > mEndMin) {
+              inBlackout = slotMinutes >= mStartMin || slotMinutes < mEndMin;
+            } else {
+              inBlackout = slotMinutes >= mStartMin && slotMinutes < mEndMin;
+            }
+
+            if (inBlackout) {
+              return res.status(400).json({
+                error: `Requested appointment time falls during overnight closed hours (${opStatus.midnightBlackout.formattedStart} – ${opStatus.midnightBlackout.formattedEnd}). Field technicians operate during daytime hours only.`,
+                code: 'MIDNIGHT_BLACKOUT'
+              });
+            }
+          }
+        }
+      }
     } catch (_opErr) {
       // Non-blocking fallback
     }

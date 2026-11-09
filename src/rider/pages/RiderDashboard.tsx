@@ -35,7 +35,7 @@ function parseSlotStartHour(timeSlotStr: string): number {
   const meridiem = startMeridiem || endMeridiem;
 
   if (meridiem === 'PM') {
-    if (hour < 12 && (hour >= 1 && hour <= 6)) {
+    if (hour < 12) {
       hour += 12;
     }
   } else if (meridiem === 'AM' && hour === 12) {

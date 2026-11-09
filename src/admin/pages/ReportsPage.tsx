@@ -208,7 +208,7 @@ export const ReportsPage: React.FC = () => {
             <tr>
               <th className="px-5 py-3.5 font-semibold">Order No</th>
               <th className="px-5 py-3.5 font-semibold">Date</th>
-              <th className="px-5 py-3.5 font-semibold">Booking Type</th>
+              <th className="px-5 py-3.5 font-semibold">Booking / Arrival Time</th>
               <th className="px-5 py-3.5 font-semibold">Amount</th>
               <th className="px-5 py-3.5 font-semibold">Vendor / Partner</th>
               <th className="px-5 py-3.5 font-semibold">Branch</th>
@@ -240,7 +240,7 @@ export const ReportsPage: React.FC = () => {
                         <div className="flex flex-col gap-0.5">
                           <span className="inline-flex items-center gap-1 text-[11px] font-black text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 self-start">
                             <Clock className="w-3 h-3 text-teal-600" />
-                            <span>📅 Scheduled Slot</span>
+                            <span>📅 Scheduled Arrival</span>
                           </span>
                           {slotTime && (
                             <span className="text-[10px] text-slate-500 font-medium truncate max-w-[180px]">
