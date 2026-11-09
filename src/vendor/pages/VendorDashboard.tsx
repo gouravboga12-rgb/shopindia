@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { ShoppingBag, DollarSign, Wallet, Clock } from 'lucide-react';
+import { ShoppingBag, DollarSign, Wallet, Clock, Power } from 'lucide-react';
+import { useVendor } from '../context/VendorContext';
 
 export const VendorDashboard: React.FC = () => {
+  const { isOnline, toggleOnline, toggling } = useVendor();
   const [data, setData] = useState<any>(null);
   const [wallet, setWallet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,67 @@ export const VendorDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Live Store Online / Offline Control Banner */}
+      {isOnline ? (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <Power className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                  Store is LIVE on ShopIndia Dispatch Network
+                </h3>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" /> Accepting Orders
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Nearby customers within your delivery radius can browse and place orders. You will be alerted when new orders arrive.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => toggleOnline(false)}
+            disabled={toggling}
+            className="self-start sm:self-center px-4 py-2 rounded-xl text-xs font-semibold bg-white text-gray-700 hover:text-amber-800 hover:bg-amber-50 border border-gray-200 hover:border-amber-300 transition-all cursor-pointer whitespace-nowrap shadow-2xs flex items-center gap-1.5"
+          >
+            <Power className="w-3.5 h-3.5 text-amber-600" />
+            <span>Pause Store (Go Offline)</span>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50/50 to-white border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <Power className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                  Store is Currently OFFLINE
+                </h3>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600" /> Paused
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Your store is currently not taking orders. Turn your store online whenever you're ready to accept orders and service bookings.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => toggleOnline(true)}
+            disabled={toggling}
+            className="self-start sm:self-center px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all cursor-pointer whitespace-nowrap shadow-xs flex items-center gap-1.5 active:scale-95"
+          >
+            <Power className="w-3.5 h-3.5" />
+            <span>Open Store (Go Online)</span>
+          </button>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Vendor Overview</h1>
         <p className="text-sm text-gray-500">Track your product sales, fulfillment pipeline, and wallet balance</p>

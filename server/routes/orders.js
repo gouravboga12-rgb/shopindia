@@ -110,12 +110,16 @@ router.post('/quote', async (req, res) => {
     });
 
     let distanceKm = 3.5;
-    if (resolved.length && resolved[0].vendorId && userLat && userLng) {
+    let isStoreOnline = true;
+    if (resolved.length && resolved[0].vendorId) {
       const v = await prisma.vendor.findUnique({
         where: { id: resolved[0].vendorId },
-        select: { lat: true, lng: true }
+        select: { lat: true, lng: true, isOnline: true }
       });
-      if (v?.lat && v?.lng) {
+      if (v?.isOnline === false) {
+        isStoreOnline = false;
+      }
+      if (v?.lat && v?.lng && userLat && userLng) {
         distanceKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
       }
     }
@@ -135,6 +139,7 @@ router.post('/quote', async (req, res) => {
         discount: totals.discount,
         total: totals.finalCustomerTotal,
         distanceKm,
+        isStoreOnline,
         isFreeDelivery: totals.delivery?.isFreeDelivery || false
       }
     });
@@ -557,15 +562,22 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Resolve distanceKm for Quick Commerce using actual vendor store & customer GPS
+    // Resolve distanceKm and store status for Quick Commerce using actual vendor store & customer GPS
     let orderDistKm = 3.5;
-    if (resolved.length && resolved[0].vendorId && orderLat && orderLng) {
+    if (resolved.length && resolved[0].vendorId) {
       const vRec = await prisma.vendor.findUnique({
         where: { id: resolved[0].vendorId },
-        select: { lat: true, lng: true }
+        select: { lat: true, lng: true, isOnline: true, businessName: true, isActive: true }
       });
-      if (vRec?.lat && vRec?.lng) {
-        orderDistKm = calculateHaversineDistanceKm(vRec.lat, vRec.lng, orderLat, orderLng);
+      if (vRec) {
+        if (vRec.isOnline === false && resolvedVertical === 'quick') {
+          return res.status(400).json({
+            error: `Merchant "${vRec.businessName || 'Store'}" is currently offline and not accepting orders. Please try again when the store is open.`
+          });
+        }
+        if (vRec.lat && vRec.lng && orderLat && orderLng) {
+          orderDistKm = calculateHaversineDistanceKm(vRec.lat, vRec.lng, orderLat, orderLng);
+        }
       }
     }
 

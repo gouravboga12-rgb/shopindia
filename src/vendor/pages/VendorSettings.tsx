@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import {
   Store, MapPin, Navigation, Landmark, ShieldCheck,
   Save, AlertTriangle, CheckCircle2, RefreshCw, Zap,
-  Compass, Clock, Building2, Phone, Mail, FileText
+  Compass, Clock, Building2, Phone, Mail, FileText, Power
 } from 'lucide-react';
 
 interface VendorSettingsData {
@@ -33,6 +33,7 @@ interface VendorSettingsData {
   description: string | null;
   category: string | null;
   isActive: boolean;
+  isOnline: boolean;
 }
 
 export const VendorSettings: React.FC = () => {
@@ -71,6 +72,7 @@ export const VendorSettings: React.FC = () => {
     description: '',
     category: '',
     isActive: true,
+    isOnline: true,
   });
 
   const loadSettings = async () => {
@@ -84,6 +86,7 @@ export const VendorSettings: React.FC = () => {
           ...res.settings,
           deliveryRadiusKm: res.settings.deliveryRadiusKm || 5,
           supportsQuick: res.settings.supportsQuick ?? true,
+          isOnline: res.settings.isOnline !== false,
         }));
       }
     } catch (err: any) {
@@ -337,6 +340,30 @@ export const VendorSettings: React.FC = () => {
                     type="checkbox"
                     checked={form.isActive}
                     onChange={e => setForm({ ...form, isActive: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* Store Operating Status (Online / Offline) Toggle */}
+              <div className="p-4 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <Power className={`w-4 h-4 ${form.isOnline ? 'text-emerald-500' : 'text-amber-500'}`} />
+                    Store Operating Status (Online / Offline)
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    {form.isOnline
+                      ? 'Store is ONLINE. You are actively receiving orders and bookings.'
+                      : 'Store is OFFLINE. New customer orders and bookings are paused.'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.isOnline}
+                    onChange={e => setForm({ ...form, isOnline: e.target.checked })}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>

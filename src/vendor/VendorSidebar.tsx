@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useVendor } from './context/VendorContext';
 import { LayoutDashboard, Package, ShoppingBag, BarChart3, Wallet, LogOut, Store, Headphones, Settings, X } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,6 +17,7 @@ export const VendorSidebar: React.FC<SidebarProps> = ({
   onClose,
 }) => {
   const { user, logout } = useAuth();
+  const { vendor, isOnline } = useVendor();
 
   const navItems = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -36,8 +38,11 @@ export const VendorSidebar: React.FC<SidebarProps> = ({
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-base font-heading">Vendor Hub</h2>
-              <p className="text-xs text-gray-400">ShopIndia Partner</p>
+              <h2 className="font-bold text-base font-heading truncate max-w-[140px]">{vendor?.businessName || 'Vendor Hub'}</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
+                <span className="text-[11px] font-semibold text-slate-500">{isOnline ? 'Store Online' : 'Store Offline'}</span>
+              </div>
             </div>
           </div>
           {isMobileDrawer && onClose && (

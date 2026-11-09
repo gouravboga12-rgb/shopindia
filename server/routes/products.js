@@ -91,6 +91,7 @@ router.get('/', async (req, res) => {
             deliveryRadiusKm: true,
             supportsQuick: true,
             isActive: true,
+            isOnline: true,
           },
         },
         category: { select: { id: true, name: true, slug: true } },
@@ -143,8 +144,8 @@ router.get('/', async (req, res) => {
 
       // ─── Hyper-Local Filtering for Quick Commerce ──────────────────────────
       if (p.fulfillmentType === 'quick_commerce') {
-        // If vendor explicitly turned off quick orders or is inactive, exclude
-        if (p.vendor && (p.vendor.isActive === false || p.vendor.supportsQuick === false)) {
+        // If vendor explicitly turned off quick orders, is offline, or is inactive, exclude
+        if (p.vendor && (p.vendor.isActive === false || p.vendor.supportsQuick === false || p.vendor.isOnline === false)) {
           continue;
         }
 
@@ -279,6 +280,7 @@ router.get('/', async (req, res) => {
           lat: p.vendor?.lat,
           lng: p.vendor?.lng,
           deliveryRadiusKm: p.vendor?.deliveryRadiusKm || 10,
+          isOnline: p.vendor?.isOnline !== false,
           distanceKm: distanceKm != null ? distanceKm : undefined,
         },
         distanceKm: distanceKm != null ? distanceKm : undefined,

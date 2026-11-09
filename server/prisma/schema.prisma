@@ -259,6 +259,7 @@ model Vendor {
   description String?
   category    String?
   isActive    Boolean @default(true)
+  isOnline    Boolean @default(true)
 
   documents   VendorDocument[]
   products    Product[]

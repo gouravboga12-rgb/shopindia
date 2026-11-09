@@ -56,6 +56,7 @@ router.get('/', async (req, res) => {
         description: true,
         category: true,
         isActive: true,
+        isOnline: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -110,6 +111,7 @@ router.put('/', async (req, res) => {
       category,
       logo,
       isActive,
+      isOnline,
       // Banking details
       accountHolder,
       accountNumber,
@@ -141,6 +143,7 @@ router.put('/', async (req, res) => {
     if (category !== undefined) updateData.category = category?.trim() || null;
     if (logo !== undefined) updateData.logo = logo?.trim() || null;
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+    if (isOnline !== undefined) updateData.isOnline = Boolean(isOnline);
 
     // Hyper-local quick commerce settings: strictly locked to 5 km - 10 km
     if (lat !== undefined) updateData.lat = lat !== null && lat !== '' ? parseFloat(lat) : null;
@@ -222,5 +225,54 @@ router.put('/', async (req, res) => {
     res.status(500).json({ error: err.message || 'Failed to update store settings.' });
   }
 });
+
+/**
+ * PATCH /api/vendor/settings/status
+ * PUT /api/vendor/settings/toggle-online
+ * Toggle Vendor Store Online/Offline status
+ */
+const handleStatusToggle = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId;
+    if (!vendorId) {
+      return res.status(403).json({ error: 'Vendor profile not found.' });
+    }
+
+    const { isOnline } = req.body;
+    let nextStatus = isOnline !== undefined ? Boolean(isOnline) : undefined;
+
+    if (nextStatus === undefined) {
+      const current = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { isOnline: true },
+      });
+      nextStatus = !current?.isOnline;
+    }
+
+    const updated = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { isOnline: nextStatus },
+      select: {
+        id: true,
+        businessName: true,
+        isOnline: true,
+        isActive: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      isOnline: updated.isOnline,
+      businessName: updated.businessName,
+      message: updated.isOnline ? 'Store is now ONLINE and receiving orders.' : 'Store is now OFFLINE. New orders are paused.',
+    });
+  } catch (err) {
+    console.error('[VendorSettings] status toggle error:', err);
+    res.status(500).json({ error: err.message || 'Failed to toggle vendor status.' });
+  }
+};
+
+router.patch('/status', handleStatusToggle);
+router.put('/toggle-online', handleStatusToggle);
 
 module.exports = router;
