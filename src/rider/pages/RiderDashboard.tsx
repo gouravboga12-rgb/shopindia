@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 interface RiderDashboardProps {
-  onNavigateToTab?: (tab: string) => void;
+  onNavigateToTab?: (tab: string, subTab?: 'trips' | 'cod_history') => void;
 }
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
@@ -142,7 +142,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
       )}
 
       {/* Cash in Hand Statement Card */}
-      {(profile?.codCashFloat ?? 0) > 0 && (
+      {((profile?.codCashFloat ?? 0) > 0 || (profile?.walletBalance ?? 0) < 0) && (
         <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-orange-300 text-orange-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-start sm:items-center gap-3.5">
             <div className="p-3 rounded-2xl border shadow-xs shrink-0 bg-orange-500 text-white border-orange-600">
@@ -156,9 +156,14 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
                 <span className="text-[10px] bg-amber-200/90 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
                   Kept in Pocket
                 </span>
+                {(profile?.walletBalance ?? 0) < 0 && (
+                  <span className="text-[10px] bg-red-100 text-red-800 font-black px-2 py-0.5 rounded-full border border-red-200">
+                    Wallet: -₹{Math.abs(Math.round(profile?.walletBalance || 0)).toLocaleString('en-IN')}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-slate-600 mt-1">
-                You collected this offline cash on deliveries and kept it with yourself. It is automatically deducted from your wallet balance.
+              <p className="text-xs text-slate-700 mt-1.5 font-medium leading-relaxed">
+                You collected and kept this offline customer cash. If your wallet balance is insufficient to clear it, please <strong>complete more delivery rides</strong> to earn delivery fees and clear this balance. If your negative balance is not cleared or exceeds the float limit, <strong>future ride assignments will be paused and your account will be suspended</strong>.
               </p>
             </div>
           </div>
@@ -166,9 +171,9 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
           {onNavigateToTab && (
             <button
               type="button"
-              onClick={() => onNavigateToTab('deliveries')}
+              onClick={() => onNavigateToTab('orders', 'cod_history')}
               className="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 shrink-0 self-start sm:self-center"
-              title="View COD Statement"
+              title="View COD Statement & Trips"
             >
               <Clock className="w-3.5 h-3.5 text-orange-600" />
               <span>View Statement</span>

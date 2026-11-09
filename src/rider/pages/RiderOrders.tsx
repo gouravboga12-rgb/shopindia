@@ -33,14 +33,24 @@ interface CODHistoryItem {
   } | null;
 }
 
-export const RiderOrders: React.FC = () => {
+interface RiderOrdersProps {
+  initialTab?: 'trips' | 'cod_history';
+}
+
+export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }) => {
   const { token } = useAuth();
   const { activeDelivery } = useRider();
-  const [activeTab, setActiveTab] = useState<'trips' | 'cod_history'>('trips');
+  const [activeTab, setActiveTab] = useState<'trips' | 'cod_history'>(initialTab);
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [codHistory, setCodHistory] = useState<CODHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCod, setLoadingCod] = useState(false);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     if (!token) return;

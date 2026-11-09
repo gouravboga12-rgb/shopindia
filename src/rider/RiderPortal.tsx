@@ -14,6 +14,7 @@ import { RiderProfile } from './pages/RiderProfile';
 const RiderContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('radar');
+  const [ordersSubTab, setOrdersSubTab] = useState<'trips' | 'cod_history'>('trips');
 
   if (!isAuthenticated) {
     const registerRequested =
@@ -21,29 +22,38 @@ const RiderContent: React.FC = () => {
     return <RiderLogin initialRegister={registerRequested} />;
   }
 
+  const handleNavigate = (targetTab: string, subTab?: 'trips' | 'cod_history') => {
+    if (subTab) {
+      setOrdersSubTab(subTab);
+    }
+    const resolvedTab = targetTab === 'deliveries' ? 'orders' : targetTab;
+    setTab(resolvedTab);
+  };
+
   const renderTab = () => {
     switch (tab) {
       case 'radar':
-        return <RiderDashboard onNavigateToTab={setTab} />;
+        return <RiderDashboard onNavigateToTab={handleNavigate} />;
       case 'orders':
-        return <RiderOrders />;
+      case 'deliveries':
+        return <RiderOrders initialTab={ordersSubTab} />;
       case 'wallet':
         return <RiderWallet />;
       case 'profile':
         return <RiderProfile />;
       default:
-        return <RiderDashboard onNavigateToTab={setTab} />;
+        return <RiderDashboard onNavigateToTab={handleNavigate} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       {/* Top sticky status header */}
-      <RiderHeader onNavigateToTab={setTab} />
+      <RiderHeader onNavigateToTab={handleNavigate} />
 
       <div className="flex flex-1">
         {/* Desktop Sidebar Navigation */}
-        <RiderSidebar currentTab={tab} onTabChange={setTab} />
+        <RiderSidebar currentTab={tab === 'deliveries' ? 'orders' : tab} onTabChange={handleNavigate} />
 
         {/* Main Content Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8 max-w-5xl mx-auto w-full">
@@ -52,7 +62,7 @@ const RiderContent: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <RiderBottomNav currentTab={tab} onTabChange={setTab} />
+      <RiderBottomNav currentTab={tab === 'deliveries' ? 'orders' : tab} onTabChange={handleNavigate} />
 
       {/* Global Real-time 30s Countdown Incoming Dispatch Modal */}
       <IncomingRadarModal />

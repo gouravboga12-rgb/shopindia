@@ -227,9 +227,9 @@ export const RiderWallet: React.FC = () => {
         </div>
 
         {isNegative && (
-          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-medium flex items-center gap-2">
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium flex items-center gap-2">
             <Info className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Withdrawals are paused while your balance is negative (-₹{Math.abs(Math.round(effectiveBalance))}). Complete more orders to earn delivery fees and bring your balance positive.</span>
+            <span>Your net wallet balance is -₹{Math.abs(Math.round(effectiveBalance))}. Please complete more delivery rides to earn fees and clear this balance. If this balance remains uncleared or exceeds the limit, new ride assignments will be paused and your account will be suspended.</span>
           </div>
         )}
 
