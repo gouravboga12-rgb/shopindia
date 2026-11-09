@@ -14,18 +14,33 @@ import {
   RefreshCw,
   AlertCircle,
   Banknote,
-  Bell
+  Bell,
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
 
 interface RiderDashboardProps {
   onNavigateToTab?: (tab: string, subTab?: 'trips' | 'cod_history' | 'scheduled_services') => void;
 }
 
+function parseSlotStartHour(timeSlotStr: string): number {
+  const match = timeSlotStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return 9;
+  let hour = parseInt(match[1], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hour < 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return hour;
+}
+
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab }) => {
-  const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation, refreshData } = useRider();
+  const { profile, isOnline, toggleOnline, activeDelivery, updateGpsLocation, refreshData, startServiceJob } = useRider();
   const [locating, setLocating] = useState(false);
   const [locFeedback, setLocFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
+  const [imminentService, setImminentService] = useState<any | null>(null);
+  const [totalScheduledCount, setTotalScheduledCount] = useState<number>(0);
+  const [startingServiceId, setStartingServiceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (refreshData) refreshData();
@@ -38,7 +53,38 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
         }
       } catch {}
     };
+
+    const fetchScheduled = async () => {
+      try {
+        const res: any = await api.get('/api/rider/scheduled-services');
+        if (res?.success) {
+          const allServices = res.services || [];
+          setTotalScheduledCount(allServices.length);
+          const todayList = res.grouped?.today || [];
+
+          // Current IST time calculation
+          const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
+          const currentHour = nowIST.getUTCHours();
+          const currentMinutes = nowIST.getUTCMinutes();
+          const currentTimeDec = currentHour + currentMinutes / 60;
+
+          // Find if any job today is starting in ~1-2 hours or already underway
+          const imminent = todayList.find((srv: any) => {
+            const slotStr = srv.order?.notes || srv.pickupAddress || '';
+            const startHour = parseSlotStartHour(slotStr);
+            const hoursUntil = startHour - currentTimeDec;
+            return hoursUntil <= 2.5 && hoursUntil >= -2.0;
+          }) || (todayList.length > 0 ? todayList[0] : null);
+
+          setImminentService(imminent || null);
+        }
+      } catch {}
+    };
+
     fetchAlerts();
+    fetchScheduled();
+    const interval = setInterval(fetchScheduled, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleUpdateLocation = async () => {
@@ -61,6 +107,113 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
 
   return (
     <div className="space-y-5 sm:space-y-6 text-slate-800 animate-in fade-in duration-200">
+
+      {/* 1 to 2 Hours Before Scheduled Service Reminder Card */}
+      {imminentService && (
+        <div className="bg-gradient-to-r from-teal-950 via-slate-900 to-teal-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-lg border-2 border-teal-500/80 relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 relative z-10">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Doorstep Service Reminder (1–2 Hours Away)</span>
+                </span>
+                <span className="px-2 py-0.5 bg-teal-500/30 text-teal-200 border border-teal-400/30 rounded-full text-[10px] font-bold">
+                  Ready to Dispatch
+                </span>
+              </div>
+
+              <h3 className="text-sm sm:text-base font-black text-white">
+                {imminentService.pickupName}
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-300 pt-0.5">
+                <span className="font-bold text-teal-300 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {imminentService.order?.notes || imminentService.pickupAddress || 'Today'}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1 text-slate-300">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate max-w-[200px]">{imminentService.dropoffAddress || 'Customer Doorstep'}</span>
+                </span>
+                <span>•</span>
+                <span className="font-black text-emerald-400 font-numbers">
+                  +₹{imminentService.deliveryFee} Payout
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+              <button
+                type="button"
+                onClick={async () => {
+                  setStartingServiceId(imminentService.id);
+                  await startServiceJob(imminentService.id);
+                  setStartingServiceId(null);
+                }}
+                disabled={startingServiceId === imminentService.id}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
+              >
+                {startingServiceId === imminentService.id ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Heading out...</span>
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>🚀 Start Navigation & Head to Site</span>
+                  </>
+                )}
+              </button>
+
+              {onNavigateToTab && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab('deliveries', 'scheduled_services')}
+                  className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors cursor-pointer"
+                  title="View Scheduled Services Roster"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Advance Scheduled Services Summary Pill */}
+      {!imminentService && totalScheduledCount > 0 && (
+        <div className="p-3 bg-teal-50 border border-teal-200 rounded-2xl flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-teal-600 text-white rounded-xl shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-extrabold text-teal-950">
+                You have {totalScheduledCount} Advance Service{totalScheduledCount > 1 ? 's' : ''} reserved
+              </p>
+              <p className="text-[11px] text-teal-800">
+                We will alert you on this screen 1–2 hours before departure time.
+              </p>
+            </div>
+          </div>
+          {onNavigateToTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateToTab('deliveries', 'scheduled_services')}
+              className="px-3 py-1.5 bg-white text-teal-900 border border-teal-300 hover:bg-teal-100 rounded-xl font-bold text-xs shrink-0 transition-colors cursor-pointer"
+            >
+              View Roster
+            </button>
+          )}
+        </div>
+      )}
       
       {/* Shift Overview Banner */}
       <div className="relative bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs overflow-hidden">

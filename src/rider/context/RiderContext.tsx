@@ -65,6 +65,8 @@ export interface ActiveDeliveryData {
   order?: {
     orderNumber: string;
     total: number;
+    type?: string;
+    notes?: string;
     paymentStatus?: string;
     paymentMethod?: string;
     items?: DeliveryItem[];
@@ -104,9 +106,11 @@ interface RiderContextType {
   uploadRiderDoc: (file: File, docType: string) => Promise<{ success: boolean; url?: string; error?: string }>;
   activeDelivery: ActiveDeliveryData | null;
   incomingBroadcast: BroadcastDelivery | null;
-  acceptOrder: (deliveryId: string) => Promise<{ success: boolean; error?: string }>;
+  acceptOrder: (deliveryId: string) => Promise<{ success: boolean; isScheduled?: boolean; error?: string }>;
   declineOrder: (deliveryId: string) => void;
   advanceStage: (nextStage: 'arrived_pickup' | 'picked_up' | 'arrived_customer') => Promise<void>;
+  startServiceJob: (deliveryId: string) => Promise<{ success: boolean; error?: string }>;
+  verifyServiceOtp: (deliveryId: string, otp: string) => Promise<{ success: boolean; error?: string }>;
   completeDelivery: (otp: string, photoProofUrl?: string, paymentCollectedVia?: 'cash' | 'razorpay') => Promise<{ success: boolean; error?: string }>;
   refreshData: () => Promise<void>;
   updateGpsLocation: () => Promise<{ success: boolean; address?: string; error?: string }>;
@@ -361,9 +365,18 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setActiveDelivery(data.delivery);
+        const isService = data.delivery?.order?.type === 'hvac_service';
+        const notes = (data.delivery?.order?.notes || data.delivery?.pickupAddress || '').toLowerCase();
+        const isTomorrowOrFuture = notes.includes('tomorrow') || (!notes.includes('today') && isService);
+
+        // If future scheduled service, do NOT set activeDelivery so tomorrow's job doesn't hijack screen
+        if (isService && isTomorrowOrFuture) {
+          setActiveDelivery(null);
+        } else {
+          setActiveDelivery(data.delivery);
+        }
         setIncomingBroadcast(null);
-        return { success: true };
+        return { success: true, isScheduled: isService && isTomorrowOrFuture, delivery: data.delivery };
       } else {
         dismissedOrderIds.current.add(deliveryId);
         setIncomingBroadcast(null);
@@ -380,8 +393,27 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIncomingBroadcast(null);
   };
 
+  // Start service explicitly from Scheduled Services tab or 1-2 hr reminder
+  const startServiceJob = async (deliveryId: string) => {
+    if (!token) return { success: false, error: 'Unauthorized' };
+    try {
+      const res = await fetch(`/api/rider/orders/${deliveryId}/start-service`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActiveDelivery(data.delivery);
+        return { success: true };
+      }
+      return { success: false, error: data.error || 'Failed to start service.' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
   // Advance delivery turn-by-turn stage
-  const advanceStage = async (nextStage: 'arrived_pickup' | 'picked_up' | 'arrived_customer') => {
+  const advanceStage = async (nextStage: 'arrived_pickup' | 'picked_up' | 'in_transit' | 'arrived_customer') => {
     if (!token || !activeDelivery) return;
     try {
       const res = await fetch(`/api/rider/orders/${activeDelivery.id}/stage`, {
@@ -395,6 +427,25 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('Error advancing delivery stage:', err);
+    }
+  };
+
+  // Verify service OTP before technician starts work at doorstep
+  const verifyServiceOtp = async (deliveryId: string, otp: string) => {
+    if (!token) return { success: false, error: 'Unauthorized' };
+    try {
+      const res = await fetch(`/api/rider/orders/${deliveryId}/verify-service-otp`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ otp }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true };
+      }
+      return { success: false, error: data.error || 'Invalid Customer Service PIN.' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   };
 
@@ -434,6 +485,8 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         acceptOrder,
         declineOrder,
         advanceStage,
+        startServiceJob,
+        verifyServiceOtp,
         completeDelivery,
         refreshData,
         updateGpsLocation,

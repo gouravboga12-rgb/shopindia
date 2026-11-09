@@ -23,9 +23,11 @@ export const IncomingRadarModal: React.FC = () => {
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [scheduledSuccessNotice, setScheduledSuccessNotice] = useState<string | null>(null);
 
   const isServiceJob = incomingBroadcast?.order?.type === 'hvac_service';
   const isUrgentReplacement = incomingBroadcast?.pickupName?.includes('[URGENT REPLACEMENT]');
+  const slotTimeStr = incomingBroadcast?.order?.notes || incomingBroadcast?.pickupAddress || '';
 
   // Lock countdown timer to the unique broadcast ID to prevent polling resets
   const currentBroadcastId = incomingBroadcast?.id;
@@ -34,6 +36,7 @@ export const IncomingRadarModal: React.FC = () => {
     if (!currentBroadcastId) {
       setSecondsLeft(30);
       setClaimError(null);
+      setScheduledSuccessNotice(null);
       return;
     }
 
@@ -99,6 +102,11 @@ export const IncomingRadarModal: React.FC = () => {
       setTimeout(() => {
         declineOrder(incomingBroadcast.id);
       }, 2500);
+    } else if (result.isScheduled) {
+      setScheduledSuccessNotice('Appointment reserved in your Scheduled Services tab! You do not need to head out now.');
+      setTimeout(() => {
+        declineOrder(incomingBroadcast.id);
+      }, 2200);
     }
   };
 
@@ -108,17 +116,41 @@ export const IncomingRadarModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
-      <div className="w-full max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col bg-white border-2 border-orange-500 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-800 relative animate-in slide-in-from-bottom-6 duration-300">
+      <div className={`w-full max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-800 relative animate-in slide-in-from-bottom-6 duration-300 ${
+        isServiceJob ? 'border-2 border-teal-500' : 'border-2 border-orange-500'
+      }`}>
         
         {/* Top Radial Countdown Bar (Smooth 30s linear transition) */}
         <div className="w-full bg-slate-100 h-2 shrink-0">
           <div
             className={`h-full transition-all duration-1000 ease-linear ${
-              secondsLeft <= 8 ? 'bg-red-500' : 'bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500'
+              secondsLeft <= 8 ? 'bg-red-500' : isServiceJob ? 'bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-600' : 'bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500'
             }`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
+
+        {/* Big Prominent Advance Scheduled Service Tag (Glacons Doorstep Appointments) */}
+        {isServiceJob && (
+          <div className="bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800 text-white px-4 py-2.5 flex items-center justify-between border-b border-teal-500/40 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 bg-white/20 rounded-xl shrink-0">
+                <Calendar className="w-4 h-4 text-white" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-teal-200 block">
+                  🗓️ ADVANCE SCHEDULED SERVICE
+                </span>
+                <span className="text-xs sm:text-sm font-black text-white truncate block">
+                  {slotTimeStr || 'Future Service Booking'}
+                </span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 bg-white text-teal-900 font-black text-[10px] rounded-full uppercase tracking-wider shadow-2xs shrink-0 ml-2">
+              Advance Roster
+            </span>
+          </div>
+        )}
 
         {/* Pinned Modal Header (Always 100% visible on mobile) */}
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 flex items-center justify-between border-b border-slate-100 bg-white shrink-0 z-10">
@@ -240,6 +272,14 @@ export const IncomingRadarModal: React.FC = () => {
                 <p className="text-xs text-slate-600 flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="truncate">{incomingBroadcast.dropoffAddress || 'Customer Doorstep'}</span>
+                </p>
+              </div>
+
+              {/* Advance Booking Clarification Notice */}
+              <div className="p-2.5 bg-emerald-100/60 border border-emerald-300/80 rounded-xl text-xs text-emerald-950 flex items-start gap-2">
+                <span className="text-sm shrink-0 mt-0.5">📌</span>
+                <p className="leading-snug text-[11px] font-medium">
+                  <strong>Advance Booking:</strong> Accepting this reserves the appointment in your <strong>Scheduled Services</strong> roster. You do <em>not</em> need to travel now. Your dashboard will alert you 1–2 hours before time.
                 </p>
               </div>
             </div>
@@ -376,13 +416,29 @@ export const IncomingRadarModal: React.FC = () => {
                 <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 <span>
                   {isServiceJob
-                    ? `ACCEPT SERVICE JOB (₹${incomingBroadcast.deliveryFee})`
+                    ? `ACCEPT & RESERVE APPOINTMENT (₹${incomingBroadcast.deliveryFee})`
                     : `ACCEPT DELIVERY (₹${incomingBroadcast.deliveryFee})`}
                 </span>
               </>
             )}
           </button>
         </div>
+
+        {/* Advance Reservation Success Celebration Overlay */}
+        {scheduledSuccessNotice && (
+          <div className="absolute inset-0 z-40 bg-teal-950/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mb-3 shadow-lg shadow-emerald-500/30 animate-bounce">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-black text-white">Appointment Reserved!</h3>
+            <p className="text-xs text-teal-100 mt-2 max-w-xs leading-relaxed font-medium">
+              {scheduledSuccessNotice}
+            </p>
+            <span className="mt-4 px-3 py-1 bg-white/20 rounded-full text-[11px] font-bold text-teal-200">
+              Check "Scheduled Services" Tab Anytime
+            </span>
+          </div>
+        )}
 
         {/* Detailed Service Job Preview Modal */}
         {showDetailsModal && isServiceJob && (

@@ -20,11 +20,14 @@ import {
   CreditCard,
   Loader2,
   QrCode,
-  X
+  X,
+  Wrench,
+  Play
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
-  const { activeDelivery, advanceStage, completeDelivery } = useRider();
+  const { activeDelivery, advanceStage, completeDelivery, verifyServiceOtp } = useRider();
+  const isService = activeDelivery?.order?.type === 'hvac_service';
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [otpInput, setOtpInput] = useState('');
   const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
@@ -49,6 +52,70 @@ export const ActiveDeliveryView: React.FC = () => {
   } | null>(null);
   const [isVerifyingUpi, setIsVerifyingUpi] = useState<boolean>(false);
   const [currentRiderCoords, setCurrentRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Doorstep Service specific states
+  const [serviceStarted, setServiceStarted] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && activeDelivery?.id) {
+      return sessionStorage.getItem(`service_started_${activeDelivery.id}`) === 'true';
+    }
+    return false;
+  });
+  const [serviceStartTime, setServiceStartTime] = useState<number>(() => {
+    if (typeof window !== 'undefined' && activeDelivery?.id) {
+      const saved = sessionStorage.getItem(`service_start_time_${activeDelivery.id}`);
+      return saved ? parseInt(saved, 10) : Date.now();
+    }
+    return Date.now();
+  });
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [serviceOtpInput, setServiceOtpInput] = useState<string>('');
+  const [isVerifyingServiceOtp, setIsVerifyingServiceOtp] = useState<boolean>(false);
+  const [serviceOtpError, setServiceOtpError] = useState<string | null>(null);
+  const [serviceChecklist, setServiceChecklist] = useState<Record<string, boolean>>({
+    inspection: true,
+    filterClean: false,
+    coilWash: false,
+    gasCheck: false,
+    finalRunTest: false,
+  });
+
+  useEffect(() => {
+    if (!serviceStarted) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - serviceStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [serviceStarted, serviceStartTime]);
+
+  const formatElapsed = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const remainingSec = sec % 60;
+    return `${String(mins).padStart(2, '0')}:${String(remainingSec).padStart(2, '0')}`;
+  };
+
+  const handleVerifyServiceStartPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeDelivery?.id || serviceOtpInput.trim().length !== 4) {
+      setServiceOtpError('Please enter the 4-digit start PIN provided by customer.');
+      return;
+    }
+    setIsVerifyingServiceOtp(true);
+    setServiceOtpError(null);
+    const res = await verifyServiceOtp(activeDelivery.id, serviceOtpInput.trim());
+    setIsVerifyingServiceOtp(false);
+    if (res.success) {
+      setServiceStarted(true);
+      const now = Date.now();
+      setServiceStartTime(now);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`service_started_${activeDelivery.id}`, 'true');
+        sessionStorage.setItem(`service_start_time_${activeDelivery.id}`, String(now));
+      }
+      setOtpInput(serviceOtpInput.trim());
+    } else {
+      setServiceOtpError(res.error || 'Incorrect PIN code. Please ask the customer for their 4-digit start PIN.');
+    }
+  };
 
   // High-frequency live GPS streaming to Customer & Vendor via WebSockets
   useEffect(() => {
@@ -319,22 +386,36 @@ export const ActiveDeliveryView: React.FC = () => {
           </div>
         </div>
 
-        {/* 4-Stage Progress Stepper */}
+        {/* Stepper */}
         <div className="mt-4 pt-4 border-t border-slate-100">
-          <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-[10px] font-bold">
-            <div className={`p-1.5 rounded-lg ${currentStage === 'assigned' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
-              1. To Store
+          {isService ? (
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-[10px] font-bold">
+              <div className={`p-1.5 rounded-lg ${currentStage !== 'arrived_customer' ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'text-slate-400 bg-slate-50'}`}>
+                1. Head to Customer
+              </div>
+              <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_customer' && !serviceStarted ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'text-slate-400 bg-slate-50'}`}>
+                2. Verify Start PIN
+              </div>
+              <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_customer' && serviceStarted ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'text-slate-400 bg-slate-50'}`}>
+                3. Work & Settle
+              </div>
             </div>
-            <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_pickup' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
-              2. Pickup & Check
+          ) : (
+            <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-[10px] font-bold">
+              <div className={`p-1.5 rounded-lg ${currentStage === 'assigned' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
+                1. To Store
+              </div>
+              <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_pickup' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
+                2. Pickup & Check
+              </div>
+              <div className={`p-1.5 rounded-lg ${currentStage === 'picked_up' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
+                3. In Transit
+              </div>
+              <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_customer' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
+                4. OTP Handover
+              </div>
             </div>
-            <div className={`p-1.5 rounded-lg ${currentStage === 'picked_up' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
-              3. In Transit
-            </div>
-            <div className={`p-1.5 rounded-lg ${currentStage === 'arrived_customer' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'text-slate-400 bg-slate-50'}`}>
-              4. OTP Handover
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -354,122 +435,23 @@ export const ActiveDeliveryView: React.FC = () => {
         currentStage={currentStage}
       />
 
-      {/* STAGE 1: Heading to Store */}
-      {currentStage === 'assigned' && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      {/* ── DOORSTEP SERVICE FLOW (Zero Store Pickup, Zero Item Checklist) ── */}
+      {isService && currentStage !== 'arrived_customer' && (
+        <div className="bg-white border-2 border-teal-400 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 animate-in fade-in">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl border border-orange-100 shadow-2xs">
-                <Store className="w-5 h-5 sm:w-6 sm:h-6" />
+              <div className="p-3 bg-teal-50 text-teal-700 rounded-2xl border border-teal-200 shadow-2xs">
+                <Wrench className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <span className="text-xs uppercase font-extrabold text-orange-600 tracking-wider">Pickup Location</span>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.pickupName}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{cleanPickupAddress}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {activeDelivery.pickupPhone && (
-                <a
-                  href={`tel:${activeDelivery.pickupPhone}`}
-                  className="p-3 bg-slate-50 hover:bg-slate-100 text-orange-600 rounded-2xl transition-colors border border-slate-200"
-                  title="Call Store"
-                >
-                  <Phone className="w-5 h-5" />
-                </a>
-              )}
-              <a
-                href={storeNavUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
-                title="1-Tap Google Maps Navigation"
-              >
-                <Navigation className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <SlideToConfirm
-              label="Slide to Confirm: Arrived at Store"
-              color="orange"
-              onConfirm={() => advanceStage('arrived_pickup')}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* STAGE 2: Store Handover & Verification Checklist */}
-      {currentStage === 'arrived_pickup' && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs uppercase font-extrabold text-amber-600 tracking-wider">Item Verification</span>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900">Inspect Packed Items</h3>
-              <p className="text-xs text-slate-500">Verify items against the packed bag before sliding</p>
-            </div>
-            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
-              <CheckSquare className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-          </div>
-
-          {/* Item Checklist */}
-          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
-            {activeDelivery.order?.items && activeDelivery.order.items.length > 0 ? (
-              activeDelivery.order.items.map((item) => {
-                const isChecked = !!checkedItems[item.id];
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => toggleItemCheck(item.id)}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/60 transition-colors text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isChecked ? (
-                        <CheckSquare className="w-5 h-5 text-emerald-600" />
-                      ) : (
-                        <Square className="w-5 h-5 text-slate-400" />
-                      )}
-                      <span className={`text-xs sm:text-sm ${isChecked ? 'line-through text-slate-400' : 'text-slate-800 font-semibold'}`}>
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      x{item.quantity}
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="text-xs text-slate-500">1x Sealed ShopIndia Delivery Package</p>
-            )}
-          </div>
-
-          <div className="pt-2">
-            <SlideToConfirm
-              label="Slide to Confirm: Picked Up & Start"
-              color="emerald"
-              onConfirm={() => advanceStage('picked_up')}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* STAGE 3: In Transit to Customer */}
-      {currentStage === 'picked_up' && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 shadow-2xs">
-                <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
-              </div>
-              <div>
-                <span className="text-xs uppercase font-extrabold text-emerald-700 tracking-wider">Customer Destination</span>
+                <span className="text-xs uppercase font-extrabold text-teal-700 tracking-wider">
+                  Doorstep Service Destination
+                </span>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.dropoffName || 'Customer Doorstep'}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">{cleanDropoffAddress}</p>
+                <p className="text-xs text-teal-800 font-bold mt-1">
+                  🗓️ Slot: {activeDelivery.order?.notes || activeDelivery.pickupAddress || 'Scheduled Booking'}
+                </p>
               </div>
             </div>
 
@@ -477,7 +459,7 @@ export const ActiveDeliveryView: React.FC = () => {
               {activeDelivery.dropoffPhone && (
                 <a
                   href={`tel:${activeDelivery.dropoffPhone}`}
-                  className="p-3 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-2xl transition-colors border border-slate-200"
+                  className="p-3 bg-slate-50 hover:bg-slate-100 text-teal-700 rounded-2xl transition-colors border border-slate-200"
                   title="Call Customer"
                 >
                   <Phone className="w-5 h-5" />
@@ -487,7 +469,7 @@ export const ActiveDeliveryView: React.FC = () => {
                 href={customerNavUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
+                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-2xl transition-colors border border-emerald-200"
                 title="1-Tap Google Maps Navigation"
               >
                 <Navigation className="w-5 h-5" />
@@ -495,19 +477,293 @@ export const ActiveDeliveryView: React.FC = () => {
             </div>
           </div>
 
+          <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs text-teal-900 leading-relaxed">
+            💡 <strong>Doorstep Service Mode:</strong> Head directly to the customer site. Store pickup & checklist are skipped. Once you arrive at the customer doorstep, slide below to request their 4-digit start PIN.
+          </div>
+
           <div className="pt-2">
             <SlideToConfirm
-              label="Slide to Confirm: Arrived at Customer"
-              color="blue"
+              label="Slide to Confirm: Arrived at Customer Site"
+              color="emerald"
               onConfirm={() => advanceStage('arrived_customer')}
             />
           </div>
         </div>
       )}
 
-      {/* STAGE 4: Customer Handover & 4-Digit OTP Verification */}
-      {currentStage === 'arrived_customer' && (
+      {/* ── STANDARD QUICK-COMMERCE DELIVERY FLOW (Store Pickup & Handover) ── */}
+      {!isService && (
+        <>
+          {/* STAGE 1: Heading to Store */}
+          {currentStage === 'assigned' && (
+            <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl border border-orange-100 shadow-2xs">
+                    <Store className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <div>
+                    <span className="text-xs uppercase font-extrabold text-orange-600 tracking-wider">Pickup Location</span>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.pickupName}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{cleanPickupAddress}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {activeDelivery.pickupPhone && (
+                    <a
+                      href={`tel:${activeDelivery.pickupPhone}`}
+                      className="p-3 bg-slate-50 hover:bg-slate-100 text-orange-600 rounded-2xl transition-colors border border-slate-200"
+                      title="Call Store"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </a>
+                  )}
+                  <a
+                    href={storeNavUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
+                    title="1-Tap Google Maps Navigation"
+                  >
+                    <Navigation className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <SlideToConfirm
+                  label="Slide to Confirm: Arrived at Store"
+                  color="orange"
+                  onConfirm={() => advanceStage('arrived_pickup')}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STAGE 2: Store Handover & Verification Checklist */}
+          {currentStage === 'arrived_pickup' && (
+            <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs uppercase font-extrabold text-amber-600 tracking-wider">Item Verification</span>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">Inspect Packed Items</h3>
+                  <p className="text-xs text-slate-500">Verify items against the packed bag before sliding</p>
+                </div>
+                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                  <CheckSquare className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+              </div>
+
+              {/* Item Checklist */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
+                {activeDelivery.order?.items && activeDelivery.order.items.length > 0 ? (
+                  activeDelivery.order.items.map((item) => {
+                    const isChecked = !!checkedItems[item.id];
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => toggleItemCheck(item.id)}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/60 transition-colors text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          {isChecked ? (
+                            <CheckSquare className="w-5 h-5 text-emerald-600" />
+                          ) : (
+                            <Square className="w-5 h-5 text-slate-400" />
+                          )}
+                          <span className={`text-xs sm:text-sm ${isChecked ? 'line-through text-slate-400' : 'text-slate-800 font-semibold'}`}>
+                            {item.name}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          x{item.quantity}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-500">1x Sealed ShopIndia Delivery Package</p>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <SlideToConfirm
+                  label="Slide to Confirm: Picked Up & Start"
+                  color="emerald"
+                  onConfirm={() => advanceStage('picked_up')}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STAGE 3: In Transit to Customer */}
+          {currentStage === 'picked_up' && (
+            <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 shadow-2xs">
+                    <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <div>
+                    <span className="text-xs uppercase font-extrabold text-emerald-700 tracking-wider">Customer Destination</span>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900">{activeDelivery.dropoffName || 'Customer Doorstep'}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{cleanDropoffAddress}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {activeDelivery.dropoffPhone && (
+                    <a
+                      href={`tel:${activeDelivery.dropoffPhone}`}
+                      className="p-3 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-2xl transition-colors border border-slate-200"
+                      title="Call Customer"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </a>
+                  )}
+                  <a
+                    href={customerNavUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
+                    title="1-Tap Google Maps Navigation"
+                  >
+                    <Navigation className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <SlideToConfirm
+                  label="Slide to Confirm: Arrived at Customer"
+                  color="blue"
+                  onConfirm={() => advanceStage('arrived_customer')}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── AT CUSTOMER DOORSTEP ── */}
+      {currentStage === 'arrived_customer' && isService && !serviceStarted && (
+        <div className="bg-white border-2 border-teal-500 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 animate-in fade-in">
+          <div className="text-center">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-2 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center border border-teal-200 shadow-2xs">
+              <KeyRound className="w-6 h-6 sm:w-7 sm:h-7" />
+            </div>
+            <span className="px-2.5 py-0.5 bg-teal-100 text-teal-900 font-extrabold rounded-full text-[10px] uppercase tracking-wider">
+              Doorstep Arrival Confirmed
+            </span>
+            <h3 className="text-lg sm:text-xl font-black text-slate-900 mt-1.5">Enter Customer Start PIN</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              Ask the customer for the 4-digit start PIN displayed on their ShopIndia service tracking screen to start work.
+            </p>
+          </div>
+
+          {serviceOtpError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{serviceOtpError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyServiceStartPin} className="space-y-4">
+            <div className="flex justify-center">
+              <input
+                type="text"
+                maxLength={4}
+                autoFocus
+                placeholder="0 0 0 0"
+                value={serviceOtpInput}
+                onChange={(e) => setServiceOtpInput(e.target.value.replace(/\D/g, ''))}
+                className="w-48 text-center text-3xl font-mono font-black tracking-widest border-2 rounded-2xl py-3 focus:outline-none shadow-inner bg-slate-50 border-teal-500 text-teal-800 focus:bg-white"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isVerifyingServiceOtp || serviceOtpInput.length !== 4}
+              className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-teal-600/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isVerifyingServiceOtp ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  <span>VERIFY PIN & START SERVICE</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* STAGE 4: Customer Handover & 4-Digit OTP Verification / Work Completion */}
+      {currentStage === 'arrived_customer' && (!isService || serviceStarted) && (
         <div className="bg-white border-2 border-emerald-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+
+          {/* Service In Progress Banner & Checklist (For HVAC Service) */}
+          {isService && (
+            <div className="space-y-3.5">
+              <div className="bg-gradient-to-r from-teal-950 to-slate-900 text-white p-4 rounded-2xl flex items-center justify-between border border-teal-700/50 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-500 text-white rounded-xl shadow-xs">
+                    <Wrench className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-teal-300">
+                      Work in Progress
+                    </span>
+                    <h4 className="text-sm font-extrabold text-white">
+                      {activeDelivery.order?.items?.[0]?.name || activeDelivery.pickupName || 'Glacons AC Service'}
+                    </h4>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-300 uppercase font-bold block">Elapsed</span>
+                  <span className="text-xl font-mono font-black text-emerald-400">
+                    {formatElapsed(elapsedSeconds)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Execution Quality Checklist */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-1.5">
+                <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                  Execution Quality Checklist
+                </span>
+                {[
+                  { id: 'inspection', label: '1. Initial safety & electrical check' },
+                  { id: 'filterClean', label: '2. High-pressure jet cleaning / filter wash' },
+                  { id: 'coilWash', label: '3. Evaporator & outdoor coil deep clean' },
+                  { id: 'gasCheck', label: '4. Gas pressure & airflow test' },
+                  { id: 'finalRunTest', label: '5. Post-service run test with customer' },
+                ].map((chk) => {
+                  const isChecked = !!serviceChecklist[chk.id];
+                  return (
+                    <button
+                      key={chk.id}
+                      type="button"
+                      onClick={() => setServiceChecklist(prev => ({ ...prev, [chk.id]: !prev[chk.id] }))}
+                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/70 text-left transition-colors cursor-pointer"
+                    >
+                      <span className={`text-xs ${isChecked ? 'line-through text-slate-400' : 'text-slate-800 font-semibold'}`}>
+                        {chk.label}
+                      </span>
+                      {isChecked ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Doorstep Payment Clearance Card (Cash vs Razorpay) */}
           {activeDelivery.order?.total ? (
@@ -802,7 +1058,11 @@ export const ActiveDeliveryView: React.FC = () => {
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>VERIFY & COMPLETE DELIVERY (+₹{activeDelivery.deliveryFee})</span>
+                  <span>
+                    {isService
+                      ? `VERIFY & COMPLETE SERVICE (+₹${activeDelivery.deliveryFee})`
+                      : `VERIFY & COMPLETE DELIVERY (+₹${activeDelivery.deliveryFee})`}
+                  </span>
                 </>
               )}
             </button>

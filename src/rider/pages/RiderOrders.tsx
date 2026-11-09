@@ -68,7 +68,8 @@ interface RiderOrdersProps {
 
 export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }) => {
   const { token } = useAuth();
-  const { activeDelivery } = useRider();
+  const { activeDelivery, startServiceJob } = useRider();
+  const [startingServiceId, setStartingServiceId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'trips' | 'cod_history' | 'scheduled_services'>(initialTab);
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [codHistory, setCodHistory] = useState<CODHistoryItem[]>([]);
@@ -570,21 +571,34 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
                           </div>
 
                           <div className="flex gap-2 pt-1">
-                            <a
-                              href={`https://maps.google.com/?q=${encodeURIComponent(srv.dropoffAddress)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setStartingServiceId(srv.id);
+                                await startServiceJob(srv.id);
+                                setStartingServiceId(null);
+                              }}
+                              disabled={startingServiceId === srv.id}
+                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                             >
-                              <Navigation className="w-3.5 h-3.5" />
-                              <span>Navigate Site</span>
-                            </a>
+                              {startingServiceId === srv.id ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  <span>Starting...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Navigation className="w-3.5 h-3.5" />
+                                  <span>🚀 Start Navigation & Go to Site</span>
+                                </>
+                              )}
+                            </button>
                             <button
                               type="button"
                               onClick={() => setServiceToCancel(srv)}
-                              className="px-3.5 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors"
+                              className="px-3.5 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                             >
-                              Cancel Service
+                              Cancel
                             </button>
                           </div>
                         </div>

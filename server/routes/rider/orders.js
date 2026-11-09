@@ -300,7 +300,8 @@ router.post(['/:id/decline', '/orders/:id/decline'], async (_req, res) => {
 
 /**
  * GET /api/rider/active-job
- * Get current ongoing delivery details and checkpoints
+ * Get current ongoing delivery details and checkpoints.
+ * Future scheduled service appointments (e.g. tomorrow) do not hijack this screen.
  */
 router.get('/active-job', async (req, res) => {
   try {
@@ -330,6 +331,28 @@ router.get('/active-job', async (req, res) => {
     });
 
     if (activeJob) {
+      // If this is a Glacons doorstep service
+      if (activeJob.order?.type === 'hvac_service') {
+        const isAlreadyEnRoute = activeJob.status === 'picked_up' || activeJob.status === 'arrived_customer';
+        if (!isAlreadyEnRoute) {
+          // If still in 'assigned' state, check if appointment is for Tomorrow or future day
+          const notes = (activeJob.order?.notes || activeJob.pickupAddress || '').toLowerCase();
+          const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
+          const todayStr = nowIST.toISOString().split('T')[0];
+
+          const isTomorrow = notes.includes('tomorrow');
+          const isExplicitFuture =
+            !notes.includes('today') &&
+            !notes.includes(todayStr) &&
+            (isTomorrow || notes.includes('wed') || notes.includes('thu') || notes.includes('fri') || notes.includes('sat') || notes.includes('sun') || notes.includes('mon') || notes.includes('tue'));
+
+          if (isTomorrow || isExplicitFuture) {
+            // Future scheduled appointment stays peacefully in Scheduled Services tab
+            return res.json({ activeJob: null, activeDelivery: null, isScheduledUpcoming: true });
+          }
+        }
+      }
+
       if (!activeJob.dropoffAddress || activeJob.dropoffAddress.replace(/[,\s]/g, '').length === 0) {
         activeJob.dropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
       }
@@ -342,6 +365,80 @@ router.get('/active-job', async (req, res) => {
     res.json({ activeJob: activeJob || null, activeDelivery: activeJob || null });
   } catch (err) {
     console.error('Fetch active job error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rider/orders/:id/start-service
+ * Technician explicitly begins travel to customer site for a scheduled service appointment.
+ * Advances status to 'picked_up' (en route to customer site, bypassing store pickup).
+ */
+router.post(['/:id/start-service', '/orders/:id/start-service'], async (req, res) => {
+  try {
+    const profile = await getRiderProfile(req.user.userId);
+    if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
+    });
+
+    if (!delivery) return res.status(404).json({ error: 'Assigned service job not found.' });
+
+    const updated = await prisma.delivery.update({
+      where: { id: delivery.id },
+      data: {
+        status: 'picked_up', // En route to customer doorstep
+        pickedUpAt: new Date(),
+      },
+      include: {
+        order: {
+          include: {
+            items: true,
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        },
+      },
+    });
+
+    res.json({ success: true, message: 'En route to customer site!', delivery: updated });
+  } catch (err) {
+    console.error('Start service error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rider/orders/:id/verify-service-otp
+ * Verifies customer 4-digit PIN when technician arrives at customer doorstep to start work
+ */
+router.post(['/:id/verify-service-otp', '/orders/:id/verify-service-otp'], async (req, res) => {
+  try {
+    const { otp } = req.body;
+    const profile = await getRiderProfile(req.user.userId);
+    if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
+    });
+
+    if (!delivery) return res.status(404).json({ error: 'Service job not found.' });
+
+    if (delivery.deliveryOtp && otp) {
+      if (String(delivery.deliveryOtp).trim() !== String(otp).trim()) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_OTP',
+          error: 'Incorrect Customer Service OTP. Please ask the customer for their 4-digit start PIN.',
+        });
+      }
+    }
+
+    res.json({ success: true, message: 'OTP verified. Service work authorized!' });
+  } catch (err) {
+    console.error('Verify service OTP error:', err);
     res.status(500).json({ error: err.message });
   }
 });

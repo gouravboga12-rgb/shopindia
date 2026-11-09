@@ -98,3 +98,4 @@ function getPlatformOperatingStatus(settings = {}) {
 module.exports = {
   getPlatformOperatingStatus,
 };
+
