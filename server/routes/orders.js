@@ -529,8 +529,9 @@ router.post('/', async (req, res) => {
     const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
 
     const isQuickOrder = fulfillmentType === 'quick_commerce';
-    const firstServiceItem = rawItems.find(i => i.deliveryTime || i.specs?.['Scheduled Slot']) || rawItems[0];
-    const scheduledSlotInfo = firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || req.body.notes || null;
+    const itemsList = Array.isArray(items) ? items : [];
+    const firstServiceItem = itemsList.find(i => i.deliveryTime || i.specs?.['Scheduled Slot']) || itemsList[0] || null;
+    const scheduledSlotInfo = firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || req.body?.notes || null;
 
     const order = await prisma.order.create({
       data: {
