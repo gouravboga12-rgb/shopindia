@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRider } from '../context/RiderContext';
-import { MapPin, Navigation, IndianRupee, Store, X, Zap, CheckCircle2, Clock, Package, ArrowRight, Wrench, Eye, Calendar } from 'lucide-react';
+import { MapPin, Navigation, IndianRupee, Store, X, Zap, CheckCircle2, Clock, Package, ArrowRight, Wrench, Eye, Calendar, Lock, ExternalLink } from 'lucide-react';
 
 function calculateHaversineKm(lat1?: number | null, lon1?: number | null, lat2?: number | null, lon2?: number | null): number | null {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -19,7 +19,7 @@ function calculateHaversineKm(lat1?: number | null, lon1?: number | null, lat2?:
 
 export const IncomingRadarModal: React.FC = () => {
   const { incomingBroadcast, acceptOrder, declineOrder, profile } = useRider();
-  const [secondsLeft, setSecondsLeft] = useState(30);
+  const [secondsLeft, setSecondsLeft] = useState(66);
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -34,13 +34,13 @@ export const IncomingRadarModal: React.FC = () => {
 
   useEffect(() => {
     if (!currentBroadcastId) {
-      setSecondsLeft(30);
+      setSecondsLeft(66);
       setClaimError(null);
       setScheduledSuccessNotice(null);
       return;
     }
 
-    setSecondsLeft(30);
+    setSecondsLeft(66);
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -110,9 +110,15 @@ export const IncomingRadarModal: React.FC = () => {
     }
   };
 
-  const progressPercent = (secondsLeft / 30) * 100;
+  const progressPercent = (secondsLeft / 66) * 100;
   const items = incomingBroadcast.order?.items || [];
   const totalItemQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+
+  const destinationLat = incomingBroadcast.dropoffLat || incomingBroadcast.pickupLat;
+  const destinationLng = incomingBroadcast.dropoffLng || incomingBroadcast.pickupLng;
+  const mapsPreviewUrl = destinationLat && destinationLng
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destinationLat},${destinationLng}`
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
@@ -120,11 +126,11 @@ export const IncomingRadarModal: React.FC = () => {
         isServiceJob ? 'border-2 border-teal-500' : 'border-2 border-orange-500'
       }`}>
         
-        {/* Top Radial Countdown Bar (Smooth 30s linear transition) */}
+        {/* Top Radial Countdown Bar (Smooth 66s linear transition) */}
         <div className="w-full bg-slate-100 h-2 shrink-0">
           <div
             className={`h-full transition-all duration-1000 ease-linear ${
-              secondsLeft <= 8 ? 'bg-red-500' : isServiceJob ? 'bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-600' : 'bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500'
+              secondsLeft <= 12 ? 'bg-red-500' : isServiceJob ? 'bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-600' : 'bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500'
             }`}
             style={{ width: `${progressPercent}%` }}
           />
@@ -263,16 +269,41 @@ export const IncomingRadarModal: React.FC = () => {
                 </button>
               </div>
 
-              <div className="bg-white p-3 rounded-xl border border-teal-100 shadow-2xs space-y-1.5">
-                <h4 className="text-sm font-extrabold text-slate-900">{incomingBroadcast.pickupName}</h4>
-                <p className="text-xs text-teal-900 font-bold flex items-center gap-1">
+              <div className="bg-white p-3.5 rounded-xl border border-teal-100 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-extrabold text-slate-900 line-clamp-1">{incomingBroadcast.pickupName}</h4>
+                  <span className="px-2 py-0.5 bg-teal-100 text-teal-800 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0">
+                    🛠️ Service
+                  </span>
+                </div>
+                <p className="text-xs text-teal-900 font-bold flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                   <span>Slot: {incomingBroadcast.order?.notes || incomingBroadcast.pickupAddress || 'As per booking'}</span>
                 </p>
-                <p className="text-xs text-slate-600 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">{incomingBroadcast.dropoffAddress || 'Customer Doorstep'}</span>
+                <p className="text-xs text-slate-600 flex items-start gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                  <span>{incomingBroadcast.dropoffAddress || 'Customer Doorstep'}</span>
                 </p>
+
+                {/* Customer Privacy Protection & Google Maps Navigation Preview */}
+                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
+                    <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Customer Contact Protected (Available on Acceptance)</span>
+                  </div>
+                  {mapsPreviewUrl && (
+                    <a
+                      href={mapsPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2.5 py-1 rounded-lg transition-all"
+                    >
+                      <Navigation className="w-3 h-3 text-teal-600" />
+                      <span>Preview Area on Maps</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
               </div>
 
               {/* Advance Booking Clarification Notice */}
@@ -338,6 +369,21 @@ export const IncomingRadarModal: React.FC = () => {
                       ? incomingBroadcast.dropoffAddress
                       : 'Customer Doorstep'}
                   </p>
+                  <div className="pt-1.5 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-amber-500" /> Phone & WhatsApp protected until acceptance
+                    </span>
+                    {mapsPreviewUrl && (
+                      <a
+                        href={mapsPreviewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5 rounded shadow-2xs hover:bg-emerald-50"
+                      >
+                        <Navigation className="w-3 h-3 text-emerald-600" /> Maps Preview <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

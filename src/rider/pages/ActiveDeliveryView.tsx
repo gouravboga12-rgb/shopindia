@@ -22,11 +22,13 @@ import {
   QrCode,
   X,
   Wrench,
-  Play
+  Play,
+  MessageSquare,
+  AlertTriangle
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
-  const { activeDelivery, advanceStage, completeDelivery, verifyServiceOtp } = useRider();
+  const { activeDelivery, advanceStage, completeDelivery, verifyServiceOtp, refreshData } = useRider();
   const isService = activeDelivery?.order?.type === 'hvac_service';
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [otpInput, setOtpInput] = useState('');
@@ -41,6 +43,9 @@ export const ActiveDeliveryView: React.FC = () => {
   const [cashConfirmed, setCashConfirmed] = useState<boolean>(false);
   const [showCashConfirmModal, setShowCashConfirmModal] = useState<boolean>(false);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [isCancellingActive, setIsCancellingActive] = useState<boolean>(false);
   const [qrData, setQrData] = useState<{
     total: number;
     orderNumber: string;
@@ -236,6 +241,29 @@ export const ActiveDeliveryView: React.FC = () => {
     }
   };
 
+  const handleCancelActiveDelivery = async () => {
+    if (!activeDelivery?.id) return;
+    if (!cancelReason || cancelReason.trim().length < 5) {
+      alert('Please enter a specific explanation (at least 5 characters). This is transparently logged.');
+      return;
+    }
+    setIsCancellingActive(true);
+    try {
+      const res: any = await api.post(`/api/rider/orders/${activeDelivery.id}/cancel-active`, {
+        reason: cancelReason.trim(),
+      });
+      if (res?.success) {
+        alert(res.message || 'Delivery cancelled and re-broadcasted to nearby partners.');
+        await refreshData();
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to cancel delivery.');
+    } finally {
+      setIsCancellingActive(false);
+      setShowCancelModal(false);
+    }
+  };
+
   const handleCollectViaRazorpay = async () => {
     if (!activeDelivery?.id) return;
     setIsOnlinePaying(true);
@@ -354,6 +382,12 @@ export const ActiveDeliveryView: React.FC = () => {
     ? `https://www.google.com/maps/dir/?api=1&destination=${dropoffLat},${dropoffLng}&travelmode=driving`
     : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanDropoffAddress)}&travelmode=driving`;
 
+  const customerPhone = activeDelivery.dropoffPhone || (activeDelivery.order as any)?.customer?.phone || '';
+  const cleanPhone = customerPhone.replace(/\D/g, '');
+  const customerWhatsAppUrl = cleanPhone
+    ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${activeDelivery.dropoffName || 'Customer'}, I am your ShopIndia assigned partner for Order #${activeDelivery.order?.orderNumber || activeDelivery.orderId || ''}.`)}`
+    : null;
+
   return (
     <div className="max-w-2xl mx-auto space-y-4 sm:space-y-5 pb-24 text-slate-800 animate-in fade-in duration-200">
 
@@ -364,7 +398,7 @@ export const ActiveDeliveryView: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-700">
-                Active Quick-Commerce Delivery
+                {isService ? 'Active Glacons Service Appointment' : 'Active Quick-Commerce Delivery'}
               </span>
               <span className="px-2 py-0.5 bg-orange-100 text-orange-900 border border-orange-300 font-black rounded-lg text-xs font-mono shadow-2xs">
                 Token: #{(activeDelivery.order?.orderNumber || activeDelivery.orderId || '').replace(/^OD-/, '').slice(-4) || '9786'}
@@ -380,9 +414,17 @@ export const ActiveDeliveryView: React.FC = () => {
               Order #{activeDelivery.order?.orderNumber || activeDelivery.orderId.slice(0, 8)}
             </h2>
           </div>
-          <div className="text-right">
+          <div className="flex flex-col items-end gap-1.5">
             <span className="text-xs text-slate-400 font-medium">Guaranteed Fee</span>
-            <p className="text-2xl font-black text-emerald-600">₹{activeDelivery.deliveryFee}</p>
+            <p className="text-xl sm:text-2xl font-black text-emerald-600">₹{activeDelivery.deliveryFee}</p>
+            <button
+              type="button"
+              onClick={() => setShowCancelModal(true)}
+              className="px-2.5 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+            >
+              <AlertTriangle className="w-3 h-3 text-rose-600" />
+              <span>Cancel Job</span>
+            </button>
           </div>
         </div>
 
@@ -457,22 +499,36 @@ export const ActiveDeliveryView: React.FC = () => {
 
             <div className="flex items-center gap-2">
               {activeDelivery.dropoffPhone && (
-                <a
-                  href={`tel:${activeDelivery.dropoffPhone}`}
-                  className="p-3 bg-slate-50 hover:bg-slate-100 text-teal-700 rounded-2xl transition-colors border border-slate-200"
-                  title="Call Customer"
-                >
-                  <Phone className="w-5 h-5" />
-                </a>
+                <>
+                  <a
+                    href={`tel:${activeDelivery.dropoffPhone}`}
+                    className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-2xl transition-colors border border-blue-200"
+                    title="Call Customer"
+                  >
+                    <Phone className="w-5 h-5" />
+                  </a>
+                  {customerWhatsAppUrl && (
+                    <a
+                      href={customerWhatsAppUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-2xl transition-colors border border-emerald-300"
+                      title="WhatsApp Customer"
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                    </a>
+                  )}
+                </>
               )}
               <a
                 href={customerNavUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-2xl transition-colors border border-emerald-200"
+                className="px-3.5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl transition-colors shadow-sm flex items-center gap-1.5 font-bold text-xs"
                 title="1-Tap Google Maps Navigation"
               >
-                <Navigation className="w-5 h-5" />
+                <Navigation className="w-4 h-4" />
+                <span>Navigate</span>
               </a>
             </div>
           </div>
@@ -615,22 +671,36 @@ export const ActiveDeliveryView: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   {activeDelivery.dropoffPhone && (
-                    <a
-                      href={`tel:${activeDelivery.dropoffPhone}`}
-                      className="p-3 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-2xl transition-colors border border-slate-200"
-                      title="Call Customer"
-                    >
-                      <Phone className="w-5 h-5" />
-                    </a>
+                    <>
+                      <a
+                        href={`tel:${activeDelivery.dropoffPhone}`}
+                        className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-2xl transition-colors border border-blue-200"
+                        title="Call Customer"
+                      >
+                        <Phone className="w-5 h-5" />
+                      </a>
+                      {customerWhatsAppUrl && (
+                        <a
+                          href={customerWhatsAppUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-2xl transition-colors border border-emerald-300"
+                          title="WhatsApp Customer"
+                        >
+                          <MessageSquare className="w-5 h-5" />
+                        </a>
+                      )}
+                    </>
                   )}
                   <a
                     href={customerNavUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-2xl transition-colors border border-blue-200"
+                    className="px-3.5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl transition-colors shadow-sm flex items-center gap-1.5 font-bold text-xs"
                     title="1-Tap Google Maps Navigation"
                   >
-                    <Navigation className="w-5 h-5" />
+                    <Navigation className="w-4 h-4" />
+                    <span>Navigate</span>
                   </a>
                 </div>
               </div>
@@ -1088,6 +1158,86 @@ export const ActiveDeliveryView: React.FC = () => {
             >
               Return to Radar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MANDATORY CANCELLATION REASON MODAL (INSTANT RE-BROADCAST) */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white border border-rose-200 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-extrabold text-base text-slate-900">Cancel & Release Delivery</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-950 leading-relaxed">
+              ⚠️ If you cannot complete this order (e.g. vehicle puncture, emergency, or distance issue), it will be <strong>immediately re-broadcasted</strong> to find another nearby partner.
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700">
+                Cancellation Reason (Required):
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {['Vehicle Breakdown / Puncture', 'Sudden Family Emergency', 'Customer Asked to Reschedule', 'Heavy Rain / Bad Weather'].map((quickOption) => (
+                  <button
+                    key={quickOption}
+                    type="button"
+                    onClick={() => setCancelReason(quickOption)}
+                    className={`p-2 rounded-xl border text-left font-medium transition-all cursor-pointer ${
+                      cancelReason === quickOption
+                        ? 'bg-rose-50 border-rose-500 text-rose-900 font-bold'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {quickOption}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Or type specific reason (at least 5 characters)..."
+                rows={3}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancellingActive}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelActiveDelivery}
+                disabled={isCancellingActive || !cancelReason || cancelReason.trim().length < 5}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {isCancellingActive ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Re-broadcasting...</span>
+                  </>
+                ) : (
+                  <span>Confirm & Re-Broadcast</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

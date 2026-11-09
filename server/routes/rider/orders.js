@@ -812,14 +812,28 @@ router.post(['/:id/complete', '/orders/:id/complete'], async (req, res) => {
         },
       });
 
-      // Rider Pure Delivery Wage Architecture:
-      // The rider always earns and receives their guaranteed delivery fee (+feeToCredit).
-      // Customer product prices are NEVER deducted from the partner's earned delivery wages.
+      // Unified Net Wallet Auto-Offset Architecture (Industry Standard):
+      // - The rider earns feeToCredit on every delivery.
+      // - If rider collected offline cash (COD), they pocket the physical cash (orderCash).
+      // - Net wallet change = isCollectedCash ? (feeToCredit - orderCash) : feeToCredit.
+      // - As rider completes subsequent deliveries, their earnings (+65, +150) dynamically
+      //   pay down any negative balance.
+      // - When resulting balance is >= 0, all cash liability is 100% RECOVERED (codCashFloat = 0).
+      // - When balance is negative, codCashFloat is strictly the remaining unrecovered float.
+      const netWalletChange = isCollectedCash && orderCash > 0
+        ? (feeToCredit - orderCash)
+        : feeToCredit;
+
+      const currentBalance = Number(profile.walletBalance) || 0;
+      const newCalculatedBalance = currentBalance + netWalletChange;
+      const newFloat = newCalculatedBalance < 0 ? Math.round(Math.abs(newCalculatedBalance) * 100) / 100 : 0;
+
       await tx.riderProfile.update({
         where: { id: profile.id },
         data: {
-          walletBalance: { increment: feeToCredit },
+          walletBalance: { increment: netWalletChange },
           totalDeliveries: { increment: 1 },
+          codCashFloat: newFloat,
         },
       });
 
@@ -1090,6 +1104,65 @@ router.post(['/:id/cancel-service', '/orders/:id/cancel-service'], async (req, r
     }
   } catch (err) {
     console.error('Cancel service appointment error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rider/orders/:id/cancel-active
+ * Allows assigned rider to cancel an ongoing delivery/job if unable to complete.
+ * Unbinds the rider, resets status to 'broadcasted', and immediately rebroadcasts to nearby fleet.
+ */
+router.post(['/:id/cancel-active', '/orders/:id/cancel-active'], async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const profile = await getRiderProfile(req.user.userId);
+    if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    const delivery = await prisma.delivery.findFirst({
+      where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
+    });
+
+    if (!delivery) {
+      return res.status(404).json({ error: 'Active assigned delivery not found.' });
+    }
+
+    const cleanReason = String(reason || 'Rider reported emergency / unable to reach').trim();
+    const updatedNotes = delivery.order?.notes
+      ? `${delivery.order.notes}\n[Rider Cancelled]: ${cleanReason}`
+      : `[Rider Cancelled]: ${cleanReason}`;
+
+    const urgentPickupName = delivery.pickupName.startsWith('[RE-BROADCAST]')
+      ? delivery.pickupName
+      : `[RE-BROADCAST] ${delivery.pickupName}`;
+
+    await prisma.$transaction([
+      prisma.delivery.update({
+        where: { id: delivery.id },
+        data: {
+          riderProfileId: null,
+          status: 'broadcasted',
+          pickupName: urgentPickupName,
+          assignedAt: null,
+        },
+      }),
+      prisma.order.update({
+        where: { id: delivery.orderId },
+        data: {
+          status: 'placed',
+          notes: updatedNotes,
+        },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Delivery successfully cancelled and re-broadcasted to nearby partners.',
+      status: 'broadcasted',
+    });
+  } catch (err) {
+    console.error('Cancel active delivery error:', err);
     res.status(500).json({ error: err.message });
   }
 });

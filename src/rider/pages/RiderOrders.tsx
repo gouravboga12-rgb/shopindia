@@ -4,7 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
 import {
   Package, CheckCircle2, Store, MapPin, Banknote, CreditCard, RefreshCw,
-  Wrench, Calendar, Clock, AlertTriangle, X, Phone, Navigation, AlertCircle
+  Wrench, Calendar, Clock, AlertTriangle, X, Phone, Navigation, AlertCircle,
+  MessageSquare, ExternalLink
 } from 'lucide-react';
 
 interface HistoryOrder {
@@ -48,6 +49,8 @@ interface ScheduledServiceItem {
   dropoffName: string;
   dropoffAddress: string;
   dropoffPhone?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
   order?: {
     id: string;
     orderNumber: string;
@@ -64,6 +67,19 @@ interface ScheduledServiceItem {
 
 interface RiderOrdersProps {
   initialTab?: 'trips' | 'cod_history' | 'scheduled_services';
+}
+
+// Helper to determine trade badge & styling from service title / items
+function getTradeBadge(pickupName: string, items?: Array<{ name: string }>) {
+  const text = `${pickupName || ''} ${(items || []).map(i => i.name).join(' ')}`.toLowerCase();
+  if (text.includes('plumb')) return { label: 'Plumbing & Sanitary Care', icon: '🔧', color: 'bg-blue-100 text-blue-900 border-blue-200' };
+  if (text.includes('electr') || text.includes('wiring') || text.includes('switch')) return { label: 'Electrician & Home Wiring', icon: '⚡', color: 'bg-amber-100 text-amber-900 border-amber-200' };
+  if (text.includes('ac') || text.includes('cooling') || text.includes('hvac')) return { label: 'AC Repair & Service', icon: '❄️', color: 'bg-teal-100 text-teal-900 border-teal-200' };
+  if (text.includes('clean') || text.includes('pest')) return { label: 'Deep Cleaning & Pest', icon: '✨', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' };
+  if (text.includes('appliance') || text.includes('machine') || text.includes('refrigerator')) return { label: 'Appliance Maintenance', icon: '🧺', color: 'bg-indigo-100 text-indigo-900 border-indigo-200' };
+  if (text.includes('carpent') || text.includes('wood')) return { label: 'Carpentry & Assembly', icon: '🪚', color: 'bg-orange-100 text-orange-900 border-orange-200' };
+  if (text.includes('paint')) return { label: 'Painting & Seepage', icon: '🎨', color: 'bg-purple-100 text-purple-900 border-purple-200' };
+  return { label: 'Glacons Doorstep Service', icon: '🛠️', color: 'bg-slate-100 text-slate-800 border-slate-200' };
 }
 
 export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }) => {
@@ -532,77 +548,119 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
-                      {groupedServices.today.map((srv) => (
-                        <div
-                          key={srv.id}
-                          className="bg-white border-2 border-emerald-300/80 rounded-2xl p-4 shadow-xs space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 rounded-lg text-xs font-bold flex items-center gap-1.5 font-numbers">
-                              <Clock className="w-3.5 h-3.5 text-emerald-700" />
-                              <span>{srv.order?.notes || srv.pickupAddress || 'Today'}</span>
-                            </span>
-                            <span className="text-emerald-700 font-black text-base font-numbers">
-                              +₹{srv.deliveryFee}
-                            </span>
-                          </div>
+                      {groupedServices.today.map((srv) => {
+                        const trade = getTradeBadge(srv.pickupName, srv.order?.items);
+                        const cleanPhone = (srv.dropoffPhone || srv.order?.customer?.phone || '').replace(/\D/g, '');
+                        const mapsUrl = srv.dropoffLat && srv.dropoffLng
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${srv.dropoffLat},${srv.dropoffLng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(srv.dropoffAddress || '')}`;
 
-                          <div>
-                            <h5 className="font-extrabold text-sm text-slate-900">{srv.pickupName}</h5>
-                            <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                              <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                            <div className="text-slate-600 font-medium">
-                              Customer: <span className="font-bold text-slate-900">{srv.dropoffName}</span>
+                        return (
+                          <div
+                            key={srv.id}
+                            className="bg-white border-2 border-emerald-300/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2.5 py-1 rounded-xl text-xs font-black border flex items-center gap-1.5 ${trade.color}`}>
+                                  <span>{trade.icon}</span>
+                                  <span>{trade.label}</span>
+                                </span>
+                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 font-numbers">
+                                  <Clock className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>{srv.order?.notes || srv.pickupAddress || 'Today'}</span>
+                                </span>
+                              </div>
+                              <span className="text-emerald-700 font-black text-base font-numbers bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                                +₹{srv.deliveryFee} Payout
+                              </span>
                             </div>
-                            {srv.dropoffPhone && (
-                              <a
-                                href={`tel:${srv.dropoffPhone}`}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold flex items-center gap-1 transition-colors"
-                              >
-                                <Phone className="w-3 h-3 text-emerald-600" />
-                                <span>Call</span>
-                              </a>
-                            )}
-                          </div>
 
-                          <div className="flex gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setStartingServiceId(srv.id);
-                                await startServiceJob(srv.id);
-                                setStartingServiceId(null);
-                              }}
-                              disabled={startingServiceId === srv.id}
-                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                            >
-                              {startingServiceId === srv.id ? (
-                                <>
-                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  <span>Starting...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Navigation className="w-3.5 h-3.5" />
-                                  <span>🚀 Start Navigation & Go to Site</span>
-                                </>
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setServiceToCancel(srv)}
-                              className="px-3.5 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                            >
-                              Cancel
-                            </button>
+                            <div>
+                              <h5 className="font-extrabold text-base text-slate-900">{srv.pickupName}</h5>
+                              <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
+                              </p>
+                            </div>
+
+                            {/* Customer Contact & Navigation Bar (Fully Unlocked Post-Acceptance) */}
+                            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 font-semibold">Customer Details:</span>
+                                <span className="font-black text-slate-900">{srv.dropoffName} {cleanPhone ? `(${cleanPhone})` : ''}</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/60">
+                                {cleanPhone && (
+                                  <>
+                                    <a
+                                      href={`tel:${cleanPhone}`}
+                                      className="flex-1 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                      title="Call Customer"
+                                    >
+                                      <Phone className="w-3.5 h-3.5 text-blue-600" />
+                                      <span>Call</span>
+                                    </a>
+                                    <a
+                                      href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${srv.dropoffName}, I am your ShopIndia service technician for your appointment today (${srv.pickupName}).`)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex-1 py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                      title="WhatsApp Customer"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>WhatsApp</span>
+                                    </a>
+                                  </>
+                                )}
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                  title="Google Maps Navigation"
+                                >
+                                  <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Maps</span>
+                                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                                </a>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setStartingServiceId(srv.id);
+                                  await startServiceJob(srv.id);
+                                  setStartingServiceId(null);
+                                }}
+                                disabled={startingServiceId === srv.id}
+                                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                              >
+                                {startingServiceId === srv.id ? (
+                                  <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <span>Starting...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Navigation className="w-3.5 h-3.5" />
+                                    <span>🚀 Start Work & Travel to Site</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setServiceToCancel(srv)}
+                                className="px-3.5 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -618,43 +676,97 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
-                      {groupedServices.tomorrow.map((srv) => (
-                        <div
-                          key={srv.id}
-                          className="bg-white border border-blue-200 rounded-2xl p-4 shadow-xs space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 rounded-lg text-xs font-bold flex items-center gap-1.5 font-numbers">
-                              <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                              <span>{srv.order?.notes || srv.pickupAddress || 'Tomorrow'}</span>
-                            </span>
-                            <span className="text-emerald-700 font-black text-base font-numbers">
-                              +₹{srv.deliveryFee}
-                            </span>
-                          </div>
+                      {groupedServices.tomorrow.map((srv) => {
+                        const trade = getTradeBadge(srv.pickupName, srv.order?.items);
+                        const cleanPhone = (srv.dropoffPhone || srv.order?.customer?.phone || '').replace(/\D/g, '');
+                        const mapsUrl = srv.dropoffLat && srv.dropoffLng
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${srv.dropoffLat},${srv.dropoffLng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(srv.dropoffAddress || '')}`;
 
-                          <div>
-                            <h5 className="font-extrabold text-sm text-slate-900">{srv.pickupName}</h5>
-                            <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                              <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                            <div className="text-slate-600 font-medium">
-                              Customer: <span className="font-bold text-slate-900">{srv.dropoffName}</span>
+                        return (
+                          <div
+                            key={srv.id}
+                            className="bg-white border-2 border-blue-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2.5 py-1 rounded-xl text-xs font-black border flex items-center gap-1.5 ${trade.color}`}>
+                                  <span>{trade.icon}</span>
+                                  <span>{trade.label}</span>
+                                </span>
+                                <span className="px-2.5 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 font-numbers">
+                                  <Calendar className="w-3.5 h-3.5 text-blue-700" />
+                                  <span>{srv.order?.notes || srv.pickupAddress || 'Tomorrow'}</span>
+                                </span>
+                              </div>
+                              <span className="text-emerald-700 font-black text-base font-numbers bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                                +₹{srv.deliveryFee} Payout
+                              </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setServiceToCancel(srv)}
-                              className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-colors"
-                            >
-                              Cancel Service
-                            </button>
+
+                            <div>
+                              <h5 className="font-extrabold text-base text-slate-900">{srv.pickupName}</h5>
+                              <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
+                              </p>
+                            </div>
+
+                            {/* Customer Contact & Navigation Bar (Fully Unlocked Post-Acceptance) */}
+                            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 font-semibold">Customer Details:</span>
+                                <span className="font-black text-slate-900">{srv.dropoffName} {cleanPhone ? `(${cleanPhone})` : ''}</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/60">
+                                {cleanPhone && (
+                                  <>
+                                    <a
+                                      href={`tel:${cleanPhone}`}
+                                      className="flex-1 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                      title="Call Customer"
+                                    >
+                                      <Phone className="w-3.5 h-3.5 text-blue-600" />
+                                      <span>Call</span>
+                                    </a>
+                                    <a
+                                      href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${srv.dropoffName}, I am your ShopIndia service technician assigned for your appointment tomorrow (${srv.pickupName}).`)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex-1 py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                      title="WhatsApp Customer"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>WhatsApp</span>
+                                    </a>
+                                  </>
+                                )}
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                  title="Google Maps Navigation"
+                                >
+                                  <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Maps</span>
+                                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                                </a>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setServiceToCancel(srv)}
+                                className="px-3.5 py-2 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Cancel Service
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -670,43 +782,97 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
-                      {groupedServices.upcoming.map((srv) => (
-                        <div
-                          key={srv.id}
-                          className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="px-2.5 py-0.5 bg-slate-100 text-slate-800 rounded-lg text-xs font-bold flex items-center gap-1.5 font-numbers">
-                              <Clock className="w-3.5 h-3.5 text-slate-600" />
-                              <span>{srv.order?.notes || srv.pickupAddress || 'Upcoming Slot'}</span>
-                            </span>
-                            <span className="text-emerald-700 font-black text-base font-numbers">
-                              +₹{srv.deliveryFee}
-                            </span>
-                          </div>
+                      {groupedServices.upcoming.map((srv) => {
+                        const trade = getTradeBadge(srv.pickupName, srv.order?.items);
+                        const cleanPhone = (srv.dropoffPhone || srv.order?.customer?.phone || '').replace(/\D/g, '');
+                        const mapsUrl = srv.dropoffLat && srv.dropoffLng
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${srv.dropoffLat},${srv.dropoffLng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(srv.dropoffAddress || '')}`;
 
-                          <div>
-                            <h5 className="font-extrabold text-sm text-slate-900">{srv.pickupName}</h5>
-                            <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                              <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                            <div className="text-slate-600 font-medium">
-                              Customer: <span className="font-bold text-slate-900">{srv.dropoffName}</span>
+                        return (
+                          <div
+                            key={srv.id}
+                            className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2.5 py-1 rounded-xl text-xs font-black border flex items-center gap-1.5 ${trade.color}`}>
+                                  <span>{trade.icon}</span>
+                                  <span>{trade.label}</span>
+                                </span>
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 font-numbers">
+                                  <Clock className="w-3.5 h-3.5 text-slate-600" />
+                                  <span>{srv.order?.notes || srv.pickupAddress || 'Upcoming Slot'}</span>
+                                </span>
+                              </div>
+                              <span className="text-emerald-700 font-black text-base font-numbers bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                                +₹{srv.deliveryFee} Payout
+                              </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setServiceToCancel(srv)}
-                              className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-colors"
-                            >
-                              Cancel Service
-                            </button>
+
+                            <div>
+                              <h5 className="font-extrabold text-base text-slate-900">{srv.pickupName}</h5>
+                              <p className="text-xs text-slate-600 mt-1 flex items-start gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                <span>{srv.dropoffAddress || 'Customer Doorstep'}</span>
+                              </p>
+                            </div>
+
+                            {/* Customer Contact & Navigation Bar (Fully Unlocked Post-Acceptance) */}
+                            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 font-semibold">Customer Details:</span>
+                                <span className="font-black text-slate-900">{srv.dropoffName} {cleanPhone ? `(${cleanPhone})` : ''}</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/60">
+                                {cleanPhone && (
+                                  <>
+                                    <a
+                                      href={`tel:${cleanPhone}`}
+                                      className="flex-1 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                      title="Call Customer"
+                                    >
+                                      <Phone className="w-3.5 h-3.5 text-blue-600" />
+                                      <span>Call</span>
+                                    </a>
+                                    <a
+                                      href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${srv.dropoffName}, I am your ShopIndia service technician assigned for your upcoming appointment (${srv.pickupName}).`)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex-1 py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                      title="WhatsApp Customer"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>WhatsApp</span>
+                                    </a>
+                                  </>
+                                )}
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                                  title="Google Maps Navigation"
+                                >
+                                  <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Maps</span>
+                                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                                </a>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setServiceToCancel(srv)}
+                                className="px-3.5 py-2 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Cancel Service
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
