@@ -4,6 +4,7 @@ import {
   ShieldCheck, RefreshCw, Zap, Phone, MessageCircle, Info,
   UserX, UserCheck, ExternalLink, Store, Bike, CheckCircle2, Clock, FileText
 } from 'lucide-react';
+import { VendorLedgerModal } from '../../admin/components/VendorLedgerModal';
 
 interface TerritoryPayoutRequest {
   id: string;
@@ -39,6 +40,7 @@ export const RegionalPayouts: React.FC<RegionalPayoutsProps> = ({ onOpenStatemen
   const [inspectPartner, setInspectPartner] = useState<any | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<{ id: string; name: string; partyType: 'VENDOR' | 'RIDER'; isSuspended: boolean } | null>(null);
   const [suspending, setSuspending] = useState<boolean>(false);
+  const [vendorLedgerId, setVendorLedgerId] = useState<string | null>(null);
 
   const loadTerritoryPayouts = async () => {
     setLoading(true);
@@ -266,17 +268,21 @@ export const RegionalPayouts: React.FC<RegionalPayoutsProps> = ({ onOpenStatemen
                             <span>Info</span>
                           </button>
 
-                          {onOpenStatement && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenStatement(r.partyType, isVendor ? r.vendor.id : r.riderProfile.id, partnerName)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold transition-colors cursor-pointer"
-                              title="View Complete Double-Entry Passbook Statement"
-                            >
-                              <FileText className="w-3 h-3 text-emerald-600" />
-                              <span>Statement</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isVendor) {
+                                setVendorLedgerId(r.vendor?.id || r.partyId);
+                              } else if (onOpenStatement) {
+                                onOpenStatement(r.partyType, r.riderProfile?.id || r.partyId, partnerName);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold transition-colors cursor-pointer"
+                            title="View Complete Merchant Ledger & Orders Statement"
+                          >
+                            <FileText className="w-3 h-3 text-emerald-600" />
+                            <span>Statement</span>
+                          </button>
                         </div>
                       </td>
 
@@ -330,17 +336,21 @@ export const RegionalPayouts: React.FC<RegionalPayoutsProps> = ({ onOpenStatemen
                             </span>
                           ) : (
                             <>
-                              {onOpenStatement && (
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenStatement(r.partyType, isVendor ? r.vendor.id : r.riderProfile.id, partnerName)}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] border border-slate-200 transition-all cursor-pointer flex items-center gap-1"
-                                  title="Check complete passbook ledger before verifying"
-                                >
-                                  <FileText className="w-3 h-3 text-slate-500" />
-                                  <span>Statement</span>
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isVendor) {
+                                    setVendorLedgerId(r.vendor?.id || r.partyId);
+                                  } else if (onOpenStatement) {
+                                    onOpenStatement(r.partyType, r.riderProfile?.id || r.partyId, partnerName);
+                                  }
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] border border-slate-200 transition-all cursor-pointer flex items-center gap-1"
+                                title="Check complete vendor ledger before verifying"
+                              >
+                                <FileText className="w-3 h-3 text-slate-500" />
+                                <span>Statement</span>
+                              </button>
 
                               <button
                                 onClick={() => {
@@ -693,6 +703,11 @@ export const RegionalPayouts: React.FC<RegionalPayoutsProps> = ({ onOpenStatemen
             </div>
           </div>
         </div>
+      )}
+
+      {/* Vendor Statement & Ledger Modal */}
+      {vendorLedgerId && (
+        <VendorLedgerModal vendorId={vendorLedgerId} onClose={() => setVendorLedgerId(null)} />
       )}
     </div>
   );

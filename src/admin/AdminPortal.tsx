@@ -14,7 +14,6 @@ import { PricingSettingsPage } from './pages/PricingSettingsPage';
 import { RidersPage } from './pages/RidersPage';
 import { RegionalAdminsPage } from './pages/RegionalAdminsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
-import { OffersPage } from './pages/OffersPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { AdminVendorView } from './pages/AdminVendorView';
@@ -49,7 +48,6 @@ const TAB_TITLES: Record<string, string> = {
   'service-areas': 'Service Areas',
   support: 'Support Queue',
   promotions: 'Promotions',
-  offers: 'Offers & Coupons',
   notifications: 'Broadcast Alerts',
 };
 
@@ -146,7 +144,6 @@ const AdminContent: React.FC = () => {
       case 'riders': return <RidersPage />;
       case 'promotions': return <PromotionsPage />;
       case 'notifications': return <NotificationsPage />;
-      case 'offers': return <OffersPage />;
       case 'categories': return <CategoriesPage />;
       default: return <Dashboard />;
     }

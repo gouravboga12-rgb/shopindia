@@ -959,6 +959,7 @@ router.get(['/scheduled-services', '/orders/scheduled-services'], async (req, re
     const profile = await getRiderProfile(req.user.userId);
     if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
 
+    // 1. Fetch appointments already claimed / assigned to this technician
     const deliveries = await prisma.delivery.findMany({
       where: {
         riderProfileId: profile.id,
@@ -975,6 +976,59 @@ router.get(['/scheduled-services', '/orders/scheduled-services'], async (req, re
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // 2. Fetch available / unclaimed scheduled service opportunities in the technician's area
+    let availableServices = [];
+    const isServiceCapable = profile.partnerType === 'both' || profile.partnerType === 'service';
+    if (isServiceCapable) {
+      const openBroadcasts = await prisma.delivery.findMany({
+        where: {
+          status: 'broadcasted',
+          riderProfileId: null,
+          order: { type: 'hvac_service' },
+        },
+        include: {
+          order: {
+            include: {
+              items: true,
+              customer: { select: { id: true, name: true, phone: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+
+      const riderLat = profile.currentLat;
+      const riderLng = profile.currentLng;
+      const maxRadius = profile.serviceRadiusKm || 50;
+
+      availableServices = openBroadcasts.filter((del) => {
+        // Match skills
+        if (profile.skills && profile.skills.length > 0) {
+          const serviceTitle = del.pickupName || '';
+          const itemNames = (del.order?.items || []).map(i => i.name).join(' ');
+          const combinedText = `${serviceTitle} ${itemNames}`.toLowerCase();
+          const hasSkillMatch = profile.skills.some(skill => {
+            const s = (skill || '').toLowerCase().trim();
+            if (s === 'all' || s === 'all_round' || s === 'general') return true;
+            const keywords = SKILL_KEYWORDS[s] || [s];
+            return keywords.some(kw => combinedText.includes(kw));
+          });
+          if (!hasSkillMatch && !profile.skills.includes('general') && !profile.skills.includes('all')) {
+            return false;
+          }
+        }
+
+        // Match radius
+        if (riderLat && riderLng && del.pickupLat && del.pickupLng) {
+          const dist = calculateHaversineDistanceKm(riderLat, riderLng, del.pickupLat, del.pickupLng);
+          if (dist > maxRadius) return false;
+        }
+
+        return true;
+      });
+    }
 
     const nowIST = new Date(Date.now() + 5.5 * 3600 * 1000);
     const todayStr = nowIST.toISOString().split('T')[0];
@@ -999,6 +1053,8 @@ router.get(['/scheduled-services', '/orders/scheduled-services'], async (req, re
     res.json({
       success: true,
       services: deliveries,
+      available: availableServices,
+      totalCount: deliveries.length + availableServices.length,
       grouped: {
         today: todayList,
         tomorrow: tomorrowList,

@@ -242,7 +242,7 @@ export const ServicesManagementPage: React.FC = () => {
             <span>Services &amp; Repairs Catalog</span>
           </h1>
           <p className="text-sm text-gray-500">
-            Centrally manage doorstep rate cards, duration estimates, and customer appointment time slots
+            Centrally manage doorstep rate cards, duration estimates, and dynamic customer booking modes
           </p>
         </div>
 
@@ -589,7 +589,7 @@ export const ServicesManagementPage: React.FC = () => {
                         type="button"
                         onClick={() => openEditModal(s)}
                         className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer"
-                        title="Edit Service & Slots"
+                        title="Edit Service & Pricing"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -625,7 +625,7 @@ export const ServicesManagementPage: React.FC = () => {
                     {editingService ? 'Edit Doorstep Service' : 'Add New Doorstep Service'}
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Configure labor price, timing slots, and duration
+                    Configure labor price, booking modes, and duration
                   </p>
                 </div>
               </div>

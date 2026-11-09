@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, Store, Package, ShoppingBag,
   MapPin, Headphones, Percent, LogOut,
-  Truck, Tag, Bell, LayoutGrid, Image, Globe2,
+  Truck, Bell, LayoutGrid, Image, Globe2,
   DollarSign, CreditCard, Bike, Banknote, Wrench, AlertOctagon, X
 } from 'lucide-react';
 
@@ -42,7 +42,6 @@ export const AdminSidebar: React.FC<SidebarProps> = ({
     { id: 'service-areas', label: 'Service Areas', icon: MapPin, perm: 'manage_service_areas' },
     { id: 'support', label: 'Support Queue', icon: Headphones, perm: 'view_support' },
     { id: 'promotions', label: 'Promotions', icon: Image, perm: 'manage_commissions' },
-    { id: 'offers', label: 'Offers & Coupons', icon: Tag, perm: 'manage_commissions' },
     { id: 'notifications', label: 'Notifications', icon: Bell, perm: 'manage_users' },
   ];
 

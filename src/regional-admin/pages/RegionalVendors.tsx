@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Store, Phone, Package, MapPin, MessageCircle, ExternalLink, Zap, ShoppingBag, FileText } from 'lucide-react';
+import { VendorLedgerModal } from '../../admin/components/VendorLedgerModal';
 
 interface VendorItem {
   id: string;
@@ -31,10 +32,11 @@ interface RegionalVendorsProps {
   onOpenStatement?: (partyType: string, partyId: string, name?: string) => void;
 }
 
-export const RegionalVendors: React.FC<RegionalVendorsProps> = ({ onOpenStatement }) => {
+export const RegionalVendors: React.FC<RegionalVendorsProps> = ({ onOpenStatement: _onOpenStatement }) => {
   const { token } = useAuth();
   const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vendorLedgerId, setVendorLedgerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -129,17 +131,15 @@ export const RegionalVendors: React.FC<RegionalVendorsProps> = ({ onOpenStatemen
                         </>
                       )}
 
-                      {onOpenStatement && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenStatement('VENDOR', vendor.id, vendor.businessName)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-xl border border-slate-200 hover:border-emerald-300 text-xs font-bold transition-colors cursor-pointer"
-                          title="View Merchant Passbook Statement"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Statement</span>
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setVendorLedgerId(vendor.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-xl border border-slate-200 hover:border-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                        title="View Merchant Statement & Orders Ledger"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Statement</span>
+                      </button>
                     </div>
                   </div>
 
@@ -200,6 +200,11 @@ export const RegionalVendors: React.FC<RegionalVendorsProps> = ({ onOpenStatemen
             );
           })}
         </div>
+      )}
+
+      {/* Vendor Statement & Ledger Modal */}
+      {vendorLedgerId && (
+        <VendorLedgerModal vendorId={vendorLedgerId} onClose={() => setVendorLedgerId(null)} />
       )}
     </div>
   );

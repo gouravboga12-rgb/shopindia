@@ -4,25 +4,23 @@ import { useApp } from '../../context/AppContext';
 import { SectionCard, Badge, statusTone } from '../../components/dashboard/DashboardUI';
 import type { DashboardTab } from '../../components/dashboard/DashboardLayout';
 import {
-  Package, Heart, ShoppingCart, BadgeIndianRupee, Ticket,
+  Package, Heart, ShoppingCart,
   ArrowRight, ChevronRight,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const OverviewPage: React.FC<{ onNavigate: (t: DashboardTab) => void }> = ({ onNavigate }) => {
-  const { profile, points, notifications, coupons, unread, wishlist } = useCustomer();
+  const { profile, notifications, unread, wishlist } = useCustomer();
   const { cart, orders } = useApp();
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const recentOrders = [...orders].slice(0, 3);
-  const activeCoupons = coupons.filter((c) => c.state === 'available').slice(0, 3);
-  const recentNotifs = notifications.slice(0, 3);
+  const recentNotifs = notifications.slice(0, 4);
 
   const stats = [
     { icon: <Package className="w-5 h-5 text-brand-blue" />, label: 'Orders', value: String(orders.length), onClick: () => onNavigate('orders') },
     { icon: <Heart className="w-5 h-5 text-red-500" />, label: 'Wishlist', value: String(wishlist.length), onClick: () => onNavigate('wishlist') },
     { icon: <ShoppingCart className="w-5 h-5 text-emerald-600" />, label: 'Cart', value: String(cartCount), onClick: () => onNavigate('cart') },
-    { icon: <BadgeIndianRupee className="w-5 h-5 text-indigo-600" />, label: 'Points', value: points.toLocaleString('en-IN'), onClick: () => onNavigate('coupons') },
   ];
 
   return (
@@ -38,7 +36,7 @@ export const OverviewPage: React.FC<{ onNavigate: (t: DashboardTab) => void }> =
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((s, i) => (
           <motion.button 
             key={i} 
@@ -121,45 +119,25 @@ export const OverviewPage: React.FC<{ onNavigate: (t: DashboardTab) => void }> =
         )}
       </SectionCard>
 
-      {/* Active Coupons + Notifications */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Active Coupons" subtitle="Available to redeem" action={<button onClick={() => onNavigate('coupons')} className="text-xs font-bold text-brand-blue inline-flex items-center gap-1">All <ChevronRight className="w-3 h-3" /></button>}>
-          <div className="flex flex-col gap-2.5">
-            {activeCoupons.map((c) => (
-              <div key={c.id} className="flex items-center justify-between border border-dashed border-brand-border rounded-xl px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-brand-orange/10 flex items-center justify-center text-brand-orange"><Ticket className="w-4 h-4" /></div>
-                  <div>
-                    <p className="text-xs font-extrabold font-numbers text-brand-graphite">{c.code}</p>
-                    <p className="text-xs text-brand-slate">{c.title}</p>
-                  </div>
-                </div>
-                <span className="text-xs text-brand-orange font-bold">-{c.discountValue}{c.discountType === 'PERCENTAGE' ? '%' : ''}</span>
+      {/* Recent Notifications */}
+      <SectionCard
+        title="Recent Notifications"
+        subtitle={`${unread} unread`}
+        action={<button onClick={() => onNavigate('notifications')} className="text-xs font-bold text-brand-blue inline-flex items-center gap-1">View all <ChevronRight className="w-3 h-3" /></button>}
+      >
+        <div className="flex flex-col gap-3">
+          {recentNotifs.map((n) => (
+            <div key={n.id} className="flex items-start gap-3">
+              <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.isRead ? 'bg-slate-200' : 'bg-brand-blue'}`} />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-brand-graphite">{n.title}</p>
+                <p className="text-xs text-brand-slate line-clamp-1">{n.message}</p>
               </div>
-            ))}
-            {activeCoupons.length === 0 && <p className="text-xs text-brand-slate">No active coupons.</p>}
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Recent Notifications"
-          subtitle={`${unread} unread`}
-          action={<button onClick={() => onNavigate('notifications')} className="text-xs font-bold text-brand-blue inline-flex items-center gap-1">View all <ChevronRight className="w-3 h-3" /></button>}
-        >
-          <div className="flex flex-col gap-3">
-            {recentNotifs.map((n) => (
-              <div key={n.id} className="flex items-start gap-3">
-                <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.isRead ? 'bg-slate-200' : 'bg-brand-blue'}`} />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-brand-graphite">{n.title}</p>
-                  <p className="text-xs text-brand-slate line-clamp-1">{n.message}</p>
-                </div>
-              </div>
-            ))}
-            {notifications.length === 0 && <p className="text-xs text-brand-slate">No notifications.</p>}
-          </div>
-        </SectionCard>
-      </div>
+            </div>
+          ))}
+          {notifications.length === 0 && <p className="text-xs text-brand-slate">No notifications.</p>}
+        </div>
+      </SectionCard>
     </div>
   );
 };

@@ -10,7 +10,7 @@ function getToken(path: string): string | null {
     return localStorage.getItem('shopindia_vendor_token');
   }
   if (path.startsWith('/api/admin')) {
-    return localStorage.getItem('shopindia_admin_token');
+    return localStorage.getItem('shopindia_admin_token') || localStorage.getItem('shopindia_regional_admin_token');
   }
   if (path.startsWith('/api/regional-admin')) {
     return localStorage.getItem('shopindia_regional_admin_token') || localStorage.getItem('shopindia_admin_token');

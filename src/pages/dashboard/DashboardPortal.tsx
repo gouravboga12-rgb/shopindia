@@ -9,7 +9,6 @@ import { CartPage } from './Cart';
 import { RecentlyViewedPage } from './RecentlyViewed';
 import { AddressesPage } from './Addresses';
 import { NotificationsPage } from './Notifications';
-import { CouponsRewardsPage } from './CouponsRewards';
 import { ProfileSettingsPage } from './ProfileSettings';
 import { SecurityPage } from './Security';
 import { SupportCenterPage } from './Support';
@@ -23,7 +22,6 @@ const Content: React.FC<{ tab: DashboardTab; onNavigate: (t: DashboardTab) => vo
     case 'recently-viewed': return <RecentlyViewedPage />;
     case 'addresses': return <AddressesPage />;
     case 'notifications': return <NotificationsPage />;
-    case 'coupons': return <CouponsRewardsPage />;
     case 'profile': return <ProfileSettingsPage onNavigate={onNavigate} />;
     case 'security': return <SecurityPage />;
     case 'support': return <SupportCenterPage />;

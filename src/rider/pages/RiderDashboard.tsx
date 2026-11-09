@@ -70,7 +70,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
         const res: any = await api.get('/api/rider/orders/scheduled-services').catch(() => api.get('/api/rider/scheduled-services'));
         if (res?.success) {
           const allServices = res.services || [];
-          setTotalScheduledCount(allServices.length);
+          setTotalScheduledCount(res.totalCount ?? allServices.length);
           const todayList = res.grouped?.today || [];
 
           // Current IST time calculation
