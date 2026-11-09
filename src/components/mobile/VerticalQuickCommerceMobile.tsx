@@ -10,6 +10,7 @@ import {
 import type { Product } from '../../data/types';
 import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
 import { PrescriptionUploadModal } from '../common/PrescriptionUploadModal';
+import { PlatformOperatingHoursModal } from '../common/PlatformOperatingHoursModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 
 type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
@@ -33,6 +34,28 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
   const [rxModalOpen, setRxModalOpen] = useState(false);
   const [selectedRxProduct, setSelectedRxProduct] = useState<Product | null>(null);
+
+  // Operating Hours (Midnight Blackout & Friday Prayer Break)
+  const [operatingStatus, setOperatingStatus] = useState<any>(null);
+  const [operatingModalOpen, setOperatingModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    fetch('/api/orders/pricing-config')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.operatingStatus) {
+          setOperatingStatus(d.operatingStatus);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const isTarget = (target: string) => target === 'both' || target === 'quick';
+  const isShuttersDown = Boolean(
+    (operatingStatus?.midnightBlackout?.isActive && isTarget(operatingStatus.midnightBlackout.verticals)) ||
+    (operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals))
+  );
+  const isFridayBreak = Boolean(operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals));
 
   const handleSubVerticalChange = (sub: QuickSubVertical) => {
     setActiveSubVertical(sub);
@@ -69,6 +92,10 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
 
   const handleAddToCartWithCustomization = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isShuttersDown) {
+      setOperatingModalOpen(true);
+      return;
+    }
     if (!requireCustomerAuth('add quick commerce items to your cart')) return;
     if (activeSubVertical === 'food') {
       setCustomizingProduct(product);
@@ -169,6 +196,37 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
             className="px-3 py-1.5 bg-white text-blue-800 font-extrabold text-[11px] rounded-xl shadow-sm hover:bg-blue-50 shrink-0"
           >
             Upload Rx
+          </button>
+        </div>
+      )}
+
+      {/* Operating Hours Shutters-Down Banner (Mobile Zepto / Blinkit style) */}
+      {isShuttersDown && (
+        <div className="bg-slate-900 text-white p-3.5 rounded-2xl border border-amber-500/40 shadow-lg flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0">
+              {isFridayBreak ? '🕌' : '🔒'}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 font-extrabold text-[9px] uppercase tracking-wider rounded">
+                  {isFridayBreak ? 'Friday Break' : 'Closed for the Night'}
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white mt-0.5">
+                {isFridayBreak ? operatingStatus?.fridayBreak?.title : (operatingStatus?.midnightBlackout?.title || "Closed for the day!")}
+              </h4>
+              <p className="text-[10px] text-slate-300 line-clamp-1">
+                Ordering paused • Tap to see reopening time
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setOperatingModalOpen(true)}
+            className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] rounded-xl transition-all shrink-0 cursor-pointer shadow-sm"
+          >
+            Opening Time
           </button>
         </div>
       )}
@@ -359,6 +417,14 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
         onUploadSuccess={() => {
           if (selectedRxProduct) addToCart(selectedRxProduct);
         }}
+      />
+
+      {/* Operating Hours Shutters Down Modal */}
+      <PlatformOperatingHoursModal
+        isOpen={operatingModalOpen}
+        onClose={() => setOperatingModalOpen(false)}
+        status={operatingStatus}
+        vertical="quick"
       />
     </div>
   );

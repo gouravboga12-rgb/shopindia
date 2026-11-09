@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import type { Product } from '../../data/types';
 import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
 import { PrescriptionUploadModal } from '../common/PrescriptionUploadModal';
+import { PlatformOperatingHoursModal } from '../common/PlatformOperatingHoursModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 
 type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
@@ -59,6 +60,28 @@ export const VerticalQuickCommerce: React.FC = () => {
   const [rxModalOpen, setRxModalOpen] = useState(false);
   const [selectedRxProduct, setSelectedRxProduct] = useState<Product | null>(null);
 
+  // Operating Hours (Midnight Blackout & Friday Prayer Break)
+  const [operatingStatus, setOperatingStatus] = useState<any>(null);
+  const [operatingModalOpen, setOperatingModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    fetch('/api/orders/pricing-config')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.operatingStatus) {
+          setOperatingStatus(d.operatingStatus);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const isTarget = (target: string) => target === 'both' || target === 'quick';
+  const isShuttersDown = Boolean(
+    (operatingStatus?.midnightBlackout?.isActive && isTarget(operatingStatus.midnightBlackout.verticals)) ||
+    (operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals))
+  );
+  const isFridayBreak = Boolean(operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals));
+
   // Reset category filter on sub-vertical change
   const handleSubVerticalChange = (sub: QuickSubVertical) => {
     setActiveSubVertical(sub);
@@ -97,6 +120,10 @@ export const VerticalQuickCommerce: React.FC = () => {
 
   const handleAddToCartWithCustomization = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isShuttersDown) {
+      setOperatingModalOpen(true);
+      return;
+    }
     if (!requireCustomerAuth('add quick commerce items to your cart')) return;
     if (activeSubVertical === 'food') {
       setCustomizingProduct(product);
@@ -223,6 +250,41 @@ export const VerticalQuickCommerce: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Operating Hours Shutters-Down Banner (Zepto / Blinkit style) */}
+      {isShuttersDown && (
+        <div className="max-w-[1440px] mx-auto w-full px-8 pt-4">
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl border border-amber-500/40 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl shrink-0 border border-amber-500/30">
+                {isFridayBreak ? '🕌' : '🔒'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-extrabold text-[10px] uppercase tracking-wider rounded-md border border-amber-500/30">
+                    {isFridayBreak ? 'Friday Prayer Break' : 'Closed for the Night'}
+                  </span>
+                  <span className="text-xs text-slate-300 font-medium">Browsing mode only • Ordering paused</span>
+                </div>
+                <h3 className="text-base font-black text-white mt-0.5">
+                  {isFridayBreak ? operatingStatus?.fridayBreak?.title : (operatingStatus?.midnightBlackout?.title || "Closed for the day! We'll be back at 7 AM.")}
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {isFridayBreak ? operatingStatus?.fridayBreak?.message : (operatingStatus?.midnightBlackout?.message || "We are currently closed for the night. You can browse products; orders will reopen at 7:00 AM.")}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setOperatingModalOpen(true)}
+              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition-all shrink-0 cursor-pointer flex items-center gap-1.5 self-start sm:self-auto shadow-md"
+            >
+              <span>View Opening Time</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 3. Main Catalog Area (Aisles & Product Grid) */}
       <div className="max-w-[1440px] mx-auto w-full px-8 py-8 flex flex-col md:flex-row gap-8 items-start">
@@ -508,6 +570,14 @@ export const VerticalQuickCommerce: React.FC = () => {
             addToCart(selectedRxProduct);
           }
         }}
+      />
+
+      {/* Operating Hours Shutters Down Modal */}
+      <PlatformOperatingHoursModal
+        isOpen={operatingModalOpen}
+        onClose={() => setOperatingModalOpen(false)}
+        status={operatingStatus}
+        vertical="quick"
       />
     </div>
   );
