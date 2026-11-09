@@ -262,4 +262,163 @@ router.post('/partner/toggle-suspend', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/regional-admin/payouts/statement/:partyType/:partyId
+ * Regional Admin view of partner immutable double-entry ledger statement
+ */
+router.get('/statement/:partyType/:partyId', async (req, res) => {
+  try {
+    const { partyType, partyId } = req.params;
+    const normalizedParty = String(partyType).toUpperCase();
+
+    let accountName = '';
+    let currentBalance = 0;
+
+    if (normalizedParty === 'VENDOR') {
+      const v = await prisma.vendor.findUnique({ where: { id: partyId } });
+      if (!v) return res.status(404).json({ error: 'Vendor not found.' });
+      accountName = v.businessName;
+      currentBalance = v.walletBalance;
+    } else if (normalizedParty === 'RIDER') {
+      const r = await prisma.riderProfile.findUnique({
+        where: { id: partyId },
+        include: { user: { select: { name: true } } },
+      });
+      if (!r) return res.status(404).json({ error: 'Rider profile not found.' });
+      accountName = r.user?.name || 'Rider';
+      currentBalance = r.walletBalance;
+    }
+
+    const { startDate, endDate } = req.query;
+    let start = null;
+    let end = null;
+    if (startDate) start = new Date(startDate);
+    if (endDate) {
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    let openingBalance = 0;
+    if (start) {
+      const priorEntries = await prisma.ledgerEntry.findMany({
+        where: {
+          party: normalizedParty,
+          partyId: partyId,
+          createdAt: { lt: start },
+        },
+      });
+      priorEntries.forEach(e => {
+        openingBalance += (e.type === 'CREDIT' ? e.amount : -e.amount);
+      });
+      openingBalance = Math.round(openingBalance * 100) / 100;
+    }
+
+    const where = {
+      party: normalizedParty,
+      partyId: partyId,
+    };
+    if (start || end) {
+      where.createdAt = {};
+      if (start) where.createdAt.gte = start;
+      if (end) where.createdAt.lte = end;
+    }
+
+    const entries = await prisma.ledgerEntry.findMany({
+      where,
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            type: true,
+            customer: { select: { name: true, phone: true } },
+            items: {
+              select: {
+                id: true,
+                name: true,
+                quantity: true,
+                price: true,
+              },
+            },
+            vendor: { select: { businessName: true } },
+            delivery: {
+              select: {
+                pickupName: true,
+                dropoffName: true,
+                dropoffAddress: true,
+                deliveryFee: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let runningBalance = openingBalance;
+    const statementRows = entries.map(e => {
+      const change = e.type === 'CREDIT' ? e.amount : -e.amount;
+      runningBalance += change;
+
+      const order = e.order;
+      const orderNum = order?.orderNumber || (e.orderId ? `ORD-${e.orderId.slice(0, 8).toUpperCase()}` : null);
+
+      let cleanDesc = e.description || 'Ledger Transaction';
+      let itemsSummary = '';
+      if (order?.items && order.items.length > 0) {
+        itemsSummary = order.items.map(it => `${it.name || 'Item'} (${it.quantity}x)`).join(', ');
+      }
+
+      if (e.entryType === 'VENDOR_CREDIT') {
+        cleanDesc = orderNum ? `Vendor Earning — Order #${orderNum}` : `Vendor Earning Credit`;
+      } else if (e.entryType === 'RIDER_CREDIT') {
+        cleanDesc = orderNum ? `Delivery Trip Earning — Order #${orderNum}` : `Delivery Trip Earning Credit`;
+      } else if (e.entryType === 'PAYOUT') {
+        cleanDesc = e.description && !e.description.includes('order #') ? e.description : `Withdrawal Payout (Cleared)`;
+      } else if (e.entryType === 'PLATFORM_FEE') {
+        cleanDesc = orderNum ? `Platform Commission — Order #${orderNum}` : `Platform Commission Fee`;
+      }
+
+      cleanDesc = cleanDesc.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, (uuid) => orderNum || `#${uuid.slice(0, 8).toUpperCase()}`);
+
+      return {
+        id: e.id,
+        date: e.createdAt,
+        type: e.type,
+        entryType: e.entryType,
+        description: cleanDesc,
+        originalDescription: e.description,
+        amount: e.amount,
+        runningBalance: Math.round(runningBalance * 100) / 100,
+        orderId: e.orderId,
+        orderNumber: orderNum,
+        customerName: order?.customer?.name || null,
+        vendorName: order?.vendor?.businessName || order?.delivery?.pickupName || null,
+        dropoffAddress: order?.delivery?.dropoffAddress || null,
+        itemsSummary: itemsSummary || null,
+        orderTotal: order?.total || null,
+        metadata: e.metadata,
+      };
+    });
+
+    res.json({
+      success: true,
+      account: {
+        partyType: normalizedParty,
+        partyId,
+        accountName,
+        currentBalance,
+      },
+      openingBalance,
+      closingBalance: Math.round(runningBalance * 100) / 100,
+      entriesCount: statementRows.length,
+      statement: statementRows,
+    });
+  } catch (err) {
+    console.error('[RegionalPayouts] Statement error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch statement.' });
+  }
+});
+
 module.exports = router;

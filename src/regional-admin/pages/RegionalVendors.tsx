@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Store, Phone, Package, MapPin, MessageCircle, ExternalLink, Zap, ShoppingBag } from 'lucide-react';
+import { Store, Phone, Package, MapPin, MessageCircle, ExternalLink, Zap, ShoppingBag, FileText } from 'lucide-react';
 
 interface VendorItem {
   id: string;
@@ -27,7 +27,11 @@ interface VendorItem {
   }[];
 }
 
-export const RegionalVendors: React.FC = () => {
+interface RegionalVendorsProps {
+  onOpenStatement?: (partyType: string, partyId: string, name?: string) => void;
+}
+
+export const RegionalVendors: React.FC<RegionalVendorsProps> = ({ onOpenStatement }) => {
   const { token } = useAuth();
   const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +127,18 @@ export const RegionalVendors: React.FC = () => {
                             <MessageCircle className="w-3.5 h-3.5 text-emerald-100" />
                           </a>
                         </>
+                      )}
+
+                      {onOpenStatement && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenStatement('VENDOR', vendor.id, vendor.businessName)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-xl border border-slate-200 hover:border-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                          title="View Merchant Passbook Statement"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Statement</span>
+                        </button>
                       )}
                     </div>
                   </div>

@@ -12,10 +12,12 @@ import { RegionalRiders } from './pages/RegionalRiders';
 import { RegionalSupport } from './pages/RegionalSupport';
 import { RegionalPayouts } from './pages/RegionalPayouts';
 import { RegionalCODCollection } from './pages/RegionalCODCollection';
+import { AccountStatementPage } from '../admin/pages/AccountStatementPage';
 
 const RegionalAdminContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('dashboard');
+  const [statementTarget, setStatementTarget] = useState<{ partyType: string; partyId: string; name?: string } | null>(null);
   const [showRegister, setShowRegister] = useState(() => {
     return window.location.pathname.includes('/register') || window.location.hash.includes('/register');
   });
@@ -27,20 +29,37 @@ const RegionalAdminContent: React.FC = () => {
     return <RegionalAdminLogin onSwitchToRegister={() => setShowRegister(true)} />;
   }
 
+  const handleTabChange = (newTab: string) => {
+    setStatementTarget(null);
+    setTab(newTab);
+  };
+
   const renderTab = () => {
+    if (statementTarget) {
+      return (
+        <AccountStatementPage
+          key={`regional-statement-${statementTarget.partyType}-${statementTarget.partyId}`}
+          partyType={statementTarget.partyType}
+          partyId={statementTarget.partyId}
+          initialAccountName={statementTarget.name}
+          onBack={() => setStatementTarget(null)}
+        />
+      );
+    }
+
     switch (tab) {
       case 'dashboard':
         return <RegionalDashboard />;
       case 'live-map':
         return <RegionalLiveMap />;
       case 'vendors':
-        return <RegionalVendors />;
+        return <RegionalVendors onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'riders':
         return <RegionalRiders />;
       case 'cod-remittance':
         return <RegionalCODCollection />;
       case 'payouts':
-        return <RegionalPayouts />;
+        return <RegionalPayouts onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'support':
         return <RegionalSupport />;
       default:
@@ -51,10 +70,10 @@ const RegionalAdminContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row">
       {/* Mobile / Tablet Sticky Header */}
-      <RegionalAdminHeader currentTab={tab} onTabChange={setTab} />
+      <RegionalAdminHeader currentTab={tab} onTabChange={handleTabChange} />
 
       {/* Desktop Persistent Left Sidebar */}
-      <RegionalAdminSidebar currentTab={tab} onTabChange={setTab} />
+      <RegionalAdminSidebar currentTab={tab} onTabChange={handleTabChange} />
 
       {/* Main Content View */}
       <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 overflow-y-auto max-w-7xl mx-auto w-full">
@@ -62,7 +81,7 @@ const RegionalAdminContent: React.FC = () => {
       </main>
 
       {/* Mobile Sticky Bottom Navigation */}
-      <RegionalAdminBottomNav currentTab={tab} onTabChange={setTab} />
+      <RegionalAdminBottomNav currentTab={tab} onTabChange={handleTabChange} />
     </div>
   );
 };

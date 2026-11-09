@@ -12,7 +12,7 @@ const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 const { postLedgerEntries } = require('../../lib/ledger');
 
-router.use(verifyToken, requireRole('super_admin'));
+router.use(verifyToken, requireRole('super_admin', 'regional_admin'));
 
 /**
  * GET /api/admin/payouts
@@ -136,7 +136,7 @@ router.get('/', async (req, res) => {
  * POST /api/admin/payouts/:id/approve
  * Super Admin approves / verifies a pending payout request
  */
-router.post('/:id/approve', async (req, res) => {
+router.post('/:id/approve', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
@@ -169,7 +169,7 @@ router.post('/:id/approve', async (req, res) => {
  * Super Admin records successful disbursement (IMPS/UPI) with UTR.
  * Automatically posts immutable LedgerEntry DEBIT and updates wallet balance.
  */
-router.post('/:id/complete', async (req, res) => {
+router.post('/:id/complete', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { utr, razorpayPayoutId, utrNumber, paymentMode, notes } = req.body;
@@ -407,7 +407,7 @@ router.get('/vendor/:vendorId/ledger', async (req, res) => {
  * POST /api/admin/payouts/:id/reject
  * Reject a payout request with reason
  */
-router.post('/:id/reject', async (req, res) => {
+router.post('/:id/reject', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -761,7 +761,7 @@ router.get('/statement/:partyType/:partyId', async (req, res) => {
  * POST /api/admin/payouts/manual-adjustment
  * Post an audited manual credit or debit adjustment to any partner ledger.
  */
-router.post('/manual-adjustment', async (req, res) => {
+router.post('/manual-adjustment', requireRole('super_admin'), async (req, res) => {
   try {
     const { partyType, partyId, amount, type, reason } = req.body;
     const numAmount = parseFloat(amount);
@@ -843,7 +843,7 @@ router.post('/manual-adjustment', async (req, res) => {
  * POST /api/admin/payouts/partner/toggle-suspend
  * Super Admin toggles partner account suspension (Vendor or Rider)
  */
-router.post('/partner/toggle-suspend', async (req, res) => {
+router.post('/partner/toggle-suspend', requireRole('super_admin'), async (req, res) => {
   try {
     const { partyType, partyId, reason } = req.body;
     const normalizedParty = String(partyType).toUpperCase();

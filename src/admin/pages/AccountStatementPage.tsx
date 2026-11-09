@@ -80,7 +80,13 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
         ...(dateParams.endDate ? { endDate: dateParams.endDate } : {}),
       });
 
-      const res: any = await api.get(`/api/admin/payouts/statement/${partyType.toLowerCase()}/${partyId}?${queryParams.toString()}`);
+      const queryStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      let res: any = null;
+      try {
+        res = await api.get(`/api/admin/payouts/statement/${partyType.toLowerCase()}/${partyId}${queryStr}`);
+      } catch {
+        res = await api.get(`/api/regional-admin/payouts/statement/${partyType.toLowerCase()}/${partyId}${queryStr}`);
+      }
       if (res?.success) {
         setStatement(res.statement || []);
         setAccount(res.account);
