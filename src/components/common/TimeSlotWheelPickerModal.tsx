@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Calendar, Clock, CheckCircle2, Sparkles } from 'lucide-react';
+import { X, Calendar, Clock, CheckCircle2, Sparkles, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TimeSlotWheelPickerModalProps {
@@ -105,217 +105,242 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm select-none">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-md select-none animate-in fade-in duration-200">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.2 }}
-          className="w-full max-w-[460px] bg-[#1A1D24] text-slate-100 rounded-3xl p-6 shadow-2xl border border-slate-700/60 flex flex-col font-sans max-h-[90vh] overflow-y-auto"
+          className="relative w-full max-w-[480px] bg-white/95 backdrop-blur-2xl text-slate-800 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] border border-slate-200/90 flex flex-col font-sans overflow-hidden"
         >
-          {/* Header */}
-          <div className="flex justify-between items-start pb-4 border-b border-slate-800">
+          {/* Header with ShopIndia Branding */}
+          <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between bg-gradient-to-r from-orange-50/70 via-white to-amber-50/70 shrink-0">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 bg-teal-500/20 text-teal-300 font-black text-[10px] rounded-full uppercase tracking-wider border border-teal-500/30">
+                <span className="px-2.5 py-0.5 bg-orange-100 text-[#FF6B00] font-black text-[10px] rounded-full uppercase tracking-wider border border-orange-200/80">
                   Glacons Appointment
                 </span>
-                <span className="text-xs text-amber-400 font-extrabold">₹{price}</span>
+                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  ₹{price}
+                </span>
               </div>
-              <h3 className="font-bold text-base text-white">{serviceTitle}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Select your preferred date & 2-hour arrival window</p>
+              <h3 className="font-extrabold text-base text-slate-900 leading-snug">{serviceTitle}</h3>
+              <p className="text-xs text-slate-500 mt-0.5 font-medium">Select your preferred date & 2-hour arrival window</p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 -mr-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              aria-label="Close"
             >
               <X size={18} />
             </button>
           </div>
 
-          {/* 1. Date Selector Pills */}
-          <div className="py-4 border-b border-slate-800/80">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Calendar size={14} className="text-teal-400" />
-              <span>Select Date</span>
-            </span>
-
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 mt-2">
-              {dateOptions.map((opt, idx) => {
-                const isSelected = selectedDateIdx === idx;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedDateIdx(idx);
-                      // If switching to Friday and selected slot is 12-2 PM, fallback to 2-4 PM
-                      if (opt.isFriday && selectedSlot.includes('12:00 PM')) {
-                        setSelectedSlot('02:00 PM - 04:00 PM');
-                      }
-                    }}
-                    className={`py-2.5 px-2 rounded-2xl flex flex-col items-center justify-center transition-all ${
-                      isSelected
-                        ? 'bg-teal-500 text-slate-950 font-black shadow-lg shadow-teal-500/25 ring-2 ring-teal-400'
-                        : 'bg-[#252A34] text-slate-300 hover:bg-[#2D333F]'
-                    }`}
-                  >
-                    <span className="text-[11px] font-bold leading-tight">{opt.label}</span>
-                    <span className={`text-[10px] mt-0.5 ${isSelected ? 'text-slate-900 font-extrabold' : 'text-slate-400'}`}>
-                      {opt.subLabel}
-                    </span>
-                    {opt.isFriday && (
-                      <span className="text-[9px] text-amber-300 font-bold mt-0.5">🕌 Fri</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 2. Slot Selector Chips */}
-          <div className="py-4 space-y-4">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Clock size={14} className="text-teal-400" />
-              <span>Select 2-Hour Arrival Window</span>
-            </span>
-
-            {/* Morning */}
-            <div>
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
-                Morning
+          {/* Scrollable Body */}
+          <div className="max-h-[68vh] overflow-y-auto px-6 py-4 space-y-4">
+            {/* 1. Date Selector Pills */}
+            <div className="space-y-2">
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={14} className="text-[#FF6B00]" />
+                <span>Select Date</span>
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {standardSlots.filter(s => s.period === 'morning').map(slot => {
-                  const check = isSlotDisabled(slot);
-                  const isSelected = selectedSlot === slot.timeRange;
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {dateOptions.map((opt, idx) => {
+                  const isSelected = selectedDateIdx === idx;
                   return (
                     <button
-                      key={slot.id}
+                      key={opt.key}
                       type="button"
-                      disabled={check.disabled}
-                      onClick={() => setSelectedSlot(slot.timeRange)}
-                      className={`py-3 px-3.5 rounded-xl text-left border flex items-center justify-between transition-all ${
-                        check.disabled
-                          ? 'opacity-40 bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed'
-                          : isSelected
-                          ? 'bg-teal-950/60 border-teal-400 text-teal-200 font-bold shadow-sm'
-                          : 'bg-[#252A34] border-slate-700/60 text-slate-300 hover:border-slate-500'
+                      onClick={() => {
+                        setSelectedDateIdx(idx);
+                        if (opt.isFriday && selectedSlot.includes('12:00 PM')) {
+                          setSelectedSlot('02:00 PM - 04:00 PM');
+                        }
+                      }}
+                      className={`py-2.5 px-1.5 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#FF6B00] text-white font-black shadow-md shadow-orange-500/30 ring-2 ring-orange-300 scale-[1.02]'
+                          : 'bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-700'
                       }`}
                     >
-                      <span className="text-xs">{slot.timeRange}</span>
-                      {check.disabled ? (
-                        <span className="text-[10px] text-rose-400 font-bold">{check.reason}</span>
-                      ) : isSelected ? (
-                        <CheckCircle2 size={15} className="text-teal-400" />
-                      ) : null}
+                      <span className="text-[11px] font-extrabold leading-tight">{opt.label}</span>
+                      <span
+                        className={`text-[10px] mt-0.5 ${
+                          isSelected ? 'text-orange-100 font-bold' : 'text-slate-500 font-medium'
+                        }`}
+                      >
+                        {opt.subLabel}
+                      </span>
+                      {opt.isFriday && (
+                        <span
+                          className={`text-[9px] font-extrabold mt-0.5 px-1 rounded ${
+                            isSelected ? 'bg-white/20 text-white' : 'text-emerald-700 bg-emerald-50'
+                          }`}
+                        >
+                          🕌 Fri
+                        </span>
+                      )}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Afternoon */}
-            <div>
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
-                Afternoon
+            {/* 2. Slot Selector Chips */}
+            <div className="space-y-3.5 pt-1">
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock size={14} className="text-[#FF6B00]" />
+                <span>Select 2-Hour Arrival Window</span>
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {standardSlots.filter(s => s.period === 'afternoon').map(slot => {
-                  const check = isSlotDisabled(slot);
-                  const isSelected = selectedSlot === slot.timeRange;
-                  return (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      disabled={check.disabled}
-                      onClick={() => setSelectedSlot(slot.timeRange)}
-                      className={`py-3 px-3.5 rounded-xl text-left border flex items-center justify-between transition-all ${
-                        check.disabled
-                          ? 'opacity-45 bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed'
-                          : isSelected
-                          ? 'bg-teal-950/60 border-teal-400 text-teal-200 font-bold shadow-sm'
-                          : 'bg-[#252A34] border-slate-700/60 text-slate-300 hover:border-slate-500'
-                      }`}
-                    >
-                      <span className="text-xs">{slot.timeRange}</span>
-                      {check.disabled ? (
-                        <span className="text-[10px] text-amber-300 font-bold">{check.reason}</span>
-                      ) : isSelected ? (
-                        <CheckCircle2 size={15} className="text-teal-400" />
-                      ) : null}
-                    </button>
-                  );
-                })}
+
+              {/* Morning */}
+              <div>
+                <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Morning
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {standardSlots
+                    .filter((s) => s.period === 'morning')
+                    .map((slot) => {
+                      const check = isSlotDisabled(slot);
+                      const isSelected = selectedSlot === slot.timeRange;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={check.disabled}
+                          onClick={() => setSelectedSlot(slot.timeRange)}
+                          className={`py-2.5 px-3 rounded-xl text-left border flex items-center justify-between transition-all cursor-pointer ${
+                            check.disabled
+                              ? 'opacity-40 bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : isSelected
+                              ? 'bg-orange-50/80 border-2 border-[#FF6B00] text-orange-950 font-bold shadow-xs'
+                              : 'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="text-xs font-bold">{slot.timeRange}</span>
+                          {check.disabled ? (
+                            <span className="text-[10px] text-rose-600 font-extrabold">{check.reason}</span>
+                          ) : isSelected ? (
+                            <CheckCircle2 size={15} className="text-[#FF6B00]" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Afternoon */}
+              <div>
+                <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Afternoon
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {standardSlots
+                    .filter((s) => s.period === 'afternoon')
+                    .map((slot) => {
+                      const check = isSlotDisabled(slot);
+                      const isSelected = selectedSlot === slot.timeRange;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={check.disabled}
+                          onClick={() => setSelectedSlot(slot.timeRange)}
+                          className={`py-2.5 px-3 rounded-xl text-left border flex items-center justify-between transition-all cursor-pointer ${
+                            check.disabled
+                              ? 'opacity-45 bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : isSelected
+                              ? 'bg-orange-50/80 border-2 border-[#FF6B00] text-orange-950 font-bold shadow-xs'
+                              : 'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="text-xs font-bold">{slot.timeRange}</span>
+                          {check.disabled ? (
+                            <span className="text-[10px] text-amber-700 font-extrabold">{check.reason}</span>
+                          ) : isSelected ? (
+                            <CheckCircle2 size={15} className="text-[#FF6B00]" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Evening */}
+              <div>
+                <span className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Evening
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {standardSlots
+                    .filter((s) => s.period === 'evening')
+                    .map((slot) => {
+                      const check = isSlotDisabled(slot);
+                      const isSelected = selectedSlot === slot.timeRange;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={check.disabled}
+                          onClick={() => setSelectedSlot(slot.timeRange)}
+                          className={`py-2.5 px-3 rounded-xl text-left border flex items-center justify-between transition-all cursor-pointer ${
+                            check.disabled
+                              ? 'opacity-40 bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : isSelected
+                              ? 'bg-orange-50/80 border-2 border-[#FF6B00] text-orange-950 font-bold shadow-xs'
+                              : 'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="text-xs font-bold">{slot.timeRange}</span>
+                          {check.disabled ? (
+                            <span className="text-[10px] text-rose-600 font-extrabold">{check.reason}</span>
+                          ) : isSelected ? (
+                            <CheckCircle2 size={15} className="text-[#FF6B00]" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                </div>
               </div>
             </div>
 
-            {/* Evening */}
-            <div>
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
-                Evening
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {standardSlots.filter(s => s.period === 'evening').map(slot => {
-                  const check = isSlotDisabled(slot);
-                  const isSelected = selectedSlot === slot.timeRange;
-                  return (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      disabled={check.disabled}
-                      onClick={() => setSelectedSlot(slot.timeRange)}
-                      className={`py-3 px-3.5 rounded-xl text-left border flex items-center justify-between transition-all ${
-                        check.disabled
-                          ? 'opacity-40 bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed'
-                          : isSelected
-                          ? 'bg-teal-950/60 border-teal-400 text-teal-200 font-bold shadow-sm'
-                          : 'bg-[#252A34] border-slate-700/60 text-slate-300 hover:border-slate-500'
-                      }`}
-                    >
-                      <span className="text-xs">{slot.timeRange}</span>
-                      {check.disabled ? (
-                        <span className="text-[10px] text-rose-400 font-bold">{check.reason}</span>
-                      ) : isSelected ? (
-                        <CheckCircle2 size={15} className="text-teal-400" />
-                      ) : null}
-                    </button>
-                  );
-                })}
+            {/* Appointment Summary Box */}
+            <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50/60 p-3.5 rounded-2xl border border-orange-200/80 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Sparkles size={18} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#FF6B00] block">
+                  Appointment Summary
+                </span>
+                <p className="text-xs font-extrabold text-slate-900 truncate">
+                  {currentDateOption.label} ({currentDateOption.subLabel}) at {selectedSlot}
+                </p>
+                <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                  <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
+                  <span>Certified Glacons professional doorstep arrival</span>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Appointment Summary Box */}
-          <div className="bg-[#242933] p-3.5 rounded-2xl border border-slate-700/60 flex items-center gap-3 mt-1">
-            <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center flex-shrink-0">
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-teal-400 block">
-                Appointment Summary
-              </span>
-              <p className="text-xs font-bold text-white">
-                {currentDateOption.label} ({currentDateOption.subLabel}) at {selectedSlot}
-              </p>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="grid grid-cols-2 gap-3 mt-5 pt-3 border-t border-slate-800">
+          {/* Footer Actions */}
+          <div className="px-6 py-4 bg-white border-t border-slate-100 flex items-center gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="py-3 px-4 rounded-xl border border-slate-700 bg-[#292D33] text-slate-300 hover:bg-[#32363D] text-xs font-bold uppercase tracking-wider transition-colors"
+              className="py-3 px-5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleConfirm}
-              className="py-3 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-teal-500/25 transition-all active:scale-95"
+              className="flex-1 py-3 px-6 rounded-2xl bg-[#FF6B00] hover:bg-orange-600 active:scale-95 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer font-heading"
             >
-              Confirm & Book
+              <span>Confirm & Book Appointment</span>
             </button>
           </div>
         </motion.div>
