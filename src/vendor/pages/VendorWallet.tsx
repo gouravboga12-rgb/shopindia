@@ -652,10 +652,20 @@ export const VendorWallet: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Withdrawal Amount (₹)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-700">Withdrawal Amount (₹)</label>
+                  <button
+                    type="button"
+                    onClick={() => setAmount(Number(availableToWithdraw.toFixed(2)))}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                  >
+                    Max (₹{availableToWithdraw.toFixed(2)})
+                  </button>
+                </div>
                 <input
                   type="number"
-                  min={1}
+                  step="any"
+                  min="0.01"
                   max={availableToWithdraw}
                   value={amount}
                   onChange={e => setAmount(Number(e.target.value))}

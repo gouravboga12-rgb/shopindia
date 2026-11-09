@@ -253,7 +253,9 @@ export const RiderWallet: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-700 mb-1">Withdrawal Amount (₹)</label>
             <input
               type="number"
-              placeholder={effectiveBalance > 0 ? `Up to ₹${Math.floor(effectiveBalance)}` : '0'}
+              step="any"
+              min="0.01"
+              placeholder={effectiveBalance > 0 ? `Up to ₹${effectiveBalance.toFixed(2)}` : '0'}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               disabled={effectiveBalance <= 0}
