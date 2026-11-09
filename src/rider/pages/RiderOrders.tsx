@@ -122,22 +122,6 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
     }
   }, [initialTab]);
 
-  useEffect(() => {
-    if (!token) return;
-    const fetchHistory = async () => {
-      setLoading(true);
-      try {
-        const data = await api.get<{ history: HistoryOrder[] }>('/api/rider/orders/history');
-        setHistoryOrders(data.history || []);
-      } catch (e) {
-        console.error('Failed to fetch rider order history', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHistory();
-  }, [token]);
-
   const fetchCODHistory = async () => {
     if (!token) return;
     setLoadingCod(true);
@@ -157,7 +141,7 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
     if (!token) return;
     setLoadingServices(true);
     try {
-      const res: any = await api.get('/api/rider/scheduled-services');
+      const res: any = await api.get('/api/rider/orders/scheduled-services').catch(() => api.get('/api/rider/scheduled-services'));
       if (res?.success) {
         setScheduledServices(res.services || []);
         if (res.grouped) {
@@ -170,6 +154,23 @@ export const RiderOrders: React.FC<RiderOrdersProps> = ({ initialTab = 'trips' }
       setLoadingServices(false);
     }
   };
+
+  useEffect(() => {
+    if (!token) return;
+    const fetchHistory = async () => {
+      setLoading(true);
+      try {
+        const data = await api.get<{ history: HistoryOrder[] }>('/api/rider/orders/history');
+        setHistoryOrders(data.history || []);
+      } catch (e) {
+        console.error('Failed to fetch rider order history', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+    fetchScheduledServices();
+  }, [token]);
 
   useEffect(() => {
     if (activeTab === 'cod_history' && codHistory.length === 0) {

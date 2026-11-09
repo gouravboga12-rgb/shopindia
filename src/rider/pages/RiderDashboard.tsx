@@ -67,7 +67,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({ onNavigateToTab 
 
     const fetchScheduled = async () => {
       try {
-        const res: any = await api.get('/api/rider/scheduled-services');
+        const res: any = await api.get('/api/rider/orders/scheduled-services').catch(() => api.get('/api/rider/scheduled-services'));
         if (res?.success) {
           const allServices = res.services || [];
           setTotalScheduledCount(allServices.length);
