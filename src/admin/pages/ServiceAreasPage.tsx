@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../../lib/api';
 import {
-  Plus, Bell, MapPin, CheckCircle2, Store, Building2, Search,
+  Plus, MapPin, Store, Building2, Search,
   Navigation, Radio, Sparkles
 } from 'lucide-react';
 
@@ -49,10 +49,9 @@ interface CoverageData {
 }
 
 export const ServiceAreasPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'merchants' | 'regional' | 'zones' | 'leads'>('merchants');
+  const [activeTab, setActiveTab] = useState<'merchants' | 'regional' | 'zones'>('merchants');
   const [coverageData, setCoverageData] = useState<CoverageData | null>(null);
   const [areas, setAreas] = useState<any[]>([]);
-  const [demandLeads, setDemandLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filters for Merchants
@@ -71,12 +70,10 @@ export const ServiceAreasPage: React.FC = () => {
     Promise.all([
       api.get<CoverageData>('/api/admin/service-areas/partner-coverage').catch(() => null),
       api.get<any[]>('/api/admin/service-areas').catch(() => []),
-      api.get<any[]>('/api/admin/service-areas/demand-leads').catch(() => []),
     ])
-      .then(([cov, areasData, leadsData]) => {
+      .then(([cov, areasData]) => {
         if (cov) setCoverageData(cov);
         setAreas(Array.isArray(areasData) ? areasData : []);
-        setDemandLeads(Array.isArray(leadsData) ? leadsData : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -229,17 +226,6 @@ export const ServiceAreasPage: React.FC = () => {
         >
           <Radio size={15} />
           <span>Custom Delivery Zones ({areas.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('leads')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'leads'
-              ? 'bg-amber-600 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-gray-100'
-            }`}
-        >
-          <Bell size={15} />
-          <span>Customer Demand Leads ({demandLeads.length})</span>
         </button>
       </div>
 
@@ -478,68 +464,6 @@ export const ServiceAreasPage: React.FC = () => {
                 </div>
               </div>
             ))
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: Nationwide Customer Demand Signals */}
-      {activeTab === 'leads' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-gray-900 text-sm">Nationwide Customer Demand Signals</h3>
-              <p className="text-xs text-gray-500">Real-time leads captured when customers clicked "Notify Me" in areas without technician coverage</p>
-            </div>
-            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-              {demandLeads.length} Captured
-            </span>
-          </div>
-
-          {demandLeads.length === 0 ? (
-            <div className="py-12 text-center">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-gray-700">No unserved demand leads at this time.</p>
-              <p className="text-xs text-gray-400 mt-0.5">When customers request service outside covered areas, their details will appear here.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-600 uppercase font-bold text-[11px] border-b border-gray-200">
-                  <tr>
-                    <th className="p-3.5">Service Requested</th>
-                    <th className="p-3.5">Category</th>
-                    <th className="p-3.5">City / Locality</th>
-                    <th className="p-3.5">Pincode</th>
-                    <th className="p-3.5">Contact</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Timestamp</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {demandLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="p-3.5 font-bold text-gray-900">{lead.serviceName}</td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
-                          {lead.category}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-gray-700 font-semibold">{lead.city || 'India'}</td>
-                      <td className="p-3.5 font-mono text-gray-800">{lead.pincode || '—'}</td>
-                      <td className="p-3.5 text-gray-600">{lead.phone || 'In-App Customer'}</td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                          {lead.status}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-gray-400">
-                        {new Date(lead.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </div>
       )}
