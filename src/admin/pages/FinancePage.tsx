@@ -5,7 +5,6 @@ import {
   Layers, Search, TrendingUp, CheckCircle2,
   ChevronRight, Store, CreditCard
 } from 'lucide-react';
-import { TreasuryBanner, type PlatformTreasury } from '../components/TreasuryBanner';
 
 interface ChannelSummary {
   channelKey: string;
@@ -110,7 +109,6 @@ export const FinancePage: React.FC = () => {
   });
 
   const [orders, setOrders] = useState<ProfitOrder[]>([]);
-  const [treasury, setTreasury] = useState<PlatformTreasury | null>(null);
   const [selectedChannelFilter, setSelectedChannelFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -136,9 +134,6 @@ export const FinancePage: React.FC = () => {
       }
       if (Array.isArray(data?.orders)) {
         setOrders(data.orders);
-      }
-      if (data?.treasury) {
-        setTreasury(data.treasury);
       }
     } catch (err) {
       console.error('Failed to load finance data:', err);
@@ -311,9 +306,6 @@ export const FinancePage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Unified Platform Treasury Metrics Banner */}
-      <TreasuryBanner initialTreasury={treasury} onRefresh={loadFinanceData} />
 
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[350px] bg-white rounded-2xl border border-gray-100 p-8">
