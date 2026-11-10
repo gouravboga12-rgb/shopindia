@@ -414,7 +414,7 @@ During this session, six major operational pillars were implemented, unified acr
 
 ## 11. Quick-Start Guide to Resume Tomorrow
 
-When resuming work tomorrow, follow these quick check steps:
+When resuming work, follow these quick check steps:
 
 1. **Local Development:**
    ```bash
@@ -426,15 +426,42 @@ When resuming work tomorrow, follow these quick check steps:
    ssh -i "ec2-key.pem" ubuntu@18.61.145.65 "pm2 status"
    ```
 3. **Super Admin URLs to Test:**
-   - `/admin` ➔ Click **Services & Repairs** on the sidebar to view the Doorstep Visit Charges, Technician Guaranteed Pays, and Net Margins.
-   - `/admin` ➔ Click **Products Catalog** to view physical products with 🔥 High / ⚡ Steady / 💤 Low Demand Badges.
-   - `/admin` ➔ Click **Riders & Fleets** to view Operating City, Partner Roles, and COD Floats.
-4. **Rider Portal to Test:**
-   - `/rider` ➔ Observe the COD Cash pill in header and prominent Pay Online / Hub Handover cards on the dashboard.
-   - Broadcast an order from `/vendor` and observe the Rapido 2-leg route card on `/rider` with non-resetting 30s countdown.
+   - `/admin/finance` ➔ Default All-Time filter showing Shop India, Quick Shopping, and Glacons Services breakdown.
+   - `/admin/orders` ➔ Horizontal scroll and permanent Delete Order button.
+   - `/dashboard` ➔ Notifications tab synced with header Alerts and Clear-all button.
+
+---
+
+## 12. Session 12 (November 10, 2026): Completed Fixes & Multi-Vendor Splitting Plan
+
+### 12.1 Completed & Deployed Changes
+1. **Service Areas Clean-up**:
+   - Removed the obsolete "Customer Demand Leads" tab from `/admin/service-areas` (`src/admin/pages/ServiceAreasPage.tsx`).
+2. **Finance Center Default Filter & Consistency**:
+   - Fixed the issue where Quick Shopping and Glacons showed ₹0.00 / 0 Orders by switching the default filter from `today` to `all` in `src/admin/pages/FinancePage.tsx`. All 3 verticals display real order data on page load.
+3. **Orders Page Horizontal Scrolling & Permanent Deletion**:
+   - Added horizontal scroll wrapper (`overflow-x-auto`) and minimum column widths to `src/admin/pages/OrdersPage.tsx` so Order IDs and Actions columns are never cramped.
+   - Added permanent **Delete Order** button with modal confirmation. Safely reverts vendor/rider wallet balances, cascades dependent records, deletes from PostgreSQL, and broadcasts real-time socket events.
+4. **Header Alerts & Customer Notifications Sync**:
+   - Unified top header "Alerts" badge with the Customer Dashboard Notifications tab via `CustomerContext`.
+   - Wired routing so clicking "Alerts" in the header opens `<DashboardInner initialTab="notifications" />`.
+   - Added **"Clear all"** action button in `src/pages/dashboard/Notifications.tsx` with backend server persistence (`DELETE /api/customer/notifications/clear-all`).
+
+---
+
+### 12.2 Next Session Task: Automatic Multi-Vendor & Multi-Service Order Splitting
+Full architectural specification saved in:
+📁 **`shopindia/MULTI_VENDOR_AND_SERVICE_SPLITTING_PLAN.md`**
+
+**Core Requirements for Next Session**:
+- Single customer checkout with 1 Razorpay payment / COD.
+- **Quick Shopping**: Auto-group items by `vendorId` $\rightarrow$ Create separate sub-orders $\rightarrow$ Dispatch separate riders to each store.
+- **Shop India Courier**: Auto-group items by `vendorId` $\rightarrow$ Independent Shiprocket warehouse pickups $\rightarrow$ Separate courier AWBs.
+- **Glacons Services**: Auto-group multiple advance services by category/skill $\rightarrow$ Dispatch distinct specialized technicians with individual appointment slots and OTPs.
 
 ---
 
 *Document updated and saved to `shopindia/PROJECT_CHANGELOG_AND_RESUME_GUIDE.md`.*
+
 
 
