@@ -6,6 +6,7 @@ import {
   RefreshCw, ShieldCheck, Zap, Calendar, Store,
   Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText, Copy, Building2
 } from 'lucide-react';
+import { TreasuryBanner, type PlatformTreasury } from '../components/TreasuryBanner';
 
 interface PayoutRequestItem {
   id: string;
@@ -35,6 +36,7 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
   const [loading, setLoading] = useState<boolean>(true);
   const [requests, setRequests] = useState<PayoutRequestItem[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [treasury, setTreasury] = useState<PlatformTreasury | null>(null);
 
   // Modal State for Disbursing Payout (Marking Paid with UTR)
   const [activePayoutForComplete, setActivePayoutForComplete] = useState<PayoutRequestItem | null>(null);
@@ -97,6 +99,7 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
       const res: any = await api.get(`/api/admin/payouts?${queryParams.toString()}`);
       if (res?.requests) setRequests(res.requests);
       if (res?.stats) setStats(res.stats);
+      if (res?.treasury) setTreasury(res.treasury);
     } catch (err: any) {
       console.error('Failed to load vendor payouts:', err);
       setActionMessage({ text: err.message || 'Failed to load vendor payouts.', isError: true });
@@ -298,6 +301,9 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
           <button onClick={() => setActionMessage(null)} className="underline hover:text-slate-900 cursor-pointer">Dismiss</button>
         </div>
       )}
+
+      {/* Unified Platform Treasury Metrics */}
+      <TreasuryBanner initialTreasury={treasury} onRefresh={loadPayouts} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -569,8 +575,10 @@ export const VendorPayoutsPage: React.FC<VendorPayoutsPageProps> = ({ onOpenStat
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        <div className="text-base font-black text-slate-900">{formatINR(req.amount)}</div>
-                        <div className="text-[10px] text-slate-500">Wallet: {formatINR(vendor?.walletBalance)}</div>
+                        <div className="text-base font-black text-slate-900 font-mono">{formatINR(req.amount)}</div>
+                        <div className="text-[10.5px] font-medium text-slate-600 mt-0.5">
+                          Pending Left: <strong className="font-mono text-amber-700">{formatINR(vendor?.walletBalance)}</strong>
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4 text-center">

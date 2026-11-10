@@ -290,11 +290,12 @@ export const AccountsPage: React.FC<AccountsPageProps> = ({ onOpenStatement }) =
                     </td>
 
                     <td className="py-3 px-4">
-                      <div className="font-black text-gray-900 text-sm">
-                        {formatINR(acc.walletBalance)}
+                      <div className="font-black text-gray-900 text-sm font-mono">
+                        {formatINR(Math.max(0, acc.walletBalance))}
                       </div>
+                      <div className="text-[10px] text-slate-500 font-medium">Pending Left</div>
                       {acc.codFloat != null && acc.codFloat > 0 && (
-                        <div className="text-[10px] text-amber-600 font-semibold">
+                        <div className="text-[10px] text-amber-600 font-semibold mt-0.5">
                           COD Float: {formatINR(acc.codFloat)}
                         </div>
                       )}

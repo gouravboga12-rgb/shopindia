@@ -5,6 +5,7 @@ import {
   Layers, Search, TrendingUp, CheckCircle2,
   ChevronRight, Store, CreditCard
 } from 'lucide-react';
+import { TreasuryBanner, type PlatformTreasury } from '../components/TreasuryBanner';
 
 interface ChannelSummary {
   channelKey: string;
@@ -109,6 +110,7 @@ export const FinancePage: React.FC = () => {
   });
 
   const [orders, setOrders] = useState<ProfitOrder[]>([]);
+  const [treasury, setTreasury] = useState<PlatformTreasury | null>(null);
   const [selectedChannelFilter, setSelectedChannelFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -134,6 +136,9 @@ export const FinancePage: React.FC = () => {
       }
       if (Array.isArray(data?.orders)) {
         setOrders(data.orders);
+      }
+      if (data?.treasury) {
+        setTreasury(data.treasury);
       }
     } catch (err) {
       console.error('Failed to load finance data:', err);
@@ -307,6 +312,9 @@ export const FinancePage: React.FC = () => {
         )}
       </div>
 
+      {/* Unified Platform Treasury Metrics Banner */}
+      <TreasuryBanner initialTreasury={treasury} onRefresh={loadFinanceData} />
+
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[350px] bg-white rounded-2xl border border-gray-100 p-8">
           <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
@@ -363,10 +371,10 @@ export const FinancePage: React.FC = () => {
                 {/* 2. Vendor Payouts */}
                 <div className="space-y-1">
                   <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <Building2Icon className="w-3 h-3 text-rose-400" /> Vendor Payouts
+                    <Building2Icon className="w-3 h-3 text-cyan-400" /> Wholesale Partner Share
                   </div>
-                  <div className="text-base font-bold font-mono text-rose-300">
-                    - {formatINR(summary.totalVendorPayout)}
+                  <div className="text-base font-bold font-mono text-cyan-200">
+                    {formatINR(summary.totalVendorPayout)}
                   </div>
                   <div className="text-[10px] text-slate-400">Wholesale cost</div>
                 </div>
@@ -376,8 +384,8 @@ export const FinancePage: React.FC = () => {
                   <div className="text-[11px] text-slate-400 flex items-center gap-1">
                     <CreditCard className="w-3 h-3 text-amber-400" /> Razorpay Fee (3%)
                   </div>
-                  <div className="text-base font-bold font-mono text-amber-300">
-                    - {formatINR(summary.totalRazorpayFee)}
+                  <div className="text-base font-bold font-mono text-amber-200">
+                    {formatINR(summary.totalRazorpayFee)}
                   </div>
                   <div className="text-[10px] text-slate-400">Gateway charges</div>
                 </div>
@@ -451,12 +459,12 @@ export const FinancePage: React.FC = () => {
                   <strong className="text-gray-900 font-mono">{formatINR(channels.shop_india.customerPaid)}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Vendor Payout:</span>
-                  <span className="text-rose-600 font-mono font-medium">- {formatINR(channels.shop_india.vendorPayout)}</span>
+                  <span className="text-gray-500">Merchant Wholesale:</span>
+                  <span className="text-cyan-700 font-mono font-medium">{formatINR(channels.shop_india.vendorPayout)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Razorpay Fee (3%):</span>
-                  <span className="text-amber-600 font-mono font-medium">- {formatINR(channels.shop_india.razorpayFee)}</span>
+                  <span className="text-amber-700 font-mono font-medium">{formatINR(channels.shop_india.razorpayFee)}</span>
                 </div>
               </div>
 
@@ -507,12 +515,12 @@ export const FinancePage: React.FC = () => {
                   <strong className="text-gray-900 font-mono">{formatINR(channels.quick_shopping.customerPaid)}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Store Payout:</span>
-                  <span className="text-rose-600 font-mono font-medium">- {formatINR(channels.quick_shopping.vendorPayout)}</span>
+                  <span className="text-gray-500">Store Wholesale:</span>
+                  <span className="text-cyan-700 font-mono font-medium">{formatINR(channels.quick_shopping.vendorPayout)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Razorpay Fee (3%):</span>
-                  <span className="text-amber-600 font-mono font-medium">- {formatINR(channels.quick_shopping.razorpayFee)}</span>
+                  <span className="text-amber-700 font-mono font-medium">{formatINR(channels.quick_shopping.razorpayFee)}</span>
                 </div>
               </div>
 
@@ -563,12 +571,12 @@ export const FinancePage: React.FC = () => {
                   <strong className="text-gray-900 font-mono">{formatINR(channels.glacons.customerPaid)}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Technician Payout:</span>
-                  <span className="text-rose-600 font-mono font-medium">- {formatINR(channels.glacons.vendorPayout)}</span>
+                  <span className="text-gray-500">Technician Share:</span>
+                  <span className="text-cyan-700 font-mono font-medium">{formatINR(channels.glacons.vendorPayout)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Razorpay Fee (3%):</span>
-                  <span className="text-amber-600 font-mono font-medium">- {formatINR(channels.glacons.razorpayFee)}</span>
+                  <span className="text-amber-700 font-mono font-medium">{formatINR(channels.glacons.razorpayFee)}</span>
                 </div>
               </div>
 
@@ -645,9 +653,9 @@ export const FinancePage: React.FC = () => {
                       <th className="py-3 px-4">Order / Reference</th>
                       <th className="py-3 px-4">Platform Vertical</th>
                       <th className="py-3 px-4 text-right">Customer Paid</th>
-                      <th className="py-3 px-4 text-right">Vendor / Tech Payout</th>
-                      <th className="py-3 px-4 text-right">Razorpay (3%)</th>
-                      <th className="py-3 px-4 text-right">Super Admin Profit</th>
+                      <th className="py-3 px-4 text-right">Wholesale Partner Share</th>
+                      <th className="py-3 px-4 text-right">Gateway Fee (3%)</th>
+                      <th className="py-3 px-4 text-right">Admin Profit</th>
                       <th className="py-3 px-4 text-center">Status</th>
                       <th className="py-3 px-4 text-right">Date & Time</th>
                     </tr>
@@ -686,7 +694,7 @@ export const FinancePage: React.FC = () => {
                               <div>
                                 <span className="line-through text-gray-400 font-bold">{formatINR(o.customerPaid)}</span>
                                 <div className="text-[10px] text-rose-600 font-bold">
-                                  Refunded: -{formatINR(o.refundAmount || o.customerPaid)}
+                                  Refunded: {formatINR(o.refundAmount || o.customerPaid)}
                                 </div>
                               </div>
                             ) : (
@@ -698,7 +706,7 @@ export const FinancePage: React.FC = () => {
                             {isRefundedOrCancelled ? (
                               <span className="text-gray-400 font-medium">₹0.00</span>
                             ) : (
-                              <span className="text-rose-600">- {formatINR(o.vendorPayout)}</span>
+                              <span className="text-cyan-700">{formatINR(o.vendorPayout)}</span>
                             )}
                           </td>
 
@@ -706,7 +714,7 @@ export const FinancePage: React.FC = () => {
                             {isRefundedOrCancelled ? (
                               <span className="text-gray-400 font-medium">₹0.00</span>
                             ) : (
-                              <span className="text-amber-600">- {formatINR(o.razorpayFee)}</span>
+                              <span className="text-amber-700">{formatINR(o.razorpayFee)}</span>
                             )}
                           </td>
 
@@ -718,7 +726,7 @@ export const FinancePage: React.FC = () => {
                             ) : (
                               <>
                                 <span className="font-mono font-bold text-sm text-emerald-600">
-                                  + {formatINR(o.adminNetProfit)}
+                                  {formatINR(o.adminNetProfit)}
                                 </span>
                                 <div className="text-[10px] font-bold text-emerald-700">
                                   {o.marginPercent}% margin

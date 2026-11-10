@@ -238,9 +238,9 @@ export const AccountStatementPage: React.FC<AccountStatementPageProps> = ({
         <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl shadow-sm space-y-1">
           <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Current Closing Balance</span>
           <div className="text-2xl font-black text-emerald-900 font-mono">
-            {formatINR(account?.currentBalance ?? closingBalance)}
+            {formatINR(Math.max(0, account?.currentBalance ?? closingBalance))}
           </div>
-          <p className="text-[11px] text-emerald-700 font-semibold">Net cleared & withdrawable funds</p>
+          <p className="text-[11px] text-emerald-700 font-semibold">Net pending partner balance left to be cleared</p>
         </div>
       </div>
 

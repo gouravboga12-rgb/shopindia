@@ -14,6 +14,7 @@ const router = express.Router();
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
+const { getPlatformTreasuryStats } = require('../../lib/treasury');
 
 router.use(verifyToken, requireRole('super_admin'));
 
@@ -303,9 +304,10 @@ router.get('/overview', async (req, res) => {
       : 0;
 
     // Parallel counts for active stores & technicians
-    const [activeVendors, activeTechnicians] = await Promise.all([
+    const [activeVendors, activeTechnicians, treasury] = await Promise.all([
       prisma.vendor.count({ where: { isActive: true } }),
       prisma.technician ? prisma.technician.count({ where: { isActive: true } }).catch(() => 0) : 0,
+      getPlatformTreasuryStats().catch(() => null),
     ]);
 
     // Backwards-compatible metrics object so legacy callers don't fail
@@ -314,9 +316,9 @@ router.get('/overview', async (req, res) => {
       actualGatewayFees: summary.totalRazorpayFee,
       netReceived: Math.max(0, summary.totalCustomerPaid - summary.totalRazorpayFee),
       totalGrossInflow: summary.totalCustomerPaid,
-      toBeCleared: summary.totalVendorPayout,
-      totalDisbursedToPartners: summary.totalVendorPayout,
-      platformNetProfit: summary.totalAdminNetProfit,
+      toBeCleared: treasury ? treasury.pendingVendorPayout : summary.totalVendorPayout,
+      totalDisbursedToPartners: treasury ? treasury.totalPaidOut : summary.totalVendorPayout,
+      platformNetProfit: treasury ? treasury.adminProfit : summary.totalAdminNetProfit,
       paidOrdersCount: summary.totalOrdersCount,
       activeVendorsCount: activeVendors,
       activeRidersCount: activeTechnicians,
@@ -331,10 +333,25 @@ router.get('/overview', async (req, res) => {
       channels,
       orders: mappedOrders,
       metrics: legacyMetrics,
+      treasury,
     });
   } catch (err) {
     console.error('[AdminFinance] Overview error:', err);
     res.status(500).json({ error: err.message || 'Failed to generate financial overview.' });
+  }
+});
+
+/**
+ * GET /api/admin/finance/balances
+ * Real-time platform treasury balances across all 4 admin financial views
+ */
+router.get('/balances', async (req, res) => {
+  try {
+    const treasury = await getPlatformTreasuryStats();
+    res.json({ success: true, treasury });
+  } catch (err) {
+    console.error('[AdminFinance] Balances error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch treasury balances.' });
   }
 });
 

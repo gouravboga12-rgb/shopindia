@@ -200,11 +200,10 @@ export const ServiceAreasPage: React.FC = () => {
       <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('merchants')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'merchants'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'merchants'
               ? 'bg-[#0F2C59] text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-100'
-          }`}
+            }`}
         >
           <Store size={15} />
           <span>Active Merchants & Stores ({coverageData?.vendors.length ?? 0})</span>
@@ -212,11 +211,10 @@ export const ServiceAreasPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('regional')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'regional'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'regional'
               ? 'bg-[#0F2C59] text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-100'
-          }`}
+            }`}
         >
           <Building2 size={15} />
           <span>Glacons Regional Hubs ({coverageData?.regionalHubs.length ?? 0})</span>
@@ -224,11 +222,10 @@ export const ServiceAreasPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('zones')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'zones'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'zones'
               ? 'bg-[#0F2C59] text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-100'
-          }`}
+            }`}
         >
           <Radio size={15} />
           <span>Custom Delivery Zones ({areas.length})</span>
@@ -236,11 +233,10 @@ export const ServiceAreasPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('leads')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'leads'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'leads'
               ? 'bg-amber-600 text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-100'
-          }`}
+            }`}
         >
           <Bell size={15} />
           <span>Customer Demand Leads ({demandLeads.length})</span>
@@ -338,13 +334,12 @@ export const ServiceAreasPage: React.FC = () => {
                           {vendor.deliveryRadiusKm ? `${vendor.deliveryRadiusKm} km` : '5-10 km'}
                         </td>
                         <td className="p-3.5 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            vendor.approvalStatus === 'approved'
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${vendor.approvalStatus === 'approved'
                               ? 'bg-emerald-100 text-emerald-800'
                               : vendor.approvalStatus === 'pending'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
                             {vendor.approvalStatus.toUpperCase()}
                           </span>
                         </td>
@@ -419,11 +414,10 @@ export const ServiceAreasPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="p-3.5 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            hub.status === 'active' || hub.status === 'approved'
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${hub.status === 'active' || hub.status === 'approved'
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-amber-100 text-amber-800'
-                          }`}>
+                            }`}>
                             {hub.status}
                           </span>
                         </td>
@@ -460,9 +454,8 @@ export const ServiceAreasPage: React.FC = () => {
                   </div>
                   <button
                     onClick={() => toggleStatus(a.id || a._id)}
-                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border cursor-pointer ${
-                      a.isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-600'
-                    }`}
+                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border cursor-pointer ${a.isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-600'
+                      }`}
                   >
                     {a.isActive ? 'Active' : 'Disabled'}
                   </button>

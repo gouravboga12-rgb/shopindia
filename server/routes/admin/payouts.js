@@ -11,6 +11,8 @@ const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 const { postLedgerEntries } = require('../../lib/ledger');
+const { getPlatformTreasuryStats } = require('../../lib/treasury');
+const { notifyTreasuryUpdate, notifyPayoutStatus, notifyWalletUpdate } = require('../../lib/socket');
 
 router.use(verifyToken, requireRole('super_admin', 'regional_admin'));
 
@@ -45,7 +47,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    const [requests, total, queueStats] = await Promise.all([
+    const [requests, total, queueStats, treasury] = await Promise.all([
       prisma.payoutRequest.findMany({
         where,
         include: {
@@ -94,6 +96,7 @@ router.get('/', async (req, res) => {
         _count: { id: true },
         _sum: { amount: true },
       }),
+      getPlatformTreasuryStats().catch(() => null),
     ]);
 
     const stats = {
@@ -125,6 +128,7 @@ router.get('/', async (req, res) => {
       page: pageNum,
       pages: Math.ceil(total / limitNum),
       stats,
+      treasury,
     });
   } catch (err) {
     console.error('[AdminPayouts] GET error:', err);
@@ -200,11 +204,18 @@ router.post('/:id/complete', requireRole('super_admin'), async (req, res) => {
         },
       });
 
-      // Update wallet and ledger based on partyType
+      // Update wallet and ledger based on partyType with safe clamping to prevent negative balances
       if (request.partyType === 'VENDOR' && request.vendorId) {
+        const v = await tx.vendor.findUnique({
+          where: { id: request.vendorId },
+          select: { walletBalance: true },
+        });
+        const curBal = Number(v?.walletBalance || 0);
+        const nextBal = Math.max(0, Math.round((curBal - request.amount) * 100) / 100);
+
         await tx.vendor.update({
           where: { id: request.vendorId },
-          data: { walletBalance: { decrement: request.amount } },
+          data: { walletBalance: nextBal },
         });
 
         await tx.ledgerEntry.create({
@@ -220,9 +231,16 @@ router.post('/:id/complete', requireRole('super_admin'), async (req, res) => {
           },
         });
       } else if (request.partyType === 'RIDER' && request.riderProfileId) {
+        const r = await tx.riderProfile.findUnique({
+          where: { id: request.riderProfileId },
+          select: { walletBalance: true },
+        });
+        const curBal = Number(r?.walletBalance || 0);
+        const nextBal = Math.max(0, Math.round((curBal - request.amount) * 100) / 100);
+
         await tx.riderProfile.update({
           where: { id: request.riderProfileId },
-          data: { walletBalance: { decrement: request.amount } },
+          data: { walletBalance: nextBal },
         });
 
         await tx.ledgerEntry.create({
@@ -251,20 +269,24 @@ router.post('/:id/complete', requireRole('super_admin'), async (req, res) => {
       return completedRequest;
     });
 
+    let updatedTreasury = null;
     try {
-      const { notifyPayoutStatus, notifyWalletUpdate } = require('../../lib/socket');
       notifyPayoutStatus(result);
       if (request.partyType === 'VENDOR' && request.vendorId) {
         notifyWalletUpdate('VENDOR', request.vendorId, null, { payoutId: id, amount: request.amount });
       } else if (request.partyType === 'RIDER' && request.riderProfileId) {
         notifyWalletUpdate('RIDER', request.riderProfileId, null, { payoutId: id, amount: request.amount });
       }
+
+      updatedTreasury = await getPlatformTreasuryStats();
+      notifyTreasuryUpdate(updatedTreasury);
     } catch (_) {}
 
     res.json({
       success: true,
       message: `Payout of ₹${request.amount.toLocaleString('en-IN')} marked as completed via ${finalMode}${finalUtr ? ` (UTR: ${finalUtr})` : ''}.`,
       payout: result,
+      treasury: updatedTreasury,
     });
   } catch (err) {
     console.error('[AdminPayouts] Complete error:', err);

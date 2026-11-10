@@ -215,6 +215,12 @@ function notifyTicketUpdate(ticketId, data = {}) {
   io.emit('ticket:updated', payload);
 }
 
+function notifyTreasuryUpdate(treasury) {
+  if (!io) return;
+  io.emit('treasury:updated', treasury);
+  io.to('panel:admin').emit('treasury:updated', treasury);
+}
+
 module.exports = {
   initSocket,
   getIo,
@@ -228,4 +234,5 @@ module.exports = {
   notifyWalletUpdate,
   notifyVendorStatus,
   notifyTicketUpdate,
+  notifyTreasuryUpdate,
 };

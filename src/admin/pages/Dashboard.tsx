@@ -4,6 +4,7 @@ import {
   Users, Store, Bike, ShoppingBag, TrendingUp,
   AlertCircle, Clock, DollarSign, ArrowUpRight, Download, Calendar,
 } from 'lucide-react';
+import { TreasuryBanner, type PlatformTreasury } from '../components/TreasuryBanner';
 
 interface Stats {
   totalUsers: number; totalVendors: number; totalRiders: number;
@@ -13,13 +14,13 @@ interface DailyOrder { _id: string; count: number; revenue: number; }
 
 type Range = '7d' | '3m' | '6m' | '12m';
 
-const fmt    = (n: number) => new Intl.NumberFormat('en-IN').format(n);
-const fmtRs  = (n: number) => '₹' + fmt(n);
+const fmt = (n: number) => new Intl.NumberFormat('en-IN').format(n);
+const fmtRs = (n: number) => '₹' + fmt(n);
 
 const PRESETS: { label: string; value: Range }[] = [
-  { label: '7 Days',    value: '7d'  },
-  { label: '3 Months',  value: '3m'  },
-  { label: '6 Months',  value: '6m'  },
+  { label: '7 Days', value: '7d' },
+  { label: '3 Months', value: '3m' },
+  { label: '6 Months', value: '6m' },
   { label: '12 Months', value: '12m' },
 ];
 
@@ -38,22 +39,27 @@ const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; 
 );
 
 export const Dashboard: React.FC = () => {
-  const [stats,   setStats]   = useState<Stats | null>(null);
-  const [chart,   setChart]   = useState<DailyOrder[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [treasury, setTreasury] = useState<PlatformTreasury | null>(null);
+  const [chart, setChart] = useState<DailyOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Filter state — only one active at a time
-  const [range,      setRange]      = useState<Range>('7d');
+  const [range, setRange] = useState<Range>('7d');
   const [singleDate, setSingleDate] = useState('');
-  const [year,       setYear]       = useState('');
+  const [year, setYear] = useState('');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // Load main stats once
   useEffect(() => {
-    api.get<{ stats: Stats; dailyOrders: DailyOrder[] }>('/api/admin/dashboard')
-      .then(d => { setStats(d.stats); setChart(d.dailyOrders); })
+    api.get<{ stats: Stats; treasury?: PlatformTreasury; dailyOrders: DailyOrder[] }>('/api/admin/dashboard')
+      .then(d => {
+        setStats(d.stats);
+        if (d.treasury) setTreasury(d.treasury);
+        setChart(d.dailyOrders);
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -86,8 +92,8 @@ export const Dashboard: React.FC = () => {
     try {
       const params = new URLSearchParams();
       if (singleDate) params.set('date', singleDate);
-      else if (year)  params.set('year', year);
-      else            params.set('range', range);
+      else if (year) params.set('year', year);
+      else params.set('range', range);
 
       const res = await api.get<{ data: Record<string, unknown>[] }>(
         `/api/admin/dashboard/revenue-export?${params}`
@@ -96,15 +102,15 @@ export const Dashboard: React.FC = () => {
       if (!csvData.length) return alert('No revenue data for this period.');
 
       const headers = Object.keys(csvData[0]).join(',');
-      const rows    = csvData.map(row =>
+      const rows = csvData.map(row =>
         Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
       ).join('\n');
 
       const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
       const label = singleDate || year || range;
-      a.href     = url;
+      a.href = url;
       a.download = `revenue_${label}_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
@@ -117,8 +123,8 @@ export const Dashboard: React.FC = () => {
 
   // Helpers to switch filter and clear the others
   const selectRange = (r: Range) => { setRange(r); setSingleDate(''); setYear(''); setHoveredIdx(null); };
-  const selectDate  = (d: string) => { setSingleDate(d); setYear(''); setHoveredIdx(null); };
-  const selectYear  = (y: string) => { setYear(y); setSingleDate(''); setHoveredIdx(null); };
+  const selectDate = (d: string) => { setSingleDate(d); setYear(''); setHoveredIdx(null); };
+  const selectYear = (y: string) => { setYear(y); setSingleDate(''); setHoveredIdx(null); };
 
   const activeLabel = singleDate
     ? `${singleDate} (Hourly)`
@@ -211,16 +217,19 @@ export const Dashboard: React.FC = () => {
         <p className="text-sm text-gray-500 mt-0.5">Platform overview — live stats</p>
       </div>
 
+      {/* Unified Platform Treasury Metrics */}
+      <TreasuryBanner initialTreasury={treasury} />
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<Users className="w-5 h-5 text-blue-600" />}    label="Total Customers" value={fmt(stats?.totalUsers    ?? 0)} color="bg-blue-50"   />
-        <StatCard icon={<Store className="w-5 h-5 text-emerald-600" />} label="Vendors"          value={fmt(stats?.totalVendors ?? 0)} sub={`${stats?.pendingVendors} pending`} color="bg-emerald-50" />
-        <StatCard icon={<Bike className="w-5 h-5 text-orange-600" />}   label="Riders"           value={fmt(stats?.totalRiders  ?? 0)} color="bg-orange-50"  />
-        <StatCard icon={<ShoppingBag className="w-5 h-5 text-purple-600" />} label="Total Orders" value={fmt(stats?.totalOrders ?? 0)} color="bg-purple-50"  />
-        <StatCard icon={<DollarSign className="w-5 h-5 text-green-600" />}   label="Platform Margin Revenue" value={fmtRs(stats?.totalRevenue ?? 0)} sub="Net commission earned" color="bg-green-50" />
-        <StatCard icon={<AlertCircle className="w-5 h-5 text-red-600" />}    label="Open Tickets"  value={fmt(stats?.openTickets  ?? 0)} color="bg-red-50"    />
-        <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />}        label="Pending Approvals" value={fmt(stats?.pendingVendors ?? 0)} sub="vendors awaiting review" color="bg-amber-50" />
-        <StatCard icon={<TrendingUp className="w-5 h-5 text-indigo-600" />}  label="Avg Margin / Order" value={fmtRs(stats ? Math.round(stats.totalRevenue / (stats.totalOrders || 1)) : 0)} sub="Commission per order" color="bg-indigo-50" />
+        <StatCard icon={<Users className="w-5 h-5 text-blue-600" />} label="Total Customers" value={fmt(stats?.totalUsers ?? 0)} color="bg-blue-50" />
+        <StatCard icon={<Store className="w-5 h-5 text-emerald-600" />} label="Vendors" value={fmt(stats?.totalVendors ?? 0)} sub={`${stats?.pendingVendors} pending`} color="bg-emerald-50" />
+        <StatCard icon={<Bike className="w-5 h-5 text-orange-600" />} label="Riders" value={fmt(stats?.totalRiders ?? 0)} color="bg-orange-50" />
+        <StatCard icon={<ShoppingBag className="w-5 h-5 text-purple-600" />} label="Total Orders" value={fmt(stats?.totalOrders ?? 0)} color="bg-purple-50" />
+        <StatCard icon={<DollarSign className="w-5 h-5 text-green-600" />} label="Platform Margin Revenue" value={fmtRs(stats?.totalRevenue ?? 0)} sub="Net commission earned" color="bg-green-50" />
+        <StatCard icon={<AlertCircle className="w-5 h-5 text-red-600" />} label="Open Tickets" value={fmt(stats?.openTickets ?? 0)} color="bg-red-50" />
+        <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />} label="Pending Approvals" value={fmt(stats?.pendingVendors ?? 0)} sub="vendors awaiting review" color="bg-amber-50" />
+        <StatCard icon={<TrendingUp className="w-5 h-5 text-indigo-600" />} label="Avg Margin / Order" value={fmtRs(stats ? Math.round(stats.totalRevenue / (stats.totalOrders || 1)) : 0)} sub="Commission per order" color="bg-indigo-50" />
       </div>
 
       {/* Revenue Chart */}
@@ -251,11 +260,10 @@ export const Dashboard: React.FC = () => {
             <button
               key={p.value}
               onClick={() => selectRange(p.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                !singleDate && !year && range === p.value
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${!singleDate && !year && range === p.value
                   ? 'bg-[#0F2C59] text-white shadow-sm'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+                }`}
             >
               {p.label}
             </button>
@@ -269,9 +277,8 @@ export const Dashboard: React.FC = () => {
               value={singleDate}
               max={new Date().toISOString().split('T')[0]}
               onChange={e => selectDate(e.target.value)}
-              className={`pl-8 pr-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20 transition-colors ${
-                singleDate ? 'border-[#0F2C59] bg-[#0F2C59]/5 text-[#0F2C59] font-semibold' : 'border-gray-200 bg-gray-50 text-gray-600'
-              }`}
+              className={`pl-8 pr-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20 transition-colors ${singleDate ? 'border-[#0F2C59] bg-[#0F2C59]/5 text-[#0F2C59] font-semibold' : 'border-gray-200 bg-gray-50 text-gray-600'
+                }`}
               title="Filter by a specific day"
             />
           </div>
@@ -280,9 +287,8 @@ export const Dashboard: React.FC = () => {
           <select
             value={year}
             onChange={e => selectYear(e.target.value)}
-            className={`px-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20 transition-colors ${
-              year ? 'border-[#0F2C59] bg-[#0F2C59]/5 text-[#0F2C59] font-semibold' : 'border-gray-200 bg-gray-50 text-gray-600'
-            }`}
+            className={`px-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0F2C59]/20 transition-colors ${year ? 'border-[#0F2C59] bg-[#0F2C59]/5 text-[#0F2C59] font-semibold' : 'border-gray-200 bg-gray-50 text-gray-600'
+              }`}
           >
             <option value="">Year</option>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}

@@ -6,6 +6,7 @@ import {
   RefreshCw, ShieldCheck, Zap, Calendar, Bike, Wrench, Sparkles,
   Phone, MessageCircle, Info, MapPin, UserX, UserCheck, ExternalLink, FileText, Trash2
 } from 'lucide-react';
+import { TreasuryBanner, type PlatformTreasury } from '../components/TreasuryBanner';
 
 interface PayoutRequestItem {
   id: string;
@@ -36,6 +37,7 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
   const [loading, setLoading] = useState<boolean>(true);
   const [requests, setRequests] = useState<PayoutRequestItem[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [treasury, setTreasury] = useState<PlatformTreasury | null>(null);
 
   // Modal State for Disbursing Payout (Marking Paid with UTR)
   const [activePayoutForComplete, setActivePayoutForComplete] = useState<PayoutRequestItem | null>(null);
@@ -94,6 +96,7 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
       const res: any = await api.get(`/api/admin/payouts?${queryParams.toString()}`);
       if (res?.requests) setRequests(res.requests);
       if (res?.stats) setStats(res.stats);
+      if (res?.treasury) setTreasury(res.treasury);
     } catch (err: any) {
       console.error('Failed to load fleet payouts:', err);
       setActionMessage({ text: err.message || 'Failed to load fleet payouts.', isError: true });
@@ -315,6 +318,9 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
           <button onClick={() => setActionMessage(null)} className="underline hover:text-slate-900 cursor-pointer">Dismiss</button>
         </div>
       )}
+
+      {/* Unified Platform Treasury Metrics */}
+      <TreasuryBanner initialTreasury={treasury} onRefresh={loadPayouts} />
 
       {/* Role Segments Filter Bar */}
       <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 overflow-x-auto">
@@ -588,8 +594,10 @@ export const FleetPayoutsPage: React.FC<FleetPayoutsPageProps> = ({ onOpenStatem
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        <div className="text-base font-black text-slate-900">{formatINR(req.amount)}</div>
-                        <div className="text-[10px] text-slate-500">Wallet: {formatINR(rider?.walletBalance)}</div>
+                        <div className="text-base font-black text-slate-900 font-mono">{formatINR(req.amount)}</div>
+                        <div className="text-[10.5px] font-medium text-slate-600 mt-0.5">
+                          Pending Left: <strong className="font-mono text-indigo-700">{formatINR(rider?.walletBalance)}</strong>
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4 text-center">

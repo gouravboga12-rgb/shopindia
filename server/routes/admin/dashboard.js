@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../../lib/prisma');
 const { verifyToken }       = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/rbac');
+const { getPlatformTreasuryStats } = require('../../lib/treasury');
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/', async (req, res) => {
 
     const [
       totalUsers, totalVendors, totalRiders, totalOrders,
-      pendingVendors, openTickets, revenueAgg,
+      pendingVendors, openTickets, revenueAgg, treasury,
     ] = await Promise.all([
       prisma.user.count({ where: { role: 'customer', ...branchFilter } }),
       prisma.user.count({ where: { role: 'vendor' } }),
@@ -39,6 +40,7 @@ router.get('/', async (req, res) => {
           ...branchFilter,
         },
       }),
+      getPlatformTreasuryStats().catch(() => null),
     ]);
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -71,6 +73,7 @@ router.get('/', async (req, res) => {
         openTickets,
         totalRevenue: revenueAgg._sum.commission || 0,
       },
+      treasury,
       dailyOrders,
     });
   } catch (err) {
