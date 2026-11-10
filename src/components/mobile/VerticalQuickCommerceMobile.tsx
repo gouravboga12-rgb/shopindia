@@ -5,7 +5,7 @@ import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
   Plus, Minus, Clock, Heart,
-  Zap, UtensilsCrossed, Pill, ShieldCheck, Store
+  Zap, UtensilsCrossed, Pill, Store
 } from 'lucide-react';
 import type { Product } from '../../data/types';
 import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
@@ -184,27 +184,6 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
         </span>
       </div>
 
-      {/* Pharmacy Prescription CTA banner on mobile */}
-      {activeSubVertical === 'pharmacy' && (
-        <div className="p-3 bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-2xl flex items-center justify-between shadow-md">
-          <div className="space-y-0.5">
-            <h4 className="text-xs font-black flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" /> Have a Doctor's Prescription?
-            </h4>
-            <p className="text-[10px] text-blue-100">Upload now for quick pharmacist verification</p>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedRxProduct(null);
-              setRxModalOpen(true);
-            }}
-            className="px-3 py-1.5 bg-white text-blue-800 font-extrabold text-[11px] rounded-xl shadow-sm hover:bg-blue-50 shrink-0"
-          >
-            Upload Rx
-          </button>
-        </div>
-      )}
-
       {/* Operating Hours Shutters-Down Banner (Mobile Zepto / Blinkit style) */}
       {isShuttersDown && (
         <div className="bg-slate-900 text-white p-3.5 rounded-2xl border border-amber-500/40 shadow-lg flex items-center justify-between gap-3">
@@ -276,7 +255,6 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
             <button
               onClick={() => {
                 setCurrentVertical('shop');
-                navigateTo('home');
               }}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm"
             >

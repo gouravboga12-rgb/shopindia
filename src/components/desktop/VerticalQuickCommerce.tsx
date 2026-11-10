@@ -5,7 +5,7 @@ import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
 import {
   Plus, Minus, Clock, ShoppingCart, ArrowRight, Heart, LayoutGrid,
-  Zap, UtensilsCrossed, Pill, Sparkles, UploadCloud, ShieldCheck, Store
+  Zap, UtensilsCrossed, Pill, Sparkles, Store
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Product } from '../../data/types';
@@ -232,26 +232,8 @@ export const VerticalQuickCommerce: React.FC = () => {
             <p className="text-xs md:text-sm text-white/80 font-medium">
               {activeSubVertical === 'grocery' && 'Dark-store stocked with fresh fruits, farm dairy, and top FMCG brands.'}
               {activeSubVertical === 'food' && 'Live preparation tracking with food safety hygiene guarantee.'}
-              {activeSubVertical === 'pharmacy' && 'Upload doctor prescription for quick doorstep medicine delivery.'}
+              {activeSubVertical === 'pharmacy' && '100% genuine OTC wellness essentials, vitamins, first-aid & health care delivered.'}
             </p>
-
-            {activeSubVertical === 'pharmacy' && (
-              <div className="pt-2 flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    setSelectedRxProduct(null);
-                    setRxModalOpen(true);
-                  }}
-                  className="px-5 py-2.5 bg-white text-blue-800 font-extrabold text-xs rounded-xl shadow-lg hover:bg-blue-50 transition-all flex items-center gap-2"
-                >
-                  <UploadCloud className="w-4 h-4 text-blue-600" />
-                  Upload Prescription (Rx)
-                </button>
-                <span className="text-xs text-white/80 flex items-center gap-1">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" /> Pharmacist Checked
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -351,7 +333,6 @@ export const VerticalQuickCommerce: React.FC = () => {
                   <button
                     onClick={() => {
                       setCurrentVertical('shop');
-                      navigateTo('home');
                     }}
                     className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
                   >
