@@ -53,7 +53,7 @@ interface ProfitOrder {
 }
 
 export const FinancePage: React.FC = () => {
-  const [period, setPeriod] = useState<string>('today');
+  const [period, setPeriod] = useState<string>('all');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -255,12 +255,12 @@ export const FinancePage: React.FC = () => {
             <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Day-wise Filter:
           </span>
           {[
+            { id: 'all', label: 'All Time' },
             { id: 'today', label: 'Today' },
             { id: 'yesterday', label: 'Yesterday' },
             { id: '7d', label: 'Last 7 Days' },
             { id: '30d', label: 'Last 30 Days' },
             { id: '90d', label: 'Last 90 Days' },
-            { id: 'all', label: 'All Time' },
             { id: 'custom', label: 'Custom Date Range' },
           ].map((p) => (
             <button
@@ -329,7 +329,7 @@ export const FinancePage: React.FC = () => {
                     Total Profit from Three Platforms
                   </span>
                   <span className="text-xs text-slate-400">
-                    ({period === 'today' ? 'Today' : period === 'yesterday' ? 'Yesterday' : period === '7d' ? 'Last 7 Days' : period === '30d' ? 'Last 30 Days' : 'Selected Period'})
+                    ({period === 'all' ? 'All Time' : period === 'today' ? 'Today' : period === 'yesterday' ? 'Yesterday' : period === '7d' ? 'Last 7 Days' : period === '30d' ? 'Last 30 Days' : 'Selected Period'})
                   </span>
                 </div>
 

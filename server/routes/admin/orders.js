@@ -3,6 +3,8 @@ const prisma = require('../../lib/prisma');
 const { verifyToken }      = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/rbac');
 const { createRefund }     = require('../../lib/razorpay');
+const { getPlatformTreasuryStats } = require('../../lib/treasury');
+const { notifyTreasuryUpdate, getIo } = require('../../lib/socket');
 
 const router = express.Router();
 router.use(verifyToken, requirePermission('manage_orders'));
@@ -246,6 +248,7 @@ router.delete('/:id', async (req, res) => {
     const orderId = req.params.id;
 
     await prisma.$transaction(async (tx) => {
+      // Revert vendor wallet balance if delivered & paid
       if (existing.status === 'delivered' && existing.paymentStatus === 'paid' && existing.vendorId) {
         const vendor = await tx.vendor.findUnique({ where: { id: existing.vendorId } });
         if (vendor) {
@@ -259,6 +262,24 @@ router.delete('/:id', async (req, res) => {
             where: { id: existing.vendorId },
             data: { walletBalance: Math.max(0, (vendor.walletBalance || 0) - netEarnings) },
           });
+        }
+      }
+
+      // Revert rider wallet balance if linked delivery was delivered
+      const linkedDelivery = await tx.delivery.findFirst({ where: { orderId } });
+      if (linkedDelivery && linkedDelivery.riderProfileId && (existing.status === 'delivered' || linkedDelivery.status === 'delivered')) {
+        const rider = await tx.riderProfile.findUnique({ where: { id: linkedDelivery.riderProfileId } });
+        if (rider) {
+          const riderFee = Number(linkedDelivery.deliveryFee || 0);
+          if (riderFee > 0) {
+            await tx.riderProfile.update({
+              where: { id: linkedDelivery.riderProfileId },
+              data: {
+                walletBalance: Math.max(0, (rider.walletBalance || 0) - riderFee),
+                totalDeliveries: Math.max(0, (rider.totalDeliveries || 1) - 1),
+              },
+            });
+          }
         }
       }
 
@@ -284,6 +305,18 @@ router.delete('/:id', async (req, res) => {
       await tx.orderItem.deleteMany({ where: { orderId } });
       await tx.order.delete({ where: { id: orderId } });
     });
+
+    // Notify sockets and broadcast updated platform treasury stats
+    try {
+      const io = getIo ? getIo() : null;
+      if (io) {
+        io.emit('order:deleted', { orderId, orderNumber: existing.orderNumber });
+      }
+      const updatedTreasury = await getPlatformTreasuryStats();
+      notifyTreasuryUpdate(updatedTreasury);
+    } catch (sockErr) {
+      console.warn('Socket notification error on order delete:', sockErr.message);
+    }
 
     res.json({ success: true, message: 'Order deleted successfully.' });
   } catch (err) {

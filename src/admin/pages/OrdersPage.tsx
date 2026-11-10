@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useSocketEvent } from '../../lib/socket';
-import { Search, RefreshCw, Eye, Download, Calendar } from 'lucide-react';
+import { Search, RefreshCw, Eye, Download, Calendar, Trash2 } from 'lucide-react';
 import { OrderDetailsModal } from '../components/OrderDetailsModal';
 import { generateAndPrintInvoice } from '../../utils/invoiceGenerator';
 
@@ -18,6 +18,8 @@ export const OrdersPage: React.FC = () => {
   const [refundAmount, setRefundAmount] = useState<number>(0);
   const [refundReason, setRefundReason] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const load = () => {
     setLoading(true);
@@ -29,13 +31,21 @@ export const OrdersPage: React.FC = () => {
 
   useEffect(load, []);
 
-  // Real-time updates on incoming orders and status changes
+  // Real-time updates on incoming orders, status changes, and deletions
   useSocketEvent('order:created', () => {
     load();
   });
 
   useSocketEvent('order:status_changed', () => {
     load();
+  });
+
+  useSocketEvent('order:deleted', (data: any) => {
+    if (data?.orderId) {
+      setOrders(prev => prev.filter(o => o.id !== data.orderId && o._id !== data.orderId));
+    } else {
+      load();
+    }
   });
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -50,6 +60,21 @@ export const OrdersPage: React.FC = () => {
       alert(err.message || 'Failed to update order status');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    const targetId = deleteModal.id || deleteModal._id;
+    try {
+      await api.delete(`/api/admin/orders/${targetId}`);
+      setOrders(prev => prev.filter(o => o.id !== targetId && o._id !== targetId));
+      setDeleteModal(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete order.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -214,151 +239,162 @@ export const OrdersPage: React.FC = () => {
 
       {/* Orders Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-premium overflow-hidden">
-        <table className="w-full text-xs text-left">
-          <thead className="bg-gray-50/80 border-b border-gray-100 text-gray-500 uppercase tracking-wider text-[11px]">
-            <tr>
-              <th className="px-5 py-3.5 font-bold">Order ID</th>
-              <th className="px-5 py-3.5 font-bold">Customer</th>
-              <th className="px-5 py-3.5 font-bold">Vendor</th>
-              <th className="px-5 py-3.5 font-bold">Type</th>
-              <th className="px-5 py-3.5 font-bold">Total</th>
-              <th className="px-5 py-3.5 font-bold">Status</th>
-              <th className="px-5 py-3.5 font-bold">Date</th>
-              <th className="px-5 py-3.5 font-bold text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}><td colSpan={8} className="px-5 py-5"><div className="h-4 skeleton-shimmer rounded" /></td></tr>
-              ))
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-14 text-gray-400 font-medium">No orders found matching filters.</td></tr>
-            ) : (
-              filtered.map(o => {
-                const customer = o.customer || o.customerId;
-                const vendor = o.vendor || o.items?.[0]?.product?.vendor;
-                const orderId = o.id || o._id;
-                const itemsCount = o.items?.length || 1;
-                const firstItemName = o.items?.[0]?.name || o.items?.[0]?.title;
+        <div className="overflow-x-auto w-full">
+          <table className="min-w-[1150px] w-full text-xs text-left">
+            <thead className="bg-gray-50/80 border-b border-gray-100 text-gray-500 uppercase tracking-wider text-[11px]">
+              <tr>
+                <th className="px-5 py-3.5 font-bold min-w-[200px]">Order ID</th>
+                <th className="px-5 py-3.5 font-bold min-w-[190px]">Customer</th>
+                <th className="px-5 py-3.5 font-bold min-w-[190px]">Vendor</th>
+                <th className="px-5 py-3.5 font-bold min-w-[120px]">Type</th>
+                <th className="px-5 py-3.5 font-bold min-w-[110px]">Total</th>
+                <th className="px-5 py-3.5 font-bold min-w-[150px]">Status</th>
+                <th className="px-5 py-3.5 font-bold min-w-[110px]">Date</th>
+                <th className="px-5 py-3.5 font-bold min-w-[180px] text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i}><td colSpan={8} className="px-5 py-5"><div className="h-4 skeleton-shimmer rounded" /></td></tr>
+                ))
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-14 text-gray-400 font-medium">No orders found matching filters.</td></tr>
+              ) : (
+                filtered.map(o => {
+                  const customer = o.customer || o.customerId;
+                  const vendor = o.vendor || o.items?.[0]?.product?.vendor;
+                  const orderId = o.id || o._id;
+                  const itemsCount = o.items?.length || 1;
+                  const firstItemName = o.items?.[0]?.name || o.items?.[0]?.title;
 
-                return (
-                  <tr key={orderId} className="hover:bg-gray-50/50 transition-colors">
-                    {/* Order ID Column */}
-                    <td className="px-5 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-mono font-black text-gray-900 text-xs tracking-tight">{o.orderNumber}</span>
-                        {firstItemName && (
-                          <span className="text-[11px] text-gray-400 truncate max-w-[200px]" title={firstItemName}>
-                            {firstItemName} {itemsCount > 1 ? `+${itemsCount - 1} more` : ''}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Customer */}
-                    <td className="px-5 py-4">
-                      <p className="font-bold text-gray-900">{customer?.name || 'Customer'}</p>
-                      <p className="text-[11px] text-gray-400">{customer?.email}</p>
-                      {customer?.phone && <p className="text-[10px] text-gray-400 font-mono">{customer?.phone}</p>}
-                    </td>
-
-                    {/* Vendor */}
-                    <td className="px-5 py-4">
-                      {vendor?.businessName ? (
+                  return (
+                    <tr key={orderId} className="hover:bg-gray-50/50 transition-colors">
+                      {/* Order ID Column */}
+                      <td className="px-5 py-4 min-w-[200px]">
                         <div className="flex flex-col">
-                          <span className="font-bold text-gray-900 text-xs">{vendor.businessName}</span>
-                          {vendor.phone && (
-                            <span className="text-[11px] text-gray-500 font-mono">{vendor.phone}</span>
-                          )}
-                          {vendor.email && (
-                            <span className="text-[10px] text-gray-400 truncate max-w-[140px]">{vendor.email}</span>
+                          <span className="font-mono font-black text-gray-900 text-xs tracking-tight whitespace-nowrap">{o.orderNumber}</span>
+                          {firstItemName && (
+                            <span className="text-[11px] text-gray-400 truncate max-w-[220px]" title={firstItemName}>
+                              {firstItemName} {itemsCount > 1 ? `+${itemsCount - 1} more` : ''}
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-gray-400 italic text-[11px] px-2 py-0.5 rounded bg-gray-50 border border-gray-100">
-                          ShopIndia Direct
-                        </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Type */}
-                    <td className="px-5 py-4">
-                      <span className="capitalize text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">
-                        {o.type?.replace('_', ' ')}
-                      </span>
-                    </td>
+                      {/* Customer */}
+                      <td className="px-5 py-4 min-w-[190px]">
+                        <p className="font-bold text-gray-900">{customer?.name || 'Customer'}</p>
+                        <p className="text-[11px] text-gray-400">{customer?.email}</p>
+                        {customer?.phone && <p className="text-[10px] text-gray-400 font-mono">{customer?.phone}</p>}
+                      </td>
 
-                    {/* Total */}
-                    <td className="px-5 py-4 font-numbers font-bold text-gray-900 text-xs">
-                      ₹{o.total?.toLocaleString('en-IN')}
-                    </td>
-
-                    {/* Status with Inline Dropdown */}
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          disabled={updatingId === orderId}
-                          value={o.status}
-                          onChange={(e) => handleStatusChange(orderId, e.target.value)}
-                          className={`text-xs font-bold px-2.5 py-1 rounded-xl border focus:outline-none cursor-pointer transition-all ${
-                            o.status === 'delivered' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                            o.status === 'cancelled' || o.status === 'refunded' ? 'bg-red-50 border-red-200 text-red-700' :
-                            'bg-amber-50 border-amber-200 text-amber-700'
-                          }`}
-                        >
-                          <option value="placed">Placed</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="processing">Processing</option>
-                          <option value="shipped">Shipped</option>
-                          <option value="out_for_delivery">Out for Delivery</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                          <option value="refunded">Refunded</option>
-                        </select>
-                      </div>
-                    </td>
-
-                    {/* Date */}
-                    <td className="px-5 py-4 text-gray-400 text-[11px]">{o.createdAt?.slice(0, 10)}</td>
-
-                    {/* Actions */}
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => setSelectedOrder(o)}
-                          className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[11px] flex items-center gap-1 transition-colors"
-                          title="View Details"
-                        >
-                          <Eye size={12} />
-                          <span>Details</span>
-                        </button>
-
-                        <button
-                          onClick={() => generateAndPrintInvoice(o)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                          title="Print Invoice"
-                        >
-                          <Download size={13} />
-                        </button>
-
-                        {o.status !== 'refunded' && o.status !== 'cancelled' && (
-                          <button
-                            onClick={() => { setRefundModal(o); setRefundAmount(o.total); }}
-                            className="px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[11px] font-bold flex items-center gap-1 transition-colors"
-                            title="Refund"
-                          >
-                            <RefreshCw size={11} /> Refund
-                          </button>
+                      {/* Vendor */}
+                      <td className="px-5 py-4 min-w-[190px]">
+                        {vendor?.businessName ? (
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 text-xs">{vendor.businessName}</span>
+                            {vendor.phone && (
+                              <span className="text-[11px] text-gray-500 font-mono">{vendor.phone}</span>
+                            )}
+                            {vendor.email && (
+                              <span className="text-[10px] text-gray-400 truncate max-w-[160px]">{vendor.email}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic text-[11px] px-2 py-0.5 rounded bg-gray-50 border border-gray-100">
+                            ShopIndia Direct
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      </td>
+
+                      {/* Type */}
+                      <td className="px-5 py-4 min-w-[120px]">
+                        <span className="capitalize text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 whitespace-nowrap">
+                          {o.type?.replace('_', ' ')}
+                        </span>
+                      </td>
+
+                      {/* Total */}
+                      <td className="px-5 py-4 min-w-[110px] font-numbers font-bold text-gray-900 text-xs whitespace-nowrap">
+                        ₹{o.total?.toLocaleString('en-IN')}
+                      </td>
+
+                      {/* Status with Inline Dropdown */}
+                      <td className="px-5 py-4 min-w-[150px]">
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            disabled={updatingId === orderId}
+                            value={o.status}
+                            onChange={(e) => handleStatusChange(orderId, e.target.value)}
+                            className={`text-xs font-bold px-2.5 py-1 rounded-xl border focus:outline-none cursor-pointer transition-all ${
+                              o.status === 'delivered' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                              o.status === 'cancelled' || o.status === 'refunded' ? 'bg-red-50 border-red-200 text-red-700' :
+                              'bg-amber-50 border-amber-200 text-amber-700'
+                            }`}
+                          >
+                            <option value="placed">Placed</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="out_for_delivery">Out for Delivery</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="refunded">Refunded</option>
+                          </select>
+                        </div>
+                      </td>
+
+                      {/* Date */}
+                      <td className="px-5 py-4 min-w-[110px] text-gray-400 text-[11px] whitespace-nowrap">{o.createdAt?.slice(0, 10)}</td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4 min-w-[180px] text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedOrder(o)}
+                            className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                            title="View Details"
+                          >
+                            <Eye size={12} />
+                            <span>Details</span>
+                          </button>
+
+                          <button
+                            onClick={() => generateAndPrintInvoice(o)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer"
+                            title="Print Invoice"
+                          >
+                            <Download size={13} />
+                          </button>
+
+                          {o.status !== 'refunded' && o.status !== 'cancelled' && (
+                            <button
+                              onClick={() => { setRefundModal(o); setRefundAmount(o.total); }}
+                              className="px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Refund"
+                            >
+                              <RefreshCw size={11} /> Refund
+                            </button>
+                          )}
+
+                          {/* Super Admin Permanent Delete */}
+                          <button
+                            onClick={() => setDeleteModal(o)}
+                            className="p-1.5 rounded-lg text-red-600 hover:text-white hover:bg-red-600 bg-red-50 transition-colors cursor-pointer"
+                            title="Permanently Delete Order from Database"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Order Details Modal */}
@@ -398,8 +434,54 @@ export const OrdersPage: React.FC = () => {
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={() => setRefundModal(null)} className="flex-1 py-2.5 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button onClick={processRefund} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 shadow-md">Confirm Refund</button>
+              <button onClick={() => setRefundModal(null)} className="flex-1 py-2.5 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer">Cancel</button>
+              <button onClick={processRefund} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 shadow-md cursor-pointer">Confirm Refund</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-base">Permanently Delete Order</h3>
+                <p className="text-xs text-gray-500">Order: <span className="font-mono font-bold text-gray-800">{deleteModal.orderNumber}</span></p>
+              </div>
+            </div>
+
+            <p className="text-xs text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 font-medium leading-relaxed">
+              <strong>Warning:</strong> This will permanently erase this order and its tracking, items, and linked records from the database. Any delivered partner earnings will be reverted.
+            </p>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                disabled={deleting}
+                onClick={() => setDeleteModal(null)}
+                className="flex-1 py-2.5 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleting}
+                onClick={handleDeleteOrder}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" /> Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={13} /> Confirm Delete
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
