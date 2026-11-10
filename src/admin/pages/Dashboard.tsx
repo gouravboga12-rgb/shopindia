@@ -217,10 +217,10 @@ export const Dashboard: React.FC = () => {
         <StatCard icon={<Store className="w-5 h-5 text-emerald-600" />} label="Vendors"          value={fmt(stats?.totalVendors ?? 0)} sub={`${stats?.pendingVendors} pending`} color="bg-emerald-50" />
         <StatCard icon={<Bike className="w-5 h-5 text-orange-600" />}   label="Riders"           value={fmt(stats?.totalRiders  ?? 0)} color="bg-orange-50"  />
         <StatCard icon={<ShoppingBag className="w-5 h-5 text-purple-600" />} label="Total Orders" value={fmt(stats?.totalOrders ?? 0)} color="bg-purple-50"  />
-        <StatCard icon={<DollarSign className="w-5 h-5 text-green-600" />}   label="Total Revenue" value={fmtRs(stats?.totalRevenue ?? 0)} color="bg-green-50" />
+        <StatCard icon={<DollarSign className="w-5 h-5 text-green-600" />}   label="Platform Margin Revenue" value={fmtRs(stats?.totalRevenue ?? 0)} sub="Net commission earned" color="bg-green-50" />
         <StatCard icon={<AlertCircle className="w-5 h-5 text-red-600" />}    label="Open Tickets"  value={fmt(stats?.openTickets  ?? 0)} color="bg-red-50"    />
         <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />}        label="Pending Approvals" value={fmt(stats?.pendingVendors ?? 0)} sub="vendors awaiting review" color="bg-amber-50" />
-        <StatCard icon={<TrendingUp className="w-5 h-5 text-indigo-600" />}  label="Avg Order Value"   value={fmtRs(stats ? Math.round(stats.totalRevenue / (stats.totalOrders || 1)) : 0)} color="bg-indigo-50" />
+        <StatCard icon={<TrendingUp className="w-5 h-5 text-indigo-600" />}  label="Avg Margin / Order" value={fmtRs(stats ? Math.round(stats.totalRevenue / (stats.totalOrders || 1)) : 0)} sub="Commission per order" color="bg-indigo-50" />
       </div>
 
       {/* Revenue Chart */}
@@ -228,8 +228,8 @@ export const Dashboard: React.FC = () => {
         {/* Header row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
-            <h2 className="font-bold text-gray-900">Revenue — {activeLabel}</h2>
-            <p className="text-sm text-gray-500">Daily revenue trend</p>
+            <h2 className="font-bold text-gray-900">Platform Margin — {activeLabel}</h2>
+            <p className="text-sm text-gray-500">Net platform profit margin from order commissions</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <ArrowUpRight className="w-4 h-4 text-emerald-600 hidden sm:block" />
@@ -451,9 +451,10 @@ export const Dashboard: React.FC = () => {
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     {p.data._id}
                   </p>
-                  <p className="text-sm font-bold text-gray-900 mt-0.5">
+                  <p className="text-sm font-bold text-emerald-600 mt-0.5">
                     {fmtRs(p.data.revenue)}
                   </p>
+                  <p className="text-[10px] text-gray-400">Net Profit Margin</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {p.data.count} {p.data.count === 1 ? 'order' : 'orders'}
                   </p>

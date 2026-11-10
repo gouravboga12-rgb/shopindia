@@ -3,6 +3,45 @@ import { ShieldCheck, CheckCircle2, AlertCircle, Building2, MapPin, RefreshCw } 
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 import { api } from '../../lib/api';
 
+export const INDIAN_STATES_AND_UTS = [
+  'Andaman and Nicobar Islands',
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chandigarh',
+  'Chhattisgarh',
+  'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jammu and Kashmir',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Ladakh',
+  'Lakshadweep',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Puducherry',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal'
+];
+
 interface RegionalAdminRegisterProps {
   onSwitchToLogin: () => void;
 }
@@ -41,13 +80,19 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
       const cityOrDistrict = geocoded.city || geocoded.district || 'Hub';
       const autoRegionName = areaOrMandal ? `${areaOrMandal} Hub (${cityOrDistrict})` : `${cityOrDistrict} Regional Hub`;
 
-      setFormData((prev) => ({
-        ...prev,
-        regionName: autoRegionName,
-        district: geocoded.district || geocoded.city || prev.district,
-        state: geocoded.state || prev.state,
-        assignedPincodes: geocoded.pincode || prev.assignedPincodes,
-      }));
+      setFormData((prev) => {
+        const matchedState = INDIAN_STATES_AND_UTS.find(
+          (s) => s.toLowerCase() === (geocoded.state || '').toLowerCase()
+        ) || geocoded.state || prev.state;
+
+        return {
+          ...prev,
+          regionName: autoRegionName,
+          district: geocoded.district || geocoded.city || prev.district,
+          state: matchedState,
+          assignedPincodes: geocoded.pincode || prev.assignedPincodes,
+        };
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to detect territory via Mapbox GPS.');
     } finally {
@@ -262,18 +307,18 @@ export const RegionalAdminRegister: React.FC<RegionalAdminRegisterProps> = ({ on
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">State</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">State / Territory</label>
                 <select
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                 >
-                  <option value="Telangana">Telangana</option>
-                  <option value="Andhra Pradesh">Andhra Pradesh</option>
-                  <option value="Karnataka">Karnataka</option>
-                  <option value="Maharashtra">Maharashtra</option>
-                  <option value="Tamil Nadu">Tamil Nadu</option>
+                  {INDIAN_STATES_AND_UTS.map((state) => (
+                    <option key={state} value={state}>
+                      {state}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

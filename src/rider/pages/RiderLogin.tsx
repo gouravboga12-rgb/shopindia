@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Sparkles,
   Check,
+  Upload,
 } from 'lucide-react';
 import { detectCurrentLocationWithMapbox, type GeocodedAddress } from '../../lib/mapbox';
 import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
@@ -46,13 +47,45 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
     vehicleType: 'bike',
     vehicleNumber: '',
     licenseNumber: '',
+    licenseUrl: '',
     aadhaarNumber: '',
+    aadhaarUrl: '',
     panNumber: '',
+    panUrl: '',
+    rcUrl: '',
     address: '',
     currentLat: undefined as number | undefined,
     currentLng: undefined as number | undefined,
     serviceRadiusKm: 25,
   });
+
+  const [uploadingDoc, setUploadingDoc] = useState<{ [key: string]: boolean }>({});
+  const [docFileNames, setDocFileNames] = useState<{ [key: string]: string }>({});
+
+  const handleUploadDoc = async (file: File, docType: 'rc' | 'aadhaar' | 'pan' | 'license') => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('docType', docType);
+    setUploadingDoc(prev => ({ ...prev, [docType]: true }));
+    setDocFileNames(prev => ({ ...prev, [docType]: file.name }));
+    setError(null);
+
+    try {
+      const res = await fetch('/api/rider/auth/upload-doc', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const urlKey = docType === 'rc' ? 'rcUrl' : docType === 'aadhaar' ? 'aadhaarUrl' : docType === 'pan' ? 'panUrl' : 'licenseUrl';
+      setFormData(prev => ({ ...prev, [urlKey]: data.url }));
+    } catch (err: any) {
+      setError(`Failed to upload ${docType.toUpperCase()}: ${err.message}`);
+      setDocFileNames(prev => ({ ...prev, [docType]: '' }));
+    } finally {
+      setUploadingDoc(prev => ({ ...prev, [docType]: false }));
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -123,6 +156,16 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
           formData.skills.length === 0
         ) {
           throw new Error('Please select at least one service skill to register as a service partner.');
+        }
+
+        // Vehicle RC is mandatory for delivery or vehicle partners
+        if (!formData.rcUrl) {
+          throw new Error('Vehicle RC (Registration Certificate) document upload is mandatory.');
+        }
+
+        // Aadhaar Card is mandatory
+        if (!formData.aadhaarUrl) {
+          throw new Error('Aadhaar Card document upload is mandatory for identity verification.');
         }
 
         const res = await fetch('/api/rider/auth/register', {
@@ -528,6 +571,152 @@ export const RiderLogin: React.FC<RiderLoginProps> = ({ initialRegister = false 
                     onChange={handleChange}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition-colors"
                   />
+                </div>
+              </div>
+
+              {/* KYC Document Uploads Grid */}
+              <div className="p-3.5 bg-orange-50/50 border border-orange-200/80 rounded-2xl space-y-3">
+                <span className="text-xs font-bold text-orange-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-orange-600" />
+                  Mandatory KYC & Verification Documents
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* 1. Vehicle RC (Mandatory) */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Vehicle RC <span className="text-red-500">* (Mandatory)</span>
+                      </label>
+                      {formData.rcUrl && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-slate-500">Registration Certificate of your delivery vehicle</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploadingDoc['rc'] ? 'Uploading...' : formData.rcUrl ? 'Change' : 'Upload RC'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          disabled={uploadingDoc['rc']}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadDoc(file, 'rc');
+                          }}
+                        />
+                      </label>
+                      <span className="text-[11px] text-slate-600 truncate max-w-[140px]">
+                        {docFileNames['rc'] || (formData.rcUrl ? 'RC Attached' : 'No file chosen')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. Aadhaar Card (Mandatory) */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Aadhaar Card <span className="text-red-500">* (Mandatory)</span>
+                      </label>
+                      {formData.aadhaarUrl && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-slate-500">Clear photo or scan of front & back Aadhaar</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploadingDoc['aadhaar'] ? 'Uploading...' : formData.aadhaarUrl ? 'Change' : 'Upload Aadhaar'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          disabled={uploadingDoc['aadhaar']}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadDoc(file, 'aadhaar');
+                          }}
+                        />
+                      </label>
+                      <span className="text-[11px] text-slate-600 truncate max-w-[140px]">
+                        {docFileNames['aadhaar'] || (formData.aadhaarUrl ? 'Aadhaar Attached' : 'No file chosen')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 3. PAN Card (Optional) */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        PAN Card <span className="text-slate-400 font-normal">(Optional)</span>
+                      </label>
+                      {formData.panUrl && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-slate-500">PAN card copy for direct tax compliance</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploadingDoc['pan'] ? 'Uploading...' : formData.panUrl ? 'Change' : 'Upload PAN'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          disabled={uploadingDoc['pan']}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadDoc(file, 'pan');
+                          }}
+                        />
+                      </label>
+                      <span className="text-[11px] text-slate-600 truncate max-w-[140px]">
+                        {docFileNames['pan'] || (formData.panUrl ? 'PAN Attached' : 'No file chosen')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 4. Driving License (Optional) */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Driving License <span className="text-slate-400 font-normal">(Optional)</span>
+                      </label>
+                      {formData.licenseUrl && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-slate-500">Valid motor vehicle driving license</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploadingDoc['license'] ? 'Uploading...' : formData.licenseUrl ? 'Change' : 'Upload DL'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          disabled={uploadingDoc['license']}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadDoc(file, 'license');
+                          }}
+                        />
+                      </label>
+                      <span className="text-[11px] text-slate-600 truncate max-w-[140px]">
+                        {docFileNames['license'] || (formData.licenseUrl ? 'DL Attached' : 'No file chosen')}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

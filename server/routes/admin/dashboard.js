@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
       prisma.vendor.count({ where: { approvalStatus: 'pending' } }),
       prisma.ticket.count({ where: { status: { in: ['open', 'in_progress'] } } }), // Not filtered by branch yet for simplicity
       prisma.order.aggregate({
-        _sum: { total: true },
+        _sum: { commission: true },
         where: {
           paymentStatus: 'paid',
           status: { notIn: ['cancelled', 'refunded', 'returned'] },
@@ -49,7 +49,7 @@ router.get('/', async (req, res) => {
         paymentStatus: { notIn: ['refunded', 'failed'] },
         ...branchFilter,
       },
-      select: { createdAt: true, total: true },
+      select: { createdAt: true, commission: true },
     });
 
     const dailyMap = {};
@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
       const day = o.createdAt.toISOString().slice(0, 10);
       if (!dailyMap[day]) dailyMap[day] = { _id: day, count: 0, revenue: 0 };
       dailyMap[day].count += 1;
-      dailyMap[day].revenue += (o.total || 0);
+      dailyMap[day].revenue += (o.commission || 0);
     });
     const dailyOrders = Object.values(dailyMap).sort((a, b) => a._id.localeCompare(b._id));
 
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
         totalOrders,
         pendingVendors,
         openTickets,
-        totalRevenue: revenueAgg._sum.total || 0,
+        totalRevenue: revenueAgg._sum.commission || 0,
       },
       dailyOrders,
     });
@@ -128,7 +128,7 @@ router.get('/revenue-chart', async (req, res) => {
         paymentStatus: { notIn: ['refunded', 'failed'] },
         ...branchFilter,
       },
-      select: { createdAt: true, total: true },
+      select: { createdAt: true, commission: true },
     });
 
     const map = {};
@@ -144,7 +144,7 @@ router.get('/revenue-chart', async (req, res) => {
       }
       if (!map[key]) map[key] = { _id: key, count: 0, revenue: 0 };
       map[key].count   += 1;
-      map[key].revenue += (o.total || 0);
+      map[key].revenue += (o.commission || 0);
     });
 
     const chartData = Object.values(map).sort((a, b) => a._id.localeCompare(b._id));
@@ -172,6 +172,7 @@ router.get('/revenue-export', async (req, res) => {
       select: {
         orderNumber:   true,
         total:         true,
+        commission:    true,
         status:        true,
         paymentStatus: true,
         createdAt:     true,
@@ -183,16 +184,17 @@ router.get('/revenue-export', async (req, res) => {
     });
 
     const data = orders.map(o => ({
-      Order_ID:       o.orderNumber,
-      Date:           o.createdAt.toISOString().split('T')[0],
-      Time:           o.createdAt.toTimeString().slice(0, 5),
-      Customer:       o.customer?.name  || 'N/A',
-      Email:          o.customer?.email || 'N/A',
-      Vendor:         o.vendor?.businessName || 'N/A',
-      Branch:         o.branch?.name || 'Online',
-      Amount_INR:     o.total || 0,
-      Order_Status:   o.status,
-      Payment_Status: o.paymentStatus,
+      Order_ID:             o.orderNumber,
+      Date:                 o.createdAt.toISOString().split('T')[0],
+      Time:                 o.createdAt.toTimeString().slice(0, 5),
+      Customer:             o.customer?.name  || 'N/A',
+      Email:                o.customer?.email || 'N/A',
+      Vendor:               o.vendor?.businessName || 'N/A',
+      Branch:               o.branch?.name || 'Online',
+      Gross_Amount_INR:     o.total || 0,
+      Profit_Margin_INR:    o.commission || 0,
+      Order_Status:         o.status,
+      Payment_Status:       o.paymentStatus,
     }));
 
     res.json({ data });

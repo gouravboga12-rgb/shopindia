@@ -145,6 +145,7 @@ router.get('/vendors', async (req, res) => {
         isActive: true,
       },
       include: {
+        documents: true,
         orders: {
           where: {
             status: { in: ['placed', 'confirmed', 'packing', 'processing'] },

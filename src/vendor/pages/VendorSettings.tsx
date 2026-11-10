@@ -3,8 +3,16 @@ import { api } from '../../lib/api';
 import {
   Store, MapPin, Navigation, Landmark, ShieldCheck,
   Save, AlertTriangle, CheckCircle2, RefreshCw, Zap,
-  Compass, Clock, Building2, Phone, Mail, FileText, Power
+  Compass, Clock, Building2, Phone, Mail, FileText, Power,
+  Upload, ExternalLink
 } from 'lucide-react';
+
+interface VendorDoc {
+  id: string;
+  name: string;
+  url: string;
+  uploadedAt: string;
+}
 
 interface VendorSettingsData {
   id: string;
@@ -34,6 +42,7 @@ interface VendorSettingsData {
   category: string | null;
   isActive: boolean;
   isOnline: boolean;
+  documents?: VendorDoc[];
 }
 
 export const VendorSettings: React.FC = () => {
@@ -44,6 +53,7 @@ export const VendorSettings: React.FC = () => {
   const [detectingGps, setDetectingGps] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'store' | 'location' | 'banking'>('store');
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const [form, setForm] = useState<VendorSettingsData>({
     id: '',
@@ -153,6 +163,34 @@ export const VendorSettings: React.FC = () => {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const handleUploadDoc = async (file: File, name: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('docType', name.includes('Aadhaar') ? 'aadhaar' : 'business_proof');
+    setUploadingDoc(true);
+    setErrorMsg(null);
+    try {
+      const uploadRes = await fetch('/api/vendor/settings/upload-doc', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: fd,
+      });
+      const data = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(data.error || 'Upload failed');
+      await api.post('/api/vendor/settings/documents', { name, url: data.url });
+      const refreshed = await api.get<{ settings: VendorSettingsData }>('/api/vendor/settings');
+      if (refreshed?.settings) setForm(refreshed.settings);
+      setSuccessMsg(`${name} updated successfully!`);
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: any) {
+      setErrorMsg(`Failed to upload ${name}: ${err.message}`);
+    } finally {
+      setUploadingDoc(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -444,6 +482,119 @@ export const VendorSettings: React.FC = () => {
                     onChange={e => setForm({ ...form, panNumber: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
+                </div>
+              </div>
+
+              {/* KYC & Verification Documents Section */}
+              <div className="pt-4 border-t border-gray-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    KYC & Business Verification Documents
+                  </span>
+                  {uploadingDoc && (
+                    <span className="text-xs text-emerald-600 font-semibold animate-pulse flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Uploading document...
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Aadhaar Card */}
+                  {(() => {
+                    const aadhaarDoc = form.documents?.find(d => d.name.toLowerCase().includes('aadhaar'));
+                    return (
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-800">Aadhaar Card</span>
+                          {aadhaarDoc ? (
+                            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified / Attached
+                            </span>
+                          ) : (
+                            <span className="text-[10.5px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                              Missing
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10.5px] text-gray-500">Government identity verification document</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          {aadhaarDoc?.url && (
+                            <a
+                              href={aadhaarDoc.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1 bg-white border border-gray-200 hover:border-emerald-500 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3 text-emerald-600" /> View
+                            </a>
+                          )}
+                          <label className="cursor-pointer px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
+                            <Upload className="w-3 h-3" />
+                            <span>{aadhaarDoc ? 'Re-upload' : 'Upload Aadhaar'}</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              disabled={uploadingDoc}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleUploadDoc(file, 'Aadhaar Card');
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Business Proof */}
+                  {(() => {
+                    const bizDoc = form.documents?.find(d => !d.name.toLowerCase().includes('aadhaar'));
+                    return (
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-800">Business Registration Proof</span>
+                          {bizDoc ? (
+                            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Attached
+                            </span>
+                          ) : (
+                            <span className="text-[10.5px] font-semibold text-gray-400 bg-gray-200/80 px-2 py-0.5 rounded-full">
+                              Optional
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10.5px] text-gray-500">Shop establishment, Trade License, FSSAI, or GST</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          {bizDoc?.url && (
+                            <a
+                              href={bizDoc.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1 bg-white border border-gray-200 hover:border-emerald-500 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3 text-emerald-600" /> View
+                            </a>
+                          )}
+                          <label className="cursor-pointer px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
+                            <Upload className="w-3 h-3" />
+                            <span>{bizDoc ? 'Re-upload' : 'Upload Proof'}</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              disabled={uploadingDoc}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleUploadDoc(file, 'Business Registration Proof');
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

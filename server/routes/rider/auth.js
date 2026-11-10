@@ -2,11 +2,18 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
+const { uploadToS3 } = require('../../lib/s3');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'shopindia_dev_secret';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 // Configure Nodemailer transporter with Gmail credentials from env
 const transporter = nodemailer.createTransport({
@@ -15,6 +22,28 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER || 'shopindia36@gmail.com',
     pass: process.env.EMAIL_PASS || 'fhpdjjlceuzfppni',
   },
+});
+
+/**
+ * POST /api/rider/auth/upload-doc
+ * Upload Rider KYC documents (RC, Aadhaar, PAN, DL) to S3
+ */
+router.post('/upload-doc', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+    const docType = req.body.docType || 'kyc';
+    const cleanName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const key = `riders/docs/${Date.now()}_${docType}_${cleanName}`;
+    const result = await uploadToS3({
+      key,
+      body: req.file.buffer,
+      contentType: req.file.mimetype,
+    });
+    res.json({ url: result.url, key: result.key, name: req.file.originalname });
+  } catch (err) {
+    console.error('Rider document upload error:', err);
+    res.status(500).json({ error: err.message || 'File upload failed.' });
+  }
 });
 
 /**
@@ -50,6 +79,14 @@ router.post('/register', async (req, res) => {
 
     if (!name || !email || !password || !phone) {
       return res.status(400).json({ error: 'Name, email, phone, and password are required.' });
+    }
+
+    // Vehicle RC and Aadhaar are mandatory
+    if (!rcUrl) {
+      return res.status(400).json({ error: 'Vehicle RC document is mandatory.' });
+    }
+    if (!aadhaarUrl) {
+      return res.status(400).json({ error: 'Aadhaar Card document is mandatory.' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();

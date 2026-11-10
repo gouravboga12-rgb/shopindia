@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { Store, Eye, EyeOff, Loader2, MapPin, Navigation, Zap } from 'lucide-react';
+import { Store, Eye, EyeOff, Loader2, MapPin, Navigation, Zap, Upload, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRegister = false }) => {
@@ -27,10 +27,53 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
   const [pincode, setPincode] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
-  const [deliveryRadiusKm, setDeliveryRadiusKm] = useState<number>(25);
   const [supportsQuick, setSupportsQuick] = useState<boolean>(true);
   const [category, setCategory] = useState<string>('grocery');
   const [detectingGps, setDetectingGps] = useState(false);
+
+  // KYC Document states
+  const [aadhaarUrl, setAadhaarUrl] = useState('');
+  const [aadhaarUploading, setAadhaarUploading] = useState(false);
+  const [aadhaarFileName, setAadhaarFileName] = useState('');
+
+  const [businessProofUrl, setBusinessProofUrl] = useState('');
+  const [businessProofUploading, setBusinessProofUploading] = useState(false);
+  const [businessProofFileName, setBusinessProofFileName] = useState('');
+
+  const handleUploadDoc = async (file: File, docType: 'aadhaar' | 'business_proof') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('docType', docType);
+
+    if (docType === 'aadhaar') {
+      setAadhaarUploading(true);
+      setAadhaarFileName(file.name);
+    } else {
+      setBusinessProofUploading(true);
+      setBusinessProofFileName(file.name);
+    }
+
+    try {
+      const res = await fetch('/api/vendor/auth/upload-doc', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      if (docType === 'aadhaar') {
+        setAadhaarUrl(data.url);
+      } else {
+        setBusinessProofUrl(data.url);
+      }
+    } catch (err: any) {
+      setError(`Failed to upload ${docType === 'aadhaar' ? 'Aadhaar' : 'Business Proof'}: ${err.message}`);
+      if (docType === 'aadhaar') setAadhaarFileName('');
+      else setBusinessProofFileName('');
+    } finally {
+      if (docType === 'aadhaar') setAadhaarUploading(false);
+      else setBusinessProofUploading(false);
+    }
+  };
 
   const handleDetectGps = () => {
     if (!navigator.geolocation) {
@@ -72,10 +115,19 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
 
     try {
       if (isRegister) {
-        // FR-02.1 Vendor registration with store location & radius
+        if (!aadhaarUrl) {
+          setError('Aadhaar Card document upload is mandatory for verification.');
+          setLoading(false);
+          return;
+        }
+
+        // FR-02.1 Vendor registration with store location & KYC docs
         const res = await api.post<any>('/api/vendor/auth/register', {
           name, email, phone, password, businessName, gstNumber, panNumber,
-          street, city, state, pincode, lat, lng, deliveryRadiusKm, supportsQuick, category
+          street, city, state, pincode, lat, lng,
+          deliveryRadiusKm: 10, // Default 5-10 km in background
+          supportsQuick, category,
+          aadhaarUrl, businessProofUrl,
         });
         setSuccess(res.message || 'Registration submitted! Please wait for admin approval.');
         setIsRegister(false);
@@ -233,59 +285,107 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
                   )}
                 </div>
 
-                {/* Hyperlocal Delivery Radius Controls */}
-                <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/70 rounded-2xl space-y-2.5">
+                {/* Quick Commerce Enable Toggle */}
+                <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/70 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                      Quick 10-Min Instant Delivery
+                    </span>
+                    <p className="text-[10.5px] text-gray-500">
+                      Enable instant hyperlocal doorstep fulfillment within 5–10 km
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={supportsQuick}
+                      onChange={e => setSupportsQuick(e.target.checked)}
+                      className="rounded accent-emerald-600"
+                    />
+                    <span>Enabled</span>
+                  </label>
+                </div>
+
+                {/* KYC & Business Documents Upload Section */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-emerald-600" />
-                        Quick Delivery Radius
-                      </span>
-                      <p className="text-[10.5px] text-gray-500">
-                        Customers within this radius from your store will see your quick items.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={supportsQuick}
-                          onChange={e => setSupportsQuick(e.target.checked)}
-                          className="rounded accent-emerald-600"
-                        />
-                        <span>Enable Quick</span>
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      KYC & Business Verification Documents
+                    </span>
+                  </div>
+
+                  {/* 1. Aadhaar Card (Mandatory) */}
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                        Aadhaar Card <span className="text-red-500">* (Mandatory)</span>
                       </label>
-                      <span className="text-xs font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg font-mono">
-                        {deliveryRadiusKm} km
+                      {aadhaarUrl && (
+                        <span className="text-[10.5px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" /> Uploaded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-gray-500">
+                      Upload front & back scan or clear photo of Aadhaar Card (PDF, JPG, PNG)
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{aadhaarUploading ? 'Uploading...' : aadhaarUrl ? 'Change File' : 'Select File'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          disabled={aadhaarUploading}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadDoc(file, 'aadhaar');
+                          }}
+                        />
+                      </label>
+                      <span className="text-xs text-gray-600 truncate max-w-[200px]">
+                        {aadhaarFileName || (aadhaarUrl ? 'Aadhaar Attached' : 'No file chosen')}
                       </span>
                     </div>
                   </div>
 
-                  <input
-                    type="range"
-                    min="5"
-                    max="100"
-                    step="1"
-                    value={deliveryRadiusKm}
-                    onChange={e => setDeliveryRadiusKm(parseInt(e.target.value))}
-                    className="w-full accent-emerald-600 cursor-pointer"
-                  />
-
-                  <div className="flex items-center justify-between gap-1 text-[10px] font-bold">
-                    {[10, 25, 50, 100].map(rad => (
-                      <button
-                        key={rad}
-                        type="button"
-                        onClick={() => setDeliveryRadiusKm(rad)}
-                        className={`px-2 py-0.5 rounded border transition-all ${
-                          deliveryRadiusKm === rad
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
-                        }`}
-                      >
-                        {rad} km
-                      </button>
-                    ))}
+                  {/* 2. Business Proof / Registration (Optional) */}
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                        Business Registration / Proof <span className="text-gray-400 font-normal">(Optional)</span>
+                      </label>
+                      {businessProofUrl && (
+                        <span className="text-[10.5px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" /> Uploaded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-gray-500">
+                      Shop establishment certificate, Trade License, FSSAI, or GST certificate
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{businessProofUploading ? 'Uploading...' : businessProofUrl ? 'Change File' : 'Select File'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          disabled={businessProofUploading}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadDoc(file, 'business_proof');
+                          }}
+                        />
+                      </label>
+                      <span className="text-xs text-gray-600 truncate max-w-[200px]">
+                        {businessProofFileName || (businessProofUrl ? 'Document Attached' : 'No file chosen')}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </>

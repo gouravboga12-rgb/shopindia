@@ -105,6 +105,75 @@ router.post('/check-pincode', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+/** GET /api/admin/service-areas/partner-coverage — all merchant stores, regional hubs, and live service locations */
+router.get('/partner-coverage', async (req, res) => {
+  try {
+    const [vendors, regionalHubs, branches] = await Promise.all([
+      prisma.vendor.findMany({
+        select: {
+          id: true,
+          businessName: true,
+          contactName: true,
+          email: true,
+          phone: true,
+          street: true,
+          city: true,
+          state: true,
+          pincode: true,
+          category: true,
+          deliveryRadiusKm: true,
+          supportsQuick: true,
+          approvalStatus: true,
+          isActive: true,
+          isOnline: true,
+          _count: { select: { products: true, orders: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.regionalAdminProfile.findMany({
+        include: {
+          user: { select: { name: true, email: true, phone: true } },
+          branch: { select: { id: true, name: true, city: true, state: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.branch.findMany({
+        include: {
+          manager: { select: { name: true, email: true, phone: true } },
+          _count: { select: { staff: true, riders: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // Unique cities and pincodes calculation
+    const vendorCities = new Set(vendors.map(v => v.city?.trim()).filter(Boolean));
+    const vendorPincodes = new Set(vendors.map(v => v.pincode?.trim()).filter(Boolean));
+    regionalHubs.forEach(h => {
+      if (h.assignedPincodes && Array.isArray(h.assignedPincodes)) {
+        h.assignedPincodes.forEach(p => p && vendorPincodes.add(p.trim()));
+      }
+      if (h.district) vendorCities.add(h.district.trim());
+    });
+
+    res.json({
+      summary: {
+        totalVendors: vendors.length,
+        quickStoresCount: vendors.filter(v => v.supportsQuick && v.approvalStatus === 'approved').length,
+        regionalHubsCount: regionalHubs.length,
+        citiesCovered: vendorCities.size,
+        pincodesCovered: vendorPincodes.size,
+      },
+      vendors,
+      regionalHubs,
+      branches,
+    });
+  } catch (err) {
+    console.error('Partner coverage fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** GET /api/admin/service-areas/demand-leads — nationwide service demand leads */
 router.get('/demand-leads', async (req, res) => {
   try {

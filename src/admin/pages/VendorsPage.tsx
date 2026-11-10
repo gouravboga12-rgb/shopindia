@@ -3,7 +3,8 @@ import { api } from '../../lib/api';
 import {
   CheckCircle, XCircle, Ban, Search, LayoutDashboard,
   Phone, Mail, MapPin, ExternalLink, MessageCircle,
-  Store, Zap, ShoppingBag, Navigation, Download
+  Store, Zap, ShoppingBag, Navigation, Download,
+  ShieldCheck, FileText, X
 } from 'lucide-react';
 import type { ManagedVendor } from '../AdminPortal';
 
@@ -42,6 +43,7 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
   const [actionId, setActionId]             = useState<string | null>(null);
   const [note, setNote]                     = useState('');
   const [modal, setModal]                   = useState<{ id: string; action: string } | null>(null);
+  const [inspectDocsVendor, setInspectDocsVendor] = useState<any | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -419,6 +421,20 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
                         <div className="flex items-center justify-center gap-2">
                           {/* Status Actions */}
                           <div className="flex items-center gap-1">
+                            {/* KYC Documents Inspector */}
+                            <button
+                              onClick={() => setInspectDocsVendor(v)}
+                              className={`p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold ${
+                                v.documents && v.documents.length > 0
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                  : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                              }`}
+                              title="View KYC Verification Documents (Aadhaar & Business Registration)"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                              <span>KYC ({v.documents?.length || 0})</span>
+                            </button>
+
                             {v.approvalStatus === 'pending' && (
                               <>
                                 <button
@@ -507,6 +523,73 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
                 className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── KYC Documents Inspector Modal ───────────────────────── */}
+      {inspectDocsVendor && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">KYC & Verification Documents</h3>
+                  <p className="text-xs text-gray-500">{inspectDocsVendor.businessName} ({inspectDocsVendor.contactName})</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectDocsVendor(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {inspectDocsVendor.documents && inspectDocsVendor.documents.length > 0 ? (
+                inspectDocsVendor.documents.map((doc: any) => (
+                  <div key={doc.id || doc.url} className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">{doc.name}</div>
+                        <div className="text-[10.5px] text-gray-500">
+                          Uploaded: {new Date(doc.uploadedAt || Date.now()).toLocaleDateString('en-IN')}
+                        </div>
+                      </div>
+                    </div>
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F2C59] text-white text-xs font-semibold hover:bg-[#1a3d73] transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      View Document
+                    </a>
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <FileText className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
+                  <p className="text-xs font-semibold text-gray-600">No KYC documents uploaded yet.</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Documents uploaded during vendor registration will be displayed here.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setInspectDocsVendor(null)}
+                className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

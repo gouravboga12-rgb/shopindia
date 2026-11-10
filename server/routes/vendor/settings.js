@@ -7,10 +7,17 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
 const { registerPickupLocation } = require('../../lib/shiprocket');
+const { uploadToS3 } = require('../../lib/s3');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 router.use(verifyToken, requireRole('vendor'));
 
@@ -27,38 +34,8 @@ router.get('/', async (req, res) => {
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: {
-        id: true,
-        businessName: true,
-        contactName: true,
-        email: true,
-        phone: true,
-        street: true,
-        city: true,
-        state: true,
-        pincode: true,
-        country: true,
-        gstNumber: true,
-        panNumber: true,
-        approvalStatus: true,
-        walletBalance: true,
-        commissionRate: true,
-        accountHolder: true,
-        accountNumber: true,
-        ifsc: true,
-        bankName: true,
-        upiId: true,
-        lat: true,
-        lng: true,
-        deliveryRadiusKm: true,
-        supportsQuick: true,
-        logo: true,
-        description: true,
-        category: true,
-        isActive: true,
-        isOnline: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
+        documents: true,
       },
     });
 
@@ -70,6 +47,55 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('[VendorSettings] GET error:', err);
     res.status(500).json({ error: err.message || 'Failed to load vendor settings.' });
+  }
+});
+
+/** POST /api/vendor/settings/upload-doc — Upload KYC Document */
+router.post('/upload-doc', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+    const docType = req.body.docType || 'kyc';
+    const cleanName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const key = `vendors/docs/${Date.now()}_${docType}_${cleanName}`;
+    const result = await uploadToS3({
+      key,
+      body: req.file.buffer,
+      contentType: req.file.mimetype,
+    });
+    res.json({ url: result.url, key: result.key, name: req.file.originalname });
+  } catch (err) {
+    console.error('Vendor document upload error:', err);
+    res.status(500).json({ error: err.message || 'File upload failed.' });
+  }
+});
+
+/** POST /api/vendor/settings/documents — Add or update KYC document */
+router.post('/documents', async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId;
+    const { name, url } = req.body;
+    if (!name || !url) return res.status(400).json({ error: 'Name and document URL required.' });
+
+    // If document with same name exists, update it, otherwise create
+    const existing = await prisma.vendorDocument.findFirst({
+      where: { vendorId, name },
+    });
+
+    let doc;
+    if (existing) {
+      doc = await prisma.vendorDocument.update({
+        where: { id: existing.id },
+        data: { url, uploadedAt: new Date() },
+      });
+    } else {
+      doc = await prisma.vendorDocument.create({
+        data: { vendorId, name, url },
+      });
+    }
+
+    res.json({ success: true, document: doc });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

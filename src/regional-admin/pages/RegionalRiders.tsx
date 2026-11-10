@@ -7,6 +7,10 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  ShieldCheck,
+  FileText,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { getSkillLabel } from '../../data/partnerSkills';
 
@@ -18,8 +22,12 @@ interface RiderItem {
   vehicleType: string;
   vehicleNumber?: string;
   licenseNumber?: string;
+  licenseUrl?: string;
   aadhaarNumber?: string;
+  aadhaarUrl?: string;
   panNumber?: string;
+  panUrl?: string;
+  rcUrl?: string;
   isOnline: boolean;
   isApproved: boolean;
   isActive: boolean;
@@ -47,6 +55,7 @@ export const RegionalRiders: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'delivery' | 'service' | 'both' | 'pending' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [inspectRiderDocs, setInspectRiderDocs] = useState<RiderItem | null>(null);
 
   const fetchRiders = async () => {
     if (!token) return;
@@ -217,6 +226,17 @@ export const RegionalRiders: React.FC = () => {
                   {rider.experienceYears && (
                     <div><span className="text-slate-400 font-medium">Experience:</span> {rider.experienceYears} Years</div>
                   )}
+                  <div className="pt-1 flex items-center justify-between border-t border-slate-200/60 mt-1">
+                    <span className="text-[10.5px] font-semibold text-slate-500">KYC Verification Files:</span>
+                    <button
+                      type="button"
+                      onClick={() => setInspectRiderDocs(rider)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[10px] transition-colors"
+                    >
+                      <ShieldCheck className="w-3 h-3 text-blue-600" />
+                      View Uploaded Docs
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-1">
@@ -395,13 +415,169 @@ export const RegionalRiders: React.FC = () => {
 
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                   <span className="text-slate-500">Total Deliveries / Jobs:</span>
-                  <span className="font-bold text-slate-900">{rider.totalDeliveries}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900">{rider.totalDeliveries}</span>
+                    <button
+                      type="button"
+                      onClick={() => setInspectRiderDocs(rider)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[10px] transition-colors"
+                      title="Inspect KYC Documents"
+                    >
+                      <ShieldCheck className="w-3 h-3 text-blue-600" />
+                      Docs
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* ─── Rider KYC Documents Inspector Modal ───────────────── */}
+      {inspectRiderDocs && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-blue-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Rider KYC & Vehicle Documents</h3>
+                  <p className="text-xs text-gray-500">{inspectRiderDocs.user?.name} • {inspectRiderDocs.user?.phone || inspectRiderDocs.user?.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectRiderDocs(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Document Details Grid */}
+            <div className="space-y-3">
+              {/* 1. Vehicle RC */}
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <span>Vehicle RC (Registration Certificate)</span>
+                    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-200">Mandatory</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    Vehicle: {inspectRiderDocs.vehicleType?.toUpperCase() || 'BIKE'} • {inspectRiderDocs.vehicleNumber || 'No plate entered'}
+                  </div>
+                </div>
+                {inspectRiderDocs.rcUrl ? (
+                  <a
+                    href={inspectRiderDocs.rcUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0F2C59] text-white text-xs font-bold rounded-lg hover:bg-[#1a3d73] transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> View RC
+                  </a>
+                ) : (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Not Attached
+                  </span>
+                )}
+              </div>
+
+              {/* 2. Aadhaar Card */}
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <span>Aadhaar Card Document</span>
+                    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-200">Mandatory</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    UID: {inspectRiderDocs.aadhaarNumber || 'Not entered'}
+                  </div>
+                </div>
+                {inspectRiderDocs.aadhaarUrl ? (
+                  <a
+                    href={inspectRiderDocs.aadhaarUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0F2C59] text-white text-xs font-bold rounded-lg hover:bg-[#1a3d73] transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> View Aadhaar
+                  </a>
+                ) : (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Not Attached
+                  </span>
+                )}
+              </div>
+
+              {/* 3. PAN Card */}
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-purple-600" />
+                    <span>PAN Card Document</span>
+                    <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded border border-gray-200">Optional</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    PAN: {inspectRiderDocs.panNumber || 'Not entered'}
+                  </div>
+                </div>
+                {inspectRiderDocs.panUrl ? (
+                  <a
+                    href={inspectRiderDocs.panUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0F2C59] text-white text-xs font-bold rounded-lg hover:bg-[#1a3d73] transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> View PAN
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-400">Not Provided</span>
+                )}
+              </div>
+
+              {/* 4. Driving License */}
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-orange-600" />
+                    <span>Driving License (DL)</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    DL No: {inspectRiderDocs.licenseNumber || 'Not entered'}
+                  </div>
+                </div>
+                {inspectRiderDocs.licenseUrl ? (
+                  <a
+                    href={inspectRiderDocs.licenseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0F2C59] text-white text-xs font-bold rounded-lg hover:bg-[#1a3d73] transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> View DL
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-400">Not Provided</span>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInspectRiderDocs(null)}
+                className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
