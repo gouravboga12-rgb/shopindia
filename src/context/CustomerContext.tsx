@@ -64,6 +64,7 @@ export interface CustomerValue {
   markNotificationRead(id: string): void;
   markAllNotificationsRead(): void;
   removeNotification(id: string): void;
+  clearAllNotifications(): void;
   addNotification(n: Omit<DashboardNotification, 'id' | 'isRead' | 'createdAt'>): void;
 
   addReview(r: Omit<Review, 'id' | 'createdAt'>): Promise<void>;
@@ -313,9 +314,30 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   // ── Notifications ──
-  const markNotificationRead = useCallback((id: string) => setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))), []);
-  const markAllNotificationsRead = useCallback(() => setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true }))), []);
-  const removeNotification = useCallback((id: string) => setNotifications((prev) => prev.filter((n) => n.id !== id)), []);
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    api.patch(`/api/customer/notifications/${id}/read`, {}).catch(() => {});
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    api.post('/api/customer/notifications/read-all', {}).catch(() => {});
+  }, []);
+
+  const removeNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    api.delete(`/api/customer/notifications/${id}`).catch(() => {});
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+    try {
+      localStorage.removeItem('shopindia_customer_notifications');
+      localStorage.removeItem('shopindia_notifications');
+    } catch {}
+    api.delete('/api/customer/notifications/clear-all').catch(() => {});
+  }, []);
+
   const addNotification = useCallback((n: Omit<DashboardNotification, 'id' | 'isRead' | 'createdAt'>) => {
     setNotifications((prev) => [{ ...n, id: 'n' + Date.now(), isRead: false, createdAt: now() }, ...prev].slice(0, 100));
   }, []);
@@ -457,7 +479,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     wishlist, savedForLater, recentlyViewed, profile, activities, activityByDay, events, isLoading,
     addAddress, updateAddress, removeAddress, setDefaultAddress,
     addPaymentMethod, removePaymentMethod, setDefaultPaymentMethod,
-    markNotificationRead, markAllNotificationsRead, removeNotification, addNotification,
+    markNotificationRead, markAllNotificationsRead, removeNotification, clearAllNotifications, addNotification,
     addReview, updateReview, removeReview,
     toggleWishlist, moveToWishlist, saveForLater, moveToCart, removeSaved, recordView, clearRecentlyViewed, updateProfile, logActivity,
     isAuthenticated: !!getCustomerToken(),

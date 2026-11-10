@@ -10,7 +10,6 @@ import { ProductDetailPage } from '../../pages/ProductDetail';
 import { CartPage } from '../../pages/Cart';
 import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
-import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
 import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
 import { CartSuccessToast } from '../common/CartSuccessToast';
@@ -44,7 +43,7 @@ export const DesktopApp: React.FC = () => {
       case 'profile':
         return <ProfilePage />;
       case 'notifications':
-        return <NotificationsPage />;
+        return <DashboardInner initialTab="notifications" />;
       case 'dashboard':
         return <DashboardInner />;
       case 'wishlist':

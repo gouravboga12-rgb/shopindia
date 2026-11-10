@@ -8,7 +8,6 @@ import { ProductDetailPage } from '../../pages/ProductDetail';
 import { CartPage } from '../../pages/Cart';
 import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
-import { NotificationsPage } from '../../pages/Notifications';
 import { CategoriesPage } from '../../pages/Categories';
 import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
 import { useCustomer } from '../../context/CustomerContext';
@@ -32,7 +31,7 @@ export const MobileApp: React.FC = () => {
     notifications
   } = useApp();
 
-  const { wishlist } = useCustomer();
+  const { wishlist, isAuthenticated, unread: customerUnread } = useCustomer();
   const wishlistCount = wishlist?.length || 0;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -73,7 +72,7 @@ export const MobileApp: React.FC = () => {
   }, [currentPath]);
 
   const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+  const unreadNotificationsCount = isAuthenticated ? customerUnread : notifications.filter(n => !n.read).length;
 
   const renderActiveScreen = () => {
     switch (currentPath) {
@@ -94,7 +93,7 @@ export const MobileApp: React.FC = () => {
       case 'profile':
         return <ProfilePage />;
       case 'notifications':
-        return <NotificationsPage />;
+        return <DashboardInner initialTab="notifications" />;
       case 'dashboard':
         return <DashboardInner />;
       case 'wishlist':

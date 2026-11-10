@@ -23,7 +23,7 @@ export const DesktopHeader: React.FC = () => {
     notifications
   } = useApp();
 
-  const { isAuthenticated, profile, logout, wishlist } = useCustomer();
+  const { isAuthenticated, profile, logout, wishlist, unread: customerUnread } = useCustomer();
 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -32,7 +32,7 @@ export const DesktopHeader: React.FC = () => {
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const suggestionRef = useRef<HTMLDivElement>(null);
   const { products } = useProducts();
-  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+  const unreadNotificationsCount = isAuthenticated ? customerUnread : notifications.filter(n => !n.read).length;
   const wishlistCount = wishlist?.length || 0;
 
   // Handle outside click for search suggestions

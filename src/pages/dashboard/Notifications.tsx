@@ -16,7 +16,14 @@ const CAT_META: Record<NotificationCategory, { label: string; icon: React.ReactN
 const FILTERS: ('all' | NotificationCategory)[] = ['all', 'order', 'shipping', 'promotion', 'coupon', 'price_drop', 'stock'];
 
 export const NotificationsPage: React.FC = () => {
-  const { notifications, unread, markNotificationRead, markAllNotificationsRead, removeNotification } = useCustomer();
+  const {
+    notifications,
+    unread,
+    markNotificationRead,
+    markAllNotificationsRead,
+    removeNotification,
+    clearAllNotifications,
+  } = useCustomer();
   const [filter, setFilter] = useState<'all' | NotificationCategory>('all');
 
   const filtered = filter === 'all' ? notifications : notifications.filter((n) => n.category === filter);
@@ -26,7 +33,27 @@ export const NotificationsPage: React.FC = () => {
       <PageHeader
         title="Notifications"
         subtitle={`${unread} unread notification${unread === 1 ? '' : 's'}`}
-        actions={unread ? <button onClick={markAllNotificationsRead} className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-button text-xs font-bold text-brand-graphite"><CheckCheck className="w-3.5 h-3.5" /> Mark all read</button> : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            {unread > 0 && (
+              <button
+                onClick={markAllNotificationsRead}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-button text-xs font-bold text-brand-graphite cursor-pointer transition-colors"
+              >
+                <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button
+                onClick={clearAllNotifications}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-button text-xs font-bold cursor-pointer transition-colors"
+                title="Clear all notifications"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear all
+              </button>
+            )}
+          </div>
+        }
       />
 
       {/* Filters */}
