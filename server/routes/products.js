@@ -287,9 +287,14 @@ router.get('/', async (req, res) => {
         isServiceAvailable: vertical === 'services' ? isServiceAvailable : undefined,
         nearbyTechniciansCount: vertical === 'services' ? nearbyTechniciansCount : undefined,
         // Specific metadata inferred or default
-        isVeg:
-          p.tags?.some((t) => t.toLowerCase().includes('veg')) ||
-          !p.tags?.some((t) => t.toLowerCase().includes('non-veg')),
+        isVeg: (() => {
+          const tagsLower = (p.tags || []).map(t => t.toLowerCase().trim());
+          const hasNonVeg = tagsLower.some(t => t === 'non-veg' || t === 'nonveg' || t === 'non veg');
+          if (hasNonVeg) return false;
+          const hasVeg = tagsLower.some(t => t === 'veg' || t === 'pure veg');
+          if (hasVeg) return true;
+          return true;
+        })(),
         prepTime,
         restaurantName: subVertical === 'food' ? p.brand || 'ShopIndia Cloud Kitchen' : undefined,
         cuisine: subVertical === 'food' ? p.tags?.[0] || 'Indian & Continental' : undefined,

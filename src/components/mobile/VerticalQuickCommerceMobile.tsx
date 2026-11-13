@@ -29,6 +29,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
 
   const [activeSubVertical, setActiveSubVertical] = useState<QuickSubVertical>('grocery');
   const [activeCat, setActiveCat] = useState('');
+  const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non_veg'>('all');
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
 
   // Modals state
@@ -65,6 +66,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
   const handleSubVerticalChange = (sub: QuickSubVertical) => {
     setActiveSubVertical(sub);
     setActiveCat('');
+    setDietaryFilter('all');
   };
 
   const quickProducts = products.filter((p) => {
@@ -81,9 +83,17 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
     return !text.includes('pharma') && !text.includes('medicine') && !text.includes('biryani') && !text.includes('pizza') && !text.includes('burger');
   });
 
-  const currentProducts = !activeCat || activeCat === 'All'
+  const baseCurrentProducts = !activeCat || activeCat === 'All'
     ? quickProducts
     : quickProducts.filter((p) => p.category === activeCat || (p.tags && p.tags.includes(activeCat)));
+
+  const currentProducts = baseCurrentProducts.filter((p) => {
+    if (activeSubVertical === 'food' && dietaryFilter !== 'all') {
+      if (dietaryFilter === 'veg') return p.isVeg === true;
+      if (dietaryFilter === 'non_veg') return p.isVeg === false;
+    }
+    return true;
+  });
 
   const getCartQty = (id: string) => {
     const item = cart.find((i) => i.product.id === id);
@@ -238,6 +248,48 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Veg / Non-Veg Filter for Food Section */}
+      {activeSubVertical === 'food' && (
+        <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200/80 shadow-2xs self-start">
+          <button
+            onClick={() => setDietaryFilter('all')}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+              dietaryFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            All Food
+          </button>
+          <button
+            onClick={() => setDietaryFilter('veg')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+              dietaryFilter === 'veg'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-emerald-700 hover:bg-emerald-50'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-xs border border-current flex items-center justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            </span>
+            <span>Pure Veg</span>
+          </button>
+          <button
+            onClick={() => setDietaryFilter('non_veg')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+              dietaryFilter === 'non_veg'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-rose-700 hover:bg-rose-50'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-xs border border-current flex items-center justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            </span>
+            <span>Non-Veg</span>
+          </button>
+        </div>
+      )}
 
       {/* 4. Product Cards Grid */}
       {currentProducts.length === 0 ? (

@@ -372,7 +372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (token) {
       api.get<{ orders: Order[] }>('/api/orders').then(res => {
         if (res?.orders) setOrders(res.orders);
-      }).catch(() => {});
+      }).catch(() => { });
     }
   });
 
@@ -405,18 +405,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
 
+    const resolveHomeUrl = (v: VerticalType) => {
+      if (v === 'quick') return '/quick';
+      if (v === 'services') return '/services';
+      return '/';
+    };
+
     if (history.length > 1) {
       const newHistory = [...history];
       newHistory.pop(); // Remove current path
       const prevPath = newHistory[newHistory.length - 1];
       setHistory(newHistory);
       setCurrentPath(prevPath);
-      const targetUrl = prevPath === 'home' ? '/' : `/${prevPath}`;
+      const targetUrl = prevPath === 'home' ? resolveHomeUrl(currentVertical) : `/${prevPath}`;
       window.history.pushState(null, '', targetUrl);
       window.dispatchEvent(new Event('shopindia:navigate'));
     } else {
       setCurrentPath('home');
-      window.history.pushState(null, '', '/');
+      const targetUrl = resolveHomeUrl(currentVertical);
+      window.history.pushState(null, '', targetUrl);
       window.dispatchEvent(new Event('shopindia:navigate'));
     }
   };

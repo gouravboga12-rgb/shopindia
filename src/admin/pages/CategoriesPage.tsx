@@ -48,6 +48,16 @@ const VERTICAL_METADATA: Record<string, {
     usedFor: 'Shop India Storefront (Pan-India courier delivery: Fashion, Electronics, Footwear, Lifestyle)',
     icon: ShoppingBag,
   },
+  quick: {
+    label: 'Quick Shopping (General)',
+    channel: 'quick',
+    channelName: 'Quick Shopping',
+    badgeBg: 'bg-emerald-50',
+    badgeText: 'text-emerald-700',
+    badgeBorder: 'border-emerald-200',
+    usedFor: 'Quick Shopping Hyperlocal (10-20 min rider delivery across all quick commerce departments)',
+    icon: Zap,
+  },
   quick_grocery: {
     label: 'Instant Grocery',
     channel: 'quick',
@@ -352,32 +362,52 @@ export const CategoriesPage: React.FC = () => {
       {/* Top Header & Main Tab Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Categories & Official Brands</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Categories &amp; Official Brands</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Organize catalog categories by business vertical (Shop India, Quick Shopping, Glacons) and manage official brands
           </p>
         </div>
 
-        {/* Master Tabs: Categories vs Brands */}
-        <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'categories' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Tag className="w-3.5 h-3.5" />
-            <span>Storefront Categories ({cats.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('brands')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'brands' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Award className="w-3.5 h-3.5 text-amber-500" />
-            <span>Official Brands ({brands.length})</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {activeTab === 'categories' ? (
+            <button
+              onClick={openCreateCat}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#0F2C59] text-white rounded-xl text-xs font-bold hover:bg-[#1a3d73] shadow-xs cursor-pointer whitespace-nowrap transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Category</span>
+            </button>
+          ) : (
+            <button
+              onClick={openCreateBrand}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#0F2C59] text-white rounded-xl text-xs font-bold hover:bg-[#1a3d73] shadow-xs cursor-pointer whitespace-nowrap transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Official Brand</span>
+            </button>
+          )}
+
+          {/* Master Tabs: Categories vs Brands */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'categories' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Tag className="w-3.5 h-3.5" />
+              <span>Categories ({cats.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('brands')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'brands' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-amber-500" />
+              <span>Official Brands ({brands.length})</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -822,11 +852,12 @@ export const CategoriesPage: React.FC = () => {
                     <Zap className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
                     <span>⚡ Quick Shopping (Hyperlocal 10-20 Min Rider Delivery)</span>
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { id: 'quick_grocery', label: '🥦 Instant Grocery', desc: 'Fruits, dairy, snacks' },
                       { id: 'quick_food', label: '🍲 Food & Dining', desc: 'Restaurant dishes' },
                       { id: 'quick_pharmacy', label: '💊 Pharmacy', desc: 'Meds & healthcare' },
+                      { id: 'quick', label: '⚡ Other Quick Dept', desc: 'Custom instant store' },
                     ].map(opt => (
                       <button
                         type="button"

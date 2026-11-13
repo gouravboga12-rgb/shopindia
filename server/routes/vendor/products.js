@@ -158,10 +158,33 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
+/** POST /api/vendor/products/upload-images — Multiple S3 Images Upload */
+router.post('/upload-images', upload.array('images', 10), async (req, res) => {
+  try {
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files || files.length === 0) return res.status(400).json({ error: 'No image files provided.' });
+    const uploadedUrls = [];
+    for (const f of files) {
+      const key = `products/${req.user.vendorId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${f.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const result = await uploadToS3({
+        key,
+        body: f.buffer,
+        contentType: f.mimetype,
+        isPrivate: false,
+      });
+      uploadedUrls.push(result.url);
+    }
+    res.json({ urls: uploadedUrls });
+  } catch (err) {
+    console.error('Multi S3 upload error:', err);
+    res.status(500).json({ error: err.message || 'Multiple S3 upload failed' });
+  }
+});
+
 /** PUT /api/vendor/products/:id */
 router.put('/:id', async (req, res) => {
   try {
-    const { variants: _v, images: _i, ...data } = req.body;
+    const { variants: _v, images, ...data } = req.body;
     if (data.fulfillmentType && !['traditional', 'quick_commerce'].includes(data.fulfillmentType)) {
       data.fulfillmentType = 'traditional';
     }
@@ -196,6 +219,15 @@ router.put('/:id', async (req, res) => {
       data.vendorPrice = pricing.vendorPrice;
     }
 
+    if (Array.isArray(images)) {
+      await prisma.productImage.deleteMany({ where: { productId: req.params.id } });
+      if (images.length > 0) {
+        await prisma.productImage.createMany({
+          data: images.map((url, i) => ({ productId: req.params.id, url, displayOrder: i }))
+        });
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data,
@@ -203,6 +235,7 @@ router.put('/:id', async (req, res) => {
     });
     res.json(product);
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
 });
 
 /** PATCH /api/vendor/products/:id/stock — toggle out-of-stock */

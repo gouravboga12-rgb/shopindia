@@ -54,6 +54,7 @@ export const VerticalQuickCommerce: React.FC = () => {
 
   const [activeSubVertical, setActiveSubVertical] = useState<QuickSubVertical>('grocery');
   const [selectedCatId, setSelectedCatId] = useState<string>('');
+  const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non_veg'>('all');
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
 
   // Modals state
@@ -87,10 +88,11 @@ export const VerticalQuickCommerce: React.FC = () => {
   );
   const isFridayBreak = Boolean(operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals));
 
-  // Reset category filter on sub-vertical change
+  // Reset category & dietary filter on sub-vertical change
   const handleSubVerticalChange = (sub: QuickSubVertical) => {
     setActiveSubVertical(sub);
     setSelectedCatId('');
+    setDietaryFilter('all');
   };
 
   // Filter products by vertical and active sub-vertical
@@ -109,9 +111,17 @@ export const VerticalQuickCommerce: React.FC = () => {
     return !text.includes('pharma') && !text.includes('medicine') && !text.includes('biryani') && !text.includes('pizza') && !text.includes('burger');
   });
 
-  const activeProducts = selectedCatId === '' || selectedCatId === 'All Items' || selectedCatId === 'All Food' || selectedCatId === 'All Medicines'
+  const baseFilteredProducts = selectedCatId === '' || selectedCatId === 'All Items' || selectedCatId === 'All Food' || selectedCatId === 'All Medicines'
     ? quickProducts
     : quickProducts.filter((p) => p.category === selectedCatId || (p.tags && p.tags.includes(selectedCatId)));
+
+  const activeProducts = baseFilteredProducts.filter((p) => {
+    if (activeSubVertical === 'food' && dietaryFilter !== 'all') {
+      if (dietaryFilter === 'veg') return p.isVeg === true;
+      if (dietaryFilter === 'non_veg') return p.isVeg === false;
+    }
+    return true;
+  });
 
   const getCartQty = (id: string) => {
     const item = cart.find((i) => i.product.id === id);
@@ -308,13 +318,55 @@ export const VerticalQuickCommerce: React.FC = () => {
 
         {/* Right Products Grid */}
         <main className="flex-1 w-full min-w-0">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <h3 className="font-heading font-black text-lg text-slate-800 flex items-center gap-2">
               <span>{selectedCatId || subCategories[0]}</span>
               <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                 {activeProducts.length} items
               </span>
             </h3>
+
+            {/* Veg / Non-Veg Filter Bar for Food Category */}
+            {activeSubVertical === 'food' && (
+              <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-2xl border border-slate-200 shadow-2xs self-start sm:self-auto">
+                <button
+                  onClick={() => setDietaryFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    dietaryFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Food
+                </button>
+                <button
+                  onClick={() => setDietaryFilter('veg')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    dietaryFilter === 'veg'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-xs border border-current flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  </span>
+                  <span>Pure Veg</span>
+                </button>
+                <button
+                  onClick={() => setDietaryFilter('non_veg')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    dietaryFilter === 'non_veg'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-xs border border-current flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  </span>
+                  <span>Non-Veg</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {activeProducts.length === 0 ? (

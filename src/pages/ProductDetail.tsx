@@ -8,7 +8,7 @@ import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
-  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart, userCoords, addNotification } = useApp();
+  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, setCurrentVertical, cart, userCoords, addNotification } = useApp();
   const { reviews, wishlist, toggleWishlist, recordView } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
@@ -30,7 +30,10 @@ export const ProductDetailPage: React.FC = () => {
     if (product?.id) {
       recordView(product.id);
     }
-  }, [selectedProductId, product?.id, recordView]);
+    if (product?.vertical && product.vertical !== currentVertical) {
+      setCurrentVertical(product.vertical as any);
+    }
+  }, [selectedProductId, product?.id, product?.vertical, recordView]);
 
   const handleAddToCart = () => {
     if (!requireCustomerAuth('add this item to your cart')) return;
@@ -95,8 +98,8 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   // Real live verified customer reviews matching this product
-  const liveReviews = (reviews || []).filter(r => 
-    r.productId === product?.id || 
+  const liveReviews = (reviews || []).filter(r =>
+    r.productId === product?.id ||
     (product?.title && r.productName && r.productName.toLowerCase() === product.title.toLowerCase())
   );
 
@@ -122,20 +125,44 @@ export const ProductDetailPage: React.FC = () => {
     }))
   ];
 
-  // Relevant recommendations: prioritize matching category, then fill with vertical
+  // Relevant recommendations: strictly within the same vertical & matching category/department
   const similarProducts = product ? (() => {
-    const sameCat = products.filter(p => 
-      p.id !== product.id && (
-        (p.categoryId && product.categoryId && p.categoryId === product.categoryId) ||
-        (p.category && product.category && p.category.toLowerCase() === product.category.toLowerCase())
-      )
+    // 1. Strict Vertical Isolation: Must be in the exact same vertical (no cross-panel contamination)
+    const sameVertical = products.filter(p => p.id !== product.id && p.vertical === product.vertical);
+
+    // 2. Department check for Quick Shopping (Food vs Pharmacy vs Grocery)
+    const isProductFood = product.tags?.some(t => t.toLowerCase() === 'food') || product.category?.toLowerCase().includes('food');
+    const isProductPharmacy = product.tags?.some(t => t.toLowerCase() === 'pharmacy' || t.toLowerCase() === 'rx') || product.category?.toLowerCase().includes('pharmacy') || product.category?.toLowerCase().includes('medicine');
+
+    const matchingDept = sameVertical.filter(p => {
+      if (product.vertical === 'quick') {
+        if (isProductFood) {
+          return p.tags?.some(t => t.toLowerCase() === 'food') || p.category?.toLowerCase().includes('food');
+        }
+        if (isProductPharmacy) {
+          return p.tags?.some(t => t.toLowerCase() === 'pharmacy' || t.toLowerCase() === 'rx') || p.category?.toLowerCase().includes('pharmacy') || p.category?.toLowerCase().includes('medicine');
+        }
+        // Grocery: Must NOT be food or pharmacy
+        const isPFood = p.tags?.some(t => t.toLowerCase() === 'food') || p.category?.toLowerCase().includes('food');
+        const isPPharm = p.tags?.some(t => t.toLowerCase() === 'pharmacy' || t.toLowerCase() === 'rx') || p.category?.toLowerCase().includes('pharmacy');
+        return !isPFood && !isPPharm;
+      }
+      return true;
+    });
+
+    // 3. Category match within the matching department
+    const sameCat = matchingDept.filter(p =>
+      (p.categoryId && product.categoryId && p.categoryId === product.categoryId) ||
+      (p.category && product.category && p.category.toLowerCase() === product.category.toLowerCase())
     );
-    const otherInVertical = products.filter(p => 
-      p.id !== product.id && 
-      p.vertical === product.vertical && 
-      !sameCat.some(sc => sc.id === p.id)
-    );
-    return [...sameCat, ...otherInVertical].slice(0, 5);
+
+    // If matching category products exist, return them (up to 5)
+    if (sameCat.length > 0) {
+      return sameCat.slice(0, 5);
+    }
+
+    // Otherwise, fallback only to the same exact department (e.g. other Food dishes)
+    return matchingDept.slice(0, 5);
   })() : [];
 
   // Desktop Page Layout
@@ -215,11 +242,10 @@ export const ProductDetailPage: React.FC = () => {
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={handleNotifyMe}
-                    className={`w-full py-4 rounded-button text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-premium cursor-pointer transition-all ${
-                      isNotified
+                    className={`w-full py-4 rounded-button text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-premium cursor-pointer transition-all ${isNotified
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
                         : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-                    }`}
+                      }`}
                   >
                     <Bell size={16} className={isNotified ? 'fill-emerald-600' : ''} />
                     <span>{isNotified ? 'Notification Set ✓' : 'Notify Me When Available'}</span>
@@ -309,9 +335,8 @@ export const ProductDetailPage: React.FC = () => {
                 </span>
                 <div className="border border-brand-border rounded-card overflow-hidden text-xs shadow-soft">
                   {Object.entries(product.specs).map(([key, val], idx) => (
-                    <div key={key} className={`grid grid-cols-3 p-3 text-left ${
-                      idx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'
-                    } border-b border-brand-border last:border-0`}>
+                    <div key={key} className={`grid grid-cols-3 p-3 text-left ${idx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'
+                      } border-b border-brand-border last:border-0`}>
                       <span className="font-extrabold text-brand-slate">{key}</span>
                       <span className="col-span-2 font-bold text-brand-graphite">{val}</span>
                     </div>
@@ -384,7 +409,7 @@ export const ProductDetailPage: React.FC = () => {
               {similarProducts.map((p) => {
                 const pDiscount = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
                 return (
-                  <div 
+                  <div
                     key={p.id}
                     onClick={() => {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -479,8 +504,8 @@ export const ProductDetailPage: React.FC = () => {
       <div className="w-full flex flex-col bg-white min-h-screen text-left pb-36 select-none text-brand-graphite font-sans selection:bg-brand-blue/20">
         {/* Navigation header row */}
         <div className="px-4 py-3.5 sticky top-0 z-30 flex items-center justify-between border-b bg-white/80 backdrop-blur-xl border-slate-200/60 text-brand-graphite shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]">
-          <button 
-            onClick={goBack} 
+          <button
+            onClick={goBack}
             className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700"
           >
             <ArrowLeft size={18} strokeWidth={2.5} className="text-zinc-700" />
@@ -489,13 +514,13 @@ export const ProductDetailPage: React.FC = () => {
             {isServices ? 'Service Details' : 'Product Details'}
           </span>
           <div className="flex items-center gap-2">
-            <button 
+            <button
               onClick={() => product && toggleWishlist(product.id)}
               className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 cursor-pointer"
             >
               <Heart size={16} strokeWidth={2.5} className={isWishlisted ? "fill-brand-red text-brand-red" : "text-zinc-700"} />
             </button>
-            <button 
+            <button
               onClick={() => navigateTo('cart')}
               className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 relative cursor-pointer"
             >
@@ -506,10 +531,10 @@ export const ProductDetailPage: React.FC = () => {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={() => {
                 if (navigator.share) {
-                  navigator.share({ title: product?.title || 'ShopIndia', url: window.location.href }).catch(() => {});
+                  navigator.share({ title: product?.title || 'ShopIndia', url: window.location.href }).catch(() => { });
                 }
               }}
               className="w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 bg-slate-100 hover:bg-slate-200 text-zinc-700 cursor-pointer"
@@ -522,13 +547,13 @@ export const ProductDetailPage: React.FC = () => {
         {/* Large picture */}
         <div className="w-full aspect-square sm:aspect-[4/3] flex items-center justify-center p-10 border-b relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/40 border-slate-200/60">
           <div className="absolute inset-0 bg-brand-blue/5 blur-3xl rounded-full scale-150 opacity-40 mix-blend-multiply"></div>
-          
-          <img 
-            src={product.image} 
-            alt={product.title} 
-            className="max-h-full max-w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.12)] z-10 transition-transform duration-500 ease-out hover:scale-[1.03]" 
+
+          <img
+            src={product.image}
+            alt={product.title}
+            className="max-h-full max-w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.12)] z-10 transition-transform duration-500 ease-out hover:scale-[1.03]"
           />
-          
+
           {product.isAssured && (
             <div className="absolute bottom-4 left-4 z-20 flex items-center gap-0.5 bg-white/95 text-xs font-black italic px-2 py-1 rounded-full border border-blue-100 shadow-[0_4px_12px_rgba(0,0,0,0.08)] backdrop-blur-md">
               <span className="text-brand-blue">ShopIndia</span>
@@ -590,7 +615,7 @@ export const ProductDetailPage: React.FC = () => {
                   else if (keyLower.includes('display') || keyLower.includes('screen')) Icon = Smartphone;
                   else if (keyLower.includes('slot') || keyLower.includes('time') || keyLower.includes('schedule')) Icon = Calendar;
                   else if (keyLower.includes('technician') || keyLower.includes('warranty')) Icon = Wrench;
-                  
+
                   return (
                     <div key={key} className="flex items-center gap-3.5 p-4 bg-slate-50/80 border border-slate-200/50 rounded-2xl transition-colors hover:bg-slate-100/80">
                       <div className="text-zinc-600 shrink-0 w-8 flex justify-center bg-white p-2 rounded-full shadow-sm border border-slate-100">
@@ -699,7 +724,7 @@ export const ProductDetailPage: React.FC = () => {
               {similarProducts.slice(0, 4).map((p) => {
                 const pDiscount = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
                 return (
-                  <div 
+                  <div
                     key={p.id}
                     onClick={() => {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -773,11 +798,10 @@ export const ProductDetailPage: React.FC = () => {
             product.isServiceAvailable === false ? (
               <button
                 onClick={handleNotifyMe}
-                className={`w-full h-[52px] text-white flex items-center justify-center gap-2 uppercase active:scale-[0.98] transition-all rounded-full tracking-wide font-black text-sm font-heading shadow-md cursor-pointer ${
-                  isNotified
+                className={`w-full h-[52px] text-white flex items-center justify-center gap-2 uppercase active:scale-[0.98] transition-all rounded-full tracking-wide font-black text-sm font-heading shadow-md cursor-pointer ${isNotified
                     ? 'bg-emerald-600'
                     : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                }`}
+                  }`}
               >
                 <Bell size={18} className={isNotified ? 'fill-white' : ''} />
                 <span>{isNotified ? 'Notification Set ✓' : 'Notify Me When Available'}</span>

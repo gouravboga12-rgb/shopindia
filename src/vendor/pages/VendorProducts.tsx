@@ -45,8 +45,9 @@ export const VendorProducts: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [availableBrands, setAvailableBrands] = useState<any[]>([]);
   const [isCustomBrand, setIsCustomBrand] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [existingImage, setExistingImage] = useState<string>('');
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
   // Showcase Reviews State (Option 3)
@@ -145,7 +146,10 @@ export const VendorProducts: React.FC = () => {
     setFulfillmentType(initialChannel);
     setSubType(initialChannel === 'quick_commerce' ? 'grocery' : 'retail');
     setIsVeg(true); setIsRx(false);
-    setCategoryId(''); setImageFile(null); setExistingImage('');
+    setCategoryId('');
+    setImageFiles([]);
+    setFilePreviews([]);
+    setExistingImages([]);
   };
 
   const openAdd = () => { resetForm(); setModal(true); };
@@ -183,8 +187,13 @@ export const VendorProducts: React.FC = () => {
     setIsVeg(!tags.includes('Non-Veg'));
     setIsRx(tags.includes('rx'));
     setCategoryId(p.categoryId || '');
-    setImageFile(null);
-    setExistingImage(p.images?.[0]?.url || '');
+    
+    const prodImages = Array.isArray(p.images)
+      ? p.images.map((img: any) => typeof img === 'string' ? img : img.url).filter(Boolean)
+      : (p.image ? [p.image] : []);
+    setExistingImages(prodImages);
+    setImageFiles([]);
+    setFilePreviews([]);
     setModal(true);
   };
 
@@ -197,25 +206,51 @@ export const VendorProducts: React.FC = () => {
     }
   };
 
-  const handleImageUpload = async (): Promise<string> => {
-    if (!imageFile) return existingImage;
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('image', imageFile);
-    const token = localStorage.getItem('shopindia_vendor_token') || localStorage.getItem('shopindia_admin_token');
-    const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : '';
-    const uploadRes = await fetch(`${API_BASE}/api/vendor/products/upload-image`, {
-      method: 'POST',
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: formData
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const combinedFiles = [...imageFiles, ...files].slice(0, 8);
+    setImageFiles(combinedFiles);
+    const newPreviews = files.map(f => URL.createObjectURL(f));
+    setFilePreviews(prev => [...prev, ...newPreviews].slice(0, 8));
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewFile = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviews(prev => {
+      if (prev[index]) URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
     });
-    if (!uploadRes.ok) {
-      const errData = await uploadRes.json().catch(() => ({}));
-      throw new Error(errData.error || `Upload failed (HTTP ${uploadRes.status})`);
+  };
+
+  const handleUploadImages = async (): Promise<string[]> => {
+    if (imageFiles.length === 0) return [];
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      imageFiles.forEach(file => {
+        formData.append('images', file);
+      });
+      const token = localStorage.getItem('shopindia_vendor_token') || localStorage.getItem('shopindia_admin_token');
+      const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : '';
+      const uploadRes = await fetch(`${API_BASE}/api/vendor/products/upload-images`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: formData
+      });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Upload failed (HTTP ${uploadRes.status})`);
+      }
+      const uploadData = await uploadRes.json();
+      return uploadData.urls || [];
+    } finally {
+      setUploading(false);
     }
-    const uploadData = await uploadRes.json();
-    setUploading(false);
-    return uploadData.url;
   };
 
   const saveProduct = async (e: React.FormEvent) => {
@@ -252,12 +287,13 @@ export const VendorProducts: React.FC = () => {
 
       if (categoryId) payload.categoryId = categoryId;
       
-      let imageUrl = existingImage;
-      if (imageFile) {
-        imageUrl = await handleImageUpload();
+      let uploadedUrls: string[] = [];
+      if (imageFiles.length > 0) {
+        uploadedUrls = await handleUploadImages();
       }
-      if (imageUrl) {
-        payload.images = [imageUrl];
+      const allImages = [...existingImages, ...uploadedUrls];
+      if (allImages.length > 0) {
+        payload.images = allImages;
       }
 
       if (editingId) {
@@ -848,21 +884,78 @@ export const VendorProducts: React.FC = () => {
               />
             </div>
 
-            {/* Product Image */}
+            {/* Product Images (Gallery) */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Product Image</label>
-              {existingImage && !imageFile && (
-                <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-xl border">
-                  <img src={existingImage} alt="Current" className="w-10 h-10 rounded-lg object-cover" />
-                  <span className="text-xs text-gray-500">Current product image</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700">
+                  Product Photos ({existingImages.length + imageFiles.length}/8)
+                </label>
+                <span className="text-[11px] text-gray-400">First photo is cover image</span>
+              </div>
+
+              {/* Photo thumbnails grid */}
+              {(existingImages.length > 0 || filePreviews.length > 0) && (
+                <div className="grid grid-cols-4 gap-2 mb-2.5">
+                  {existingImages.map((url, idx) => (
+                    <div key={`existing-${idx}`} className="relative aspect-square rounded-xl border border-gray-200 overflow-hidden bg-gray-50 group">
+                      <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      {idx === 0 && (
+                        <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                          Cover
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(idx)}
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center opacity-80 hover:opacity-100 shadow transition-opacity"
+                        title="Remove image"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {filePreviews.map((url, idx) => {
+                    const isFirstOverall = existingImages.length === 0 && idx === 0;
+                    return (
+                      <div key={`preview-${idx}`} className="relative aspect-square rounded-xl border-2 border-dashed border-emerald-400 overflow-hidden bg-emerald-50/30 group">
+                        <img src={url} alt={`New ${idx + 1}`} className="w-full h-full object-cover" />
+                        {isFirstOverall && (
+                          <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                            Cover
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeNewFile(idx)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center opacity-80 hover:opacity-100 shadow transition-opacity"
+                          title="Remove image"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => setImageFile(e.target.files?.[0] || null)}
-                className="w-full px-3 py-2 border rounded-xl text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-              />
+
+              {existingImages.length + imageFiles.length < 8 && (
+                <div>
+                  <input
+                    id="product-images-input"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFilesSelected}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="product-images-input"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 px-3 border border-dashed border-gray-300 rounded-xl text-xs font-semibold text-gray-600 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50/50 cursor-pointer transition-colors"
+                  >
+                    <Plus size={14} /> Add Product Photos (Upload multiple)
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* Showcase Reviews & Testimonials Section (Option 3) */}
