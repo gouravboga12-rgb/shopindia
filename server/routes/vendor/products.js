@@ -236,7 +236,6 @@ router.put('/:id', async (req, res) => {
     res.json(product);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
-});
 
 /** PATCH /api/vendor/products/:id/stock — toggle out-of-stock */
 router.patch('/:id/stock', async (req, res) => {
