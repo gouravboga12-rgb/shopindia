@@ -12,6 +12,7 @@ import { RegionalRiders } from './pages/RegionalRiders';
 import { RegionalSupport } from './pages/RegionalSupport';
 import { RegionalPayouts } from './pages/RegionalPayouts';
 import { RegionalCODCollection } from './pages/RegionalCODCollection';
+import { RegionalSettings } from './pages/RegionalSettings';
 import { AccountStatementPage } from '../admin/pages/AccountStatementPage';
 
 const RegionalAdminContent: React.FC = () => {
@@ -62,6 +63,8 @@ const RegionalAdminContent: React.FC = () => {
         return <RegionalPayouts onOpenStatement={(partyType, partyId, name) => setStatementTarget({ partyType, partyId, name })} />;
       case 'support':
         return <RegionalSupport />;
+      case 'settings':
+        return <RegionalSettings />;
       default:
         return <RegionalDashboard />;
     }

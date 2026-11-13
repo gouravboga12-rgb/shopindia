@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe2, LayoutDashboard, Radar, Store, Bike, LogOut, ChevronRight, Headphones, Wallet, Banknote } from 'lucide-react';
+import { Globe2, LayoutDashboard, Radar, Store, Bike, LogOut, ChevronRight, Headphones, Wallet, Banknote, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface RegionalAdminSidebarProps {
@@ -18,6 +18,7 @@ export const RegionalAdminSidebar: React.FC<RegionalAdminSidebarProps> = ({ curr
     { id: 'cod-remittance', label: 'Rider Cash & COD Float', icon: Banknote },
     { id: 'payouts', label: 'Rider & Tech Payouts', icon: Wallet },
     { id: 'support', label: 'Customer & Partner Support', icon: Headphones },
+    { id: 'settings', label: 'Hub Profile & Settings', icon: Settings },
   ];
 
   return (

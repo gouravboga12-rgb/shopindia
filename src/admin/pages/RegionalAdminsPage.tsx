@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   Globe2,
   CheckCircle2,
@@ -8,6 +9,10 @@ import {
   Mail,
   Phone,
   PauseCircle,
+  Eye,
+  FileText,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 
 interface RegionalAdminItem {
@@ -22,6 +27,8 @@ interface RegionalAdminItem {
     district?: string;
     state?: string;
     assignedPincodes?: string[];
+    address?: string;
+    idProofUrl?: string;
     status: string;
     branch?: { id: string; name: string; city: string };
   };
@@ -31,6 +38,7 @@ export const RegionalAdminsPage: React.FC = () => {
   const [admins, setAdmins] = useState<RegionalAdminItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ title: string; url: string } | null>(null);
 
   const loadAdmins = () => {
     setLoading(true);
@@ -42,6 +50,11 @@ export const RegionalAdminsPage: React.FC = () => {
   };
 
   useEffect(loadAdmins, []);
+
+  // Real-time synchronization when any regional admin updates their profile/pincodes/docs
+  useSocketEvent('regional_admin:profile_updated', () => {
+    loadAdmins();
+  });
 
   const handleUpdateStatus = async (userId: string, newStatus: string) => {
     setActionLoadingId(userId);
@@ -157,6 +170,22 @@ export const RegionalAdminsPage: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* ID Proof / Compliance Document Preview */}
+                  <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-gray-400">KYC / ID Proof:</span>
+                    {profile?.idProofUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc({ title: `Hub Admin ID Proof • ${adm.name}`, url: profile.idProofUrl! })}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3 h-3" /> View Document
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-gray-400 font-medium">Not Attached</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Status Action Buttons */}
@@ -196,6 +225,68 @@ export const RegionalAdminsPage: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ─── In-Page Document Preview Lightbox Modal ─── */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border border-slate-200">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                <h3 className="font-bold text-sm text-slate-900 truncate">{previewDoc.title}</h3>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={previewDoc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-colors"
+                  title="Open in new window"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Viewer Body */}
+            <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-950 flex items-center justify-center min-h-[350px]">
+              {previewDoc.url.toLowerCase().includes('.pdf') ? (
+                <iframe
+                  src={previewDoc.url}
+                  className="w-full h-[65vh] rounded-xl border border-slate-800"
+                  title={previewDoc.title}
+                />
+              ) : (
+                <img
+                  src={previewDoc.url}
+                  alt={previewDoc.title}
+                  className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-2xl"
+                />
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+              <span className="font-mono text-[11px] text-slate-500">AWS Cloud S3 Verified Document</span>
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(null)}
+                className="px-4 py-1.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

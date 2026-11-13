@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Globe2, LogOut, Menu, X, Shield, RefreshCw,
-  LayoutDashboard, Radar, Store, Bike, Banknote, Wallet, Headphones
+  LayoutDashboard, Radar, Store, Bike, Banknote, Wallet, Headphones, Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -29,6 +29,7 @@ export const RegionalAdminHeader: React.FC<RegionalAdminHeaderProps> = ({
     { id: 'cod-remittance', label: 'Rider Cash & COD Float', icon: Banknote },
     { id: 'payouts', label: 'Rider & Tech Payouts', icon: Wallet },
     { id: 'support', label: 'Customer & Partner Support', icon: Headphones },
+    { id: 'settings', label: 'Hub Profile & Settings', icon: Settings },
   ];
 
   return (

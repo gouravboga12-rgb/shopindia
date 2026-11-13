@@ -1,7 +1,16 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const multer = require('multer');
 const prisma = require('../../lib/prisma');
 const { verifyToken } = require('../../middleware/auth');
 const { requireRole } = require('../../middleware/rbac');
+const { uploadToS3 } = require('../../lib/s3');
+const { getIo } = require('../../lib/socket');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 const router = express.Router();
 router.use(verifyToken, requireRole('regional_admin', 'branch_manager', 'super_admin'));
@@ -487,6 +496,241 @@ router.patch('/location', async (req, res) => {
   } catch (err) {
     console.error('Update regional admin location error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/regional-admin/profile
+ * Get current authenticated regional admin user and hub profile details
+ */
+router.get('/profile', async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        regionalAdminProfile: {
+          include: {
+            branch: { select: { id: true, name: true, city: true, state: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Regional administrator not found.' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+      },
+      profile: user.regionalAdminProfile,
+    });
+  } catch (err) {
+    console.error('Fetch regional admin profile error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/regional-admin/profile
+ * Update personal info, hub jurisdiction, assigned pincodes, base address, GPS coordinates, and optional password
+ */
+router.put('/profile', async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    const {
+      name,
+      phone,
+      regionName,
+      district,
+      state,
+      assignedPincodes,
+      address,
+      latitude,
+      longitude,
+      idProofUrl,
+      currentPassword,
+      newPassword,
+    } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { regionalAdminProfile: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Regional administrator not found.' });
+    }
+
+    // Optional password change with security validation
+    let updatedPasswordHash = undefined;
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to set a new password.' });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Current password entered is incorrect.' });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+      }
+      updatedPasswordHash = await bcrypt.hash(newPassword, 10);
+    }
+
+    // Sanitize assigned pincodes (strictly 6-digit Indian postal codes, no duplicates)
+    let sanitizedPincodes = undefined;
+    if (assignedPincodes !== undefined) {
+      const rawList = Array.isArray(assignedPincodes)
+        ? assignedPincodes
+        : String(assignedPincodes).split(',');
+      sanitizedPincodes = Array.from(
+        new Set(
+          rawList
+            .map((p) => String(p).trim().replace(/\D/g, ''))
+            .filter((p) => p.length === 6)
+        )
+      );
+    }
+
+    // Update user record
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(name && name.trim() ? { name: name.trim() } : {}),
+        ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
+        ...(updatedPasswordHash ? { password: updatedPasswordHash } : {}),
+      },
+    });
+
+    // Update or create regional admin profile record
+    const profileData = {
+      ...(regionName && regionName.trim() ? { regionName: regionName.trim() } : {}),
+      ...(district !== undefined ? { district: district ? district.trim() : null } : {}),
+      ...(state !== undefined ? { state: state ? state.trim() : null } : {}),
+      ...(sanitizedPincodes !== undefined ? { assignedPincodes: sanitizedPincodes } : {}),
+      ...(address !== undefined ? { address: address ? address.trim() : null } : {}),
+      ...(latitude !== undefined && latitude !== null && !isNaN(Number(latitude))
+        ? { currentLat: Number(latitude) }
+        : {}),
+      ...(longitude !== undefined && longitude !== null && !isNaN(Number(longitude))
+        ? { currentLng: Number(longitude) }
+        : {}),
+      ...(idProofUrl !== undefined ? { idProofUrl: idProofUrl || null } : {}),
+    };
+
+    let updatedProfile = null;
+    if (user.regionalAdminProfile) {
+      updatedProfile = await prisma.regionalAdminProfile.update({
+        where: { id: user.regionalAdminProfile.id },
+        data: profileData,
+      });
+    } else {
+      updatedProfile = await prisma.regionalAdminProfile.create({
+        data: {
+          userId,
+          regionName: regionName || 'Regional Hub',
+          ...profileData,
+        },
+      });
+    }
+
+    // Real-time broadcast to Super Admin panel and Regional clients
+    try {
+      const io = getIo ? getIo() : null;
+      if (io) {
+        io.emit('regional_admin:profile_updated', {
+          userId,
+          user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, phone: updatedUser.phone },
+          profile: updatedProfile,
+        });
+      }
+    } catch (e) {
+      console.warn('Socket broadcast warning:', e.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Regional Hub profile and settings updated successfully.',
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+      },
+      profile: updatedProfile,
+    });
+  } catch (err) {
+    console.error('Update regional admin profile error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/regional-admin/profile/upload-doc
+ * Direct upload of Regional Admin ID proof / Trade License / Branch certificate to AWS S3
+ */
+router.post('/upload-doc', upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No document file provided.' });
+    }
+
+    const userId = req.user?.userId || req.user?.id;
+    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const key = `regional-admins/docs/${userId}/idproof-${Date.now()}-${safeName}`;
+
+    const result = await uploadToS3({
+      key,
+      body: req.file.buffer,
+      contentType: req.file.mimetype,
+      isPrivate: false,
+    });
+
+    // Auto-save immediately to database
+    let updatedProfile = null;
+    const existing = await prisma.regionalAdminProfile.findUnique({ where: { userId } });
+    if (existing) {
+      updatedProfile = await prisma.regionalAdminProfile.update({
+        where: { userId },
+        data: { idProofUrl: result.url },
+      });
+    } else {
+      updatedProfile = await prisma.regionalAdminProfile.create({
+        data: {
+          userId,
+          regionName: 'Regional Hub',
+          idProofUrl: result.url,
+        },
+      });
+    }
+
+    // Broadcast update
+    try {
+      const io = getIo ? getIo() : null;
+      if (io) {
+        io.emit('regional_admin:profile_updated', { userId, profile: updatedProfile });
+      }
+    } catch (e) {
+      console.warn('Socket broadcast warning:', e.message);
+    }
+
+    res.json({
+      success: true,
+      url: result.url,
+      profile: updatedProfile,
+    });
+  } catch (err) {
+    console.error('Regional admin doc upload error:', err);
+    res.status(500).json({ error: err.message || 'Failed to upload document to AWS S3.' });
   }
 });
 
