@@ -181,6 +181,37 @@ router.post('/upload-images', upload.array('images', 10), async (req, res) => {
   }
 });
 
+const uploadVideo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only video files (MP4, WebM, MOV, etc.) are allowed.'));
+    }
+  }
+});
+
+/** POST /api/vendor/products/upload-video — S3 Video Upload (up to 50MB) */
+router.post('/upload-video', uploadVideo.single('video'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No video file provided.' });
+    const ext = req.file.originalname.split('.').pop() || 'mp4';
+    const key = `products/${req.user.vendorId}/videos/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    const result = await uploadToS3({
+      key,
+      body: req.file.buffer,
+      contentType: req.file.mimetype,
+      isPrivate: false,
+    });
+    res.json({ url: result.url });
+  } catch (err) {
+    console.error('Video upload error:', err);
+    res.status(500).json({ error: err.message || 'Video upload failed' });
+  }
+});
+
 /** PUT /api/vendor/products/:id */
 router.put('/:id', async (req, res) => {
   try {

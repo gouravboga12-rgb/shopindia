@@ -308,6 +308,7 @@ model Product {
   tags            String[]        @default([])
   serviceSlots    String[]        @default([])
   durationEstimate String?
+  videoUrl        String?
 
   // NEW: Pricing engine — vendor receives exactly vendorPrice; platform fee is added on top
   vendorPrice     Float?   // What vendor actually receives (set by vendor, overrides basePrice if set)

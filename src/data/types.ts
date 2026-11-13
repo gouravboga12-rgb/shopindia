@@ -27,6 +27,8 @@ export interface Product {
   isOutOfStock?: boolean;
   vendorId?: string;
   categoryId?: string;
+  images?: string[];
+  videoUrl?: string;
   showcaseReviews?: Array<{ name: string; rating: number; title?: string; comment: string; date?: string }>;
 
   // Food Delivery specifics

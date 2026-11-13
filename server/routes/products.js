@@ -264,6 +264,8 @@ router.get('/', async (req, res) => {
         rating: p.ratingAvg,
         ratingCount: p.ratingCount,
         image: p.images && p.images.length ? p.images[0].url : '',
+        images: p.images && p.images.length ? p.images.map(img => img.url) : [],
+        videoUrl: p.videoUrl || null,
         category: resolvedCategory,
         brand: p.brand || '',
         vertical,

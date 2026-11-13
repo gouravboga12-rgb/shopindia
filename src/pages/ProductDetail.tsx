@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useProducts } from '../hooks/useProducts';
 import { useCustomer } from '../context/CustomerContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2, Bell } from 'lucide-react';
+import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2, Bell, Play } from 'lucide-react';
 import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
 
@@ -22,11 +22,30 @@ export const ProductDetailPage: React.FC = () => {
   const discount = product ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
   const isServices = currentVertical === 'services' || product?.vertical === 'services';
 
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState<number>(0);
+
+  const mediaItems = React.useMemo(() => {
+    if (!product) return [];
+    const items: Array<{ type: 'image' | 'video'; url: string }> = [];
+    if (product.images && product.images.length > 0) {
+      product.images.forEach(url => items.push({ type: 'image', url }));
+    } else if (product.image) {
+      items.push({ type: 'image', url: product.image });
+    }
+    if (product.videoUrl) {
+      items.push({ type: 'video', url: product.videoUrl });
+    }
+    return items;
+  }, [product?.id, product?.images, product?.image, product?.videoUrl]);
+
+  const activeMedia = mediaItems[selectedMediaIndex] || mediaItems[0] || (product ? { type: 'image', url: product.image } : null);
+
   // Automatically scroll to top of page whenever a product is selected/opened and record view
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+    setSelectedMediaIndex(0);
     if (product?.id) {
       recordView(product.id);
     }
@@ -208,17 +227,29 @@ export const ProductDetailPage: React.FC = () => {
         <div className="grid grid-cols-5 gap-8">
           {/* Left Column: Image & Checkout Buttons (Span 2) */}
           <div className="col-span-2 flex flex-col gap-5">
-            <div className="border rounded-[20px] p-8 aspect-square flex items-center justify-center relative bg-white border-brand-border shadow-premium">
+            <div className="border rounded-[20px] p-6 aspect-square flex items-center justify-center relative bg-white border-brand-border shadow-premium overflow-hidden">
               {/* Floating Wishlist Heart */}
               <motion.button
                 whileTap={{ scale: 0.85 }}
                 onClick={() => product && toggleWishlist(product.id)}
-                className="absolute top-4 right-4 p-2.5 rounded-full bg-white text-zinc-400 hover:text-brand-red shadow-soft border border-brand-border transition-colors z-10"
+                className="absolute top-4 right-4 p-2.5 rounded-full bg-white text-zinc-400 hover:text-brand-red shadow-soft border border-brand-border transition-colors z-20"
               >
                 <Heart size={16} className={isWishlisted ? "fill-brand-red text-brand-red" : ""} />
               </motion.button>
 
-              <img src={product.image} alt={product.title} className="max-h-full max-w-full object-contain rounded" />
+              {activeMedia?.type === 'video' ? (
+                <video
+                  src={activeMedia.url}
+                  controls
+                  autoPlay
+                  muted
+                  playsInline
+                  className="max-h-full max-w-full rounded-xl object-contain z-10"
+                />
+              ) : (
+                <img src={activeMedia?.url || product.image} alt={product.title} className="max-h-full max-w-full object-contain rounded" />
+              )}
+
               {product.isAssured && (
                 <div className="absolute bottom-4 left-4 z-10 flex items-center gap-0.5 bg-blue-50/95 text-xs font-black italic px-2 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-sm">
                   <span className="text-brand-blue">ShopIndia</span>
@@ -226,6 +257,33 @@ export const ProductDetailPage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Media Thumbnails Gallery (Multiple Photos + Video) */}
+            {mediaItems.length > 1 && (
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-thin">
+                {mediaItems.map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedMediaIndex(idx)}
+                    className={`relative w-16 h-16 rounded-xl border-2 overflow-hidden bg-white shrink-0 transition-all cursor-pointer ${
+                      selectedMediaIndex === idx
+                        ? 'border-brand-blue shadow-md scale-105'
+                        : 'border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    {item.type === 'video' ? (
+                      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center text-white relative">
+                        <Play size={18} className="fill-white" />
+                        <span className="text-[9px] font-bold mt-0.5">Video</span>
+                      </div>
+                    ) : (
+                      <img src={item.url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* CTA action buttons (16px curved) */}
             {product.isOutOfStock || (product.stock !== undefined && product.stock <= 0) ? (
@@ -544,15 +602,26 @@ export const ProductDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Large picture */}
-        <div className="w-full aspect-square sm:aspect-[4/3] flex items-center justify-center p-10 border-b relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/40 border-slate-200/60">
+        {/* Large picture / Video Player */}
+        <div className="w-full aspect-square sm:aspect-[4/3] flex items-center justify-center p-6 border-b relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/40 border-slate-200/60">
           <div className="absolute inset-0 bg-brand-blue/5 blur-3xl rounded-full scale-150 opacity-40 mix-blend-multiply"></div>
 
-          <img
-            src={product.image}
-            alt={product.title}
-            className="max-h-full max-w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.12)] z-10 transition-transform duration-500 ease-out hover:scale-[1.03]"
-          />
+          {activeMedia?.type === 'video' ? (
+            <video
+              src={activeMedia.url}
+              controls
+              autoPlay
+              muted
+              playsInline
+              className="max-h-full max-w-full rounded-2xl object-contain z-10"
+            />
+          ) : (
+            <img
+              src={activeMedia?.url || product.image}
+              alt={product.title}
+              className="max-h-full max-w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.12)] z-10 transition-transform duration-500 ease-out hover:scale-[1.03]"
+            />
+          )}
 
           {product.isAssured && (
             <div className="absolute bottom-4 left-4 z-20 flex items-center gap-0.5 bg-white/95 text-xs font-black italic px-2 py-1 rounded-full border border-blue-100 shadow-[0_4px_12px_rgba(0,0,0,0.08)] backdrop-blur-md">
@@ -561,6 +630,33 @@ export const ProductDetailPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Mobile Media Thumbnails Gallery */}
+        {mediaItems.length > 1 && (
+          <div className="flex items-center gap-2 px-5 py-2.5 overflow-x-auto bg-white border-b border-slate-100">
+            {mediaItems.map((item, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedMediaIndex(idx)}
+                className={`relative w-14 h-14 rounded-xl border-2 overflow-hidden bg-white shrink-0 transition-all ${
+                  selectedMediaIndex === idx
+                    ? 'border-brand-blue shadow-sm scale-105'
+                    : 'border-slate-200 opacity-60'
+                }`}
+              >
+                {item.type === 'video' ? (
+                  <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center text-white">
+                    <Play size={14} className="fill-white" />
+                    <span className="text-[8px] font-bold">Video</span>
+                  </div>
+                ) : (
+                  <img src={item.url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Product / Service details */}
         <div className="p-5 flex flex-col gap-6">

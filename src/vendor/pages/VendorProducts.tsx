@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search, X, Package, Zap, ShoppingBag, CheckCircle, AlertCircle, RefreshCw, Star } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Package, Zap, ShoppingBag, CheckCircle, AlertCircle, RefreshCw, Star, Video, Play } from 'lucide-react';
 
 const parseDescriptionAndReviews = (raw: string) => {
   if (!raw) return { desc: '', reviews: [] };
@@ -48,7 +48,11 @@ export const VendorProducts: React.FC = () => {
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   // Showcase Reviews State (Option 3)
   const [showcaseReviews, setShowcaseReviews] = useState<Array<{ name: string; rating: number; title: string; comment: string }>>([]);
@@ -150,6 +154,10 @@ export const VendorProducts: React.FC = () => {
     setImageFiles([]);
     setFilePreviews([]);
     setExistingImages([]);
+    setVideoUrl('');
+    setVideoFile(null);
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoPreview(null);
   };
 
   const openAdd = () => { resetForm(); setModal(true); };
@@ -194,6 +202,10 @@ export const VendorProducts: React.FC = () => {
     setExistingImages(prodImages);
     setImageFiles([]);
     setFilePreviews([]);
+    setVideoUrl(p.videoUrl || '');
+    setVideoFile(null);
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoPreview(null);
     setModal(true);
   };
 
@@ -227,6 +239,27 @@ export const VendorProducts: React.FC = () => {
     });
   };
 
+  const handleVideoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Video file size exceeds 50MB limit. Please upload a compressed MP4/WebM video.');
+      return;
+    }
+    setVideoFile(file);
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoPreview(URL.createObjectURL(file));
+  };
+
+  const removeVideo = () => {
+    setVideoFile(null);
+    if (videoPreview) {
+      URL.revokeObjectURL(videoPreview);
+      setVideoPreview(null);
+    }
+    setVideoUrl('');
+  };
+
   const handleUploadImages = async (): Promise<string[]> => {
     if (imageFiles.length === 0) return [];
     setUploading(true);
@@ -250,6 +283,30 @@ export const VendorProducts: React.FC = () => {
       return uploadData.urls || [];
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleUploadVideo = async (): Promise<string | null> => {
+    if (!videoFile) return videoUrl || null;
+    setUploadingVideo(true);
+    try {
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      const token = localStorage.getItem('shopindia_vendor_token') || localStorage.getItem('shopindia_admin_token');
+      const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : '';
+      const uploadRes = await fetch(`${API_BASE}/api/vendor/products/upload-video`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: formData
+      });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Video upload failed (HTTP ${uploadRes.status})`);
+      }
+      const uploadData = await uploadRes.json();
+      return uploadData.url;
+    } finally {
+      setUploadingVideo(false);
     }
   };
 
@@ -296,6 +353,12 @@ export const VendorProducts: React.FC = () => {
         payload.images = allImages;
       }
 
+      let finalVideoUrl = videoUrl || null;
+      if (videoFile) {
+        finalVideoUrl = await handleUploadVideo();
+      }
+      payload.videoUrl = finalVideoUrl;
+
       if (editingId) {
         await api.put(`/api/vendor/products/${editingId}`, payload);
       } else {
@@ -307,6 +370,7 @@ export const VendorProducts: React.FC = () => {
       load();
     } catch (err: any) {
       setUploading(false);
+      setUploadingVideo(false);
       alert(err.message || 'Failed to save product');
     }
   };
@@ -958,6 +1022,62 @@ export const VendorProducts: React.FC = () => {
               )}
             </div>
 
+            {/* Product Video (Optional) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                  <Video size={14} className="text-indigo-600" />
+                  <span>Product Video (Optional)</span>
+                </label>
+                <span className="text-[11px] text-gray-400">MP4, WebM (up to 50MB)</span>
+              </div>
+
+              {(videoPreview || videoUrl) ? (
+                <div className="relative rounded-2xl border border-indigo-200 overflow-hidden bg-slate-900 group">
+                  <video
+                    src={videoPreview || videoUrl}
+                    controls
+                    playsInline
+                    className="w-full h-44 object-contain"
+                  />
+                  <div className="absolute top-2 left-2 bg-indigo-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs flex items-center gap-1">
+                    <Play size={10} className="fill-white" />
+                    <span>{videoPreview ? 'New Video Selected' : 'Active Product Video'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeVideo}
+                    className="absolute top-2 right-2 px-2.5 py-1 bg-red-600/90 hover:bg-red-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 shadow transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    <span>Remove Video</span>
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <input
+                    id="product-video-input"
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime,video/*"
+                    onChange={handleVideoSelected}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="product-video-input"
+                    className="flex flex-col items-center justify-center gap-1.5 w-full py-4 px-3 border-2 border-dashed border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/40 rounded-2xl text-xs cursor-pointer transition-all text-center"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <Video size={18} />
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-800">Upload Product Video</span>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Showcase unboxing, features, demo, or 360 view</p>
+                    </div>
+                  </label>
+                </div>
+              )}
+            </div>
+
             {/* Showcase Reviews & Testimonials Section (Option 3) */}
             <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/80 space-y-3">
               <div className="flex items-center justify-between">
@@ -1105,17 +1225,17 @@ export const VendorProducts: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setModal(false); resetForm(); }}
-                className="flex-1 py-2.5 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                disabled={uploading}
+                className="flex-1 py-2.5 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                disabled={uploading || uploadingVideo}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={uploading}
+                disabled={uploading || uploadingVideo}
                 className="flex-1 py-2.5 bg-[#10B981] text-white rounded-xl text-sm font-bold hover:bg-[#059669] shadow-sm disabled:opacity-50 cursor-pointer"
               >
-                {uploading ? 'Uploading...' : editingId ? 'Save Changes' : 'Publish Product'}
+                {(uploading || uploadingVideo) ? 'Uploading media...' : editingId ? 'Save Changes' : 'Publish Product'}
               </button>
             </div>
           </form>
