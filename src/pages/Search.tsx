@@ -15,9 +15,11 @@ export const SearchPage: React.FC = () => {
 
   // Filters state
   const [sortBy, setSortBy] = useState<string>('relevance');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
-  const [maxPrice, setMaxPrice] = useState<number>(150000);
+  const [assuredOnly, setAssuredOnly] = useState<boolean>(false);
+  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [officialBrands, setOfficialBrands] = useState<string[]>([]);
 
@@ -32,6 +34,13 @@ export const SearchPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories(prev => {
+      const exists = prev.some(c => c.toLowerCase() === cat.toLowerCase());
+      return exists ? prev.filter(c => c.toLowerCase() !== cat.toLowerCase()) : [...prev, cat];
+    });
+  };
+
   const toggleBrand = (brand: string) => {
     setSelectedBrands(prev => {
       const exists = prev.some(b => b.toLowerCase() === brand.toLowerCase());
@@ -44,6 +53,17 @@ export const SearchPage: React.FC = () => {
       prev.includes(star) ? prev.filter(s => s !== star) : [...prev, star]
     );
   };
+
+  const categories = useMemo(() => {
+    const catSet = new Set<string>();
+    allProducts
+      .filter(p => p.vertical === currentVertical)
+      .forEach(p => {
+        const c = (p.category || '').trim();
+        if (c) catSet.add(c);
+      });
+    return Array.from(catSet).sort((a, b) => a.localeCompare(b));
+  }, [allProducts, currentVertical]);
 
   // Filter products
   const searchedProducts = useMemo(() => {
@@ -58,6 +78,15 @@ export const SearchPage: React.FC = () => {
         (p.brand && p.brand.toLowerCase().includes(q)) ||
         (p.description && p.description.toLowerCase().includes(q))
       );
+    }
+
+    // Apply categories filter
+    if (selectedCategories.length > 0) {
+      const selCatsLower = selectedCategories.map(c => c.toLowerCase());
+      filtered = filtered.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        return selCatsLower.includes(cat);
+      });
     }
 
     // Apply multiple brands filter (case-insensitive & intelligent name match)
@@ -76,7 +105,15 @@ export const SearchPage: React.FC = () => {
       filtered = filtered.filter(p => p.rating >= minStar);
     }
 
-    filtered = filtered.filter(p => p.price <= maxPrice);
+    // Apply Assured Only filter
+    if (assuredOnly) {
+      filtered = filtered.filter(p => p.isAssured);
+    }
+
+    // Apply In-Stock Only filter
+    if (inStockOnly) {
+      filtered = filtered.filter(p => !p.isOutOfStock && (p.stock === undefined || p.stock > 0));
+    }
 
     // Apply Sorting
     if (sortBy === 'price-low') {
@@ -88,7 +125,7 @@ export const SearchPage: React.FC = () => {
     }
 
     return filtered;
-  }, [allProducts, currentVertical, searchQuery, selectedBrands, selectedRatings, maxPrice, sortBy]);
+  }, [allProducts, currentVertical, searchQuery, selectedCategories, selectedBrands, selectedRatings, assuredOnly, inStockOnly, sortBy]);
 
   const brands = useMemo(() => {
     const brandMap = new Map<string, string>(); // lowercase -> display name
@@ -123,11 +160,15 @@ export const SearchPage: React.FC = () => {
   };
 
   const handleResetFilters = () => {
+    setSelectedCategories([]);
     setSelectedBrands([]);
     setSelectedRatings([]);
-    setMaxPrice(150000);
+    setAssuredOnly(false);
+    setInStockOnly(false);
     setSortBy('relevance');
   };
+
+  const hasActiveFilters = selectedCategories.length > 0 || selectedBrands.length > 0 || selectedRatings.length > 0 || assuredOnly || inStockOnly || sortBy !== 'relevance';
 
   const isServices = currentVertical === 'services';
 
@@ -135,73 +176,64 @@ export const SearchPage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto w-full flex gap-8 py-8 px-12 text-left font-sans text-brand-graphite">
         {/* Left Filter Sidebar */}
-        <aside className="w-full max-w-[260px] p-6 border rounded-card shrink-0 h-fit select-none shadow-premium bg-white border-brand-border">
-          <div className="flex justify-between items-center border-b pb-3.5 mb-5 border-brand-border/60">
-            <span className="font-black text-xs uppercase tracking-widest font-heading">Filters</span>
-            {(selectedBrands.length > 0 || selectedRatings.length > 0 || maxPrice < 150000 || sortBy !== 'relevance') && (
+        <aside className="w-full max-w-[260px] p-5 border rounded-card shrink-0 h-fit select-none shadow-premium bg-white border-brand-border">
+          <div className="flex justify-between items-center border-b pb-3.5 mb-4 border-brand-border/60">
+            <span className="font-black text-xs uppercase tracking-widest font-heading text-brand-graphite">Filters</span>
+            {hasActiveFilters && (
               <button onClick={handleResetFilters} className="text-xs font-bold text-brand-blue hover:underline cursor-pointer">
                 Clear All
               </button>
             )}
           </div>
 
-          {/* Sort By Section */}
-          <div className="mb-6">
-            <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-3 font-heading">Sort Results</span>
-            <div className="flex flex-col gap-2">
-              {[
-                { id: 'relevance', name: 'Relevance' },
-                { id: 'price-low', name: 'Price: Low to High' },
-                { id: 'price-high', name: 'Price: High to Low' },
-                { id: 'rating', name: 'Popularity (Rating)' }
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  onClick={() => setSortBy(opt.id)}
-                  className={`text-xs text-left font-bold py-1.5 transition-all cursor-pointer ${
-                    sortBy === opt.id
-                      ? 'text-brand-blue font-extrabold pl-2 border-l-2 border-brand-blue'
-                      : 'text-brand-slate hover:text-brand-graphite'
-                  }`}
-                >
-                  {opt.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Price Range Slider */}
-          <div className="mb-6">
-            <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-2.5 font-heading">Price Limit</span>
-            <input
-              type="range"
-              min={0}
-              max={150000}
-              step={100}
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-brand-blue mb-3"
-            />
-            <div className="flex justify-between text-xs font-black text-brand-slate font-numbers">
-              <span>₹0</span>
-              <span>₹{maxPrice.toLocaleString('en-IN')}</span>
-            </div>
-          </div>
-
-          {/* Brands Multi-Select Filter */}
-          {brands.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
+          {/* Categories Filter */}
+          {categories.length > 0 && (
+            <div className="mb-5 pb-4 border-b border-brand-border/40">
+              <div className="flex items-center justify-between mb-2.5">
                 <span className="font-black text-xs uppercase text-brand-slate tracking-widest block font-heading">
-                  Brand {selectedBrands.length > 0 && `(${selectedBrands.length})`}
+                  Category {selectedCategories.length > 0 && `(${selectedCategories.length})`}
                 </span>
-                {selectedBrands.length > 0 && (
-                  <button onClick={() => setSelectedBrands([])} className="text-[10px] font-bold text-brand-blue hover:underline">
+                {selectedCategories.length > 0 && (
+                  <button onClick={() => setSelectedCategories([])} className="text-[10px] font-bold text-brand-blue hover:underline cursor-pointer">
                     Reset
                   </button>
                 )}
               </div>
-              <div className="flex flex-col gap-2.5 max-h-48 overflow-y-auto no-scrollbar font-bold pr-1">
+              <div className="flex flex-col gap-2 max-h-44 overflow-y-auto no-scrollbar font-bold pr-1">
+                {categories.map(cat => {
+                  const isChecked = selectedCategories.some(c => c.toLowerCase() === cat.toLowerCase());
+                  return (
+                    <label key={cat} className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleCategory(cat)}
+                        className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
+                      />
+                      <span className={isChecked ? 'text-brand-graphite font-black' : 'font-semibold'}>
+                        {cat}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Brands Filter */}
+          {brands.length > 0 && (
+            <div className="mb-5 pb-4 border-b border-brand-border/40">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="font-black text-xs uppercase text-brand-slate tracking-widest block font-heading">
+                  Brand {selectedBrands.length > 0 && `(${selectedBrands.length})`}
+                </span>
+                {selectedBrands.length > 0 && (
+                  <button onClick={() => setSelectedBrands([])} className="text-[10px] font-bold text-brand-blue hover:underline cursor-pointer">
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 max-h-44 overflow-y-auto no-scrollbar font-bold pr-1">
                 {brands.map(brand => {
                   const isChecked = selectedBrands.some(b => b.toLowerCase() === brand.toLowerCase());
                   return (
@@ -223,9 +255,9 @@ export const SearchPage: React.FC = () => {
           )}
 
           {/* Customer Ratings Filter */}
-          <div className="mb-2">
-            <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-3 font-heading">Customer Rating</span>
-            <div className="flex flex-col gap-2.5">
+          <div className="mb-5 pb-4 border-b border-brand-border/40">
+            <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-2.5 font-heading">Customer Rating</span>
+            <div className="flex flex-col gap-2">
               {[4, 3, 2].map(star => (
                 <label
                   key={star}
@@ -238,20 +270,74 @@ export const SearchPage: React.FC = () => {
                     className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
                   />
                   <span className={`font-bold ${selectedRatings.includes(star) ? 'text-brand-blue font-extrabold' : ''}`}>
-                    {star}★ & above
+                    {star}★ &amp; above
                   </span>
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* Availability & Assured Toggles */}
+          <div>
+            <span className="font-black text-xs uppercase text-brand-slate tracking-widest block mb-2.5 font-heading">Availability</span>
+            <div className="flex flex-col gap-2.5">
+              <label className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={assuredOnly}
+                  onChange={e => setAssuredOnly(e.target.checked)}
+                  className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
+                />
+                <span className={assuredOnly ? 'text-brand-blue font-black' : 'font-semibold'}>
+                  ShopIndia Assured Only
+                </span>
+              </label>
+              <label className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={inStockOnly}
+                  onChange={e => setInStockOnly(e.target.checked)}
+                  className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
+                />
+                <span className={inStockOnly ? 'text-brand-graphite font-black' : 'font-semibold'}>
+                  In Stock Only
+                </span>
+              </label>
             </div>
           </div>
         </aside>
 
         {/* Search Results Display */}
         <main className="flex-1">
-          <div className="p-5 border rounded-card mb-6 flex justify-between items-center shadow-premium bg-white border-brand-border">
+          <div className="p-4 border rounded-card mb-6 flex flex-wrap justify-between items-center gap-3 shadow-premium bg-white border-brand-border">
             <span className="text-xs font-bold text-brand-slate">
               Showing <strong className="font-numbers text-brand-graphite">{searchedProducts.length}</strong> results for "{searchQuery || 'All catalog'}"
             </span>
+
+            {/* Horizontal Sort Selector Pills */}
+            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs">
+              <span className="text-slate-400 font-bold px-2 flex items-center gap-1 text-[11px]">
+                <ArrowUpDown size={12} /> Sort By:
+              </span>
+              {[
+                { id: 'relevance', name: 'Relevance' },
+                { id: 'price-low', name: 'Price: Low to High' },
+                { id: 'price-high', name: 'Price: High to Low' },
+                { id: 'rating', name: 'Top Rated' }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setSortBy(opt.id)}
+                  className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                    sortBy === opt.id
+                      ? 'bg-white text-brand-blue shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {opt.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (
@@ -466,70 +552,163 @@ export const SearchPage: React.FC = () => {
             <div className="absolute inset-0" onClick={() => setMobileFilterOpen(false)} />
             <div className="w-full bg-white rounded-t-bottom-nav p-5 pb-8 z-50 text-left shadow-elevated border-t border-brand-border text-brand-graphite">
               <div className="flex justify-between items-center border-b border-brand-border pb-3 mb-4 leading-none">
-                <span className="font-extrabold text-sm font-heading">Filter & Sort Options</span>
+                <span className="font-extrabold text-sm font-heading">Filter &amp; Sort Options</span>
                 <button onClick={() => setMobileFilterOpen(false)} className="text-brand-slate hover:text-brand-graphite font-bold p-1">
                   ✕
                 </button>
               </div>
 
-              {/* Brands selection (Multi-Select) */}
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
-                  Select Brand {selectedBrands.length > 0 && `(${selectedBrands.length})`}
+              {/* Sort By Selection */}
+              <div className="mb-4">
+                <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading block mb-2">
+                  Sort By
                 </span>
-                {selectedBrands.length > 0 && (
-                  <button onClick={() => setSelectedBrands([])} className="text-[11px] font-bold text-brand-blue hover:underline">
-                    Reset
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2 mb-5 font-bold max-h-40 overflow-y-auto no-scrollbar pr-1">
-                {brands.map(brand => {
-                  const isChecked = selectedBrands.some(b => b.toLowerCase() === brand.toLowerCase());
-                  return (
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'relevance', name: 'Relevance' },
+                    { id: 'price-low', name: 'Price: Low to High' },
+                    { id: 'price-high', name: 'Price: High to Low' },
+                    { id: 'rating', name: 'Top Rated' }
+                  ].map(opt => (
                     <button
-                      key={brand}
-                      onClick={() => toggleBrand(brand)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
-                        isChecked
+                      key={opt.id}
+                      onClick={() => setSortBy(opt.id)}
+                      className={`py-2 text-center text-xs border rounded-xl font-bold transition-all cursor-pointer ${
+                        sortBy === opt.id
                           ? 'bg-brand-blue text-white border-brand-blue shadow-xs font-black'
                           : 'bg-slate-50 text-brand-slate border-brand-border'
                       }`}
                     >
-                      {isChecked ? `✓ ${brand}` : brand}
+                      {opt.name}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
 
+              {/* Categories selection (Multi-Select) */}
+              {categories.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
+                      Category {selectedCategories.length > 0 && `(${selectedCategories.length})`}
+                    </span>
+                    {selectedCategories.length > 0 && (
+                      <button onClick={() => setSelectedCategories([])} className="text-[11px] font-bold text-brand-blue hover:underline">
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1">
+                    {categories.map(cat => {
+                      const isChecked = selectedCategories.some(c => c.toLowerCase() === cat.toLowerCase());
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => toggleCategory(cat)}
+                          className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
+                            isChecked
+                              ? 'bg-brand-blue text-white border-brand-blue shadow-xs font-black'
+                              : 'bg-slate-50 text-brand-slate border-brand-border'
+                          }`}
+                        >
+                          {isChecked ? `✓ ${cat}` : cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Brands selection (Multi-Select) */}
+              {brands.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
+                      Select Brand {selectedBrands.length > 0 && `(${selectedBrands.length})`}
+                    </span>
+                    {selectedBrands.length > 0 && (
+                      <button onClick={() => setSelectedBrands([])} className="text-[11px] font-bold text-brand-blue hover:underline">
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1">
+                    {brands.map(brand => {
+                      const isChecked = selectedBrands.some(b => b.toLowerCase() === brand.toLowerCase());
+                      return (
+                        <button
+                          key={brand}
+                          onClick={() => toggleBrand(brand)}
+                          className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
+                            isChecked
+                              ? 'bg-brand-blue text-white border-brand-blue shadow-xs font-black'
+                              : 'bg-slate-50 text-brand-slate border-brand-border'
+                          }`}
+                        >
+                          {isChecked ? `✓ ${brand}` : brand}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Ratings selection (Multi-Select) */}
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
-                  Customer Rating {selectedRatings.length > 0 && `(${selectedRatings.length})`}
-                </span>
-                {selectedRatings.length > 0 && (
-                  <button onClick={() => setSelectedRatings([])} className="text-[11px] font-bold text-brand-blue hover:underline">
-                    Reset
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-2 mb-6 font-bold">
-                {[4, 3, 2].map(star => {
-                  const isChecked = selectedRatings.includes(star);
-                  return (
-                    <button
-                      key={star}
-                      onClick={() => toggleRating(star)}
-                      className={`py-2 text-center text-xs border rounded-xl transition-all cursor-pointer ${
-                        isChecked
-                          ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold shadow-xs'
-                          : 'border-brand-border bg-slate-50 text-brand-slate'
-                      }`}
-                    >
-                      {isChecked ? `✓ ${star}★ & above` : `${star}★ & above`}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-brand-slate font-black uppercase tracking-widest font-heading">
+                    Customer Rating {selectedRatings.length > 0 && `(${selectedRatings.length})`}
+                  </span>
+                  {selectedRatings.length > 0 && (
+                    <button onClick={() => setSelectedRatings([])} className="text-[11px] font-bold text-brand-blue hover:underline">
+                      Reset
                     </button>
-                  );
-                })}
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2 font-bold">
+                  {[4, 3, 2].map(star => {
+                    const isChecked = selectedRatings.includes(star);
+                    return (
+                      <button
+                        key={star}
+                        onClick={() => toggleRating(star)}
+                        className={`py-2 text-center text-xs border rounded-xl transition-all cursor-pointer ${
+                          isChecked
+                            ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold shadow-xs'
+                            : 'border-brand-border bg-slate-50 text-brand-slate'
+                        }`}
+                      >
+                        {isChecked ? `✓ ${star}★ & above` : `${star}★ & above`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Availability toggles */}
+              <div className="mb-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAssuredOnly(!assuredOnly)}
+                  className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer font-bold ${
+                    assuredOnly
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {assuredOnly ? '✓ ShopIndia Assured' : 'ShopIndia Assured'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInStockOnly(!inStockOnly)}
+                  className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer font-bold ${
+                    inStockOnly
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {inStockOnly ? '✓ In Stock Only' : 'In Stock Only'}
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
