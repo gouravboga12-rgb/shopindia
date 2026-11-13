@@ -110,38 +110,86 @@ router.post('/quote', async (req, res) => {
       };
     });
 
-    let distanceKm = 3.5;
-    let isStoreOnline = true;
-    if (resolved.length && resolved[0].vendorId) {
-      const v = await prisma.vendor.findUnique({
-        where: { id: resolved[0].vendorId },
-        select: { lat: true, lng: true, isOnline: true }
-      });
-      if (v?.isOnline === false) {
-        isStoreOnline = false;
-      }
-      if (v?.lat && v?.lng && userLat && userLng) {
-        distanceKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
-      }
-    }
+    const uniqueVendors = Array.from(new Set(resolved.map(r => r.vendorId).filter(Boolean)));
+    const fType = mapType(vertical);
+    const isQuick = fType === 'quick_commerce';
 
-    const totals = await calculateCartTotals({
-      items: resolved,
-      fulfillmentType: mapType(vertical),
-      distanceKm
-    });
+    let quoteSubtotal = 0;
+    let quoteDeliveryFee = 0;
+    let quotePlatformFee = 0;
+    let quoteDiscount = 0;
+    let quoteTotal = 0;
+    let isStoreOnline = true;
+    let maxDistKm = 3.5;
+    let isFreeDelivery = false;
+
+    if (uniqueVendors.length > 1 && isQuick) {
+      // Multi-store Quick Shopping: Calculate quote per individual store dispatch
+      for (const vId of uniqueVendors) {
+        const vItems = resolved.filter(r => r.vendorId === vId);
+        let vDistKm = 3.5;
+        const v = await prisma.vendor.findUnique({
+          where: { id: vId },
+          select: { lat: true, lng: true, isOnline: true }
+        });
+        if (v?.isOnline === false) isStoreOnline = false;
+        if (v?.lat && v?.lng && userLat && userLng) {
+          vDistKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
+        }
+        if (vDistKm > maxDistKm) maxDistKm = vDistKm;
+
+        const vTotals = await calculateCartTotals({
+          items: vItems,
+          fulfillmentType: fType,
+          distanceKm: vDistKm
+        });
+
+        quoteSubtotal += vTotals.subtotal;
+        quoteDeliveryFee += vTotals.deliveryFee;
+        quotePlatformFee += vTotals.customerPlatformFee;
+        quoteDiscount += vTotals.discount;
+        quoteTotal += vTotals.finalCustomerTotal;
+      }
+    } else {
+      let distanceKm = 3.5;
+      if (resolved.length && resolved[0].vendorId) {
+        const v = await prisma.vendor.findUnique({
+          where: { id: resolved[0].vendorId },
+          select: { lat: true, lng: true, isOnline: true }
+        });
+        if (v?.isOnline === false) {
+          isStoreOnline = false;
+        }
+        if (v?.lat && v?.lng && userLat && userLng) {
+          distanceKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
+        }
+      }
+      maxDistKm = distanceKm;
+      const totals = await calculateCartTotals({
+        items: resolved,
+        fulfillmentType: fType,
+        distanceKm
+      });
+      quoteSubtotal = totals.subtotal;
+      quoteDeliveryFee = totals.deliveryFee;
+      quotePlatformFee = totals.customerPlatformFee;
+      quoteDiscount = totals.discount;
+      quoteTotal = totals.finalCustomerTotal;
+      isFreeDelivery = totals.delivery?.isFreeDelivery || false;
+    }
 
     res.json({
       success: true,
       quote: {
-        subtotal: totals.subtotal,
-        deliveryFee: totals.deliveryFee,
-        platformFee: totals.customerPlatformFee,
-        discount: totals.discount,
-        total: totals.finalCustomerTotal,
-        distanceKm,
+        subtotal: quoteSubtotal,
+        deliveryFee: quoteDeliveryFee,
+        platformFee: quotePlatformFee,
+        discount: quoteDiscount,
+        total: quoteTotal,
+        distanceKm: maxDistKm,
         isStoreOnline,
-        isFreeDelivery: totals.delivery?.isFreeDelivery || false
+        isFreeDelivery,
+        storeCount: uniqueVendors.length || 1
       }
     });
   } catch (err) {
@@ -271,6 +319,8 @@ router.get('/', customerAuth, async (req, res) => {
       return {
         id: o.id,
         orderNumber: o.orderNumber,
+        masterOrderNumber: o.masterOrderNumber || null,
+        isSubOrder: Boolean(o.isSubOrder),
         subtotal: orderSubtotal,
         discount: o.discount ?? 0,
         deliveryFee,
@@ -570,130 +620,12 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Resolve distanceKm and store status for Quick Commerce using actual vendor store & customer GPS
-    let orderDistKm = 3.5;
-    if (resolved.length && resolved[0].vendorId) {
-      const vRec = await prisma.vendor.findUnique({
-        where: { id: resolved[0].vendorId },
-        select: { lat: true, lng: true, isOnline: true, businessName: true, isActive: true }
-      });
-      if (vRec) {
-        if (vRec.isOnline === false && resolvedVertical === 'quick') {
-          return res.status(400).json({
-            error: `Merchant "${vRec.businessName || 'Store'}" is currently offline and not accepting orders. Please try again when the store is open.`
-          });
-        }
-        if (vRec.lat && vRec.lng && orderLat && orderLng) {
-          orderDistKm = calculateHaversineDistanceKm(vRec.lat, vRec.lng, orderLat, orderLng);
-        }
-      }
-    }
-
     const fulfillmentType = mapType(resolvedVertical);
-    const cartTotals = await calculateCartTotals({
-      items: resolved,
-      fulfillmentType,
-      distanceKm: orderDistKm,
-      zoneId: branchId
-    });
-
-    const subtotal = cartTotals.subtotal;
-    const discount = cartTotals.discount || 0;
-    const deliveryFee = cartTotals.deliveryFee;
-    const totalCommission = cartTotals.totalAdminCommission;
-    const total = cartTotals.finalCustomerTotal;
-    const riderFee = cartTotals.totalRiderPayout;
-    const orderNumber = 'OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
-
     const isQuickOrder = fulfillmentType === 'quick_commerce';
     const isServiceOrder = fulfillmentType === 'hvac_service' || resolvedVertical === 'services';
     const itemsList = Array.isArray(items) ? items : [];
     const firstServiceItem = itemsList.find(i => i.deliveryTime || i.specs?.['Scheduled Slot']) || itemsList[0] || null;
     const scheduledSlotInfo = req.body?.notes || firstServiceItem?.deliveryTime || firstServiceItem?.specs?.['Scheduled Slot'] || null;
-
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        customerId,
-        vendorId: isServiceOrder ? null : (resolved.length ? resolved[0].vendorId : null),
-        branchId,
-        type: fulfillmentType,
-        status: isQuickOrder ? 'confirmed' : 'placed',
-        subtotal,
-        discount,
-        commission: totalCommission,
-        total,
-        paymentMethod: isOnlinePayment ? 'razorpay' : 'COD',
-        paymentStatus: isOnlinePayment ? 'paid' : 'pending',
-        paymentRef: isOnlinePayment ? razorpayPayment.paymentId : null,
-        deliveryLine1: location || '',
-        deliveryPincode,
-        deliveryLat: orderLat,
-        deliveryLng: orderLng,
-        notes: scheduledSlotInfo || req.body.notes || null,
-        items: {
-          create: resolved.map((it) => ({
-            productId: it.productId,
-            vendorId: isServiceOrder ? null : it.vendorId,
-            name: it.name,
-            price: it.price,
-            quantity: it.quantity,
-            vendorPrice: it.vendorPrice,
-            platformFee: it.platformFee,
-            gatewayFeeShare: it.gatewayFeeShare,
-            vendorPaidOut: false
-          })),
-        },
-      },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                images: true
-              }
-            }
-          }
-        }
-      },
-    });
-
-    // Real-time WebSocket announcement across panels
-    try {
-      notifyNewOrder(order);
-    } catch (_wsErr) {
-      console.warn('WebSocket notifyNewOrder error:', _wsErr.message);
-    }
-
-    await Promise.all(
-      resolved.map(async (it) => {
-        const prod = await prisma.product.findUnique({ where: { id: it.productId } });
-        if (prod) {
-          const newStock = Math.max(0, prod.stock - it.quantity);
-          await prisma.product.update({
-            where: { id: it.productId },
-            data: {
-              stock: newStock,
-              isOutOfStock: newStock <= 0 ? true : prod.isOutOfStock
-            }
-          });
-        }
-      })
-    );
-
-    // If online payment was verified, create PaymentRecord in captured state
-    if (isOnlinePayment && razorpayPayment) {
-      await prisma.paymentRecord.create({
-        data: {
-          orderId: order.id,
-          razorpayOrderId: razorpayPayment.orderId,
-          razorpayPaymentId: razorpayPayment.paymentId,
-          amount: order.total,
-          currency: 'INR',
-          status: 'captured',
-        }
-      }).catch(err => console.error('Failed to create PaymentRecord on order placement:', err));
-    }
 
     // Resolve Customer's stable 4-Digit Master Delivery PIN
     let masterDeliveryPin = '1234';
@@ -711,39 +643,122 @@ router.post('/', async (req, res) => {
       masterDeliveryPin = String(1000 + Math.abs(hash));
     }
 
-    // Auto-create Delivery record and broadcast to nearby riders immediately for Quick Shopping
-    if (order.type === 'quick_commerce' && order.vendorId) {
-      const vendorRecord = await prisma.vendor.findUnique({
-        where: { id: order.vendorId },
-        select: { id: true, businessName: true, phone: true, street: true, city: true, state: true, pincode: true, lat: true, lng: true },
+    // Partition items by fulfillment entity:
+    // If services: partition by category/trade
+    // If physical goods (quick or shop): partition strictly by vendor store ID
+    const itemGroups = new Map();
+    for (const it of resolved) {
+      const gKey = isServiceOrder ? (it.categoryId || it.vendorId || 'service_trade') : (it.vendorId || 'platform_direct');
+      if (!itemGroups.has(gKey)) itemGroups.set(gKey, []);
+      itemGroups.get(gKey).push(it);
+    }
+
+    const isMultiStore = itemGroups.size > 1;
+    const masterOrderNumber = isMultiStore
+      ? 'MST-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000)
+      : null;
+
+    const createdOrders = [];
+    let subOrderIdx = 1;
+
+    for (const [groupKey, groupItems] of itemGroups.entries()) {
+      const gVendorId = isServiceOrder ? null : (groupKey !== 'platform_direct' ? groupKey : null);
+      let gDistKm = 3.5;
+      let vendorRecord = null;
+
+      if (gVendorId) {
+        vendorRecord = await prisma.vendor.findUnique({
+          where: { id: gVendorId },
+          select: { id: true, businessName: true, phone: true, street: true, city: true, state: true, pincode: true, lat: true, lng: true, isOnline: true, isActive: true }
+        });
+
+        if (vendorRecord) {
+          if (vendorRecord.isOnline === false && isQuickOrder) {
+            return res.status(400).json({
+              error: `Merchant "${vendorRecord.businessName || 'Store'}" is currently offline and not accepting orders. Please try again when the store is open.`
+            });
+          }
+          if (vendorRecord.lat && vendorRecord.lng && orderLat && orderLng) {
+            gDistKm = calculateHaversineDistanceKm(vendorRecord.lat, vendorRecord.lng, orderLat, orderLng);
+          }
+        }
+      }
+
+      const groupTotals = await calculateCartTotals({
+        items: groupItems,
+        fulfillmentType,
+        distanceKm: gDistKm,
+        zoneId: branchId
       });
 
-      if (vendorRecord) {
+      const orderNumber = isMultiStore
+        ? `${masterOrderNumber}-${subOrderIdx}`
+        : ('OD-' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000));
+
+      const subOrder = await prisma.order.create({
+        data: {
+          orderNumber,
+          masterOrderNumber,
+          isSubOrder: isMultiStore,
+          customerId,
+          vendorId: gVendorId,
+          branchId,
+          type: fulfillmentType,
+          status: isQuickOrder ? 'confirmed' : 'placed',
+          subtotal: groupTotals.subtotal,
+          discount: groupTotals.discount || 0,
+          commission: groupTotals.totalAdminCommission,
+          total: groupTotals.finalCustomerTotal,
+          paymentMethod: isOnlinePayment ? 'razorpay' : 'COD',
+          paymentStatus: isOnlinePayment ? 'paid' : 'pending',
+          paymentRef: isOnlinePayment ? razorpayPayment.paymentId : null,
+          deliveryLine1: location || '',
+          deliveryPincode,
+          deliveryLat: orderLat,
+          deliveryLng: orderLng,
+          notes: scheduledSlotInfo || req.body.notes || null,
+          items: {
+            create: groupItems.map((it) => ({
+              productId: it.productId,
+              vendorId: isServiceOrder ? null : it.vendorId,
+              name: it.name,
+              price: it.price,
+              quantity: it.quantity,
+              vendorPrice: it.vendorPrice,
+              platformFee: it.platformFee,
+              gatewayFeeShare: it.gatewayFeeShare,
+              vendorPaidOut: false
+            })),
+          },
+        },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  images: true
+                }
+              }
+            }
+          }
+        },
+      });
+
+      // Auto-create Delivery record and broadcast to nearby riders immediately for Quick Shopping
+      if (isQuickOrder && gVendorId && vendorRecord) {
         const pickupLat = vendorRecord.lat || 17.3732;
         const pickupLng = vendorRecord.lng || 78.5385;
-        const dropoffLat = order.deliveryLat || (pickupLat + 0.015);
-        const dropoffLng = order.deliveryLng || (pickupLng - 0.008);
+        const dropoffLat = orderLat || (pickupLat + 0.015);
+        const dropoffLng = orderLng || (pickupLng - 0.008);
         const pickupAddress = [vendorRecord.street, vendorRecord.city, vendorRecord.state, vendorRecord.pincode].filter(Boolean).join(', ') || 'Merchant Store Address';
-        const dropoffAddress = [order.deliveryLine1, order.deliveryCity, order.deliveryState, order.deliveryPincode].filter(Boolean).join(', ') || 'Customer Delivery Address';
-
-        // Distance via Haversine
-        const dLat = ((dropoffLat - pickupLat) * Math.PI) / 180;
-        const dLng = ((dropoffLng - pickupLng) * Math.PI) / 180;
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos((pickupLat * Math.PI) / 180) *
-            Math.cos((dropoffLat * Math.PI) / 180) *
-            Math.sin(dLng / 2) *
-            Math.sin(dLng / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const calculatedDist = Math.max(1, Math.round(6371 * c * 10) / 10);
+        const dropoffAddress = [location, deliveryPincode].filter(Boolean).join(', ') || 'Customer Delivery Address';
 
         await prisma.delivery.create({
           data: {
-            orderId: order.id,
+            orderId: subOrder.id,
             status: 'broadcasted',
-            deliveryFee: riderFee || 30,
-            distanceKm: orderDistKm || calculatedDist,
+            deliveryFee: groupTotals.totalRiderPayout || 30,
+            distanceKm: gDistKm,
             deliveryOtp: masterDeliveryPin,
             pickupName: vendorRecord.businessName || 'Merchant Store',
             pickupAddress,
@@ -758,82 +773,134 @@ router.post('/', async (req, res) => {
           },
         }).catch(err => console.error('Auto-broadcast delivery error:', err.message));
       }
+
+      // Auto-create Delivery record and broadcast to nearby technicians for Glacons / HVAC Services
+      if (isServiceOrder) {
+        const serviceTitle = subOrder.items?.[0]?.name || firstServiceItem?.name || 'Glacons Technician Service';
+        const serviceAddress = [location, deliveryPincode].filter(Boolean).join(', ') || 'Customer Service Address';
+        const serviceLat = orderLat || 17.385044;
+        const serviceLng = orderLng || 78.486671;
+        const technicianGuaranteedFee = groupTotals.totalRiderPayout > 0 ? groupTotals.totalRiderPayout : (firstServiceItem?.vendorPrice || Math.round(subOrder.total * 0.8) || 400);
+
+        const isInstantService = req.body?.bookingMode === 'instant' || (scheduledSlotInfo && scheduledSlotInfo.toLowerCase().includes('instant'));
+        const formattedPickupName = isInstantService
+          ? `⚡ Instant Match: ${serviceTitle}`
+          : `Glacons Service: ${serviceTitle}`;
+        const formattedPickupAddress = isInstantService
+          ? `⚡ INSTANT MATCH (15–30 Min ETA) | Site: ${serviceAddress}`
+          : (scheduledSlotInfo ? `🗓️ Scheduled: ${scheduledSlotInfo} | Site: ${serviceAddress}` : `Site: ${serviceAddress}`);
+
+        await prisma.delivery.create({
+          data: {
+            orderId: subOrder.id,
+            status: 'broadcasted',
+            deliveryFee: technicianGuaranteedFee,
+            distanceKm: gDistKm,
+            deliveryOtp: masterDeliveryPin,
+            pickupName: formattedPickupName,
+            pickupAddress: formattedPickupAddress,
+            pickupLat: serviceLat,
+            pickupLng: serviceLng,
+            pickupPhone: customerRecord?.phone || null,
+            dropoffName: customerRecord?.name || 'Customer',
+            dropoffAddress: serviceAddress,
+            dropoffLat: serviceLat,
+            dropoffLng: serviceLng,
+            dropoffPhone: customerRecord?.phone || '9999999999',
+          },
+        }).catch(err => console.error('Auto-broadcast service delivery error:', err.message));
+
+        await prisma.serviceJob.create({
+          data: {
+            orderId: subOrder.id,
+            status: isInstantService ? 'dispatched' : 'scheduled',
+            notes: scheduledSlotInfo || (isInstantService ? '⚡ Instant Match Service' : 'Scheduled Doorstep Service'),
+            originalAmount: subOrder.total,
+          }
+        }).catch(err => console.error('Auto-create ServiceJob error:', err.message));
+      }
+
+      // Real-time WebSocket announcement per sub-order
+      try {
+        notifyNewOrder(subOrder);
+      } catch (_wsErr) {
+        console.warn('WebSocket notifyNewOrder error:', _wsErr.message);
+      }
+
+      createdOrders.push(subOrder);
+      subOrderIdx++;
     }
 
-    // Auto-create Delivery record and broadcast to nearby technicians for Glacons / HVAC Services
-    if (order.type === 'hvac_service') {
-      const serviceTitle = order.items?.[0]?.name || firstServiceItem?.name || 'Glacons Technician Service';
-      const serviceAddress = [order.deliveryLine1, order.deliveryCity, order.deliveryState, order.deliveryPincode].filter(Boolean).join(', ') || 'Customer Service Address';
-      const serviceLat = orderLat || 17.385044;
-      const serviceLng = orderLng || 78.486671;
-      const technicianGuaranteedFee = riderFee > 0 ? riderFee : (firstServiceItem?.vendorPrice || Math.round(order.total * 0.8) || 400);
-
-      const isInstantService = req.body?.bookingMode === 'instant' || (scheduledSlotInfo && scheduledSlotInfo.toLowerCase().includes('instant'));
-      const formattedPickupName = isInstantService
-        ? `⚡ Instant Match: ${serviceTitle}`
-        : `Glacons Service: ${serviceTitle}`;
-      const formattedPickupAddress = isInstantService
-        ? `⚡ INSTANT MATCH (15–30 Min ETA) | Site: ${serviceAddress}`
-        : (scheduledSlotInfo ? `🗓️ Scheduled: ${scheduledSlotInfo} | Site: ${serviceAddress}` : `Site: ${serviceAddress}`);
-
-      await prisma.delivery.create({
-        data: {
-          orderId: order.id,
-          status: 'broadcasted',
-          deliveryFee: technicianGuaranteedFee, // Guaranteed technician payout (80% or admin configured pay)
-          distanceKm: orderDistKm || 3.5,
-          deliveryOtp: masterDeliveryPin,
-          pickupName: formattedPickupName,
-          pickupAddress: formattedPickupAddress,
-          pickupLat: serviceLat,
-          pickupLng: serviceLng,
-          pickupPhone: customerRecord?.phone || null,
-          dropoffName: customerRecord?.name || 'Customer',
-          dropoffAddress: serviceAddress,
-          dropoffLat: serviceLat,
-          dropoffLng: serviceLng,
-          dropoffPhone: customerRecord?.phone || '9999999999',
-        },
-      }).catch(err => console.error('Auto-broadcast service delivery error:', err.message));
-
-      await prisma.serviceJob.create({
-        data: {
-          orderId: order.id,
-          status: isInstantService ? 'dispatched' : 'scheduled',
-          notes: scheduledSlotInfo || (isInstantService ? '⚡ Instant Match Service' : 'Scheduled Doorstep Service'),
-          originalAmount: order.total,
+    // Decrement stock for all ordered items
+    await Promise.all(
+      resolved.map(async (it) => {
+        const prod = await prisma.product.findUnique({ where: { id: it.productId } });
+        if (prod) {
+          const newStock = Math.max(0, prod.stock - it.quantity);
+          await prisma.product.update({
+            where: { id: it.productId },
+            data: {
+              stock: newStock,
+              isOutOfStock: newStock <= 0 ? true : prod.isOutOfStock
+            }
+          });
         }
-      }).catch(err => console.error('Auto-create ServiceJob error:', err.message));
+      })
+    );
+
+    const masterTotal = createdOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+    // If online payment was verified, create PaymentRecord in captured state
+    if (isOnlinePayment && razorpayPayment && createdOrders.length > 0) {
+      await prisma.paymentRecord.create({
+        data: {
+          orderId: createdOrders[0].id,
+          razorpayOrderId: razorpayPayment.orderId,
+          razorpayPaymentId: razorpayPayment.paymentId,
+          amount: masterTotal,
+          currency: 'INR',
+          status: 'captured',
+        }
+      }).catch(err => console.error('Failed to create PaymentRecord on order placement:', err));
     }
 
     // Save notification to PostgreSQL for the customer
-    if (customerId) {
-      const isQuick = order.type === 'quick_commerce';
-      const isService = order.type === 'hvac_service';
+    if (customerId && createdOrders.length > 0) {
+      const isQuick = fulfillmentType === 'quick_commerce';
+      const isService = fulfillmentType === 'hvac_service';
+      const notifOrderRef = masterOrderNumber || createdOrders[0].orderNumber;
       await prisma.userNotification.create({
         data: {
           userId: customerId,
           category: 'order',
-          title: isQuick ? 'Arriving in 10-15 mins! ⚡' : isService ? 'Service Booked Successfully 🛠️' : 'Order Placed Successfully! 🎉',
-          message: isQuick 
-            ? `Your 10-Min order #${order.orderNumber} is placed and being packed at the dark store.`
-            : isService 
-            ? `Your service appointment #${order.orderNumber} has been booked. Technician will arrive at scheduled time.`
-            : `Your E-Commerce order #${order.orderNumber} is confirmed! Estimated delivery in 2-4 business days.`,
+          title: isQuick
+            ? (isMultiStore ? `Arriving in 10-25 mins! ⚡ (${createdOrders.length} Stores)` : 'Arriving in 10-15 mins! ⚡')
+            : isService
+            ? 'Service Booked Successfully 🛠️'
+            : 'Order Placed Successfully! 🎉',
+          message: isMultiStore
+            ? `Your multi-store order #${notifOrderRef} has been placed. ${createdOrders.length} separate delivery riders are being assigned to pick up from each store.`
+            : isQuick
+            ? `Your 10-Min order #${notifOrderRef} is placed and being packed at the dark store.`
+            : isService
+            ? `Your service appointment #${notifOrderRef} has been booked. Technician will arrive at scheduled time.`
+            : `Your E-Commerce order #${notifOrderRef} is confirmed! Estimated delivery in 2-4 business days.`,
           channel: 'IN_APP',
           isRead: false,
-          link: `/orders/${order.id}`,
+          link: `/orders/${createdOrders[0].id}`,
         }
       }).catch(err => console.error('Failed to create order placement notification', err));
     }
 
+    const primaryOrder = createdOrders[0];
     res.status(201).json({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      total: order.total,
-      status: order.status,
-      date: new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-      items: order.items.map((it) => ({
+      id: primaryOrder.id,
+      orderNumber: primaryOrder.orderNumber,
+      masterOrderNumber: masterOrderNumber || null,
+      total: masterTotal,
+      status: primaryOrder.status,
+      date: new Date(primaryOrder.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      items: createdOrders.flatMap(o => o.items.map((it) => ({
         product: {
           id: it.productId,
           title: it.name,
@@ -841,7 +908,15 @@ router.post('/', async (req, res) => {
           image: it.product && it.product.images && it.product.images.length ? it.product.images[0].url : '',
         },
         quantity: it.quantity,
-      })),
+      }))),
+      subOrders: createdOrders.map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        vendorId: o.vendorId,
+        total: o.total,
+        status: o.status,
+        itemCount: o.items.length
+      }))
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

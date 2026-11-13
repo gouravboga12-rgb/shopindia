@@ -270,8 +270,18 @@ export const OrdersPage: React.FC = () => {
                     <span className="font-bold text-sm text-brand-graphite block truncate">
                       {o.items.map(it => it.product?.title || 'Item').join(', ') || 'Order Details'}
                     </span>
-                    <p className="text-xs text-brand-slate mt-0.5">
-                      {v === 'services' ? 'Booking' : 'Order'} {o.orderNumber || o.id} • {o.date || 'Today'}
+                    <p className="text-xs text-brand-slate mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>{v === 'services' ? 'Booking' : 'Order'} {o.orderNumber || o.id} • {o.date || 'Today'}</span>
+                      {o.vendor?.businessName && (
+                        <span className="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                          🏪 {o.vendor.businessName}
+                        </span>
+                      )}
+                      {(o as any).masterOrderNumber && (
+                        <span className="font-mono text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">
+                          Multi-Store ({(o as any).masterOrderNumber})
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>

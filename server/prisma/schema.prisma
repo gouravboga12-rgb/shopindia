@@ -352,9 +352,12 @@ model ProductImage {
 }
 
 model Order {
-  id          String          @id @default(uuid())
-  orderNumber String          @unique
-  customerId  String
+  id                String          @id @default(uuid())
+  orderNumber       String          @unique
+  masterOrderNumber String?         // Shared parent reference (e.g. "MST-9842") linking sibling sub-orders
+  parentOrderId     String?         // Optional reference to primary order
+  isSubOrder        Boolean         @default(false)
+  customerId        String
   customer    User            @relation("CustomerOrders", fields: [customerId], references: [id])
   vendorId    String?
   vendor      Vendor?         @relation(fields: [vendorId], references: [id])
@@ -404,6 +407,7 @@ model Order {
 
   @@index([customerId, createdAt(sort: Desc)])
   @@index([vendorId, status])
+  @@index([masterOrderNumber])
   @@map("orders")
 }
 

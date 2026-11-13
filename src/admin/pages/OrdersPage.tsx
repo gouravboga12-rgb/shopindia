@@ -92,6 +92,7 @@ export const OrdersPage: React.FC = () => {
   const filtered = orders.filter(o => {
     const matchesQuery = !q ||
       o.orderNumber?.toLowerCase().includes(q.toLowerCase()) ||
+      o.masterOrderNumber?.toLowerCase().includes(q.toLowerCase()) ||
       o.id?.toLowerCase().includes(q.toLowerCase()) ||
       o.customer?.name?.toLowerCase().includes(q.toLowerCase()) ||
       o.customerId?.name?.toLowerCase().includes(q.toLowerCase()) ||
@@ -272,8 +273,15 @@ export const OrdersPage: React.FC = () => {
                     <tr key={orderId} className="hover:bg-gray-50/50 transition-colors">
                       {/* Order ID Column */}
                       <td className="px-5 py-4 min-w-[200px]">
-                        <div className="flex flex-col">
-                          <span className="font-mono font-black text-gray-900 text-xs tracking-tight whitespace-nowrap">{o.orderNumber}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-black text-gray-900 text-xs tracking-tight whitespace-nowrap">{o.orderNumber}</span>
+                            {o.masterOrderNumber && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                Master: {o.masterOrderNumber}
+                              </span>
+                            )}
+                          </div>
                           {firstItemName && (
                             <span className="text-[11px] text-gray-400 truncate max-w-[220px]" title={firstItemName}>
                               {firstItemName} {itemsCount > 1 ? `+${itemsCount - 1} more` : ''}
