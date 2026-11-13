@@ -40,7 +40,7 @@ const VEHICLE_CATEGORIES = [
 ];
 
 export const VerticalServices: React.FC = () => {
-  const { addToCart, navigateTo, userCoords, addNotification } = useApp();
+  const { addToCart, navigateTo, userCoords, addNotification, location } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
 
@@ -174,6 +174,7 @@ export const VerticalServices: React.FC = () => {
         body: JSON.stringify({
           serviceName: service.title,
           category: service.category,
+          locality: location || userCoords?.city,
           pincode: userCoords?.pincode,
           city: userCoords?.city,
           lat: userCoords?.lat,
@@ -186,7 +187,7 @@ export const VerticalServices: React.FC = () => {
       addNotification({
         type: 'service',
         title: 'Demand Request Registered 🔔',
-        message: `We've noted your request for "${service.title}" in ${userCoords?.city || 'your area'}. We will notify you when service coverage begins!`,
+        message: `We've noted your request for "${service.title}" in ${location || userCoords?.city || 'your area'}. We will notify you when service coverage begins!`,
         icon: Bell,
         color: 'text-blue-600',
         bg: 'bg-blue-50',

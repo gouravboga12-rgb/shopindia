@@ -1310,6 +1310,7 @@ model ServiceDemandLead {
   serviceName String
   pincode     String?
   city        String?
+  locality    String?
   lat         Float?
   lng         Float?
   status      String   @default("pending") // pending, notified, fulfilled

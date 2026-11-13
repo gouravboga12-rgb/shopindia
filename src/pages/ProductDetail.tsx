@@ -8,7 +8,7 @@ import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
 
 export const ProductDetailPage: React.FC = () => {
-  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, setCurrentVertical, cart, userCoords, addNotification } = useApp();
+  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, setCurrentVertical, cart, userCoords, addNotification, location } = useApp();
   const { reviews, wishlist, toggleWishlist, recordView } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
@@ -95,6 +95,7 @@ export const ProductDetailPage: React.FC = () => {
         body: JSON.stringify({
           serviceName: product.title,
           category: product.category,
+          locality: location || userCoords?.city,
           pincode: userCoords?.pincode,
           city: userCoords?.city,
           lat: userCoords?.lat,
@@ -106,7 +107,7 @@ export const ProductDetailPage: React.FC = () => {
       addNotification({
         type: 'service',
         title: 'Demand Request Registered 🔔',
-        message: `We've noted your request for "${product.title}" in ${userCoords?.city || 'your area'}. We will notify you when coverage goes live!`,
+        message: `We've noted your request for "${product.title}" in ${location || userCoords?.city || 'your area'}. We will notify you when coverage goes live!`,
         icon: Bell,
         color: 'text-blue-600',
         bg: 'bg-blue-50',

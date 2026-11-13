@@ -540,13 +540,23 @@ export const ServiceAreasPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="p-3.5 font-semibold text-slate-700">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <MapPin size={13} className="text-amber-600 shrink-0" />
-                          <span>{lead.city || 'Unknown City'}</span>
+                          <span className="font-bold text-slate-900">{lead.locality || lead.city || 'Unknown Location'}</span>
                           {lead.pincode && (
                             <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px] text-slate-600">
                               {lead.pincode}
                             </span>
+                          )}
+                          {lead.lat && lead.lng && (
+                            <a
+                              href={`https://www.google.com/maps?q=${lead.lat},${lead.lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10px] text-blue-600 hover:underline font-semibold ml-1 inline-flex items-center gap-0.5"
+                            >
+                              Map ↗
+                            </a>
                           )}
                         </div>
                       </td>

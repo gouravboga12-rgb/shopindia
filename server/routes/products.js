@@ -347,10 +347,18 @@ router.get('/', async (req, res) => {
  */
 router.post('/demand-lead', async (req, res) => {
   try {
-    const { userId, phone, category, serviceName, pincode, city, lat, lng } = req.body;
+    const { userId, phone, category, serviceName, pincode, city, locality, lat, lng } = req.body;
 
     if (!serviceName) {
       return res.status(400).json({ error: 'Service name is required' });
+    }
+
+    let finalLocality = locality ? String(locality).trim() : null;
+    let finalCity = city ? String(city).trim() : null;
+
+    if (!finalLocality && finalCity && finalCity.includes(',')) {
+      finalLocality = finalCity;
+      finalCity = finalCity.split(',').pop().trim();
     }
 
     const lead = await prisma.serviceDemandLead.create({
@@ -360,7 +368,8 @@ router.post('/demand-lead', async (req, res) => {
         category: category || 'general_service',
         serviceName,
         pincode: pincode ? String(pincode).trim() : null,
-        city: city ? String(city).trim() : null,
+        city: finalCity,
+        locality: finalLocality,
         lat: lat ? parseFloat(lat) : null,
         lng: lng ? parseFloat(lng) : null,
         status: 'pending',
