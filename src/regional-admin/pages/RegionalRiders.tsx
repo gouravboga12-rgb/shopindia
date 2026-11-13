@@ -146,9 +146,9 @@ export const RegionalRiders: React.FC = () => {
       {/* Header */}
       <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900">Territory Fleet & Service Network</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900">Territory Riders & Technicians Network</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Review partner KYC documents, verify service qualifications, and monitor dispatch capabilities
+            Review partner KYC documents, verify service qualifications, and monitor delivery & technician capabilities
           </p>
         </div>
 
@@ -158,7 +158,7 @@ export const RegionalRiders: React.FC = () => {
           className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold border border-blue-200 transition-colors shadow-2xs cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
-          <span>Refresh Fleet</span>
+          <span>Refresh Partners</span>
         </button>
       </div>
 

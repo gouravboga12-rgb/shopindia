@@ -76,7 +76,7 @@ export const RegionalLiveMap: React.FC = () => {
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900">Live Dispatch Radar</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Real-time tracking of active quick-commerce trips, online fleet, and 3PL pickups
+            Real-time tracking of active delivery trips, online riders & technicians, and 3PL pickups
           </p>
         </div>
 
@@ -116,7 +116,7 @@ export const RegionalLiveMap: React.FC = () => {
         {/* Overlay Online Riders Nodes */}
         {onlineRiders.length === 0 ? (
           <div className="absolute top-10 z-20 text-[11px] font-semibold text-slate-500 bg-white/90 px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            No verified fleet online in this territory
+            No verified riders or technicians online in this territory
           </div>
         ) : (
           onlineRiders.slice(0, 6).map((rider, idx) => {
@@ -173,7 +173,7 @@ export const RegionalLiveMap: React.FC = () => {
         <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 bg-white/95 border border-slate-200 rounded-xl p-2 sm:p-2.5 backdrop-blur-md flex items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] text-slate-700 shadow-xs">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="font-medium">Online Fleet</span>
+            <span className="font-medium">Online Riders & Techs</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />

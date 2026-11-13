@@ -10,8 +10,8 @@ export const RegionalAdminBottomNav: React.FC<RegionalAdminBottomNavProps> = ({ 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'live-map', label: 'Radar Map', icon: Radar },
-    { id: 'vendors', label: 'Merchants', icon: Store },
-    { id: 'riders', label: 'Fleet & KYC', icon: Bike },
+    { id: 'vendors', label: 'Vendors', icon: Store },
+    { id: 'riders', label: 'Riders & Techs', icon: Bike },
     { id: 'support', label: 'Support', icon: Headphones },
   ];
 

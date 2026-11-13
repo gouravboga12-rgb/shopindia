@@ -363,7 +363,7 @@ export const RegionalSupport: React.FC = () => {
                         <span className="text-slate-500 block">{selectedTicket.order.vendor?.phone || selectedTicket.vendor?.phone || ''}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block font-medium">🚴 Delivery Fleet</span>
+                        <span className="text-slate-400 block font-medium">🚴 Delivery Partner / Tech</span>
                         {selectedTicket.order.delivery?.riderProfile?.user ? (
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-slate-800">{selectedTicket.order.delivery.riderProfile.user.name}</span>

@@ -13,11 +13,11 @@ export const RegionalAdminSidebar: React.FC<RegionalAdminSidebarProps> = ({ curr
   const navItems = [
     { id: 'dashboard', label: 'Regional Dashboard', icon: LayoutDashboard },
     { id: 'live-map', label: 'Live Dispatch Radar', icon: Radar },
-    { id: 'vendors', label: 'Territory Merchants', icon: Store },
-    { id: 'riders', label: 'Delivery Fleet & KYC', icon: Bike },
+    { id: 'vendors', label: 'Vendors & Stores', icon: Store },
+    { id: 'riders', label: 'Riders, Techs & KYC', icon: Bike },
     { id: 'cod-remittance', label: 'Rider Cash & COD Float', icon: Banknote },
-    { id: 'payouts', label: 'Payout Approvals', icon: Wallet },
-    { id: 'support', label: 'Territory Support', icon: Headphones },
+    { id: 'payouts', label: 'Rider & Tech Payouts', icon: Wallet },
+    { id: 'support', label: 'Customer & Partner Support', icon: Headphones },
   ];
 
   return (

@@ -231,7 +231,7 @@ export const RegionalDashboard: React.FC = () => {
             Regional Control: {user?.name || 'Hub Manager'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Real-time quick-commerce fleet, merchant dispatches, and Shiprocket 3PL performance
+            Real-time delivery riders, technician dispatches, and Shiprocket 3PL performance
           </p>
         </div>
 
@@ -376,7 +376,7 @@ export const RegionalDashboard: React.FC = () => {
         {/* Online Riders */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-blue-200 transition-all">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">Online Fleet</span>
+            <span className="text-xs font-semibold text-slate-500">Online Riders & Techs</span>
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>READY</span>

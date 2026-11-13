@@ -187,7 +187,7 @@ export const RegionalCODCollection: React.FC = () => {
               Rider Cash & COD Float Monitoring Hub
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              Territory fleet cash-in-hand oversight, safety limit tracking, clearance alerts, and rider contact management.
+              Territory rider cash-in-hand oversight, safety limit tracking, clearance alerts, and COD remittances.
             </p>
           </div>
         </div>
@@ -222,7 +222,7 @@ export const RegionalCODCollection: React.FC = () => {
         {/* Card 1: Total Fleet COD Cash Held */}
         <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-5 rounded-3xl shadow-sm border border-blue-500/20 relative overflow-hidden">
           <div className="flex items-center justify-between text-white/70 text-xs font-bold uppercase tracking-wider">
-            <span>Fleet Cash in Hand</span>
+            <span>Rider Cash in Hand</span>
             <Banknote className="w-4 h-4 text-emerald-400" />
           </div>
           <p className="text-3xl font-black mt-2 font-mono text-emerald-300">
