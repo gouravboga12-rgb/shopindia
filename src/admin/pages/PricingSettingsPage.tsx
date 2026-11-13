@@ -38,6 +38,8 @@ interface AppSettings {
   quick_free_delivery_enabled: string;
   quick_free_threshold: string;
   service_commission_pct: string;
+  shop_commission_pct?: string;
+  quick_commission_pct?: string;
   platform_charge_pct: string;
   gst_percent: string;
   cgst_percent: string;
@@ -193,6 +195,8 @@ export const PricingSettingsPage: React.FC = () => {
     quick_free_delivery_enabled: 'false',
     quick_free_threshold: '999',
     service_commission_pct: '15',
+    shop_commission_pct: '10',
+    quick_commission_pct: '10',
     platform_charge_pct: '3.0',
     gst_percent: '18',
     cgst_percent: '9',
@@ -229,6 +233,8 @@ export const PricingSettingsPage: React.FC = () => {
 
   // Interactive Live Previews
   const [quickSimDistance, setQuickSimDistance] = useState<number>(4);
+  const [shopSimPrice, setShopSimPrice] = useState<number>(500);
+  const [quickItemSimPrice, setQuickItemSimPrice] = useState<number>(100);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -270,6 +276,8 @@ export const PricingSettingsPage: React.FC = () => {
           shiprocket_free_delivery_enabled: String(sRes.settings.shiprocket_free_delivery_enabled || 'false'),
           quick_free_delivery_enabled: String(sRes.settings.quick_free_delivery_enabled || 'false'),
           service_commission_pct: sRes.settings.service_commission_pct || '15',
+          shop_commission_pct: sRes.settings.shop_commission_pct || '10',
+          quick_commission_pct: sRes.settings.quick_commission_pct || '10',
           platform_charge_pct: sRes.settings.platform_charge_pct || '3.0'
         }));
       }
@@ -507,6 +515,137 @@ export const PricingSettingsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Card 0: Platform Base Product Commission Rate */}
+          <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black text-sm">
+                  %
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900">Platform Product Commission Rate (Shop India E-Commerce)</h3>
+                  <p className="text-xs text-gray-500">
+                    Base markup percentage added to vendor base price for nationwide courier orders. Vendors receive 100% of their base listing price.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  saveSettingsBundle(
+                    { shop_commission_pct: settings.shop_commission_pct || '10' },
+                    undefined,
+                    'shop_commission',
+                    'Shop India product commission rate saved successfully!'
+                  )
+                }
+                disabled={savingKey === 'shop_commission'}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+              >
+                <Save className="w-4 h-4" />
+                <span>{savingKey === 'shop_commission' ? 'Saving...' : 'Save Commission Rate'}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              {/* Left Column: Slider and Rate Controls */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Admin Commission Percentage (%)
+                  </label>
+                  <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
+                    {settings.shop_commission_pct || '10'}%
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="0.5"
+                    value={parseFloat(settings.shop_commission_pct || '10') || 0}
+                    onChange={e => setSettings({ ...settings, shop_commission_pct: e.target.value })}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      step="0.5"
+                      value={settings.shop_commission_pct || '10'}
+                      onChange={e => setSettings({ ...settings, shop_commission_pct: e.target.value })}
+                      className="w-20 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-extrabold text-gray-900 text-center focus:bg-white focus:border-indigo-600 focus:outline-none"
+                    />
+                    <span className="text-xs font-bold text-gray-400">%</span>
+                  </div>
+                </div>
+
+                {/* Split Visualizer */}
+                <div className="space-y-1.5">
+                  <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(0, parseFloat(settings.shop_commission_pct || '10') || 0)) * 2}%` }}
+                      className="bg-indigo-600 h-full transition-all duration-300"
+                    />
+                    <div
+                      style={{ width: `${100 - (Math.min(100, Math.max(0, parseFloat(settings.shop_commission_pct || '10') || 0)) * 2)}%` }}
+                      className="bg-emerald-500 h-full transition-all duration-300"
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] font-bold">
+                    <span className="text-indigo-600">Admin Markup: {settings.shop_commission_pct || '10'}%</span>
+                    <span className="text-emerald-700">Vendor Receives: 100% (Protected Base Price)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Real-Time Payout Simulator */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-gray-700">Real-Time Product Price Simulator</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-400 font-bold">Sample Vendor Price: ₹</span>
+                    <input
+                      type="number"
+                      value={shopSimPrice}
+                      onChange={e => setShopSimPrice(Number(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-900 text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center p-2 bg-white rounded-xl border border-gray-100">
+                    <span className="text-gray-600 font-medium">Vendor Listing Base Price:</span>
+                    <span className="font-black text-gray-900">₹{shopSimPrice}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-indigo-50 rounded-xl border border-indigo-100">
+                    <span className="text-indigo-900 font-semibold">
+                      Admin Platform Markup ({settings.shop_commission_pct || '10'}%):
+                    </span>
+                    <span className="font-black text-indigo-700">
+                      +₹{Math.round((shopSimPrice * ((parseFloat(settings.shop_commission_pct || '10') || 0) / 100)) * 100) / 100}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <span className="text-emerald-900 font-bold">Customer Checkout Product Price:</span>
+                    <span className="font-black text-emerald-700">
+                      ₹{Math.round((shopSimPrice + (shopSimPrice * ((parseFloat(settings.shop_commission_pct || '10') || 0) / 100))) * 100) / 100}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-amber-50 rounded-xl border border-amber-100">
+                    <span className="text-amber-900 font-bold">Vendor Payout (Transferred to Seller):</span>
+                    <span className="font-black text-amber-700">₹{shopSimPrice} (100% Guaranteed)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Card 1: Delivery Charges & Free Threshold Policy */}
           <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm space-y-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
@@ -694,7 +833,7 @@ export const PricingSettingsPage: React.FC = () => {
                   {rules.filter(r => r.vertical !== 'services').length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-gray-400">
-                        No custom commission rules configured. The fallback global commission applies.
+                        No custom commission rules configured. The fallback Shop India commission applies ({settings.shop_commission_pct || '10'}%).
                       </td>
                     </tr>
                   )}
@@ -721,6 +860,137 @@ export const PricingSettingsPage: React.FC = () => {
                 Manages customer delivery fees and guaranteed rider payouts. When a rider delivers and enters the customer's 4-digit OTP,
                 the rider payout is credited directly to their wallet balance automatically.
               </p>
+            </div>
+          </div>
+
+          {/* Card: Quick Commerce Product Commission Rate */}
+          <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-black text-sm">
+                  %
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900">Quick Commerce Product Commission Rate</h3>
+                  <p className="text-xs text-gray-500">
+                    Platform markup percentage added on quick dark-store groceries and essentials. Quick merchants receive 100% of their base listed price.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  saveSettingsBundle(
+                    { quick_commission_pct: settings.quick_commission_pct || '10' },
+                    undefined,
+                    'quick_commission',
+                    'Quick Shopping product commission rate saved successfully!'
+                  )
+                }
+                disabled={savingKey === 'quick_commission'}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+              >
+                <Save className="w-4 h-4" />
+                <span>{savingKey === 'quick_commission' ? 'Saving...' : 'Save Quick Commission'}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              {/* Left Column: Slider and Rate Controls */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Quick Commission Percentage (%)
+                  </label>
+                  <span className="text-xs font-black text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                    {settings.quick_commission_pct || '10'}%
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="0.5"
+                    value={parseFloat(settings.quick_commission_pct || '10') || 0}
+                    onChange={e => setSettings({ ...settings, quick_commission_pct: e.target.value })}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      step="0.5"
+                      value={settings.quick_commission_pct || '10'}
+                      onChange={e => setSettings({ ...settings, quick_commission_pct: e.target.value })}
+                      className="w-20 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-extrabold text-gray-900 text-center focus:bg-white focus:border-amber-500 focus:outline-none"
+                    />
+                    <span className="text-xs font-bold text-gray-400">%</span>
+                  </div>
+                </div>
+
+                {/* Split Visualizer */}
+                <div className="space-y-1.5">
+                  <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(0, parseFloat(settings.quick_commission_pct || '10') || 0)) * 2}%` }}
+                      className="bg-amber-500 h-full transition-all duration-300"
+                    />
+                    <div
+                      style={{ width: `${100 - (Math.min(100, Math.max(0, parseFloat(settings.quick_commission_pct || '10') || 0)) * 2)}%` }}
+                      className="bg-emerald-500 h-full transition-all duration-300"
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] font-bold">
+                    <span className="text-amber-700">Admin Markup: {settings.quick_commission_pct || '10'}%</span>
+                    <span className="text-emerald-700">Quick Merchant: 100% (Protected Listing Price)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Real-Time Payout Simulator */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-gray-700">Real-Time Quick Item Price Simulator</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-400 font-bold">Sample Item Price: ₹</span>
+                    <input
+                      type="number"
+                      value={quickItemSimPrice}
+                      onChange={e => setQuickItemSimPrice(Number(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-900 text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center p-2 bg-white rounded-xl border border-gray-100">
+                    <span className="text-gray-600 font-medium">Merchant Listed Item Price:</span>
+                    <span className="font-black text-gray-900">₹{quickItemSimPrice}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-amber-50 rounded-xl border border-amber-100">
+                    <span className="text-amber-900 font-semibold">
+                      Admin Quick Markup ({settings.quick_commission_pct || '10'}%):
+                    </span>
+                    <span className="font-black text-amber-700">
+                      +₹{Math.round((quickItemSimPrice * ((parseFloat(settings.quick_commission_pct || '10') || 0) / 100)) * 100) / 100}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <span className="text-emerald-900 font-bold">Customer Checkout Item Price:</span>
+                    <span className="font-black text-emerald-700">
+                      ₹{Math.round((quickItemSimPrice + (quickItemSimPrice * ((parseFloat(settings.quick_commission_pct || '10') || 0) / 100))) * 100) / 100}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded-xl border border-blue-100">
+                    <span className="text-blue-900 font-bold">Merchant Store Payout (Protected):</span>
+                    <span className="font-black text-blue-700">₹{quickItemSimPrice} (100% Guaranteed)</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

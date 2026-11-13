@@ -108,17 +108,40 @@ async function resolvePricingRule({ productId, vendorId, categoryId, vertical = 
         isActive: true
       };
     }
+    if (vertical === 'shop' && settings && settings['shop_commission_pct']) {
+      return {
+        id: 'settings_shop',
+        scope: 'vertical',
+        vertical: 'shop',
+        commissionPct: parseFloat(settings['shop_commission_pct']),
+        includeGateway: true,
+        isActive: true
+      };
+    }
+    if (vertical === 'quick' && settings && settings['quick_commission_pct']) {
+      return {
+        id: 'settings_quick',
+        scope: 'vertical',
+        vertical: 'quick',
+        commissionPct: parseFloat(settings['quick_commission_pct']),
+        includeGateway: true,
+        isActive: true
+      };
+    }
   }
 
   // 5. Global level
   const globalRule = list.find(r => r.scope === 'global');
   if (globalRule) return globalRule;
 
+  const { settings } = await getCachedRules();
+  const fallbackPct = settings && settings['shop_commission_pct'] ? parseFloat(settings['shop_commission_pct']) : 10.00;
+
   // Fallback default rule
   return {
     id: 'default_global',
     scope: 'global',
-    commissionPct: 10.00,
+    commissionPct: fallbackPct,
     includeGateway: true,
     deliveryFeeRules: null,
     isActive: true

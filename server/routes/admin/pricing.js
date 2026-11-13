@@ -289,6 +289,8 @@ router.get('/settings', async (req, res) => {
       service_visit_charge: '199',
       service_technician_min_pay: '149',
       service_commission_pct: '15',
+      shop_commission_pct: '10',
+      quick_commission_pct: '10',
       gst_percent: '18',
       cgst_percent: '9',
       sgst_percent: '9',
@@ -440,6 +442,95 @@ router.post('/settings', async (req, res) => {
               commissionPct: commPct,
               includeGateway: true,
               description: 'Doorstep Services & Repairs Commission',
+              isActive: true
+            }
+          });
+        }
+      }
+    }
+
+    // Automatically keep PricingRule for vertical 'shop' (Shop India Pan-India E-Commerce) synchronized
+    if (settings.shop_commission_pct != null) {
+      const commPct = parseFloat(settings.shop_commission_pct);
+      if (!isNaN(commPct) && commPct >= 0) {
+        const existingShopRule = await prisma.pricingRule.findFirst({
+          where: { scope: 'vertical', vertical: 'shop' }
+        });
+
+        if (existingShopRule) {
+          await prisma.pricingRule.update({
+            where: { id: existingShopRule.id },
+            data: {
+              commissionPct: commPct,
+              description: 'Shop India Pan-India E-Commerce Commission',
+              isActive: true
+            }
+          });
+        } else {
+          await prisma.pricingRule.create({
+            data: {
+              scope: 'vertical',
+              vertical: 'shop',
+              commissionPct: commPct,
+              includeGateway: true,
+              description: 'Shop India Pan-India E-Commerce Commission',
+              isActive: true
+            }
+          });
+        }
+
+        // Also sync global fallback rule if it exists or create it
+        const existingGlobalRule = await prisma.pricingRule.findFirst({
+          where: { scope: 'global' }
+        });
+        if (existingGlobalRule) {
+          await prisma.pricingRule.update({
+            where: { id: existingGlobalRule.id },
+            data: {
+              commissionPct: commPct,
+              description: 'Global Base Product Commission',
+              isActive: true
+            }
+          });
+        } else {
+          await prisma.pricingRule.create({
+            data: {
+              scope: 'global',
+              commissionPct: commPct,
+              includeGateway: true,
+              description: 'Global Base Product Commission',
+              isActive: true
+            }
+          });
+        }
+      }
+    }
+
+    // Automatically keep PricingRule for vertical 'quick' (Quick Shopping Hyperlocal) synchronized
+    if (settings.quick_commission_pct != null) {
+      const commPct = parseFloat(settings.quick_commission_pct);
+      if (!isNaN(commPct) && commPct >= 0) {
+        const existingQuickRule = await prisma.pricingRule.findFirst({
+          where: { scope: 'vertical', vertical: 'quick' }
+        });
+
+        if (existingQuickRule) {
+          await prisma.pricingRule.update({
+            where: { id: existingQuickRule.id },
+            data: {
+              commissionPct: commPct,
+              description: 'Quick Commerce Hyperlocal Commission',
+              isActive: true
+            }
+          });
+        } else {
+          await prisma.pricingRule.create({
+            data: {
+              scope: 'vertical',
+              vertical: 'quick',
+              commissionPct: commPct,
+              includeGateway: true,
+              description: 'Quick Commerce Hyperlocal Commission',
               isActive: true
             }
           });
