@@ -19,11 +19,24 @@ export const SearchPage: React.FC = () => {
   const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState<number>(150000);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [officialBrands, setOfficialBrands] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/brands')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.brands && Array.isArray(data.brands)) {
+          setOfficialBrands(data.brands.filter((b: any) => b.isActive !== false).map((b: any) => b.name));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleBrand = (brand: string) => {
-    setSelectedBrands(prev => 
-      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
-    );
+    setSelectedBrands(prev => {
+      const exists = prev.some(b => b.toLowerCase() === brand.toLowerCase());
+      return exists ? prev.filter(b => b.toLowerCase() !== brand.toLowerCase()) : [...prev, brand];
+    });
   };
 
   const toggleRating = (star: number) => {
@@ -47,9 +60,14 @@ export const SearchPage: React.FC = () => {
       );
     }
 
-    // Apply multiple brands filter
+    // Apply multiple brands filter (case-insensitive & intelligent name match)
     if (selectedBrands.length > 0) {
-      filtered = filtered.filter(p => p.brand && selectedBrands.includes(p.brand));
+      const selectedBrandsLower = selectedBrands.map(b => b.toLowerCase());
+      filtered = filtered.filter(p => {
+        const prodBrand = (p.brand || '').toLowerCase();
+        if (prodBrand && selectedBrandsLower.includes(prodBrand)) return true;
+        return selectedBrandsLower.some(b => p.title.toLowerCase().includes(b));
+      });
     }
 
     // Apply multiple ratings filter
@@ -73,12 +91,31 @@ export const SearchPage: React.FC = () => {
   }, [allProducts, currentVertical, searchQuery, selectedBrands, selectedRatings, maxPrice, sortBy]);
 
   const brands = useMemo(() => {
-    const allBrands = allProducts
-      .filter(p => p.vertical === currentVertical)
-      .map(p => p.brand)
-      .filter((b): b is string => Boolean(b && b.trim()));
-    return Array.from(new Set(allBrands)).sort();
-  }, [allProducts, currentVertical]);
+    const brandMap = new Map<string, string>(); // lowercase -> display name
+    const currentProducts = allProducts.filter(p => p.vertical === currentVertical);
+
+    // 1. Collect brands explicitly set on products in current vertical
+    currentProducts.forEach(p => {
+      const b = (p.brand || '').trim();
+      if (b && !brandMap.has(b.toLowerCase())) {
+        brandMap.set(b.toLowerCase(), b);
+      }
+    });
+
+    // 2. Match official platform brands against products in this vertical
+    officialBrands.forEach(ob => {
+      const obLower = ob.toLowerCase();
+      const hasMatch = currentProducts.some(p => {
+        const pb = (p.brand || '').toLowerCase();
+        return pb === obLower || p.title.toLowerCase().includes(obLower);
+      });
+      if (hasMatch && !brandMap.has(obLower)) {
+        brandMap.set(obLower, ob);
+      }
+    });
+
+    return Array.from(brandMap.values()).sort((a, b) => a.localeCompare(b));
+  }, [allProducts, currentVertical, officialBrands]);
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -165,19 +202,22 @@ export const SearchPage: React.FC = () => {
                 )}
               </div>
               <div className="flex flex-col gap-2.5 max-h-48 overflow-y-auto no-scrollbar font-bold pr-1">
-                {brands.map(brand => (
-                  <label key={brand} className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={selectedBrands.includes(brand)}
-                      onChange={() => toggleBrand(brand)}
-                      className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
-                    />
-                    <span className={selectedBrands.includes(brand) ? 'text-brand-graphite font-black' : 'font-semibold'}>
-                      {brand}
-                    </span>
-                  </label>
-                ))}
+                {brands.map(brand => {
+                  const isChecked = selectedBrands.some(b => b.toLowerCase() === brand.toLowerCase());
+                  return (
+                    <label key={brand} className="flex items-center gap-2.5 text-xs text-brand-slate hover:text-brand-graphite cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleBrand(brand)}
+                        className="rounded-[4px] border-brand-border text-brand-blue focus:ring-brand-blue focus:ring-1 w-4 h-4 cursor-pointer accent-blue-600"
+                      />
+                      <span className={isChecked ? 'text-brand-graphite font-black' : 'font-semibold'}>
+                        {brand}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -445,7 +485,7 @@ export const SearchPage: React.FC = () => {
               </div>
               <div className="flex flex-wrap gap-2 mb-5 font-bold max-h-40 overflow-y-auto no-scrollbar pr-1">
                 {brands.map(brand => {
-                  const isChecked = selectedBrands.includes(brand);
+                  const isChecked = selectedBrands.some(b => b.toLowerCase() === brand.toLowerCase());
                   return (
                     <button
                       key={brand}

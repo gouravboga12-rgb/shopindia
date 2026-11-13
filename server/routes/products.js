@@ -267,7 +267,20 @@ router.get('/', async (req, res) => {
         images: p.images && p.images.length ? p.images.map(img => img.url) : [],
         videoUrl: p.videoUrl || null,
         category: resolvedCategory,
-        brand: p.brand || '',
+        brand: p.brand || (() => {
+          const lowerName = (p.name || '').toLowerCase();
+          if (lowerName.includes('iphone') || lowerName.includes('ipad') || lowerName.includes('apple')) return 'Apple';
+          if (lowerName.includes('samsung') || lowerName.includes('galaxy')) return 'Samsung';
+          if (lowerName.includes('oneplus') || lowerName.includes('nord')) return 'OnePlus';
+          if (lowerName.includes('levis') || lowerName.includes("levi's")) return "Levi's";
+          if (lowerName.includes('lego')) return 'LEGO';
+          if (lowerName.includes('wildcraft')) return 'Wildcraft';
+          if (lowerName.includes('boat')) return 'boAt';
+          if (lowerName.includes('nike')) return 'Nike';
+          if (lowerName.includes('puma')) return 'Puma';
+          if (lowerName.includes('sony')) return 'Sony';
+          return '';
+        })(),
         vertical,
         subVertical,
         stock: p.stock,
