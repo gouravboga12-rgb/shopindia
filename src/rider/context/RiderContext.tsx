@@ -219,6 +219,9 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to upload document to AWS S3');
+      if (json.profile) {
+        setProfile((prev) => (prev ? { ...prev, ...json.profile } : json.profile));
+      }
       return { success: true, url: json.url };
     } catch (err: unknown) {
       console.error('Doc upload error:', err);

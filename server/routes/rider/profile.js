@@ -71,11 +71,29 @@ router.post('/upload-doc', upload.single('document'), async (req, res) => {
       isPrivate: false,
     });
 
+    // Instantly persist document URL to database so uploads are never lost
+    const updateData = {};
+    const norm = String(docType).toLowerCase();
+    if (norm === 'rc') updateData.rcUrl = result.url;
+    else if (norm === 'license' || norm === 'dl') updateData.licenseUrl = result.url;
+    else if (norm === 'aadhaar' || norm === 'aadhar') updateData.aadhaarUrl = result.url;
+    else if (norm === 'pan') updateData.panUrl = result.url;
+    else if (norm === 'avatar' || norm === 'photo') updateData.photoUrl = result.url;
+
+    let updatedProfile = null;
+    if (Object.keys(updateData).length > 0) {
+      updatedProfile = await prisma.riderProfile.update({
+        where: { userId: req.user.userId },
+        data: updateData,
+      }).catch(err => console.warn('[RiderUpload] Auto-save profile update warning:', err.message));
+    }
+
     res.json({
       success: true,
       url: result.url,
       key,
       docType,
+      profile: updatedProfile,
     });
   } catch (err) {
     console.error('Rider doc upload error:', err);
