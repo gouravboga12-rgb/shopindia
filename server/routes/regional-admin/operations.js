@@ -253,6 +253,11 @@ router.patch('/riders/:id/verify', async (req, res) => {
       });
     }
 
+    try {
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      broadcastAdminBadgeCounts();
+    } catch (e) {}
+
     res.json({
       success: true,
       message: `Rider ${rider.user.name} KYC ${approved ? 'approved' : 'rejected'}.`,

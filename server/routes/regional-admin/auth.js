@@ -73,6 +73,24 @@ router.post('/register', async (req, res) => {
       },
     });
 
+    try {
+      const { getIo } = require('../../lib/socket');
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      const io = getIo ? getIo() : null;
+      if (io) {
+        io.to('panel:admin').emit('admin:new_regional_admin_application', {
+          admin: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            regionName,
+          },
+        });
+      }
+      broadcastAdminBadgeCounts();
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       message: 'Regional Admin application submitted! Your credentials will be activated upon Super Admin approval.',

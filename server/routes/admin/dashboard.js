@@ -206,4 +206,18 @@ router.get('/revenue-export', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/dashboard/badge-counts
+ * Returns real-time counts for sidebar alert badges & header indicators
+ */
+router.get('/badge-counts', async (req, res) => {
+  try {
+    const { fetchAdminBadgeCounts } = require('../../lib/adminBadges');
+    const counts = await fetchAdminBadgeCounts();
+    res.json({ success: true, counts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

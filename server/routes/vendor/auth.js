@@ -123,6 +123,31 @@ router.post('/register', async (req, res) => {
       data: { vendorId: vendor.id },
     });
 
+    // Real-time broadcast to Super Admin panel
+    try {
+      const { getIo } = require('../../lib/socket');
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      const io = getIo ? getIo() : null;
+      if (io) {
+        io.to('panel:admin').emit('admin:new_vendor_application', {
+          vendor: {
+            id: vendor.id,
+            businessName: vendor.businessName,
+            contactName: vendor.contactName,
+            email: vendor.email,
+            phone: vendor.phone,
+            category: vendor.category,
+            city: vendor.city,
+            pincode: vendor.pincode,
+            createdAt: vendor.createdAt,
+          },
+        });
+      }
+      broadcastAdminBadgeCounts();
+    } catch (e) {
+      console.warn('[VendorRegister] Socket alert error:', e.message);
+    }
+
     res.status(201).json({
       message: 'Registration submitted with KYC documents. Awaiting admin approval.',
       vendorId: vendor.id,

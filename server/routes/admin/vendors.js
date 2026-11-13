@@ -117,6 +117,24 @@ router.patch('/:id/approval', restrictManage, async (req, res) => {
         approvedAt: new Date(),
       },
     });
+
+    // Real-time broadcast to Super Admin & Regional panels
+    try {
+      const { getIo } = require('../../lib/socket');
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      const io = getIo ? getIo() : null;
+      if (io) {
+        io.to('panel:admin').emit('admin:vendor_status_changed', {
+          vendorId: vendor.id,
+          approvalStatus,
+          businessName: vendor.businessName,
+        });
+      }
+      broadcastAdminBadgeCounts();
+    } catch (e) {
+      console.warn('[VendorApproval] Socket broadcast error:', e.message);
+    }
+
     res.json(vendor);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

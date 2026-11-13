@@ -7,11 +7,20 @@ import {
   DollarSign, CreditCard, Bike, Banknote, Wrench, AlertOctagon, X
 } from 'lucide-react';
 
+export interface AdminBadgeCounts {
+  pendingVendors?: number;
+  pendingRiders?: number;
+  pendingRegionalAdmins?: number;
+  openTickets?: number;
+  pendingRefunds?: number;
+}
+
 interface SidebarProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
   isOpen?: boolean;
   onClose?: () => void;
+  badgeCounts?: AdminBadgeCounts;
 }
 
 export const AdminSidebar: React.FC<SidebarProps> = ({
@@ -19,6 +28,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({
   onTabChange,
   isOpen = false,
   onClose,
+  badgeCounts,
 }) => {
   const { user, logout, hasPermission } = useAuth();
 
@@ -80,6 +90,40 @@ export const AdminSidebar: React.FC<SidebarProps> = ({
           if (!allowed) return null;
           const Icon = item.icon;
           const active = currentTab === item.id;
+
+          let badgeElement = null;
+          if (item.id === 'vendors' && (badgeCounts?.pendingVendors ?? 0) > 0) {
+            badgeElement = (
+              <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse shadow-xs shrink-0">
+                {badgeCounts!.pendingVendors} pending
+              </span>
+            );
+          } else if (item.id === 'riders' && (badgeCounts?.pendingRiders ?? 0) > 0) {
+            badgeElement = (
+              <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shrink-0">
+                {badgeCounts!.pendingRiders}
+              </span>
+            );
+          } else if (item.id === 'regional-admins' && (badgeCounts?.pendingRegionalAdmins ?? 0) > 0) {
+            badgeElement = (
+              <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500 text-white shrink-0">
+                {badgeCounts!.pendingRegionalAdmins}
+              </span>
+            );
+          } else if (item.id === 'support' && (badgeCounts?.openTickets ?? 0) > 0) {
+            badgeElement = (
+              <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white shrink-0">
+                {badgeCounts!.openTickets}
+              </span>
+            );
+          } else if (item.id === 'canceled-orders' && (badgeCounts?.pendingRefunds ?? 0) > 0) {
+            badgeElement = (
+              <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shrink-0">
+                {badgeCounts!.pendingRefunds}
+              </span>
+            );
+          }
+
           return (
             <button
               key={item.id}
@@ -95,6 +139,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="truncate">{item.label}</span>
+              {badgeElement}
             </button>
           );
         })}

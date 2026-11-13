@@ -71,6 +71,11 @@ router.patch('/:id/status', async (req, res) => {
       });
     }
 
+    try {
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      broadcastAdminBadgeCounts();
+    } catch (e) {}
+
     res.json({
       success: true,
       message: `Regional admin status updated to ${status}.`,

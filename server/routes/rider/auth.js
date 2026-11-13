@@ -198,6 +198,11 @@ router.post('/register', async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    try {
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      broadcastAdminBadgeCounts();
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       message: 'Rider account registered successfully. Verification pending approval.',

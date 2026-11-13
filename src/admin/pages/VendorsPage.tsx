@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSocketEvent } from '../../lib/socket';
 import {
   CheckCircle, XCircle, Ban, Search, LayoutDashboard,
   Phone, Mail, MapPin, ExternalLink, MessageCircle,
@@ -32,17 +33,24 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 interface Props {
   onManage?: (vendor: ManagedVendor) => void;
+  initialFilter?: string;
 }
 
-export const VendorsPage: React.FC<Props> = ({ onManage }) => {
+export const VendorsPage: React.FC<Props> = ({ onManage, initialFilter }) => {
   const [vendors, setVendors]               = useState<any[]>([]);
-  const [filter, setFilter]                 = useState('all');
+  const [filter, setFilter]                 = useState(initialFilter || 'all');
   const [serviceFilter, setServiceFilter]   = useState('all');
   const [q, setQ]                           = useState('');
   const [loading, setLoading]               = useState(true);
   const [actionId, setActionId]             = useState<string | null>(null);
   const [note, setNote]                     = useState('');
   const [modal, setModal]                   = useState<{ id: string; action: string } | null>(null);
+
+  useEffect(() => {
+    if (initialFilter) {
+      setFilter(initialFilter);
+    }
+  }, [initialFilter]);
   const [inspectDocsVendor, setInspectDocsVendor] = useState<any | null>(null);
 
   const load = () => {
@@ -58,6 +66,14 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
   };
 
   useEffect(load, [filter]);
+
+  // Real-time synchronization when any vendor registers or status changes
+  useSocketEvent('admin:new_vendor_application', () => {
+    load();
+  });
+  useSocketEvent('admin:vendor_status_changed', () => {
+    load();
+  });
 
   const approve = async (id: string, approvalStatus: string) => {
     setActionId(id);
@@ -169,19 +185,27 @@ export const VendorsPage: React.FC<Props> = ({ onManage }) => {
           {/* Status Tabs */}
           <div className="flex flex-wrap items-center gap-1 bg-gray-100 rounded-xl p-1 text-xs">
             <span className="text-[11px] font-bold text-gray-400 px-2 uppercase tracking-wider">Status:</span>
-            {STATUSES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  filter === s
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
+            {STATUSES.map((s) => {
+              const pendingCount = vendors.filter((v) => v.approvalStatus === 'pending').length;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setFilter(s)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    filter === s
+                      ? 'bg-white text-gray-900 shadow-xs'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  <span>{s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                  {s === 'pending' && pendingCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse shadow-2xs">
+                      {pendingCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Service Opted Tabs */}
