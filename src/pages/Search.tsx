@@ -388,7 +388,7 @@ export const SearchPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <h3 className="text-xs font-bold text-brand-graphite line-clamp-2 leading-relaxed mb-2.5 min-h-[36px] group-hover:text-brand-blue transition-colors dark:group-hover:text-services-gold dark:text-white font-heading">
+                    <h3 className="text-xs font-bold text-brand-graphite line-clamp-2 leading-relaxed mb-2.5 min-h-[36px] group-hover:text-brand-blue transition-colors font-heading">
                       {product.title}
                     </h3>
                     <div className="flex items-center gap-2 mb-3 mt-auto leading-none">
@@ -399,7 +399,7 @@ export const SearchPage: React.FC = () => {
                       <span className="text-xs text-brand-slate font-bold font-numbers">({product.ratingCount.toLocaleString('en-IN')})</span>
                     </div>
                     <div className="flex items-baseline gap-1.5 leading-none font-numbers mt-1">
-                      <span className="text-sm font-extrabold text-brand-graphite dark:text-white">₹{product.price.toLocaleString('en-IN')}</span>
+                      <span className="text-sm font-extrabold text-brand-graphite">₹{product.price.toLocaleString('en-IN')}</span>
                       {product.originalPrice > product.price && (
                         <>
                           <span className="text-xs text-brand-slate line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>

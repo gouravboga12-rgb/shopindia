@@ -217,12 +217,12 @@ export const ProductDetailPage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto px-12 py-8 text-left select-none text-brand-graphite font-sans">
         {/* Breadcrumbs */}
-        <div className="flex items-center gap-1.5 text-xs text-brand-slate font-bold mb-6 font-heading uppercase tracking-wider">
-          <button onClick={() => navigateTo('home')} className="hover:underline">Home</button>
-          <ChevronRight size={12} />
-          <button onClick={() => navigateTo('search')} className="hover:underline capitalize">{isServices ? 'Services' : product.vertical} Catalog</button>
-          <ChevronRight size={12} />
-          <span className="text-brand-graphite font-black truncate max-w-sm dark:text-white">{product.title}</span>
+        <div className="flex items-center gap-2 text-xs text-slate-600 font-bold mb-6 font-heading uppercase tracking-wider">
+          <button onClick={() => navigateTo('home')} className="hover:text-blue-600 hover:underline transition-colors">Home</button>
+          <ChevronRight size={13} className="text-slate-400 shrink-0" />
+          <button onClick={() => navigateTo('search')} className="hover:text-blue-600 hover:underline capitalize transition-colors">{isServices ? 'Services' : product.vertical} Catalog</button>
+          <ChevronRight size={13} className="text-slate-400 shrink-0" />
+          <span className="text-slate-900 font-black truncate max-w-md">{product.title}</span>
         </div>
 
         <div className="grid grid-cols-5 gap-8">
