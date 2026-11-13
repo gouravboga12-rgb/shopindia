@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../../lib/api';
 import {
   Plus, MapPin, Store, Building2, Search,
-  Navigation, Radio, Sparkles
+  Navigation, Radio, Sparkles, Bell, CheckCircle2
 } from 'lucide-react';
 
 interface VendorCoverage {
@@ -49,9 +49,10 @@ interface CoverageData {
 }
 
 export const ServiceAreasPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'merchants' | 'regional' | 'zones'>('merchants');
+  const [activeTab, setActiveTab] = useState<'merchants' | 'regional' | 'zones' | 'demand_leads'>('merchants');
   const [coverageData, setCoverageData] = useState<CoverageData | null>(null);
   const [areas, setAreas] = useState<any[]>([]);
+  const [demandLeads, setDemandLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filters for Merchants
@@ -70,10 +71,12 @@ export const ServiceAreasPage: React.FC = () => {
     Promise.all([
       api.get<CoverageData>('/api/admin/service-areas/partner-coverage').catch(() => null),
       api.get<any[]>('/api/admin/service-areas').catch(() => []),
+      api.get<any[]>('/api/admin/service-areas/demand-leads').catch(() => []),
     ])
-      .then(([cov, areasData]) => {
+      .then(([cov, areasData, leadsData]) => {
         if (cov) setCoverageData(cov);
         setAreas(Array.isArray(areasData) ? areasData : []);
+        setDemandLeads(Array.isArray(leadsData) ? leadsData : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -226,6 +229,22 @@ export const ServiceAreasPage: React.FC = () => {
         >
           <Radio size={15} />
           <span>Custom Delivery Zones ({areas.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('demand_leads')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'demand_leads'
+              ? 'bg-[#0F2C59] text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-100'
+            }`}
+        >
+          <Bell size={15} className={demandLeads.length > 0 ? 'text-amber-400 fill-amber-400' : ''} />
+          <span>Customer Demand Leads ({demandLeads.length})</span>
+          {demandLeads.length > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">
+              NEW
+            </span>
+          )}
         </button>
       </div>
 
@@ -464,6 +483,89 @@ export const ServiceAreasPage: React.FC = () => {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: Customer Demand Leads (Notify Me When Available) */}
+      {activeTab === 'demand_leads' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-amber-50 via-blue-50 to-indigo-50 p-4 rounded-2xl border border-amber-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-500 text-white rounded-xl mt-0.5">
+                <Bell className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900">
+                  Nationwide Customer Demand Leads ({demandLeads.length})
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Customers across India who clicked "Notify Me When Available" in unserved localities. Use this intelligence to expand technician networks and onboard partners in high-demand pin codes.
+                </p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-xs font-black text-amber-800 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-300">
+                {demandLeads.length} Unserved Leads
+              </span>
+            </div>
+          </div>
+
+          {demandLeads.length === 0 ? (
+            <div className="py-12 text-center bg-white rounded-2xl border border-dashed border-slate-200">
+              <CheckCircle2 className="w-9 h-9 text-emerald-500 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700">No Unserved Customer Leads</p>
+              <p className="text-xs text-slate-400 mt-1">Every customer service request across India currently has active technician coverage.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 uppercase font-bold text-[11px] border-b border-slate-200/80">
+                  <tr>
+                    <th className="p-3.5">Service Requested</th>
+                    <th className="p-3.5">Category</th>
+                    <th className="p-3.5">Locality / City / Pincode</th>
+                    <th className="p-3.5">Customer Contact</th>
+                    <th className="p-3.5">Requested At</th>
+                    <th className="p-3.5 text-center">Coverage Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {demandLeads.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="p-3.5 font-bold text-slate-900">{lead.serviceName}</td>
+                      <td className="p-3.5">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                          {lead.category}
+                        </span>
+                      </td>
+                      <td className="p-3.5 font-semibold text-slate-700">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin size={13} className="text-amber-600 shrink-0" />
+                          <span>{lead.city || 'Unknown City'}</span>
+                          {lead.pincode && (
+                            <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px] text-slate-600">
+                              {lead.pincode}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-slate-600 font-mono">
+                        {lead.phone || 'In-App Customer'}
+                      </td>
+                      <td className="p-3.5 text-slate-400 text-[11px]">
+                        {new Date(lead.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </td>
+                      <td className="p-3.5 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          Pending Coverage
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
