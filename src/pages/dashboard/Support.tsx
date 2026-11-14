@@ -380,16 +380,16 @@ export const SupportCenterPage: React.FC = () => {
           { 
             icon: <Mail className="w-5 h-5" />, 
             label: 'Email Support', 
-            sub: 'support@shopindia.in',
+            sub: 'shopindia.info.co.in@gmail.com',
             color: 'bg-emerald-50 text-emerald-600',
-            action: () => window.open('mailto:support@shopindia.in') 
+            action: () => window.open('mailto:shopindia.info.co.in@gmail.com') 
           },
           { 
             icon: <Phone className="w-5 h-5" />, 
             label: 'Call Helpline', 
-            sub: '1800-123-SHOP',
+            sub: '+91 7386570555',
             color: 'bg-amber-50 text-amber-600',
-            action: () => window.open('tel:18001237467') 
+            action: () => window.open('tel:+917386570555') 
           },
           { 
             icon: <LifeBuoy className="w-5 h-5" />, 

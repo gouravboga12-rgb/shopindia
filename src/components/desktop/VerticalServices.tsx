@@ -327,7 +327,7 @@ export const VerticalServices: React.FC = () => {
                   <p className="font-bold flex items-center gap-1.5">
                     <PhoneCall className="w-3.5 h-3.5 text-red-600 animate-bounce" /> 24x7 Roadside RSA
                   </p>
-                  <p className="text-[11px] text-red-700">Call 1800-SHOP-INDIA for instant breakdown towing dispatch.</p>
+                  <p className="text-[11px] text-red-700">Call +91 7386570555 for instant breakdown towing dispatch.</p>
                 </div>
               </div>
             )}
