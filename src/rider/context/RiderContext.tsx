@@ -379,17 +379,17 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     refreshData();
   });
 
-  // Real-time: another rider claimed this delivery — dismiss it immediately for all losing riders
+  // Real-time: another rider claimed this delivery
   useSocketEvent('radar:order_claimed', (data: { deliveryId: string; claimedByRiderProfileId: string }) => {
-    if (data.deliveryId && incomingBroadcast?.id === data.deliveryId) {
-      if (profile?.id !== data.claimedByRiderProfileId) {
-        // We are a LOSING rider — immediately clear this broadcast from our screen
-        dismissedOrderIds.current.add(data.deliveryId);
-        setIncomingBroadcast(null);
-      }
+    if (data.deliveryId) {
+      dismissedOrderIds.current.add(data.deliveryId);
     }
-    // Always re-poll so the next available order (if any) appears instantly
-    pollBroadcasts();
+    // If this rider is currently viewing this broadcast in IncomingRadarModal,
+    // IncomingRadarModal handles displaying the "Missed Order" overlay for 3s before calling declineOrder().
+    // If not viewing it, poll for any other broadcasts immediately.
+    if (!incomingBroadcast || incomingBroadcast.id !== data.deliveryId) {
+      pollBroadcasts();
+    }
   });
 
   // Atomic claim
@@ -419,7 +419,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: true, isScheduled: isScheduledService, isInstant, delivery: data.delivery };
       } else {
         dismissedOrderIds.current.add(deliveryId);
-        setIncomingBroadcast(null);
+        // Do NOT call setIncomingBroadcast(null) here so IncomingRadarModal stays mounted and displays the missed overlay!
         return { success: false, error: data.message || 'Already claimed by another partner.' };
       }
     } catch (err) {
@@ -430,7 +430,8 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Decline order
   const declineOrder = (deliveryId: string) => {
     dismissedOrderIds.current.add(deliveryId);
-    setIncomingBroadcast(null);
+    setIncomingBroadcast((prev) => (prev?.id === deliveryId ? null : prev));
+    pollBroadcasts();
   };
 
   // Start service explicitly from Scheduled Services tab or 1-2 hr reminder

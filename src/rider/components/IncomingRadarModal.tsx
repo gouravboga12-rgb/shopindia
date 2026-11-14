@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useRider } from '../context/RiderContext';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useRider, type BroadcastDelivery } from '../context/RiderContext';
+import { useSocketEvent } from '../../lib/socket';
 import { MapPin, Navigation, IndianRupee, Store, X, Zap, CheckCircle2, Clock, Package, ArrowRight, Wrench, Eye, Calendar, Lock, ExternalLink } from 'lucide-react';
 
 function calculateHaversineKm(lat1?: number | null, lon1?: number | null, lat2?: number | null, lon2?: number | null): number | null {
@@ -22,12 +23,26 @@ interface IncomingRadarModalProps {
 }
 
 export const IncomingRadarModal: React.FC<IncomingRadarModalProps> = ({ onNavigateToTab }) => {
-  const { incomingBroadcast, acceptOrder, declineOrder, profile } = useRider();
+  const { incomingBroadcast: rawBroadcast, acceptOrder, declineOrder, profile } = useRider();
   const [secondsLeft, setSecondsLeft] = useState(66);
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [scheduledSuccessNotice, setScheduledSuccessNotice] = useState<string | null>(null);
+
+  // Persistent overlay state when another partner claims the opportunity
+  const [cachedBroadcast, setCachedBroadcast] = useState<BroadcastDelivery | null>(null);
+  const [missedOrderNotice, setMissedOrderNotice] = useState<string | null>(null);
+  const missedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (rawBroadcast) {
+      setCachedBroadcast(rawBroadcast);
+    }
+  }, [rawBroadcast]);
+
+  // Keep modal visible while missedOrderNotice overlay is active even if incomingBroadcast became null
+  const incomingBroadcast = rawBroadcast || (missedOrderNotice ? cachedBroadcast : null);
 
   const isServiceJob = incomingBroadcast?.order?.type === 'hvac_service';
   const isUrgentReplacement = incomingBroadcast?.pickupName?.includes('[URGENT REPLACEMENT]');
@@ -37,13 +52,50 @@ export const IncomingRadarModal: React.FC<IncomingRadarModalProps> = ({ onNaviga
   // Lock countdown timer to the unique broadcast ID to prevent polling resets
   const currentBroadcastId = incomingBroadcast?.id;
 
+  const triggerMissedOrder = useCallback((reason: string) => {
+    setMissedOrderNotice(reason);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    } catch {}
+    if (missedTimeoutRef.current) clearTimeout(missedTimeoutRef.current);
+    missedTimeoutRef.current = setTimeout(() => {
+      setMissedOrderNotice(null);
+      if (currentBroadcastId) {
+        declineOrder(currentBroadcastId);
+      }
+    }, 3200);
+  }, [currentBroadcastId, declineOrder]);
+
+  const handleDismissMissed = () => {
+    if (missedTimeoutRef.current) clearTimeout(missedTimeoutRef.current);
+    setMissedOrderNotice(null);
+    if (currentBroadcastId) {
+      declineOrder(currentBroadcastId);
+    }
+  };
+
+  // Real-time: if another rider accepts while this modal is open, trigger missed order overlay instantly
+  useSocketEvent('radar:order_claimed', (data: { deliveryId: string; claimedByRiderProfileId: string }) => {
+    if (data.deliveryId && currentBroadcastId === data.deliveryId) {
+      if (profile?.id !== data.claimedByRiderProfileId) {
+        triggerMissedOrder('Another nearby partner accepted this opportunity first.');
+      }
+    }
+  });
+
   useEffect(() => {
     if (!currentBroadcastId) {
       setSecondsLeft(66);
       setClaimError(null);
       setScheduledSuccessNotice(null);
+      setMissedOrderNotice(null);
+      if (missedTimeoutRef.current) clearTimeout(missedTimeoutRef.current);
       return;
     }
+
+    if (missedOrderNotice) return;
 
     setSecondsLeft(66);
     const timer = setInterval(() => {
@@ -58,7 +110,7 @@ export const IncomingRadarModal: React.FC<IncomingRadarModalProps> = ({ onNaviga
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [currentBroadcastId, declineOrder]);
+  }, [currentBroadcastId, declineOrder, missedOrderNotice]);
 
   // Two-Leg Route Calculations (Rapido / Swiggy Architecture)
   const routeMetrics = useMemo(() => {
@@ -98,15 +150,13 @@ export const IncomingRadarModal: React.FC<IncomingRadarModalProps> = ({ onNaviga
   if (!incomingBroadcast || !routeMetrics) return null;
 
   const handleAccept = async () => {
+    if (missedOrderNotice || !incomingBroadcast) return;
     setIsClaiming(true);
     setClaimError(null);
     const result = await acceptOrder(incomingBroadcast.id);
     setIsClaiming(false);
     if (!result.success) {
-      setClaimError(result.error || 'This order was accepted by another partner.');
-      setTimeout(() => {
-        declineOrder(incomingBroadcast.id);
-      }, 2500);
+      triggerMissedOrder(result.error || 'Another nearby partner accepted this opportunity first.');
     } else if (result.isScheduled) {
       setScheduledSuccessNotice('Appointment reserved in your Scheduled Services roster! Redirecting...');
       setTimeout(() => {
@@ -514,6 +564,34 @@ export const IncomingRadarModal: React.FC<IncomingRadarModalProps> = ({ onNaviga
             <span className="mt-4 px-3 py-1 bg-white/20 rounded-full text-[11px] font-bold text-teal-200">
               Check "Scheduled Services" Tab Anytime
             </span>
+          </div>
+        )}
+
+        {/* Missed Order / Opportunity Taken by Another Partner Overlay */}
+        {missedOrderNotice && (
+          <div className="absolute inset-0 z-40 bg-slate-950/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-3xl bg-amber-500/20 border-2 border-amber-500/40 text-amber-400 flex items-center justify-center mb-4 shadow-xl shadow-amber-500/10">
+              <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
+            </div>
+            <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full text-[11px] font-black uppercase tracking-wider mb-2.5">
+              Opportunity Taken
+            </span>
+            <h3 className="text-xl font-black text-white tracking-tight">You Missed This Order</h3>
+            <p className="text-xs text-slate-300 mt-2 max-w-xs leading-relaxed font-medium">
+              {missedOrderNotice}
+            </p>
+            <div className="mt-6 w-full max-w-xs flex flex-col items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleDismissMissed}
+                className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer"
+              >
+                Keep Radar Scanning
+              </button>
+              <span className="text-[10px] text-slate-400 font-medium">
+                Auto-closing in 3s to scan next orders...
+              </span>
+            </div>
           </div>
         )}
 
