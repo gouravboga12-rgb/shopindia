@@ -29,4 +29,8 @@ server/.env
 
 *.pem
 ec2-key.pem
-*.dump
+*.dump
+
+# Local documentation & future plans
+DYNAMIC_PRICE_TIERED_COMMISSIONS_PLAN.md
+
