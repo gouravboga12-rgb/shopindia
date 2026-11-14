@@ -1216,8 +1216,8 @@ export const ActiveDeliveryView: React.FC = () => {
                 value={otpInput}
                 onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
                 className={`w-48 text-center text-3xl font-mono font-black tracking-widest border-2 rounded-2xl py-3 focus:outline-none shadow-inner ${isPaymentCleared
-                    ? 'bg-slate-50 border-emerald-500 text-emerald-700 focus:bg-white'
-                    : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-60'
+                  ? 'bg-slate-50 border-emerald-500 text-emerald-700 focus:bg-white'
+                  : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-60'
                   }`}
               />
             </div>
@@ -1298,11 +1298,10 @@ export const ActiveDeliveryView: React.FC = () => {
                     key={quickOption}
                     type="button"
                     onClick={() => setCancelReason(quickOption)}
-                    className={`p-2 rounded-xl border text-left font-medium transition-all cursor-pointer ${
-                      cancelReason === quickOption
+                    className={`p-2 rounded-xl border text-left font-medium transition-all cursor-pointer ${cancelReason === quickOption
                         ? 'bg-rose-50 border-rose-500 text-rose-900 font-bold'
                         : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {quickOption}
                   </button>
