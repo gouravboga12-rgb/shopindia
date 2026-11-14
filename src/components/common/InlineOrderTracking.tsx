@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSocket } from '../../lib/socket';
 import { RealWorldMap } from './RealWorldMap';
-import { Bike, Wrench, Store, RefreshCw } from 'lucide-react';
+import { Bike, Wrench, Store, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface TrackingData {
   deliveryId: string;
@@ -108,6 +108,11 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
   useEffect(() => {
     if (!data?.deliveryId) return;
 
+    // Do NOT connect to live telemetry if already delivered
+    if (['delivered', 'completed'].includes(liveStage) || ['delivered', 'completed'].includes(orderStatus)) {
+      return;
+    }
+
     const socket = getSocket();
     socket.emit('join_delivery', { deliveryId: data.deliveryId });
 
@@ -120,12 +125,18 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
       });
       if (payload.stage) {
         setLiveStage(payload.stage);
+        if (['delivered', 'completed'].includes(payload.stage)) {
+          socket.emit('leave_delivery', { deliveryId: data.deliveryId });
+        }
       }
     };
 
     const handleStageChange = (payload: { stage: string }) => {
       if (payload.stage) {
         setLiveStage(payload.stage);
+        if (['delivered', 'completed'].includes(payload.stage)) {
+          socket.emit('leave_delivery', { deliveryId: data.deliveryId });
+        }
       }
     };
 
@@ -137,7 +148,7 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
       socket.off('delivery:stage_changed', handleStageChange);
       socket.emit('leave_delivery', { deliveryId: data.deliveryId });
     };
-  }, [data?.deliveryId]);
+  }, [data?.deliveryId, liveStage, orderStatus]);
 
   const getStageDisplay = (stage: string) => {
     if (isService) {
@@ -186,10 +197,38 @@ export const InlineOrderTracking: React.FC<InlineOrderTrackingProps> = ({
     );
   }
 
-  // CRITICAL REQUIREMENT: Show live map ONLY after rider took item from the vendor shop!
+  // CRITICAL REQUIREMENT: Stop live tracking immediately once delivered or completed!
+  const isDelivered =
+    ['delivered', 'completed'].includes(liveStage) ||
+    ['delivered', 'completed'].includes((orderStatus || '').toLowerCase());
+
+  if (isDelivered) {
+    return (
+      <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-extrabold text-slate-900">
+              {isService ? 'Service Completed Successfully' : 'Order Delivered Successfully'}
+            </h4>
+            <p className="text-xs text-emerald-700 font-medium mt-0.5">
+              Live GPS tracking concluded • Telemetry disconnected
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+          Delivered
+        </span>
+      </div>
+    );
+  }
+
+  // Show live map ONLY while partner has picked up items and is on the way to customer
   const isPickedUp =
-    ['picked_up', 'on_the_way', 'in_transit', 'arrived_customer', 'delivered', 'completed'].includes(liveStage) ||
-    ['shipped', 'on_the_way', 'in_transit', 'delivered', 'completed'].includes(orderStatus);
+    ['picked_up', 'on_the_way', 'in_transit', 'arrived_customer'].includes(liveStage) ||
+    ['shipped', 'on_the_way', 'in_transit'].includes((orderStatus || '').toLowerCase());
 
   // Show Store Preparation / Dispatch Standby card before rider picks up the order from the store
   if (!data || error || !isPickedUp) {

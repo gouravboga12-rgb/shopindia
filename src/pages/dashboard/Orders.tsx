@@ -434,6 +434,41 @@ export const OrdersPage: React.FC = () => {
                                   No payment was deducted or the order was registered under Cash on Delivery (Zero amount due).
                                 </p>
                               </div>
+                            ) : ['delivered', 'completed'].includes((openOrder.status || '').toLowerCase()) ? (
+                              <div className="bg-white border border-brand-border rounded-2xl p-5 shadow-sm space-y-3.5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+                                      <CheckCircle2 className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-extrabold text-slate-900">
+                                          {orderVert === 'services' ? 'Service Completed Successfully' : 'Order Delivered Successfully'}
+                                        </h4>
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                          Delivered
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-slate-500 mt-0.5">
+                                        Package handed over & verified • Live GPS tracking concluded
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-600 flex items-center justify-between gap-3">
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    Live GPS telemetry is turned off for completed deliveries.
+                                  </span>
+                                  <button
+                                    onClick={() => generateAndPrintInvoice(openOrder)}
+                                    className="font-bold text-brand-blue hover:underline text-xs flex items-center gap-1 shrink-0"
+                                  >
+                                    <Download className="w-3.5 h-3.5" /> Download Invoice
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-sm">
                                 <div className="flex items-center justify-between mb-3">
@@ -480,7 +515,12 @@ export const OrdersPage: React.FC = () => {
                               </div>
 
                               {/* PROMINENT 4-DIGIT CUSTOMER DELIVERY OTP (Directly under items / beside tracking) */}
-                              {activeOtp ? (
+                              {['delivered', 'completed'].includes((openOrder.status || '').toLowerCase()) ? (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                  <span>Order handed over and verified via secure OTP.</span>
+                                </div>
+                              ) : activeOtp ? (
                                 <div className="p-3.5 sm:p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                   <div className="flex items-start sm:items-center gap-3 min-w-0">
                                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-orange-500/20 shrink-0">
@@ -505,11 +545,6 @@ export const OrdersPage: React.FC = () => {
                                       {activeOtp}
                                     </div>
                                   </div>
-                                </div>
-                              ) : openOrder.status === 'delivered' ? (
-                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold">
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                  Order handed over and verified via secure OTP.
                                 </div>
                               ) : null}
                             </div>
