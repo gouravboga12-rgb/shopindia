@@ -6,7 +6,7 @@ import { useCategories } from '../../hooks/useCategories';
 import {
   Star, Clock, Calendar, ShieldCheck,
   Heart, LayoutGrid,
-  Home, Wrench, Shield, PhoneCall,
+  Home, Wrench, Shield,
   Bell, MapPin
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -320,17 +320,6 @@ export const VerticalServices: React.FC = () => {
                 );
               })}
             </div>
-
-            {activeSubVertical === 'vehicle' && (
-              <div className="pt-4 border-t border-slate-100">
-                <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-900 space-y-1">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <PhoneCall className="w-3.5 h-3.5 text-red-600 animate-bounce" /> 24x7 Roadside RSA
-                  </p>
-                  <p className="text-[11px] text-red-700">Call +91 7386570555 for instant breakdown towing dispatch.</p>
-                </div>
-              </div>
-            )}
           </aside>
 
           {/* Right Services List */}
