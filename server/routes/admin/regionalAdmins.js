@@ -46,9 +46,16 @@ router.patch('/:id/status', async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
 
-    const updatedProfile = await prisma.regionalAdminProfile.update({
+    const updatedProfile = await prisma.regionalAdminProfile.upsert({
       where: { userId: id },
-      data: {
+      create: {
+        userId: id,
+        regionName: 'Territory Hub',
+        status: status || 'approved',
+        approvedAt: status === 'approved' ? new Date() : undefined,
+        branchId: branchId || undefined,
+      },
+      update: {
         ...(status ? { status, approvedAt: status === 'approved' ? new Date() : undefined } : {}),
         ...(branchId ? { branchId } : {}),
       },
@@ -68,6 +75,11 @@ router.patch('/:id/status', async (req, res) => {
       await prisma.user.update({
         where: { id },
         data: { status: 'suspended' },
+      });
+    } else if (status === 'rejected') {
+      await prisma.user.update({
+        where: { id },
+        data: { status: 'blocked' },
       });
     }
 

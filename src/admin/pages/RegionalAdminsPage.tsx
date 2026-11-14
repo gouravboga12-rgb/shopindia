@@ -59,13 +59,17 @@ export const RegionalAdminsPage: React.FC = () => {
   const handleUpdateStatus = async (userId: string, newStatus: string) => {
     setActionLoadingId(userId);
     try {
-      await api.patch(`/api/admin/regional-admins/${userId}/status`, { status: newStatus });
+      const res: any = await api.patch(`/api/admin/regional-admins/${userId}/status`, { status: newStatus });
       setAdmins((prev) =>
         prev.map((a) => {
-          if (a.id === userId && a.regionalAdminProfile) {
+          if (a.id === userId) {
             return {
               ...a,
-              regionalAdminProfile: { ...a.regionalAdminProfile, status: newStatus },
+              regionalAdminProfile: res?.profile || {
+                ...(a.regionalAdminProfile || {}),
+                status: newStatus,
+                regionName: a.regionalAdminProfile?.regionName || 'Territory Hub',
+              },
             };
           }
           return a;
