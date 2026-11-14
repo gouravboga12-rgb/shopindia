@@ -6,6 +6,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { Star, ShoppingCart, Zap, ArrowLeft, Heart, Share2, MapPin, ChevronRight, ShieldCheck, Truck, RefreshCcw, Mic, Battery, Bluetooth, Cpu, Smartphone, Calendar, Wrench, CheckCircle2, Bell, Play } from 'lucide-react';
 import { requireCustomerAuth } from '../lib/customerAuth';
 import { motion } from 'framer-motion';
+import type { Product } from '../data/types';
 
 export const ProductDetailPage: React.FC = () => {
   const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, setCurrentVertical, cart, userCoords, addNotification, location } = useApp();
@@ -145,44 +146,91 @@ export const ProductDetailPage: React.FC = () => {
     }))
   ];
 
-  // Relevant recommendations: strictly within the same vertical & matching category/department
+  // Helper to reliably classify Quick Commerce sub-verticals (Grocery vs Food vs Pharmacy)
+  const resolveQuickSubVertical = (p: Product): 'grocery' | 'food' | 'pharmacy' => {
+    if (p.subVertical === 'grocery' || p.subVertical === 'food' || p.subVertical === 'pharmacy') {
+      return p.subVertical;
+    }
+    const text = `${p.category || ''} ${p.title || ''} ${p.description || ''} ${(p.tags || []).join(' ')}`.toLowerCase();
+    if (
+      text.includes('pharma') ||
+      text.includes('medicine') ||
+      text.includes('tablet') ||
+      text.includes('capsule') ||
+      text.includes('syrup') ||
+      text.includes('first aid') ||
+      text.includes('rx') ||
+      text.includes('paracetamol') ||
+      text.includes('dolo') ||
+      text.includes('limcee') ||
+      text.includes('benadryl') ||
+      text.includes('cough') ||
+      text.includes('vitamin')
+    ) {
+      return 'pharmacy';
+    }
+    if (
+      text.includes('food') ||
+      text.includes('biryani') ||
+      text.includes('briyani') ||
+      text.includes('pizza') ||
+      text.includes('burger') ||
+      text.includes('meal') ||
+      text.includes('paneer') ||
+      text.includes('kitchen') ||
+      text.includes('curry') ||
+      text.includes('curries') ||
+      text.includes('shake') ||
+      text.includes('dessert') ||
+      text.includes('thali') ||
+      text.includes('roll') ||
+      text.includes('rice') ||
+      text.includes('bakery') ||
+      text.includes('fast food') ||
+      text.includes('tandoor') ||
+      text.includes('brownie')
+    ) {
+      return 'food';
+    }
+    return 'grocery';
+  };
+
+  // Relevant recommendations: strictly isolated by vertical & sub-vertical (Grocery vs Food vs Pharmacy)
   const similarProducts = product ? (() => {
     // 1. Strict Vertical Isolation: Must be in the exact same vertical (no cross-panel contamination)
     const sameVertical = products.filter(p => p.id !== product.id && p.vertical === product.vertical);
 
-    // 2. Department check for Quick Shopping (Food vs Pharmacy vs Grocery)
-    const isProductFood = product.tags?.some(t => t.toLowerCase() === 'food') || product.category?.toLowerCase().includes('food');
-    const isProductPharmacy = product.tags?.some(t => t.toLowerCase() === 'pharmacy' || t.toLowerCase() === 'rx') || product.category?.toLowerCase().includes('pharmacy') || product.category?.toLowerCase().includes('medicine');
-
-    const matchingDept = sameVertical.filter(p => {
-      if (product.vertical === 'quick') {
-        if (isProductFood) {
-          return p.tags?.some(t => t.toLowerCase() === 'food') || p.category?.toLowerCase().includes('food');
-        }
-        if (isProductPharmacy) {
-          return p.tags?.some(t => t.toLowerCase() === 'pharmacy' || t.toLowerCase() === 'rx') || p.category?.toLowerCase().includes('pharmacy') || p.category?.toLowerCase().includes('medicine');
-        }
-        // Grocery: Must NOT be food or pharmacy
-        const isPFood = p.tags?.some(t => t.toLowerCase() === 'food') || p.category?.toLowerCase().includes('food');
-        const isPPharm = p.tags?.some(t => t.toLowerCase() === 'pharmacy' || t.toLowerCase() === 'rx') || p.category?.toLowerCase().includes('pharmacy');
-        return !isPFood && !isPPharm;
-      }
-      return true;
-    });
-
-    // 3. Category match within the matching department
-    const sameCat = matchingDept.filter(p =>
-      (p.categoryId && product.categoryId && p.categoryId === product.categoryId) ||
-      (p.category && product.category && p.category.toLowerCase() === product.category.toLowerCase())
-    );
-
-    // If matching category products exist, return them (up to 5)
-    if (sameCat.length > 0) {
-      return sameCat.slice(0, 5);
+    // 2. Strict SubVertical Isolation for Quick Shopping
+    let candidatePool = sameVertical;
+    if (product.vertical === 'quick') {
+      const currentSub = resolveQuickSubVertical(product);
+      // Strictly only products belonging to the SAME sub-vertical (Never mix Grocery, Food, or Pharmacy)
+      candidatePool = sameVertical.filter(p => resolveQuickSubVertical(p) === currentSub);
+    } else if (product.vertical === 'services') {
+      candidatePool = sameVertical.filter(p => p.serviceType === product.serviceType || p.subVertical === product.subVertical);
     }
 
-    // Otherwise, fallback only to the same exact department (e.g. other Food dishes)
-    return matchingDept.slice(0, 5);
+    // 3. Exact Category match within the isolated pool
+    const sameCategory = candidatePool.filter(p =>
+      (product.categoryId && p.categoryId && p.categoryId === product.categoryId) ||
+      (product.category && p.category && p.category.trim().toLowerCase() === product.category.trim().toLowerCase())
+    );
+
+    // If matching category products exist, prioritize them (up to 5)
+    if (sameCategory.length >= 3) {
+      return sameCategory.slice(0, 5);
+    }
+
+    // If exact category has fewer than 3, supplement ONLY from the same isolated pool (e.g. only other Grocery items for Grocery)
+    const combined = [...sameCategory];
+    for (const p of candidatePool) {
+      if (combined.length >= 5) break;
+      if (!combined.some(c => c.id === p.id)) {
+        combined.push(p);
+      }
+    }
+
+    return combined.slice(0, 5);
   })() : [];
 
   // Desktop Page Layout
