@@ -22,6 +22,8 @@ interface PayoutItem {
   status: string;
   bankAccountNumber?: string;
   ifscCode?: string;
+  rejectionReason?: string;
+  notes?: string;
   createdAt: string;
 }
 
@@ -375,34 +377,51 @@ export const RiderWallet: React.FC = () => {
         ) : (
           <div className="divide-y divide-slate-100">
             {payouts.map((p) => (
-              <div key={p.id} className="py-3 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-bold text-slate-900 text-sm">₹{p.amount}</span>
-                  <p className="text-slate-500">
-                    {p.bankAccountNumber?.startsWith('UPI:')
-                      ? p.bankAccountNumber
-                      : `Bank A/c: ••••${p.bankAccountNumber?.slice(-4) || 'Bank'}`}
-                  </p>
-                  <span className="text-[10px] text-slate-400">
-                    {new Date(p.createdAt).toLocaleDateString('en-IN', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+              <div key={p.id} className="py-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-900 text-sm">₹{p.amount}</span>
+                    <p className="text-slate-500">
+                      {p.bankAccountNumber?.startsWith('UPI:')
+                        ? p.bankAccountNumber
+                        : `Bank A/c: ••••${p.bankAccountNumber?.slice(-4) || 'Bank'}`}
+                    </p>
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(p.createdAt).toLocaleDateString('en-IN', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  <div>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                        p.status === 'processed' || p.status === 'completed'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : p.status === 'rejected'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : p.status === 'under_review'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
-                      p.status === 'processed'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}
-                  >
-                    {p.status}
-                  </span>
-                </div>
+
+                {/* Show Rejection Reason if rejected */}
+                {p.status === 'rejected' && (p.rejectionReason || p.notes) && (
+                  <div className="p-2.5 rounded-xl bg-rose-50/90 border border-rose-200/80 text-rose-800 text-[11px] flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-extrabold uppercase tracking-wider text-[10px] text-rose-900 block">Rejection Reason:</span>
+                      <span className="font-medium">{p.rejectionReason || p.notes}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

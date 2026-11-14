@@ -15,11 +15,64 @@ router.get('/', async (req, res) => {
     const profile = await prisma.riderProfile.findUnique({
       where: { userId: req.user.userId },
       include: {
-        payouts: { orderBy: { createdAt: 'desc' }, take: 10 },
+        payouts: { orderBy: { createdAt: 'desc' }, take: 15 },
       },
     });
 
     if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
+
+    // Fetch primary PayoutRequests (which tracks real-time regional and super admin approvals/rejections)
+    const payoutRequests = await prisma.payoutRequest.findMany({
+      where: {
+        partyType: 'RIDER',
+        riderProfileId: profile.id,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+    });
+
+    // Format unified payout items for the rider panel
+    let unifiedPayouts = [];
+    if (payoutRequests.length > 0) {
+      unifiedPayouts = payoutRequests.map(r => {
+        let cleanReason = r.rejectionReason;
+        if (!cleanReason && r.notes && r.notes.includes('Rejection')) {
+          const parts = r.notes.split(']:');
+          cleanReason = parts.length > 1 ? parts[1].trim() : r.notes;
+        }
+
+        const snapshot = r.bankSnapshot || {};
+        let accDisplay = snapshot.upiId ? `UPI: ${snapshot.upiId}` : null;
+        if (!accDisplay && snapshot.accountNumber) {
+          accDisplay = `Bank A/c: ••••${String(snapshot.accountNumber).slice(-4)}`;
+        }
+        if (!accDisplay) {
+          accDisplay = profile.upiId ? `UPI: ${profile.upiId}` : (profile.accountNumber ? `Bank A/c: ••••${profile.accountNumber.slice(-4)}` : 'Bank Transfer');
+        }
+
+        return {
+          id: r.id,
+          amount: r.amount,
+          status: r.status, // pending, approved, under_review, completed, rejected
+          bankAccountNumber: accDisplay,
+          ifscCode: snapshot.ifsc || profile.ifsc || '',
+          rejectionReason: cleanReason || null,
+          notes: r.notes || null,
+          createdAt: r.requestedAt || r.createdAt,
+          processedAt: r.processedAt,
+        };
+      });
+    } else {
+      unifiedPayouts = (profile.payouts || []).map(p => ({
+        id: p.id,
+        amount: p.amount,
+        status: p.status,
+        bankAccountNumber: p.bankAccountNumber,
+        ifscCode: p.ifscCode,
+        rejectionReason: p.referenceNumber,
+        createdAt: p.createdAt,
+      }));
+    }
 
     // Recent deliveries credited
     const recentDeliveries = await prisma.delivery.findMany({
@@ -38,7 +91,7 @@ router.get('/', async (req, res) => {
     res.json({
       walletBalance: profile.walletBalance,
       totalDeliveries: profile.totalDeliveries,
-      payouts: profile.payouts,
+      payouts: unifiedPayouts,
       recentEarnings: recentDeliveries,
     });
   } catch (err) {

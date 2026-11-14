@@ -139,18 +139,42 @@ router.post('/:id/verify', async (req, res) => {
       prefix = 'Regional Rejection';
     }
 
+    const cleanNote = note ? note.trim() : (action === 'approve' ? 'Verified by Regional Lead' : action === 'escalate' ? 'Escalated to Super Admin by Regional Lead due to verification issue' : 'Rejected by Regional Lead');
+
     const updated = await prisma.payoutRequest.update({
       where: { id },
       data: {
         status: newStatus,
         reviewedAt: new Date(),
-        notes: `${request.notes ? request.notes + '\n' : ''}[${prefix} (${new Date().toLocaleDateString('en-IN')})]: ${note || (action === 'approve' ? 'Verified by Regional Lead' : action === 'escalate' ? 'Escalated to Super Admin by Regional Lead due to verification issue' : 'Rejected by Regional Lead')}`,
+        rejectedAt: action === 'reject' ? new Date() : undefined,
+        rejectionReason: action === 'reject' ? cleanNote : undefined,
+        notes: `${request.notes ? request.notes + '\n' : ''}[${prefix} (${new Date().toLocaleDateString('en-IN')})]: ${cleanNote}`,
       },
     });
 
+    // Synchronize legacy RiderPayout table if this is a rider payout
+    if (request.partyType === 'RIDER' && request.riderProfileId) {
+      await prisma.riderPayout.updateMany({
+        where: {
+          riderProfileId: request.riderProfileId,
+          amount: request.amount,
+          status: 'pending',
+        },
+        data: {
+          status: action === 'reject' ? 'rejected' : action === 'approve' ? 'approved' : 'pending',
+          referenceNumber: action === 'reject' ? cleanNote : undefined,
+        },
+      }).catch(() => {});
+    }
+
     try {
-      const { notifyPayoutStatus } = require('../../lib/socket');
+      const { notifyPayoutStatus, notifyWalletUpdate } = require('../../lib/socket');
       notifyPayoutStatus(updated);
+      if (request.partyType === 'RIDER' && request.riderProfileId) {
+        notifyWalletUpdate('RIDER', request.riderProfileId, null, { action: newStatus, reason: cleanNote });
+      } else if (request.partyType === 'VENDOR' && request.vendorId) {
+        notifyWalletUpdate('VENDOR', request.vendorId, null, { action: newStatus, reason: cleanNote });
+      }
     } catch (_) {}
 
     const statusMsg = action === 'approve'

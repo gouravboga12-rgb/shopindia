@@ -464,6 +464,31 @@ router.post('/:id/reject', requireRole('super_admin'), async (req, res) => {
       },
     });
 
+    // Synchronize legacy RiderPayout table if this is a rider payout
+    if (request.partyType === 'RIDER' && request.riderProfileId) {
+      await prisma.riderPayout.updateMany({
+        where: {
+          riderProfileId: request.riderProfileId,
+          amount: request.amount,
+          status: 'pending',
+        },
+        data: {
+          status: 'rejected',
+          referenceNumber: reason.trim(),
+        },
+      }).catch(() => {});
+    }
+
+    try {
+      const { notifyPayoutStatus, notifyWalletUpdate } = require('../../lib/socket');
+      notifyPayoutStatus(updated);
+      if (request.partyType === 'RIDER' && request.riderProfileId) {
+        notifyWalletUpdate('RIDER', request.riderProfileId, null, { action: 'rejected', reason: reason.trim() });
+      } else if (request.partyType === 'VENDOR' && request.vendorId) {
+        notifyWalletUpdate('VENDOR', request.vendorId, null, { action: 'rejected', reason: reason.trim() });
+      }
+    } catch (_) {}
+
     res.json({ success: true, message: 'Payout request rejected.', payout: updated });
   } catch (err) {
     console.error('[AdminPayouts] Reject error:', err);
