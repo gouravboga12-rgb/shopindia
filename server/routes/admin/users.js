@@ -103,4 +103,73 @@ router.patch('/:id/permissions', restrictManage, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+/** DELETE /api/admin/users/:id — permanently delete user from database with confirmation and cascade */
+router.delete('/:id', restrictManage, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Safety checks
+    if (req.user && req.user.id === id) {
+      return res.status(400).json({ error: 'You cannot delete your own active super admin account.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (targetUser.email === 'admin@shopindia.in') {
+      return res.status(400).json({ error: 'The primary super admin account (admin@shopindia.in) cannot be deleted.' });
+    }
+
+    // Clean up all dependent records before deleting user
+    await prisma.$transaction(async (tx) => {
+      // 1. Carts and Wishlists
+      await tx.cartItem.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.cart.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.wishlistItem.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.wishlist.deleteMany({ where: { userId: id } }).catch(() => {});
+
+      // 2. Notifications, Activity, Addresses, Payment Methods, Rewards, Reviews
+      await tx.userNotification.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.userActivity.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.address.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.paymentMethod.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.reward.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.review.deleteMany({ where: { userId: id } }).catch(() => {});
+
+      // 3. Support Tickets (unassign or delete customer tickets)
+      await tx.ticket.updateMany({ where: { assignedToId: id }, data: { assignedToId: null } }).catch(() => {});
+      await tx.ticketMessage.deleteMany({ where: { senderId: id } }).catch(() => {});
+      await tx.ticket.deleteMany({ where: { customerId: id } }).catch(() => {});
+
+      // 4. Profiles (Regional Admin, Rider, Branch Staff)
+      await tx.regionalAdminProfile.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.riderProfile.deleteMany({ where: { userId: id } }).catch(() => {});
+      await tx.branchStaff.deleteMany({ where: { userId: id } }).catch(() => {});
+
+      // 5. Vendor links
+      await tx.vendor.updateMany({ where: { approvedById: id }, data: { approvedById: null } }).catch(() => {});
+      await tx.vendor.deleteMany({ where: { userId: id } }).catch(() => {});
+
+      // 6. Orders (if any, remove items and deliveries)
+      const userOrders = await tx.order.findMany({ where: { customerId: id }, select: { id: true } });
+      if (userOrders.length > 0) {
+        const orderIds = userOrders.map(o => o.id);
+        await tx.orderItem.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => {});
+        await tx.delivery.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => {});
+        await tx.order.deleteMany({ where: { id: { in: orderIds } } }).catch(() => {});
+      }
+
+      // 7. Permanently delete the user record from database
+      await tx.user.delete({ where: { id } });
+    });
+
+    res.json({ success: true, message: `User "${targetUser.name}" (${targetUser.email}) permanently deleted from database.` });
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete user.' });
+  }
+});
+
 module.exports = router;

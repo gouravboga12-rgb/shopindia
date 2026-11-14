@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Search, UserX, Ban, CheckCircle, Download } from 'lucide-react';
+import { Search, UserX, Ban, CheckCircle, Download, Trash2 } from 'lucide-react';
 
 const ROLES = ['all', 'customer', 'vendor', 'rider', 'regional_admin', 'super_admin'];
 
@@ -9,6 +9,7 @@ export const UsersPage: React.FC = () => {
   const [role, setRole] = useState('all');
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -27,6 +28,23 @@ export const UsersPage: React.FC = () => {
       load();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleDeleteUser = async (id: string, name: string, email: string) => {
+    const confirmed = window.confirm(
+      `⚠️ PERMANENT DELETE CONFIRMATION\n\nAre you sure you want to permanently delete user "${name}" (${email})?\n\nThis will permanently erase their account from the database. This action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    try {
+      await api.delete(`/api/admin/users/${id}`);
+      setUsers(prev => prev.filter(u => (u.id || u._id) !== id));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete user.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -148,23 +166,44 @@ export const UsersPage: React.FC = () => {
                     </td>
                     <td className="px-5 py-4 text-xs text-gray-400">{u.createdAt?.slice(0, 10)}</td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {u.status !== 'active' && (
-                          <button onClick={() => updateStatus(u.id || u._id, 'active')}
-                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100" title="Activate">
+                          <button
+                            onClick={() => updateStatus(u.id || u._id, 'active')}
+                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors cursor-pointer"
+                            title="Activate User"
+                          >
                             <CheckCircle className="w-4 h-4" />
                           </button>
                         )}
                         {u.status !== 'suspended' && (
-                          <button onClick={() => updateStatus(u.id || u._id, 'suspended')}
-                            className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100" title="Suspend">
+                          <button
+                            onClick={() => updateStatus(u.id || u._id, 'suspended')}
+                            className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+                            title="Suspend User"
+                          >
                             <UserX className="w-4 h-4" />
                           </button>
                         )}
                         {u.status !== 'blocked' && (
-                          <button onClick={() => updateStatus(u.id || u._id, 'blocked')}
-                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100" title="Block">
+                          <button
+                            onClick={() => updateStatus(u.id || u._id, 'blocked')}
+                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="Block User"
+                          >
                             <Ban className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {/* Permanent Delete Button with Confirmation */}
+                        {u.email !== 'admin@shopindia.in' && (
+                          <button
+                            disabled={deletingId === (u.id || u._id)}
+                            onClick={() => handleDeleteUser(u.id || u._id, u.name, u.email)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                            title="Permanently Delete User Account"
+                          >
+                            <Trash2 className={`w-4 h-4 ${deletingId === (u.id || u._id) ? 'animate-pulse text-red-500' : ''}`} />
                           </button>
                         )}
                       </div>
