@@ -101,23 +101,102 @@ router.patch('/:id/status', async (req, res) => {
 
 /**
  * DELETE /api/admin/regional-admins/:id
- * Delete or purge a rejected regional admin user & profile
+ * Permanently delete a regional administrator and purge all related territory data from database and panels
  */
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.regionalAdminProfile.deleteMany({ where: { userId: id } });
-    await prisma.user.delete({ where: { id } });
 
+    // Safety checks
+    if (req.user && req.user.id === id) {
+      return res.status(400).json({ error: 'You cannot delete your own active super admin account.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      include: { regionalAdminProfile: true },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Regional administrator not found.' });
+    }
+
+    if (targetUser.email === 'admin@shopindia.in') {
+      return res.status(400).json({ error: 'The primary super admin account (admin@shopindia.in) cannot be deleted.' });
+    }
+
+    // Clean up all dependent records before deleting user from database
+    await prisma.$transaction(async (tx) => {
+      // 1. Unlink branches where this user is manager
+      await tx.branch.updateMany({
+        where: { managerId: id },
+        data: { managerId: null },
+      }).catch(() => {});
+
+      // 2. Unlink branch staff records
+      await tx.branchStaff.deleteMany({
+        where: { userId: id },
+      }).catch(() => {});
+
+      // 3. Unassign or clean up support tickets
+      await tx.ticket.updateMany({
+        where: { assignedToId: id },
+        data: { assignedToId: null },
+      }).catch(() => {});
+      await tx.ticketMessage.deleteMany({
+        where: { senderId: id },
+      }).catch(() => {});
+      await tx.ticket.deleteMany({
+        where: { customerId: id },
+      }).catch(() => {});
+
+      // 4. Notifications & user activities
+      await tx.userNotification.deleteMany({
+        where: { userId: id },
+      }).catch(() => {});
+      await tx.userActivity.deleteMany({
+        where: { userId: id },
+      }).catch(() => {});
+
+      // 5. Unlink vendor approvals
+      await tx.vendor.updateMany({
+        where: { approvedById: id },
+        data: { approvedById: null },
+      }).catch(() => {});
+
+      // 6. Delete RegionalAdminProfile explicitly
+      await tx.regionalAdminProfile.deleteMany({
+        where: { userId: id },
+      }).catch(() => {});
+
+      // 7. Delete User record permanently
+      await tx.user.delete({
+        where: { id },
+      });
+    });
+
+    // Realtime badge and socket sync across all panels
     try {
       const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
       broadcastAdminBadgeCounts();
     } catch (e) {}
 
-    res.json({ success: true, message: 'Regional admin record deleted successfully.' });
+    try {
+      const { getIo } = require('../../lib/socket');
+      const io = getIo();
+      if (io) {
+        io.emit('regional_admin:profile_updated', { userId: id, action: 'deleted' });
+        io.emit('regional_admin:deleted', { userId: id });
+      }
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      message: `Regional administrator "${targetUser.name}" (${targetUser.email}) and all territory data have been permanently deleted from database and panels.`,
+    });
   } catch (error) {
     console.error('Error deleting regional admin:', error);
-    res.status(500).json({ error: 'Failed to delete regional admin' });
+    res.status(500).json({ error: error.message || 'Failed to delete regional admin' });
   }
 });
 
