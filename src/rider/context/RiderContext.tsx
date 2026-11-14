@@ -379,6 +379,19 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     refreshData();
   });
 
+  // Real-time: another rider claimed this delivery — dismiss it immediately for all losing riders
+  useSocketEvent('radar:order_claimed', (data: { deliveryId: string; claimedByRiderProfileId: string }) => {
+    if (data.deliveryId && incomingBroadcast?.id === data.deliveryId) {
+      if (profile?.id !== data.claimedByRiderProfileId) {
+        // We are a LOSING rider — immediately clear this broadcast from our screen
+        dismissedOrderIds.current.add(data.deliveryId);
+        setIncomingBroadcast(null);
+      }
+    }
+    // Always re-poll so the next available order (if any) appears instantly
+    pollBroadcasts();
+  });
+
   // Atomic claim
   const acceptOrder = async (deliveryId: string) => {
     if (!token) return { success: false, error: 'Unauthorized' };
@@ -399,6 +412,8 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setActiveDelivery(null);
         } else {
           setActiveDelivery(data.delivery);
+          // Sync from server 300ms later to get full active job details and prevent blank flash
+          setTimeout(() => refreshData(), 300);
         }
         setIncomingBroadcast(null);
         return { success: true, isScheduled: isScheduledService, isInstant, delivery: data.delivery };

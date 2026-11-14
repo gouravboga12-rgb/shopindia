@@ -301,13 +301,25 @@ router.post(['/:id/accept', '/orders/:id/accept'], async (req, res) => {
     }).catch(() => {});
 
     try {
-      const { notifyOrderStatus } = require('../../lib/socket');
+      const { notifyOrderStatus, getIo } = require('../../lib/socket');
       notifyOrderStatus(delivery.orderId, isServiceJob ? 'confirmed' : 'in_transit', {
         deliveryId: delivery.id,
         customerId: delivery.order?.customer?.id,
         vendorId: delivery.order?.vendor?.id,
         riderProfileId: profile.id,
       });
+
+      // Broadcast to ALL riders on the radar: this delivery is now taken.
+      // This clears the stale broadcast from every other rider's screen in real-time
+      // instead of waiting up to 10 seconds for their next poll cycle.
+      const io = getIo();
+      if (io) {
+        io.to('panel:rider:radar').emit('radar:order_claimed', {
+          deliveryId: req.params.id,
+          orderId: delivery.orderId,
+          claimedByRiderProfileId: profile.id,
+        });
+      }
     } catch (_) {}
 
     res.json({
