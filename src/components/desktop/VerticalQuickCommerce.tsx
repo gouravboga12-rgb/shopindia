@@ -140,9 +140,7 @@ export const VerticalQuickCommerce: React.FC = () => {
       return;
     }
     if (!requireCustomerAuth('add quick commerce items to your cart')) return;
-    if (activeSubVertical === 'food') {
-      setCustomizingProduct(product);
-    } else if (activeSubVertical === 'pharmacy' && product.requiresPrescription) {
+    if (activeSubVertical === 'pharmacy' && product.requiresPrescription) {
       setSelectedRxProduct(product);
       setRxModalOpen(true);
     } else {
@@ -499,14 +497,7 @@ export const VerticalQuickCommerce: React.FC = () => {
                         )}
                       </div>
 
-                      {activeSubVertical === 'food' ? (
-                        <button
-                          onClick={(e) => handleAddToCartWithCustomization(product, e)}
-                          className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold rounded-xl transition-all shadow-sm"
-                        >
-                          Customize +
-                        </button>
-                      ) : qty === 0 ? (
+                      {qty === 0 ? (
                         <div className="flex items-center gap-1.5">
                           <motion.button
                             whileTap={{ scale: 0.95 }}
@@ -523,6 +514,8 @@ export const VerticalQuickCommerce: React.FC = () => {
                             className={`px-3 py-1.5 text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-wider text-white ${
                               activeSubVertical === 'pharmacy'
                                 ? 'bg-blue-600 hover:bg-blue-700'
+                                : activeSubVertical === 'food'
+                                ? 'bg-orange-600 hover:bg-orange-700'
                                 : 'bg-emerald-600 hover:bg-emerald-700'
                             }`}
                           >
@@ -534,6 +527,8 @@ export const VerticalQuickCommerce: React.FC = () => {
                             className={`px-3 py-1.5 text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-wider ${
                               activeSubVertical === 'pharmacy'
                                 ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                                : activeSubVertical === 'food'
+                                ? 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
                                 : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                             }`}
                           >
@@ -541,17 +536,23 @@ export const VerticalQuickCommerce: React.FC = () => {
                           </motion.button>
                         </div>
                       ) : (
-                        <div className="flex items-center bg-emerald-600 text-white rounded-xl overflow-hidden text-xs font-bold shadow-sm">
+                        <div className={`flex items-center text-white rounded-xl overflow-hidden text-xs font-bold shadow-sm ${
+                          activeSubVertical === 'pharmacy' ? 'bg-blue-600' : activeSubVertical === 'food' ? 'bg-orange-600' : 'bg-emerald-600'
+                        }`}>
                           <button
                             onClick={() => updateQuantity(product.id, qty - 1)}
-                            className="px-2 py-1.5 hover:bg-emerald-700 transition-colors"
+                            className={`px-2 py-1.5 transition-colors ${
+                              activeSubVertical === 'pharmacy' ? 'hover:bg-blue-700' : activeSubVertical === 'food' ? 'hover:bg-orange-700' : 'hover:bg-emerald-700'
+                            }`}
                           >
                             <Minus size={11} strokeWidth={3} />
                           </button>
                           <span className="px-2 text-center select-none">{qty}</span>
                           <button
                             onClick={() => updateQuantity(product.id, qty + 1)}
-                            className="px-2 py-1.5 hover:bg-emerald-700 transition-colors"
+                            className={`px-2 py-1.5 transition-colors ${
+                              activeSubVertical === 'pharmacy' ? 'hover:bg-blue-700' : activeSubVertical === 'food' ? 'hover:bg-orange-700' : 'hover:bg-emerald-700'
+                            }`}
                           >
                             <Plus size={11} strokeWidth={3} />
                           </button>

@@ -112,9 +112,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
       return;
     }
     if (!requireCustomerAuth('add quick commerce items to your cart')) return;
-    if (activeSubVertical === 'food') {
-      setCustomizingProduct(product);
-    } else if (activeSubVertical === 'pharmacy' && product.requiresPrescription) {
+    if (activeSubVertical === 'pharmacy' && product.requiresPrescription) {
       setSelectedRxProduct(product);
       setRxModalOpen(true);
     } else {
@@ -397,32 +395,37 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
                   )}
                 </div>
 
-                {activeSubVertical === 'food' ? (
+                {qty === 0 ? (
                   <button
                     onClick={(e) => handleAddToCartWithCustomization(product, e)}
-                    className="px-2.5 py-1 bg-orange-50 text-orange-700 border border-orange-200 text-[11px] font-bold rounded-lg"
-                  >
-                    Add +
-                  </button>
-                ) : qty === 0 ? (
-                  <button
-                    onClick={(e) => handleAddToCartWithCustomization(product, e)}
-                    className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-black rounded-lg uppercase"
+                    className={`px-3 py-1 border text-[11px] font-black rounded-lg uppercase ${
+                      activeSubVertical === 'pharmacy'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : activeSubVertical === 'food'
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}
                   >
                     Add
                   </button>
                 ) : (
-                  <div className="flex items-center bg-emerald-600 text-white rounded-lg overflow-hidden text-xs font-bold">
+                  <div className={`flex items-center text-white rounded-lg overflow-hidden text-xs font-bold ${
+                    activeSubVertical === 'pharmacy' ? 'bg-blue-600' : activeSubVertical === 'food' ? 'bg-orange-600' : 'bg-emerald-600'
+                  }`}>
                     <button
                       onClick={() => updateQuantity(product.id, qty - 1)}
-                      className="px-1.5 py-1 hover:bg-emerald-700"
+                      className={`px-1.5 py-1 ${
+                        activeSubVertical === 'pharmacy' ? 'hover:bg-blue-700' : activeSubVertical === 'food' ? 'hover:bg-orange-700' : 'hover:bg-emerald-700'
+                      }`}
                     >
                       <Minus size={10} strokeWidth={3} />
                     </button>
                     <span className="px-1.5 text-[11px]">{qty}</span>
                     <button
                       onClick={() => updateQuantity(product.id, qty + 1)}
-                      className="px-1.5 py-1 hover:bg-emerald-700"
+                      className={`px-1.5 py-1 ${
+                        activeSubVertical === 'pharmacy' ? 'hover:bg-blue-700' : activeSubVertical === 'food' ? 'hover:bg-orange-700' : 'hover:bg-emerald-700'
+                      }`}
                     >
                       <Plus size={10} strokeWidth={3} />
                     </button>
