@@ -183,7 +183,7 @@ router.post('/upload-images', upload.array('images', 10), async (req, res) => {
 
 const uploadVideo = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('video/')) {
       cb(null, true);
@@ -193,12 +193,22 @@ const uploadVideo = multer({
   }
 });
 
-/** POST /api/vendor/products/upload-video — S3 Video Upload (up to 50MB) */
-router.post('/upload-video', uploadVideo.single('video'), async (req, res) => {
+/** POST /api/vendor/products/upload-video — S3 Video Upload (up to 100MB) */
+router.post('/upload-video', (req, res, next) => {
+  uploadVideo.single('video')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Video file size exceeds 100MB limit. Please compress or select a smaller video.' });
+      }
+      return res.status(400).json({ error: err.message || 'Video upload failed' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No video file provided.' });
     const ext = req.file.originalname.split('.').pop() || 'mp4';
-    const key = `products/${req.user.vendorId}/videos/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    const key = `products/${req.user.vendorId || 'common'}/videos/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
     const result = await uploadToS3({
       key,
       body: req.file.buffer,

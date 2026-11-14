@@ -242,8 +242,8 @@ export const VendorProducts: React.FC = () => {
   const handleVideoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      alert('Video file size exceeds 50MB limit. Please upload a compressed MP4/WebM video.');
+    if (file.size > 100 * 1024 * 1024) {
+      alert('Video file size exceeds 100MB limit. Please upload a compressed MP4/WebM video.');
       return;
     }
     setVideoFile(file);
