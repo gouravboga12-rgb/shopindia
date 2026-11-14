@@ -357,6 +357,13 @@ async function calculateCartTotals({
     const qty = Number(item.quantity) || 1;
     const basePrice = Number(item.price || item.basePrice || item.vendorPrice || 0);
 
+    // Defense-in-depth: Determine if the specific item is a physical good or a service
+    const isPhysicalItem = item.fulfillmentType === 'traditional' || 
+                           item.fulfillmentType === 'quick_commerce' || 
+                           item.vertical === 'shop' || 
+                           item.vertical === 'quick';
+    const isItemService = !isPhysicalItem && (isService || item.fulfillmentType === 'hvac_service' || item.vertical === 'services');
+
     const itemPricing = await calculateItemPricing({
       vendorPrice: basePrice,
       basePrice,
@@ -365,11 +372,11 @@ async function calculateCartTotals({
         productId: item.productId,
         vendorId: item.vendorId,
         categoryId: item.categoryId,
-        vertical: isService ? 'services' : (fulfillmentType === 'quick_commerce' || fulfillmentType === 'quick' ? 'quick' : 'shop')
+        vertical: isItemService ? 'services' : (fulfillmentType === 'quick_commerce' || fulfillmentType === 'quick' ? 'quick' : 'shop')
       }
     });
 
-    if (isService) {
+    if (isItemService) {
       // In Glacons Services, admin commission is DEDUCTED from the catalog price
       // Customer pays the flat catalog price; technician receives the guaranteed technician pay
       const itemSubtotal = basePrice * qty;

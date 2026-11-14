@@ -95,24 +95,58 @@ router.post('/quote', async (req, res) => {
     const productIds = items.map(i => i.productId).filter(Boolean);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, basePrice: true, vendorId: true, categoryId: true }
+      select: {
+        id: true,
+        basePrice: true,
+        vendorId: true,
+        categoryId: true,
+        fulfillmentType: true,
+        category: { select: { vertical: true, name: true } }
+      }
     });
     const pMap = new Map(products.map(p => [p.id, p]));
 
     const resolved = items.map(it => {
       const p = pMap.get(it.productId);
+      const catV = (p?.category?.vertical || '').toLowerCase();
+      let itemChannel = p?.fulfillmentType;
+      if (!itemChannel || itemChannel === 'traditional') {
+        if (catV === 'quick' || catV === 'quick_commerce') {
+          itemChannel = 'quick_commerce';
+        } else if (catV === 'services' || catV === 'hvac_service' || catV === 'hvac') {
+          itemChannel = 'hvac_service';
+        } else {
+          itemChannel = 'traditional';
+        }
+      }
       return {
         productId: it.productId,
         vendorId: p?.vendorId || it.vendorId,
         categoryId: p?.categoryId || it.categoryId,
         price: p?.basePrice || it.price || 0,
-        quantity: it.quantity || 1
+        quantity: it.quantity || 1,
+        fulfillmentType: itemChannel,
+        vertical: catV || (itemChannel === 'hvac_service' ? 'services' : itemChannel === 'quick_commerce' ? 'quick' : 'shop')
       };
     });
 
-    const uniqueVendors = Array.from(new Set(resolved.map(r => r.vendorId).filter(Boolean)));
-    const fType = mapType(vertical);
-    const isQuick = fType === 'quick_commerce';
+    // Partition items by channel and vendor store for accurate multi-order quotation
+    const itemGroups = new Map();
+    for (const it of resolved) {
+      const channel = it.fulfillmentType || 'traditional';
+      const gKey = channel === 'hvac_service'
+        ? `services_${it.categoryId || 'appointment'}`
+        : `${channel}_${it.vendorId || 'platform_direct'}`;
+
+      if (!itemGroups.has(gKey)) {
+        itemGroups.set(gKey, {
+          channel,
+          vendorId: channel === 'hvac_service' ? null : (it.vendorId || null),
+          items: []
+        });
+      }
+      itemGroups.get(gKey).items.push(it);
+    }
 
     let quoteSubtotal = 0;
     let quoteDeliveryFee = 0;
@@ -123,59 +157,34 @@ router.post('/quote', async (req, res) => {
     let maxDistKm = 3.5;
     let isFreeDelivery = false;
 
-    if (uniqueVendors.length > 1 && isQuick) {
-      // Multi-store Quick Shopping: Calculate quote per individual store dispatch
-      for (const vId of uniqueVendors) {
-        const vItems = resolved.filter(r => r.vendorId === vId);
-        let vDistKm = 3.5;
+    for (const group of itemGroups.values()) {
+      let gDistKm = 3.5;
+      if (group.vendorId) {
         const v = await prisma.vendor.findUnique({
-          where: { id: vId },
+          where: { id: group.vendorId },
           select: { lat: true, lng: true, isOnline: true }
         });
-        if (v?.isOnline === false) isStoreOnline = false;
-        if (v?.lat && v?.lng && userLat && userLng) {
-          vDistKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
-        }
-        if (vDistKm > maxDistKm) maxDistKm = vDistKm;
-
-        const vTotals = await calculateCartTotals({
-          items: vItems,
-          fulfillmentType: fType,
-          distanceKm: vDistKm
-        });
-
-        quoteSubtotal += vTotals.subtotal;
-        quoteDeliveryFee += vTotals.deliveryFee;
-        quotePlatformFee += vTotals.customerPlatformFee;
-        quoteDiscount += vTotals.discount;
-        quoteTotal += vTotals.finalCustomerTotal;
-      }
-    } else {
-      let distanceKm = 3.5;
-      if (resolved.length && resolved[0].vendorId) {
-        const v = await prisma.vendor.findUnique({
-          where: { id: resolved[0].vendorId },
-          select: { lat: true, lng: true, isOnline: true }
-        });
-        if (v?.isOnline === false) {
+        if (v?.isOnline === false && group.channel === 'quick_commerce') {
           isStoreOnline = false;
         }
         if (v?.lat && v?.lng && userLat && userLng) {
-          distanceKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
+          gDistKm = calculateHaversineDistanceKm(v.lat, v.lng, userLat, userLng);
         }
       }
-      maxDistKm = distanceKm;
-      const totals = await calculateCartTotals({
-        items: resolved,
-        fulfillmentType: fType,
-        distanceKm
+      if (gDistKm > maxDistKm) maxDistKm = gDistKm;
+
+      const gTotals = await calculateCartTotals({
+        items: group.items,
+        fulfillmentType: group.channel,
+        distanceKm: gDistKm
       });
-      quoteSubtotal = totals.subtotal;
-      quoteDeliveryFee = totals.deliveryFee;
-      quotePlatformFee = totals.customerPlatformFee;
-      quoteDiscount = totals.discount;
-      quoteTotal = totals.finalCustomerTotal;
-      isFreeDelivery = totals.delivery?.isFreeDelivery || false;
+
+      quoteSubtotal += gTotals.subtotal;
+      quoteDeliveryFee += gTotals.deliveryFee;
+      quotePlatformFee += gTotals.customerPlatformFee;
+      quoteDiscount += gTotals.discount;
+      quoteTotal += gTotals.finalCustomerTotal;
+      if (gTotals.delivery?.isFreeDelivery) isFreeDelivery = true;
     }
 
     res.json({
@@ -408,9 +417,13 @@ router.post('/', async (req, res) => {
         id: true, 
         name: true, 
         basePrice: true, 
+        vendorPrice: true,
+        mrp: true,
         vendorId: true, 
         stock: true, 
         isOutOfStock: true,
+        fulfillmentType: true,
+        categoryId: true,
         category: { select: { vertical: true, name: true } }
       },
     });
@@ -441,6 +454,18 @@ router.post('/', async (req, res) => {
 
       const qty = Number(it.quantity) || 1;
 
+      const rawVertical = (product.category?.vertical || '').toLowerCase();
+      let itemChannel = product.fulfillmentType;
+      if (!itemChannel || itemChannel === 'traditional') {
+        if (rawVertical === 'quick' || rawVertical === 'quick_commerce') {
+          itemChannel = 'quick_commerce';
+        } else if (rawVertical === 'services' || rawVertical === 'hvac_service' || rawVertical === 'hvac') {
+          itemChannel = 'hvac_service';
+        } else {
+          itemChannel = 'traditional';
+        }
+      }
+
       resolved.push({
         productId: product.id,
         vendorId: product.vendorId,
@@ -449,7 +474,11 @@ router.post('/', async (req, res) => {
         quantity: qty,
         vendorPrice: itemPricing.vendorPrice,
         platformFee: itemPricing.platformFee,
-        gatewayFeeShare: itemPricing.gatewayBuffer
+        gatewayFeeShare: itemPricing.gatewayBuffer,
+        fulfillmentType: itemChannel,
+        vertical: rawVertical || (itemChannel === 'hvac_service' ? 'services' : itemChannel === 'quick_commerce' ? 'quick' : 'shop'),
+        categoryId: product.categoryId,
+        categoryName: product.category?.name
       });
     }
 
@@ -471,13 +500,16 @@ router.post('/', async (req, res) => {
       const { settings: cachedSettings } = await getCachedRules();
       const opStatus = getPlatformOperatingStatus(cachedSettings);
 
-      const isQuick = resolvedVertical === 'quick' || resolvedVertical === 'quick_commerce';
-      const isServices = resolvedVertical === 'services' || resolvedVertical === 'hvac_service';
+      const hasQuickItems = resolved.some(r => r.fulfillmentType === 'quick_commerce');
+      const hasServiceItems = resolved.some(r => r.fulfillmentType === 'hvac_service');
 
       const isBlockedVertical = (target) => {
         // Shop India (standard e-commerce, 2-5 days) is 24/7 — only Quick Commerce and Glacons Services are paused
-        if (resolvedVertical === 'shop' || resolvedVertical === 'ecommerce') return false;
-        if (target === 'both') return isQuick || isServices;
+        if (target === 'both') return hasQuickItems || hasServiceItems;
+        if (target === 'quick') return hasQuickItems;
+        if (target === 'services') return hasServiceItems;
+        return false;
+      };
         if (target === 'quick') return isQuick;
         if (target === 'services') return isServices;
         return false;
@@ -560,7 +592,7 @@ router.post('/', async (req, res) => {
     const isOnlinePayment = paymentMethod === 'razorpay' || paymentMethod === 'online' || paymentMethodId === 'razorpay';
     const isCodPayment = paymentMethod === 'cod' || paymentMethod === 'COD' || paymentMethodId === 'COD';
 
-    if (isCodPayment && (resolvedVertical === 'shop' || resolvedVertical === 'traditional')) {
+    if (isCodPayment && (resolvedVertical === 'shop' || resolvedVertical === 'traditional' || resolved.some(r => r.fulfillmentType === 'traditional'))) {
       return res.status(400).json({ error: 'Cash on Delivery is not available for standard ShopIndia courier orders. Please pay online via Razorpay.' });
     }
 
@@ -643,14 +675,25 @@ router.post('/', async (req, res) => {
       masterDeliveryPin = String(1000 + Math.abs(hash));
     }
 
-    // Partition items by fulfillment entity:
-    // If services: partition by category/trade
-    // If physical goods (quick or shop): partition strictly by vendor store ID
+    // Partition items strictly by fulfillment channel FIRST, then by vendor store:
+    // 1. 'hvac_service' -> Glacons services (handled by field technicians)
+    // 2. 'quick_commerce' -> Quick 10-min delivery (handled by local store vendor + bike rider)
+    // 3. 'traditional' -> Pan-India e-commerce (handled by warehouse/store vendor + Shiprocket courier)
     const itemGroups = new Map();
     for (const it of resolved) {
-      const gKey = isServiceOrder ? (it.categoryId || it.vendorId || 'service_trade') : (it.vendorId || 'platform_direct');
-      if (!itemGroups.has(gKey)) itemGroups.set(gKey, []);
-      itemGroups.get(gKey).push(it);
+      const channel = it.fulfillmentType || 'traditional';
+      const gKey = channel === 'hvac_service'
+        ? `services_${it.categoryId || 'appointment'}`
+        : `${channel}_${it.vendorId || 'platform_direct'}`;
+
+      if (!itemGroups.has(gKey)) {
+        itemGroups.set(gKey, {
+          channel,
+          vendorId: channel === 'hvac_service' ? null : (it.vendorId || null),
+          items: []
+        });
+      }
+      itemGroups.get(gKey).items.push(it);
     }
 
     const isMultiStore = itemGroups.size > 1;
@@ -661,8 +704,12 @@ router.post('/', async (req, res) => {
     const createdOrders = [];
     let subOrderIdx = 1;
 
-    for (const [groupKey, groupItems] of itemGroups.entries()) {
-      const gVendorId = isServiceOrder ? null : (groupKey !== 'platform_direct' ? groupKey : null);
+    for (const [groupKey, groupData] of itemGroups.entries()) {
+      const { channel: groupChannel, vendorId: gVendorId, items: groupItems } = groupData;
+      const groupIsServiceOrder = groupChannel === 'hvac_service';
+      const groupIsQuickOrder = groupChannel === 'quick_commerce';
+      const groupIsTraditionalOrder = groupChannel === 'traditional';
+
       let gDistKm = 3.5;
       let vendorRecord = null;
 
@@ -673,7 +720,7 @@ router.post('/', async (req, res) => {
         });
 
         if (vendorRecord) {
-          if (vendorRecord.isOnline === false && isQuickOrder) {
+          if (vendorRecord.isOnline === false && groupIsQuickOrder) {
             return res.status(400).json({
               error: `Merchant "${vendorRecord.businessName || 'Store'}" is currently offline and not accepting orders. Please try again when the store is open.`
             });
@@ -686,7 +733,7 @@ router.post('/', async (req, res) => {
 
       const groupTotals = await calculateCartTotals({
         items: groupItems,
-        fulfillmentType,
+        fulfillmentType: groupChannel,
         distanceKm: gDistKm,
         zoneId: branchId
       });
@@ -703,8 +750,8 @@ router.post('/', async (req, res) => {
           customerId,
           vendorId: gVendorId,
           branchId,
-          type: fulfillmentType,
-          status: isQuickOrder ? 'confirmed' : 'placed',
+          type: groupChannel,
+          status: groupIsQuickOrder ? 'confirmed' : 'placed',
           subtotal: groupTotals.subtotal,
           discount: groupTotals.discount || 0,
           commission: groupTotals.totalAdminCommission,
@@ -720,7 +767,7 @@ router.post('/', async (req, res) => {
           items: {
             create: groupItems.map((it) => ({
               productId: it.productId,
-              vendorId: isServiceOrder ? null : it.vendorId,
+              vendorId: groupIsServiceOrder ? null : it.vendorId,
               name: it.name,
               price: it.price,
               quantity: it.quantity,
@@ -744,8 +791,8 @@ router.post('/', async (req, res) => {
         },
       });
 
-      // Auto-create Delivery record and broadcast to nearby riders immediately for Quick Shopping
-      if (isQuickOrder && gVendorId && vendorRecord) {
+      // Auto-create Delivery record and broadcast to nearby riders ONLY for Quick Shopping
+      if (groupIsQuickOrder && gVendorId && vendorRecord) {
         const pickupLat = vendorRecord.lat || 17.3732;
         const pickupLng = vendorRecord.lng || 78.5385;
         const dropoffLat = orderLat || (pickupLat + 0.015);
@@ -774,13 +821,13 @@ router.post('/', async (req, res) => {
         }).catch(err => console.error('Auto-broadcast delivery error:', err.message));
       }
 
-      // Auto-create Delivery record and broadcast to nearby technicians for Glacons / HVAC Services
-      if (isServiceOrder) {
-        const serviceTitle = subOrder.items?.[0]?.name || firstServiceItem?.name || 'Glacons Technician Service';
+      // Auto-create Delivery record and broadcast to nearby technicians ONLY for Glacons / HVAC Services
+      if (groupIsServiceOrder) {
+        const serviceTitle = subOrder.items?.[0]?.name || groupItems?.[0]?.name || 'Glacons Technician Service';
         const serviceAddress = [location, deliveryPincode].filter(Boolean).join(', ') || 'Customer Service Address';
         const serviceLat = orderLat || 17.385044;
         const serviceLng = orderLng || 78.486671;
-        const technicianGuaranteedFee = groupTotals.totalRiderPayout > 0 ? groupTotals.totalRiderPayout : (firstServiceItem?.vendorPrice || Math.round(subOrder.total * 0.8) || 400);
+        const technicianGuaranteedFee = groupTotals.totalRiderPayout > 0 ? groupTotals.totalRiderPayout : (groupItems?.[0]?.vendorPrice || Math.round(subOrder.total * 0.8) || 400);
 
         const isInstantService = req.body?.bookingMode === 'instant' || (scheduledSlotInfo && scheduledSlotInfo.toLowerCase().includes('instant'));
         const formattedPickupName = isInstantService
@@ -819,6 +866,9 @@ router.post('/', async (req, res) => {
           }
         }).catch(err => console.error('Auto-create ServiceJob error:', err.message));
       }
+
+      // Traditional Shop India courier orders DO NOT create local Delivery or dispatch riders/technicians.
+      // They are fulfilled directly by vendor/courier (Shiprocket).
 
       // Real-time WebSocket announcement per sub-order
       try {
