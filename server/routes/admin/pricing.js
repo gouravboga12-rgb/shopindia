@@ -551,6 +551,87 @@ router.post('/settings', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/pricing/apply-service-commission
+ * Save global doorstep service commission rate and batch-recalculate guaranteed technician pay across all active doorstep services in DB
+ */
+router.post('/apply-service-commission', async (req, res) => {
+  try {
+    const { commissionPct } = req.body;
+    const pct = parseFloat(commissionPct);
+    if (isNaN(pct) || pct < 0 || pct > 75) {
+      return res.status(400).json({ error: 'Commission percentage must be between 0% and 75%' });
+    }
+
+    // 1. Persist in appSetting
+    await prisma.appSetting.upsert({
+      where: { key: 'service_commission_pct' },
+      update: { value: String(pct) },
+      create: { key: 'service_commission_pct', value: String(pct), group: 'pricing' }
+    });
+
+    // 2. Upsert PricingRule for vertical 'services'
+    const existingRule = await prisma.pricingRule.findFirst({
+      where: { scope: 'vertical', vertical: 'services' }
+    });
+
+    if (existingRule) {
+      await prisma.pricingRule.update({
+        where: { id: existingRule.id },
+        data: { commissionPct: pct, isActive: true }
+      });
+    } else {
+      await prisma.pricingRule.create({
+        data: {
+          scope: 'vertical',
+          vertical: 'services',
+          commissionPct: pct,
+          includeGateway: true,
+          description: 'Glacons Doorstep Services Platform Commission',
+          isActive: true
+        }
+      });
+    }
+
+    // 3. Batch recalculate vendorPrice on all active doorstep services
+    const services = await prisma.product.findMany({
+      where: {
+        OR: [
+          { fulfillmentType: 'hvac_service' },
+          { fulfillmentType: 'hvac' },
+          { tags: { has: 'doorstep_service' } },
+          { category: { vertical: { startsWith: 'services' } } },
+        ]
+      },
+      select: { id: true, basePrice: true }
+    });
+
+    const updateOps = services.map(s => {
+      const techPay = Math.round(s.basePrice * (1 - pct / 100));
+      return prisma.product.update({
+        where: { id: s.id },
+        data: { vendorPrice: techPay }
+      });
+    });
+
+    if (updateOps.length > 0) {
+      await prisma.$transaction(updateOps);
+    }
+
+    invalidatePricingCache();
+
+    res.json({
+      success: true,
+      message: `Successfully set platform commission to ${pct}%. Recalculated guaranteed pay for ${services.length} doorstep services.`,
+      updatedCount: services.length,
+      commissionPct: pct
+    });
+  } catch (err) {
+    console.error('[AdminPricing] Error applying service commission:', err);
+    res.status(500).json({ error: err.message || 'Failed to apply service commission' });
+  }
+});
+
+/**
  * GET /api/admin/pricing/audit-logs
  * Audit history of pricing and commission modifications
  */

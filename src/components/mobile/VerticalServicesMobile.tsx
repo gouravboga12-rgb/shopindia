@@ -7,7 +7,6 @@ import {
   Star, Heart, Calendar, Home, Wrench,
   Clock, Bell, MapPin
 } from 'lucide-react';
-import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
 import { TimeSlotWheelPickerModal, type SlotConfirmationData } from '../common/TimeSlotWheelPickerModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 import type { Product } from '../../data/types';
@@ -47,20 +46,6 @@ export const VerticalServicesMobile: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
   const [notifiedLeadIds, setNotifiedLeadIds] = useState<Record<string, boolean>>({});
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
-
-  // Selected Vehicle state
-  const [selectedVehicle, setSelectedVehicle] = useState<{
-    type: 'car' | 'bike';
-    brand: string;
-    model: string;
-    fuel?: string;
-  } | null>({
-    type: 'car',
-    brand: 'Hyundai',
-    model: 'Creta',
-    fuel: 'Petrol',
-  });
-  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
 
   const services = products.filter((p) => {
     if (p.vertical !== 'services') return false;
@@ -145,7 +130,7 @@ export const VerticalServicesMobile: React.FC = () => {
         'Customer Phone': slotData?.contactPhone || '',
         'Customer WhatsApp': slotData?.whatsappPhone || '',
         'Special Notes': slotData?.notes || '',
-        'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : `Vehicle Services (${selectedVehicle?.brand} ${selectedVehicle?.model})`,
+        'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : 'Vehicle Services',
         'Technician': 'Certified Professional Assigned',
       },
     };
@@ -228,25 +213,7 @@ export const VerticalServicesMobile: React.FC = () => {
         </button>
       </div>
 
-      {/* 2. Top Info / Vehicle Selector Strip */}
-      {activeSubVertical === 'vehicle' ? (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between">
-          <div className="text-xs">
-            <span className="text-slate-500 font-bold block text-[10px] uppercase">Selected Vehicle</span>
-            <span className="font-extrabold text-blue-950">
-              {selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model}` : 'Pick Vehicle'}
-            </span>
-          </div>
-          <button
-            onClick={() => setVehicleModalOpen(true)}
-            className="px-3 py-1 bg-blue-600 text-white text-[11px] font-bold rounded-xl shadow-sm"
-          >
-            Change
-          </button>
-        </div>
-      ) : null}
-
-      {/* 3. Horizontal Categories */}
+      {/* 2. Horizontal Categories */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
         {activeCategories.map((cat) => {
           const isSelected = selectedCategory === cat || (!selectedCategory && cat === 'All');
@@ -386,14 +353,6 @@ export const VerticalServicesMobile: React.FC = () => {
             : 'both'
         }
         onConfirm={confirmBooking}
-      />
-
-      {/* Vehicle Selector Modal */}
-      <VehicleSelectorModal
-        isOpen={vehicleModalOpen}
-        onClose={() => setVehicleModalOpen(false)}
-        selectedVehicle={selectedVehicle}
-        onSelectVehicle={(v) => setSelectedVehicle(v)}
       />
     </div>
   );

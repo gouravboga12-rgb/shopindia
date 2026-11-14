@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useRider } from '../context/RiderContext';
 import {
@@ -69,6 +70,19 @@ export const RiderProfile: React.FC = () => {
   );
   const [skills, setSkills] = useState<string[]>(profile?.skills || []);
   const [experienceYears, setExperienceYears] = useState<number>(profile?.experienceYears || 1);
+  const [dynamicCategories, setDynamicCategories] = useState<Array<{ id: string; name: string; slug?: string; vertical?: string }>>([]);
+
+  // Fetch dynamic categories from Super Admin Catalog
+  useEffect(() => {
+    api.get<any>('/api/categories?vertical=services')
+      .then((res: any) => {
+        const list = Array.isArray(res) ? res : res.categories || [];
+        if (list && list.length > 0) {
+          setDynamicCategories(list);
+        }
+      })
+      .catch((err) => console.log('Dynamic categories fetch error:', err));
+  }, []);
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
@@ -196,14 +210,70 @@ export const RiderProfile: React.FC = () => {
     }
   };
 
-  const toggleSkill = (skillId: string) => {
-    setSkills((prev) =>
-      prev.includes(skillId) ? prev.filter((s) => s !== skillId) : [...prev, skillId]
-    );
+  const homeSkills = useMemo(() => {
+    if (dynamicCategories.length > 0) {
+      return dynamicCategories
+        .filter(c => {
+          const v = (c.vertical || '').toLowerCase();
+          const n = (c.name || '').toLowerCase();
+          return v === 'services_home' || v === 'services' || (!v.includes('vehicle') && !n.includes('car') && !n.includes('bike') && !n.includes('towing'));
+        })
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          category: 'home' as const,
+          icon: '🏠',
+          slug: c.slug
+        }));
+    }
+    return PARTNER_SKILLS.filter((s) => s.category === 'home');
+  }, [dynamicCategories]);
+
+  const vehicleSkills = useMemo(() => {
+    if (dynamicCategories.length > 0) {
+      return dynamicCategories
+        .filter(c => {
+          const v = (c.vertical || '').toLowerCase();
+          const n = (c.name || '').toLowerCase();
+          return v === 'services_vehicle' || n.includes('car') || n.includes('bike') || n.includes('vehicle') || n.includes('towing');
+        })
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          category: 'vehicle' as const,
+          icon: '🚗',
+          slug: c.slug
+        }));
+    }
+    return PARTNER_SKILLS.filter((s) => s.category === 'vehicle');
+  }, [dynamicCategories]);
+
+  const isSkillChecked = (skill: { id: string; name: string; slug?: string }) => {
+    return skills.includes(skill.id) ||
+      skills.includes(skill.name) ||
+      (skill.slug ? skills.includes(skill.slug) : false) ||
+      skills.some(s => s.toLowerCase() === skill.name.toLowerCase());
   };
 
-  const homeSkills = PARTNER_SKILLS.filter((s) => s.category === 'home');
-  const vehicleSkills = PARTNER_SKILLS.filter((s) => s.category === 'vehicle');
+  const toggleSkillItem = (skill: { id: string; name: string; slug?: string }) => {
+    setSkills((prev) => {
+      const isChecked = prev.includes(skill.id) ||
+        prev.includes(skill.name) ||
+        (skill.slug ? prev.includes(skill.slug) : false) ||
+        prev.some(s => s.toLowerCase() === skill.name.toLowerCase());
+
+      if (isChecked) {
+        return prev.filter(s =>
+          s !== skill.id &&
+          s !== skill.name &&
+          s !== skill.slug &&
+          s.toLowerCase() !== skill.name.toLowerCase()
+        );
+      } else {
+        return [...prev, skill.id];
+      }
+    });
+  };
 
   return (
     <div className="space-y-5 pb-24 text-slate-800 animate-in fade-in duration-200 max-w-4xl mx-auto">
@@ -845,12 +915,12 @@ export const RiderProfile: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[...homeSkills, ...vehicleSkills].map((skill) => {
-                    const isChecked = skills.includes(skill.id);
+                    const isChecked = isSkillChecked(skill);
                     return (
                       <button
                         key={skill.id}
                         type="button"
-                        onClick={() => toggleSkill(skill.id)}
+                        onClick={() => toggleSkillItem(skill)}
                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           isChecked
                             ? 'bg-orange-50 border-orange-500 text-orange-950 font-bold shadow-2xs'

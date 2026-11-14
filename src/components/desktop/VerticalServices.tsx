@@ -10,7 +10,6 @@ import {
   Bell, MapPin
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { VehicleSelectorModal } from '../common/VehicleSelectorModal';
 import { TimeSlotWheelPickerModal, type SlotConfirmationData } from '../common/TimeSlotWheelPickerModal';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 import type { Product } from '../../data/types';
@@ -47,20 +46,6 @@ export const VerticalServices: React.FC = () => {
   const [activeSubVertical, setActiveSubVertical] = useState<ServiceSubVertical>('home');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [notifiedLeadIds, setNotifiedLeadIds] = useState<Record<string, boolean>>({});
-
-  // Selected Vehicle state
-  const [selectedVehicle, setSelectedVehicle] = useState<{
-    type: 'car' | 'bike';
-    brand: string;
-    model: string;
-    fuel?: string;
-  } | null>({
-    type: 'car',
-    brand: 'Hyundai',
-    model: 'Creta',
-    fuel: 'Petrol',
-  });
-  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
 
   // Booking Slot Modal
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState<Product | null>(null);
@@ -152,7 +137,7 @@ export const VerticalServices: React.FC = () => {
         'Customer Phone': slotData?.contactPhone || '',
         'Customer WhatsApp': slotData?.whatsappPhone || '',
         'Special Notes': slotData?.notes || '',
-        'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : `Vehicle Services (${selectedVehicle?.brand} ${selectedVehicle?.model})`,
+        'Service Vertical': activeSubVertical === 'home' ? 'Home Services' : 'Vehicle Services',
         'Technician': 'Certified Professional Assigned',
       },
     };
@@ -243,28 +228,10 @@ export const VerticalServices: React.FC = () => {
             </button>
           </div>
 
-          {/* Vehicle Selector Badge (if in Vehicle Mode) */}
-          {activeSubVertical === 'vehicle' ? (
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-4 py-2 rounded-2xl">
-              <div className="text-xs">
-                <span className="text-slate-500 font-semibold block text-[10px] uppercase">Active Vehicle:</span>
-                <span className="font-bold text-blue-900">
-                  {selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model} (${selectedVehicle.fuel})` : 'No vehicle selected'}
-                </span>
-              </div>
-              <button
-                onClick={() => setVehicleModalOpen(true)}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm ml-2"
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <div className="text-xs font-semibold text-slate-500 flex items-center gap-2 px-3">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>30-Day Post-Service Warranty & Pre-Vetted Pros</span>
-            </div>
-          )}
+          <div className="text-xs font-semibold text-slate-500 flex items-center gap-2 px-3">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>30-Day Post-Service Warranty & Pre-Vetted Pros</span>
+          </div>
         </div>
 
         {/* 2. Hero Banner */}
@@ -475,14 +442,6 @@ export const VerticalServices: React.FC = () => {
             : 'both'
         }
         onConfirm={confirmBooking}
-      />
-
-      {/* Vehicle Selector Modal */}
-      <VehicleSelectorModal
-        isOpen={vehicleModalOpen}
-        onClose={() => setVehicleModalOpen(false)}
-        selectedVehicle={selectedVehicle}
-        onSelectVehicle={(v) => setSelectedVehicle(v)}
       />
     </div>
   );

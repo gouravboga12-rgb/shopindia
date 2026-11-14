@@ -94,6 +94,21 @@ router.get('/broadcast-feed', async (req, res) => {
                 name: true,
                 quantity: true,
                 price: true,
+                productId: true,
+                product: {
+                  select: {
+                    id: true,
+                    categoryId: true,
+                    category: {
+                      select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        vertical: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             vendor: {
@@ -139,6 +154,12 @@ router.get('/broadcast-feed', async (req, res) => {
         const hasSkillMatch = profile.skills.some(skill => {
           const s = (skill || '').toLowerCase().trim();
           if (s === 'all' || s === 'all_round' || s === 'general') return true;
+          // Match against product category id, slug, or name
+          for (const item of (del.order?.items || [])) {
+            if (item.product?.categoryId === skill) return true;
+            if (item.product?.category?.slug && item.product.category.slug.toLowerCase() === s) return true;
+            if (item.product?.category?.name && item.product.category.name.toLowerCase() === s) return true;
+          }
           const keywords = SKILL_KEYWORDS[s] || [s];
           return keywords.some(kw => combinedText.includes(kw));
         });
@@ -1053,7 +1074,15 @@ router.get(['/scheduled-services', '/orders/scheduled-services'], async (req, re
         include: {
           order: {
             include: {
-              items: true,
+              items: {
+                include: {
+                  product: {
+                    include: {
+                      category: true,
+                    },
+                  },
+                },
+              },
               customer: { select: { id: true, name: true, phone: true } },
             },
           },
@@ -1075,6 +1104,11 @@ router.get(['/scheduled-services', '/orders/scheduled-services'], async (req, re
           const hasSkillMatch = profile.skills.some(skill => {
             const s = (skill || '').toLowerCase().trim();
             if (s === 'all' || s === 'all_round' || s === 'general') return true;
+            for (const item of (del.order?.items || [])) {
+              if (item.product?.categoryId === skill) return true;
+              if (item.product?.category?.slug && item.product.category.slug.toLowerCase() === s) return true;
+              if (item.product?.category?.name && item.product.category.name.toLowerCase() === s) return true;
+            }
             const keywords = SKILL_KEYWORDS[s] || [s];
             return keywords.some(kw => combinedText.includes(kw));
           });

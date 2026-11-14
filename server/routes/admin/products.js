@@ -1,8 +1,22 @@
 const express = require('express');
+const multer = require('multer');
 const prisma = require('../../lib/prisma');
-const { verifyToken }      = require('../../middleware/auth');
+const { verifyToken } = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/rbac');
 const { calculateItemPricing, invalidatePricingCache } = require('../../lib/pricing');
+const { uploadToS3 } = require('../../lib/s3');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed.'));
+    }
+  }
+});
 
 const router = express.Router();
 router.use(verifyToken, requirePermission('manage_products'));
@@ -14,7 +28,7 @@ router.get('/', async (req, res) => {
     const where = {};
     if (status && status !== 'all') where.status = status;
     if (vendorId) where.vendorId = vendorId;
-    if (q)        where.name = { contains: q, mode: 'insensitive' };
+    if (q) where.name = { contains: q, mode: 'insensitive' };
 
     // Vertical / Fulfillment Filtering
     if (fulfillmentType && fulfillmentType !== 'all') {
@@ -93,7 +107,12 @@ router.post('/', async (req, res) => {
       data: {
         ...data,
         variants: variants && variants.length ? { create: variants } : undefined,
-        images: images && images.length ? { create: images.map((url, i) => ({ url, displayOrder: i })) } : undefined,
+        images: images && images.length ? {
+          create: images.map((img, i) => ({
+            url: typeof img === 'string' ? img : img.url,
+            displayOrder: i
+          }))
+        } : undefined,
       },
       include: { variants: true, images: true, category: true, vendor: true },
     });
@@ -103,10 +122,33 @@ router.post('/', async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+/** POST /api/admin/products/upload-images — Multi S3 Image Upload for Super Admin */
+router.post('/upload-images', upload.array('images', 10), async (req, res) => {
+  try {
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files || files.length === 0) return res.status(400).json({ error: 'No image files provided.' });
+    const uploadedUrls = [];
+    for (const f of files) {
+      const key = `services/admin/${Date.now()}-${Math.random().toString(36).substring(7)}-${f.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const result = await uploadToS3({
+        key,
+        body: f.buffer,
+        contentType: f.mimetype,
+        isPrivate: false,
+      });
+      uploadedUrls.push(result.url);
+    }
+    res.json({ urls: uploadedUrls });
+  } catch (err) {
+    console.error('[AdminProducts] Multi S3 upload error:', err);
+    res.status(500).json({ error: err.message || 'Multiple S3 upload failed' });
+  }
+});
+
 /** PUT /api/admin/products/:id */
 router.put('/:id', async (req, res) => {
   try {
-    const { variants: _v, images: _i, vendor: _vd, category: _cat, _count: _cnt, ...data } = req.body;
+    const { variants: _v, images, vendor: _vd, category: _cat, _count: _cnt, ...data } = req.body;
 
     if (data.basePrice != null && data.vendorPrice != null && Number(data.basePrice) > 0 && Number(data.vendorPrice) > 0) {
       data.basePrice = parseFloat(data.basePrice);
@@ -126,6 +168,20 @@ router.put('/:id', async (req, res) => {
         context: { vendorId: data.vendorId, categoryId: data.categoryId }
       });
       data.vendorPrice = pricing.vendorPrice;
+    }
+
+    // Synchronize product images if images array is provided
+    if (Array.isArray(images)) {
+      await prisma.productImage.deleteMany({ where: { productId: req.params.id } });
+      if (images.length > 0) {
+        await prisma.productImage.createMany({
+          data: images.map((img, i) => ({
+            productId: req.params.id,
+            url: typeof img === 'string' ? img : img.url,
+            displayOrder: i,
+          }))
+        });
+      }
     }
 
     const product = await prisma.product.update({
