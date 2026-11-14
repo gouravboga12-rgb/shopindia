@@ -13,6 +13,8 @@ import {
   FileText,
   ExternalLink,
   X,
+  XCircle,
+  Trash2,
 } from 'lucide-react';
 
 interface RegionalAdminItem {
@@ -82,6 +84,19 @@ export const RegionalAdminsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteAdmin = async (userId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the application record for "${name}"?`)) return;
+    setActionLoadingId(userId);
+    try {
+      await api.delete(`/api/admin/regional-admins/${userId}`);
+      setAdmins((prev) => prev.filter((a) => a.id !== userId));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete regional admin');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -137,7 +152,9 @@ export const RegionalAdminsPage: React.FC = () => {
                         status === 'approved'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : status === 'suspended'
-                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          ? 'bg-gray-100 text-gray-700 border border-gray-200'
+                          : status === 'rejected'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
                           : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}
                     >
@@ -193,18 +210,30 @@ export const RegionalAdminsPage: React.FC = () => {
                 </div>
 
                 {/* Status Action Buttons */}
-                <div className="pt-3 border-t border-gray-100 flex gap-2">
-                  {status !== 'approved' && (
-                    <button
-                      disabled={actionLoadingId === adm.id}
-                      onClick={() => handleUpdateStatus(adm.id, 'approved')}
-                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <CheckCircle2 size={13} />
-                      <span>Approve</span>
-                    </button>
+                <div className="pt-3 border-t border-gray-100 flex items-center gap-2">
+                  {/* When Pending: Show Approve & Reject */}
+                  {status === 'pending_approval' && (
+                    <>
+                      <button
+                        disabled={actionLoadingId === adm.id}
+                        onClick={() => handleUpdateStatus(adm.id, 'approved')}
+                        className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>Approve</span>
+                      </button>
+
+                      <button
+                        disabled={actionLoadingId === adm.id}
+                        onClick={() => handleUpdateStatus(adm.id, 'rejected')}
+                        className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Reject
+                      </button>
+                    </>
                   )}
 
+                  {/* When Approved: Show Suspend */}
                   {status === 'approved' && (
                     <button
                       disabled={actionLoadingId === adm.id}
@@ -216,14 +245,46 @@ export const RegionalAdminsPage: React.FC = () => {
                     </button>
                   )}
 
-                  {status !== 'rejected' && status !== 'approved' && (
+                  {/* When Suspended: Show Re-activate */}
+                  {status === 'suspended' && (
                     <button
                       disabled={actionLoadingId === adm.id}
-                      onClick={() => handleUpdateStatus(adm.id, 'rejected')}
-                      className="py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      onClick={() => handleUpdateStatus(adm.id, 'approved')}
+                      className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      Reject
+                      <CheckCircle2 size={13} />
+                      <span>Re-activate</span>
                     </button>
+                  )}
+
+                  {/* When Rejected: Clearly show Rejected state, do not show Approve as primary button */}
+                  {status === 'rejected' && (
+                    <div className="flex-1 flex items-center justify-between py-1">
+                      <span className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
+                        <XCircle size={14} className="text-rose-500" />
+                        Application Rejected
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === adm.id}
+                          onClick={() => handleUpdateStatus(adm.id, 'approved')}
+                          className="text-[11px] font-semibold text-gray-500 hover:text-emerald-700 hover:underline cursor-pointer transition-colors"
+                          title="Reconsider and approve this application"
+                        >
+                          Re-approve?
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === adm.id}
+                          onClick={() => handleDeleteAdmin(adm.id, adm.name)}
+                          className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete application record"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

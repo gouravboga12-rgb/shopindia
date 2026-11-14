@@ -99,4 +99,26 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/admin/regional-admins/:id
+ * Delete or purge a rejected regional admin user & profile
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.regionalAdminProfile.deleteMany({ where: { userId: id } });
+    await prisma.user.delete({ where: { id } });
+
+    try {
+      const { broadcastAdminBadgeCounts } = require('../../lib/adminBadges');
+      broadcastAdminBadgeCounts();
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Regional admin record deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting regional admin:', error);
+    res.status(500).json({ error: 'Failed to delete regional admin' });
+  }
+});
+
 module.exports = router;
