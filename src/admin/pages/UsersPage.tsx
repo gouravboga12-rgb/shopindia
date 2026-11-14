@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Search, UserX, Ban, CheckCircle, Download, Trash2 } from 'lucide-react';
+import { Search, UserX, Ban, CheckCircle, Download, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 
 const ROLES = ['all', 'customer', 'vendor', 'rider', 'regional_admin', 'super_admin'];
 
@@ -9,7 +9,8 @@ export const UsersPage: React.FC = () => {
   const [role, setRole] = useState('all');
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; email: string; role?: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -31,20 +32,17 @@ export const UsersPage: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (id: string, name: string, email: string) => {
-    const confirmed = window.confirm(
-      `⚠️ PERMANENT DELETE CONFIRMATION\n\nAre you sure you want to permanently delete user "${name}" (${email})?\n\nThis will permanently erase their account from the database. This action CANNOT be undone.`
-    );
-    if (!confirmed) return;
-
-    setDeletingId(id);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.delete(`/api/admin/users/${id}`);
-      setUsers(prev => prev.filter(u => (u.id || u._id) !== id));
+      await api.delete(`/api/admin/users/${deleteTarget.id}`);
+      setUsers(prev => prev.filter(u => (u.id || u._id) !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (err: any) {
       alert(err.message || 'Failed to delete user.');
     } finally {
-      setDeletingId(null);
+      setDeleting(false);
     }
   };
 
@@ -195,15 +193,14 @@ export const UsersPage: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Permanent Delete Button with Confirmation */}
+                        {/* Permanent Delete Button with Professional In-Page Confirmation */}
                         {u.email !== 'admin@shopindia.in' && (
                           <button
-                            disabled={deletingId === (u.id || u._id)}
-                            onClick={() => handleDeleteUser(u.id || u._id, u.name, u.email)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                            onClick={() => setDeleteTarget({ id: u.id || u._id, name: u.name, email: u.email, role: u.role })}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Permanently Delete User Account"
                           >
-                            <Trash2 className={`w-4 h-4 ${deletingId === (u.id || u._id) ? 'animate-pulse text-red-500' : ''}`} />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -215,6 +212,76 @@ export const UsersPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* ─── Professional In-Page Delete Confirmation Modal ─── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-gray-100 space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Header Icon & Title */}
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto shadow-xs">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
+                Permanently Delete User?
+              </h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed">
+                This will permanently purge this user's account and all linked records from the database. This action <strong className="text-rose-600 font-bold">cannot be undone</strong>.
+              </p>
+            </div>
+
+            {/* Target Account Summary Card */}
+            <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4 text-xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 font-medium">User Name:</span>
+                <span className="font-extrabold text-gray-900">{deleteTarget.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 font-medium">Email:</span>
+                <span className="font-mono text-gray-800 font-bold">{deleteTarget.email}</span>
+              </div>
+              {deleteTarget.role && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Assigned Role:</span>
+                  <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                    {deleteTarget.role}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Permanently</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
