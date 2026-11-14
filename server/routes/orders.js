@@ -510,10 +510,6 @@ router.post('/', async (req, res) => {
         if (target === 'services') return hasServiceItems;
         return false;
       };
-        if (target === 'quick') return isQuick;
-        if (target === 'services') return isServices;
-        return false;
-      };
 
       if (opStatus.fridayBreak.isActive && isBlockedVertical(opStatus.fridayBreak.verticals)) {
         return res.status(400).json({
