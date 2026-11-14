@@ -178,17 +178,8 @@ export const ServicesManagementPage: React.FC = () => {
       for (let i = 0; i < files.length; i++) {
         formData.append('images', files[i]);
       }
-      const token = localStorage.getItem('token') || localStorage.getItem('adminToken') || '';
-      const res = await fetch('/api/admin/products/upload-images', {
-        method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      if (data.urls && Array.isArray(data.urls)) {
+      const data: any = await api.post('/api/admin/products/upload-images', formData);
+      if (data?.urls && Array.isArray(data.urls)) {
         setImages(prev => [...prev, ...data.urls]);
       }
     } catch (err: any) {
