@@ -392,10 +392,15 @@ router.post('/:id/handover', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found.' });
     if (!order.delivery) return res.status(400).json({ error: 'No delivery assigned to this order.' });
 
+    const now = new Date();
     await prisma.$transaction([
       prisma.delivery.update({
         where: { id: order.delivery.id },
-        data: { status: 'picked_up', pickedUpAt: new Date() },
+        data: {
+          vendorHandoverAt: now,
+          pickedUpAt: now,
+          status: 'picked_up',
+        },
       }),
       prisma.order.update({
         where: { id: order.id },
@@ -403,7 +408,43 @@ router.post('/:id/handover', async (req, res) => {
       }),
     ]);
 
-    res.json({ success: true, message: 'Handover confirmed! Order is out for delivery with the rider.' });
+    // Real-time WebSocket broadcast to Rider, Customer, and Admin panels
+    try {
+      const { notifyOrderStatus, getIo, emitDeliveryStageChange } = require('../../lib/socket');
+      emitDeliveryStageChange(order.delivery.id, {
+        stage: 'picked_up',
+        vendorHandoverAt: now.toISOString(),
+      });
+      const io = getIo();
+      if (io) {
+        io.to(`delivery:${order.delivery.id}`).emit('delivery:handover_confirmed', {
+          orderId: order.id,
+          deliveryId: order.delivery.id,
+          vendorHandoverAt: now.toISOString(),
+        });
+        if (order.delivery.riderProfileId) {
+          io.to(`panel:rider:${order.delivery.riderProfileId}`).emit('delivery:handover_confirmed', {
+            orderId: order.id,
+            deliveryId: order.delivery.id,
+            vendorHandoverAt: now.toISOString(),
+          });
+        }
+      }
+      notifyOrderStatus(order.id, 'in_transit', {
+        deliveryId: order.delivery.id,
+        customerId: order.customerId,
+        vendorId: order.vendorId,
+        riderProfileId: order.delivery.riderProfileId,
+      });
+    } catch (wsErr) {
+      console.error('[Handover WS Error]:', wsErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Handover confirmed! Order verified and cleared for delivery.',
+      vendorHandoverAt: now.toISOString(),
+    });
   } catch (err) {
     console.error('Handover order error:', err);
     res.status(500).json({ error: err.message });

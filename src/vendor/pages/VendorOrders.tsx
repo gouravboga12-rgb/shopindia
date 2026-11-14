@@ -508,7 +508,7 @@ export const VendorOrders: React.FC = () => {
                                 </div>
 
                                 {/* Pickup Code Box & Confirm Handover Button */}
-                                {o.delivery.status !== 'picked_up' && o.delivery.status !== 'arrived_customer' && o.delivery.status !== 'delivered' && o.status !== 'delivered' && (
+                                {(!o.delivery.vendorHandoverAt && o.delivery.status !== 'picked_up' && o.delivery.status !== 'arrived_customer' && o.delivery.status !== 'delivered' && o.status !== 'delivered') ? (
                                   <div className="bg-white p-2 rounded-lg border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                     <div>
                                       <span className="text-[10px] font-bold text-gray-500 uppercase block">Store Pickup Code</span>
@@ -526,12 +526,15 @@ export const VendorOrders: React.FC = () => {
                                       <span>🤝 Confirm Handover</span>
                                     </button>
                                   </div>
-                                )}
-
-                                {o.delivery.status === 'picked_up' || o.delivery.status === 'arrived_customer' ? (
-                                  <div className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200 flex items-center gap-1">
-                                    <Bike size={12} />
-                                    <span>Out for Delivery with Rider</span>
+                                ) : (o.delivery.vendorHandoverAt || o.delivery.status === 'picked_up' || o.delivery.status === 'arrived_customer') ? (
+                                  <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <CheckCircle2 size={13} className="text-emerald-600" />
+                                      <span>Handed Over to Rider</span>
+                                    </div>
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded-md font-mono font-bold">
+                                      PK-{o.orderNumber?.slice(-4) || '0000'}
+                                    </span>
                                   </div>
                                 ) : null}
                               </div>

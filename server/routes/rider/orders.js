@@ -485,12 +485,29 @@ router.patch(['/:id/stage', '/orders/:id/stage'], async (req, res) => {
     const profile = await getRiderProfile(req.user.userId);
     const existing = await prisma.delivery.findFirst({
       where: { id: req.params.id, riderProfileId: profile.id },
+      include: { order: true },
     });
 
     if (!existing) return res.status(404).json({ error: 'Active delivery not found.' });
 
+    // Strict Handover Gate: ONLY for Quick Instant Shopping (quick_commerce)
+    // Services, Glacons, and Pan-India e-commerce do not have a store handover step
+    const isQuickCommerce = existing.order?.type === 'quick_commerce';
+    if (stage === 'picked_up' && isQuickCommerce) {
+      if (!existing.vendorHandoverAt && existing.status !== 'picked_up') {
+        return res.status(400).json({
+          error: 'Store merchant has not confirmed package handover yet. Please present your Store Pickup Code to the store merchant so they can tap Confirm Handover in their vendor panel.'
+        });
+      }
+    }
+
     const data = { status: stage };
-    if (stage === 'picked_up') data.pickedUpAt = new Date();
+    if (stage === 'picked_up') {
+      data.pickedUpAt = new Date();
+      if (!existing.vendorHandoverAt && !isQuickCommerce) {
+        data.vendorHandoverAt = new Date();
+      }
+    }
 
     const updated = await prisma.delivery.update({
       where: { id: req.params.id },

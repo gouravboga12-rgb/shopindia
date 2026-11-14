@@ -24,12 +24,25 @@ import {
   Wrench,
   Play,
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 
 export const ActiveDeliveryView: React.FC = () => {
   const { activeDelivery, advanceStage, completeDelivery, verifyServiceOtp, refreshData } = useRider();
   const isService = activeDelivery?.order?.type === 'hvac_service';
+  const isQuickCommerce = activeDelivery?.order?.type === 'quick_commerce';
+  const isHandoverConfirmed = Boolean(activeDelivery?.vendorHandoverAt || activeDelivery?.status === 'picked_up');
+
+  // Real-time polling backup while waiting for vendor handover approval
+  useEffect(() => {
+    if (activeDelivery?.status !== 'arrived_pickup' || !isQuickCommerce || isHandoverConfirmed) return;
+    const interval = setInterval(() => {
+      refreshData();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeDelivery?.status, isQuickCommerce, isHandoverConfirmed, refreshData]);
+
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [otpInput, setOtpInput] = useState('');
   const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
@@ -611,6 +624,53 @@ export const ActiveDeliveryView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Quick Commerce Store Pickup Code & Vendor Handover Status Card */}
+              {isQuickCommerce && (
+                <div className="space-y-3">
+                  <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+                    <div>
+                      <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider block">Store Pickup Code</span>
+                      <span className="text-xl font-mono font-black text-emerald-950 tracking-widest block">
+                        PK-{activeDelivery.order?.orderNumber?.slice(-4) || '0000'}
+                      </span>
+                      <span className="text-xs font-bold text-slate-600 block mt-0.5">
+                        Token #{activeDelivery.order?.orderNumber?.slice(-4) || '0000'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      {isHandoverConfirmed ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-xs">
+                          <CheckCircle2 size={14} />
+                          <span>Handover Approved</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold animate-pulse">
+                          <Loader2 size={13} className="animate-spin text-amber-700" />
+                          <span>Waiting for Vendor</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {!isHandoverConfirmed ? (
+                    <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold">Store Handover Required</p>
+                        <p className="text-amber-800 text-[11px] mt-0.5 leading-relaxed">
+                          Please show Token <span className="font-mono font-black text-amber-950">#{activeDelivery.order?.orderNumber?.slice(-4) || '0000'}</span> and Pickup Code <span className="font-mono font-black text-amber-950">PK-{activeDelivery.order?.orderNumber?.slice(-4) || '0000'}</span> to the store merchant. Once the merchant taps <strong>"Confirm Handover"</strong> on their panel, this screen will unlock automatically.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-900">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Package handover verified by merchant! You may now slide to start navigation to customer.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Item Checklist */}
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
                 {activeDelivery.order?.items && activeDelivery.order.items.length > 0 ? (
@@ -645,11 +705,22 @@ export const ActiveDeliveryView: React.FC = () => {
               </div>
 
               <div className="pt-2">
-                <SlideToConfirm
-                  label="Slide to Confirm: Picked Up & Start"
-                  color="emerald"
-                  onConfirm={() => advanceStage('picked_up')}
-                />
+                {isQuickCommerce && !isHandoverConfirmed ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full py-3.5 px-4 bg-slate-100 border border-slate-300 text-slate-400 font-extrabold rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-80"
+                  >
+                    <Lock className="w-4 h-4 text-slate-400" />
+                    <span>Locked: Awaiting Merchant Handover</span>
+                  </button>
+                ) : (
+                  <SlideToConfirm
+                    label="Slide to Confirm: Picked Up & Start"
+                    color="emerald"
+                    onConfirm={() => advanceStage('picked_up')}
+                  />
+                )}
               </div>
             </div>
           )}

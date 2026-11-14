@@ -63,6 +63,7 @@ export interface ActiveDeliveryData {
   riderLat?: number;
   riderLng?: number;
   riderBearing?: number;
+  vendorHandoverAt?: string | null;
   order?: {
     orderNumber: string;
     total: number;
@@ -363,6 +364,10 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useSocketEvent('order:status_changed', () => {
     pollBroadcasts();
+    refreshData();
+  });
+
+  useSocketEvent('delivery:handover_confirmed', () => {
     refreshData();
   });
 

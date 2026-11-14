@@ -685,9 +685,10 @@ model Delivery {
   dropoffLng      Float?
   dropoffPhone    String?
 
-  assignedAt      DateTime?
-  pickedUpAt      DateTime?
-  deliveredAt     DateTime?
+  assignedAt          DateTime?
+  vendorHandoverAt    DateTime?   // Timestamp when Quick Commerce store vendor confirmed physical handover
+  pickedUpAt          DateTime?
+  deliveredAt         DateTime?
   proofPhotoUrl   String?
 
   // NEW: COD payment tracking
