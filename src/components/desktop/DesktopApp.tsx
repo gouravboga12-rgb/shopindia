@@ -13,6 +13,12 @@ import { ProfilePage } from '../../pages/Profile';
 import { CategoriesPage } from '../../pages/Categories';
 import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
 import { CartSuccessToast } from '../common/CartSuccessToast';
+import { CareersPage } from '../../pages/content/CareersPage';
+import { VendorGuidePage } from '../../pages/content/VendorGuidePage';
+import { RefundPolicyPage } from '../../pages/content/RefundPolicyPage';
+import { TermsAndConditionsPage } from '../../pages/content/TermsAndConditionsPage';
+import { PrivacyPolicyPage } from '../../pages/content/PrivacyPolicyPage';
+import { AboutUsPage } from '../../pages/content/AboutUsPage';
 
 export const DesktopApp: React.FC = () => {
   const { currentVertical, currentPath } = useApp();
@@ -48,6 +54,18 @@ export const DesktopApp: React.FC = () => {
         return <DashboardInner />;
       case 'wishlist':
         return <DashboardInner initialTab="wishlist" />;
+      case 'about':
+        return <AboutUsPage />;
+      case 'careers':
+        return <CareersPage />;
+      case 'vendor-guide':
+        return <VendorGuidePage />;
+      case 'refund-policy':
+        return <RefundPolicyPage />;
+      case 'terms':
+        return <TermsAndConditionsPage />;
+      case 'privacy':
+        return <PrivacyPolicyPage />;
       default:
         return <VerticalShop />;
     }

@@ -8,7 +8,7 @@ import { getCustomerToken, requireCustomerAuth } from '../lib/customerAuth';
 import { useSocketEvent } from '../lib/socket';
 
 export type VerticalType = 'shop' | 'quick' | 'services';
-export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category' | 'wishlist';
+export type PathType = 'home' | 'search' | 'detail' | 'cart' | 'orders' | 'profile' | 'dashboard' | 'notifications' | 'category' | 'wishlist' | 'about' | 'careers' | 'vendor-guide' | 'refund-policy' | 'terms' | 'privacy';
 
 export interface OrderItem {
   product: Product;
@@ -120,6 +120,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (p === '/search') return { path: 'search' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/category' || p === '/categories') return { path: 'category' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/notifications') return { path: 'notifications' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/about' || p === '/about-us') return { path: 'about' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/careers' || p === '/career' || p === '/riders' || p === '/technicians') return { path: 'careers' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/sell' || p === '/register-vendor' || p === '/vendor-guide') return { path: 'vendor-guide' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/refund-policy' || p === '/refunds' || p === '/cancellation-and-returns') return { path: 'refund-policy' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/terms' || p === '/terms-and-conditions' || p === '/terms-of-use') return { path: 'terms' as PathType, vertical: 'shop' as VerticalType };
+    if (p === '/privacy' || p === '/privacy-policy') return { path: 'privacy' as PathType, vertical: 'shop' as VerticalType };
     if (p === '/quick') return { path: 'home' as PathType, vertical: 'quick' as VerticalType };
     if (p === '/services' || p === '/glacons') return { path: 'home' as PathType, vertical: 'services' as VerticalType };
     return { path: 'home' as PathType, vertical: 'shop' as VerticalType };
@@ -354,6 +360,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       else if (p === '/search') setCurrentPath('search');
       else if (p === '/category' || p === '/categories') setCurrentPath('category');
       else if (p === '/notifications') setCurrentPath('notifications');
+      else if (p === '/about' || p === '/about-us') setCurrentPath('about');
+      else if (p === '/careers' || p === '/career' || p === '/riders' || p === '/technicians') setCurrentPath('careers');
+      else if (p === '/sell' || p === '/register-vendor' || p === '/vendor-guide') setCurrentPath('vendor-guide');
+      else if (p === '/refund-policy' || p === '/refunds' || p === '/cancellation-and-returns') setCurrentPath('refund-policy');
+      else if (p === '/terms' || p === '/terms-and-conditions' || p === '/terms-of-use') setCurrentPath('terms');
+      else if (p === '/privacy' || p === '/privacy-policy') setCurrentPath('privacy');
       else if (p === '/quick') {
         setCurrentPath('home');
         setCurrentVerticalState('quick');

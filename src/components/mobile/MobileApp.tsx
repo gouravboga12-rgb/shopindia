@@ -10,6 +10,12 @@ import { OrdersPage } from '../../pages/Orders';
 import { ProfilePage } from '../../pages/Profile';
 import { CategoriesPage } from '../../pages/Categories';
 import { DashboardInner } from '../../pages/dashboard/DashboardPortal';
+import { CareersPage } from '../../pages/content/CareersPage';
+import { VendorGuidePage } from '../../pages/content/VendorGuidePage';
+import { RefundPolicyPage } from '../../pages/content/RefundPolicyPage';
+import { TermsAndConditionsPage } from '../../pages/content/TermsAndConditionsPage';
+import { PrivacyPolicyPage } from '../../pages/content/PrivacyPolicyPage';
+import { AboutUsPage } from '../../pages/content/AboutUsPage';
 import { useCustomer } from '../../context/CustomerContext';
 import { Home, User, MapPin, X, Search, ChevronDown, Zap, LayoutGrid, Bell, ShoppingCart, ListOrdered, MessageSquare, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -98,6 +104,18 @@ export const MobileApp: React.FC = () => {
         return <DashboardInner />;
       case 'wishlist':
         return <DashboardInner initialTab="wishlist" />;
+      case 'about':
+        return <AboutUsPage />;
+      case 'careers':
+        return <CareersPage />;
+      case 'vendor-guide':
+        return <VendorGuidePage />;
+      case 'refund-policy':
+        return <RefundPolicyPage />;
+      case 'terms':
+        return <TermsAndConditionsPage />;
+      case 'privacy':
+        return <PrivacyPolicyPage />;
       default:
         return <VerticalShopMobile />;
     }
