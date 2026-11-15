@@ -257,6 +257,7 @@ router.get('/', async (req, res) => {
       mapped.push({
         id: p.id,
         title: p.name,
+        name: p.name,
         description: cleanDesc,
         showcaseReviews: showcaseReviews || [],
         price: p.basePrice,
@@ -267,6 +268,7 @@ router.get('/', async (req, res) => {
         images: p.images && p.images.length ? p.images.map(img => img.url) : [],
         videoUrl: p.videoUrl || null,
         category: resolvedCategory,
+        categoryId: p.categoryId,
         brand: p.brand || (() => {
           const lowerName = (p.name || '').toLowerCase();
           if (lowerName.includes('iphone') || lowerName.includes('ipad') || lowerName.includes('apple')) return 'Apple';
@@ -396,12 +398,13 @@ function mapVertical(fulfillmentType) {
 }
 
 function mapSubVertical(fulfillmentType, category, tags, name) {
+  const text = `${typeof category === 'string' ? category : (category?.name || '')} ${(tags || []).join(' ')} ${name || ''}`.toLowerCase();
+
   if (fulfillmentType === 'quick_commerce') {
     const catVertical = (category?.vertical || '').toLowerCase();
     if (catVertical.startsWith('quick_')) {
       return catVertical.replace('quick_', '');
     }
-    const text = `${typeof category === 'string' ? category : (category?.name || '')} ${(tags || []).join(' ')} ${name || ''}`.toLowerCase();
     if (
       text.includes('pharma') ||
       text.includes('medicine') ||
