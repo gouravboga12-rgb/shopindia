@@ -404,14 +404,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
 
-    if (path !== 'detail') {
-      const targetUrl = path === 'home'
-        ? (currentVertical === 'shop' ? '/' : `/${currentVertical}`)
-        : `/${path}`;
-      if (window.location.pathname !== targetUrl) {
-        window.history.pushState(null, '', targetUrl);
-        window.dispatchEvent(new Event('shopindia:navigate'));
-      }
+    const targetUrl = path === 'detail'
+      ? (productId ? `/detail?id=${productId}` : (selectedProductId ? `/detail?id=${selectedProductId}` : '/detail'))
+      : path === 'home'
+      ? (currentVertical === 'shop' ? '/' : `/${currentVertical}`)
+      : `/${path}`;
+
+    if (window.location.pathname !== targetUrl && `${window.location.pathname}${window.location.search}` !== targetUrl) {
+      window.history.pushState(null, '', targetUrl);
+      window.dispatchEvent(new Event('shopindia:navigate'));
     }
   };
 
@@ -428,14 +429,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (history.length > 1) {
       const newHistory = [...history];
-      newHistory.pop(); // Remove current path
-      const prevPath = newHistory[newHistory.length - 1];
+      newHistory.pop(); // Remove current path (e.g. 'detail')
+      let prevPath = newHistory[newHistory.length - 1];
+
+      // If previous path was 'detail' (e.g. hopped between related products), pop until reaching referring screen
+      while (prevPath === 'detail' && newHistory.length > 1) {
+        newHistory.pop();
+        prevPath = newHistory[newHistory.length - 1];
+      }
+
+      // Safety guard: if previous path was 'dashboard' or 'profile' or empty, return safely to current panel's home
+      if (prevPath === 'dashboard' || prevPath === 'profile' || !prevPath) {
+        prevPath = 'home';
+      }
+
       setHistory(newHistory);
       setCurrentPath(prevPath);
       const targetUrl = prevPath === 'home' ? resolveHomeUrl(currentVertical) : `/${prevPath}`;
       window.history.pushState(null, '', targetUrl);
       window.dispatchEvent(new Event('shopindia:navigate'));
     } else {
+      setHistory(['home']);
       setCurrentPath('home');
       const targetUrl = resolveHomeUrl(currentVertical);
       window.history.pushState(null, '', targetUrl);

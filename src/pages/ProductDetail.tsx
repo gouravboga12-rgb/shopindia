@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import type { Product } from '../data/types';
 
 export const ProductDetailPage: React.FC = () => {
-  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, setCurrentVertical, cart, userCoords, addNotification, location } = useApp();
+  const { selectedProductId, addToCart, navigateTo, goBack, currentVertical, cart, userCoords, addNotification, location } = useApp();
   const { reviews, wishlist, toggleWishlist, recordView } = useCustomer();
   const isMobile = useIsMobile();
   const { products, loading } = useProducts();
@@ -50,10 +50,7 @@ export const ProductDetailPage: React.FC = () => {
     if (product?.id) {
       recordView(product.id);
     }
-    if (product?.vertical && product.vertical !== currentVertical) {
-      setCurrentVertical(product.vertical as any);
-    }
-  }, [selectedProductId, product?.id, product?.vertical, recordView]);
+  }, [selectedProductId, product?.id, recordView]);
 
   const handleAddToCart = () => {
     if (!requireCustomerAuth('add this item to your cart')) return;
@@ -264,13 +261,25 @@ export const ProductDetailPage: React.FC = () => {
 
     return (
       <div className="max-w-7xl mx-auto px-12 py-8 text-left select-none text-brand-graphite font-sans">
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 text-xs text-slate-600 font-bold mb-6 font-heading uppercase tracking-wider">
-          <button onClick={() => navigateTo('home')} className="hover:text-blue-600 hover:underline transition-colors">Home</button>
-          <ChevronRight size={13} className="text-slate-400 shrink-0" />
-          <button onClick={() => navigateTo('search')} className="hover:text-blue-600 hover:underline capitalize transition-colors">{isServices ? 'Services' : product.vertical} Catalog</button>
-          <ChevronRight size={13} className="text-slate-400 shrink-0" />
-          <span className="text-slate-900 font-black truncate max-w-md">{product.title}</span>
+        {/* Navigation Bar for Desktop & Tablet */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <button
+            onClick={goBack}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
+            title="Go back to recent page"
+          >
+            <ArrowLeft size={16} strokeWidth={2.5} />
+            <span>Back to {currentVertical === 'quick' ? 'Quick Shopping' : currentVertical === 'services' ? 'Glacons Services' : 'Shop India'}</span>
+          </button>
+
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold font-heading uppercase tracking-wider">
+            <button onClick={() => navigateTo('home')} className="hover:text-blue-600 hover:underline transition-colors cursor-pointer">Home</button>
+            <ChevronRight size={13} className="text-slate-400 shrink-0" />
+            <button onClick={() => navigateTo('search')} className="hover:text-blue-600 hover:underline capitalize transition-colors cursor-pointer">{isServices ? 'Services' : product.vertical} Catalog</button>
+            <ChevronRight size={13} className="text-slate-400 shrink-0" />
+            <span className="text-slate-900 font-black truncate max-w-xs">{product.title}</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-5 gap-8">

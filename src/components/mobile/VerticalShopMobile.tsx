@@ -1,128 +1,109 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
+import { useCategories } from '../../hooks/useCategories';
 import { 
   Heart, ShieldCheck,
   Clock, ChevronRight, Truck, Award, RotateCcw, Star,
-  ShoppingCart, Zap
+  ShoppingCart, Zap, LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
 import { requireCustomerAuth } from '../../lib/customerAuth';
 
-const REFERENCE_CATEGORIES = [
-  {
-    id: 'all',
-    name: 'All Categories',
-    bg: 'bg-[#EEF2FF]',
-    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any, _setCurrentVertical: any) => {
-      setSearchQuery('');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'grocery',
-    name: 'Grocery',
-    bg: 'bg-[#E8F8F0]',
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any, setCurrentVertical: any) => {
-      setCurrentVertical('quick');
-      setSearchQuery('Grocery');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'electronics',
-    name: 'Electronics',
-    bg: 'bg-[#EBF2FE]',
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any) => {
-      setSearchQuery('Electronics');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'fashion',
-    name: 'Fashion',
-    bg: 'bg-[#F5F0FF]',
-    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any) => {
-      setSearchQuery('Fashion');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'beauty',
-    name: 'Beauty',
-    bg: 'bg-[#FDF2F8]',
-    image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any) => {
-      setSearchQuery('Beauty');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'pharmacy',
-    name: 'Pharmacy',
-    bg: 'bg-[#FFF1F2]',
-    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any, setCurrentVertical: any) => {
-      setCurrentVertical('quick');
-      setSearchQuery('Pharmacy');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'home-kitchen',
-    name: 'Home & Kitchen',
-    bg: 'bg-[#FFFBEB]',
-    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any) => {
-      setSearchQuery('Home & Kitchen');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'food-drinks',
-    name: 'Food & Drinks',
-    bg: 'bg-[#ECFEFF]',
-    image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any, setCurrentVertical: any) => {
-      setCurrentVertical('quick');
-      setSearchQuery('Food');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'baby-care',
-    name: 'Baby Care',
-    bg: 'bg-[#F0FDF4]',
-    image: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=160&auto=format&fit=crop&q=80',
-    action: (setSearchQuery: any, navigateTo: any) => {
-      setSearchQuery('Baby Care');
-      navigateTo('search');
-    }
-  },
-  {
-    id: 'more',
-    name: 'More',
-    bg: 'bg-[#F3F4F6]',
-    isMore: true,
-    action: (setSearchQuery: any, navigateTo: any) => {
-      setSearchQuery('');
-      navigateTo('search');
-    }
-  }
+const PASTEL_BG = [
+  'bg-[#EEF2FF]',
+  'bg-[#EBF2FE]',
+  'bg-[#F5F0FF]',
+  'bg-[#FDF2F8]',
+  'bg-[#FFFBEB]',
+  'bg-[#F0FDF4]',
+  'bg-[#ECFEFF]',
+  'bg-[#FEF3C7]'
 ];
 
 export const VerticalShopMobile: React.FC = () => {
-  const { navigateTo, setSearchQuery, addToCart, setCurrentVertical } = useApp();
+  const { navigateTo, setSearchQuery, addToCart } = useApp();
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
+  const { categories: apiCategories } = useCategories();
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [currentSlide, setCurrentSlide] = useState(0);
   const [banners, setBanners] = useState<any[]>([]);
+
+  // Dynamically filter active Shop India categories strictly from the database
+  const shopCategories = useMemo(() => {
+    return apiCategories.filter(
+      (c) => (c.vertical || '').toLowerCase() === 'shop' && c.isActive !== false
+    );
+  }, [apiCategories]);
+
+  // Construct dynamic 2x5 grid items
+  const displayItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      name: string;
+      image?: string | null;
+      bg: string;
+      isAll?: boolean;
+      isMore?: boolean;
+      action: () => void;
+    }> = [];
+
+    // Slot 0: All Categories -> opens full Shop India Categories page
+    items.push({
+      id: '__all__',
+      name: 'All Categories',
+      bg: 'bg-[#EEF2FF]',
+      isAll: true,
+      action: () => {
+        setSearchQuery('');
+        navigateTo('category');
+      }
+    });
+
+    if (shopCategories.length <= 9) {
+      shopCategories.forEach((cat, idx) => {
+        items.push({
+          id: cat.id,
+          name: cat.name,
+          image: cat.image,
+          bg: PASTEL_BG[idx % PASTEL_BG.length],
+          action: () => {
+            setSearchQuery(cat.name);
+            navigateTo('search');
+          }
+        });
+      });
+    } else {
+      // If more than 9 categories, take first 8 and slot 10 is 'More'
+      shopCategories.slice(0, 8).forEach((cat, idx) => {
+        items.push({
+          id: cat.id,
+          name: cat.name,
+          image: cat.image,
+          bg: PASTEL_BG[idx % PASTEL_BG.length],
+          action: () => {
+            setSearchQuery(cat.name);
+            navigateTo('search');
+          }
+        });
+      });
+
+      items.push({
+        id: '__more__',
+        name: 'More',
+        bg: 'bg-[#F3F4F6]',
+        isMore: true,
+        action: () => {
+          setSearchQuery('');
+          navigateTo('category');
+        }
+      });
+    }
+
+    return items;
+  }, [shopCategories, navigateTo, setSearchQuery]);
   const [dealsConfig, setDealsConfig] = useState<{
     isActive: boolean;
     showTimer?: boolean;
@@ -210,28 +191,36 @@ export const VerticalShopMobile: React.FC = () => {
   return (
     <div className="w-full flex flex-col gap-6 py-4 px-3.5 bg-brand-bg min-h-screen text-brand-graphite font-sans pb-24 transition-colors duration-300">
       
-      {/* 2. Circular Categories Grid (Exact 2x5 matching reference image) */}
+      {/* 2. Circular Categories Grid (Exact 2x5 dynamically loaded from database) */}
       <div className="w-full bg-white border border-brand-border/70 rounded-[24px] p-4 shadow-soft grid grid-cols-5 gap-y-4 gap-x-1.5 select-none justify-items-center">
-        {REFERENCE_CATEGORIES.map((cat) => {
+        {displayItems.map((cat) => {
           return (
             <div
               key={cat.id}
-              onClick={() => cat.action(setSearchQuery, navigateTo, setCurrentVertical)}
+              onClick={cat.action}
               className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-all w-full"
             >
               <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center mb-1.5 shadow-xs transition-transform hover:scale-105 ${cat.bg}`}>
-                {cat.isMore ? (
+                {cat.isAll ? (
+                  <div className="w-6 h-6 flex items-center justify-center text-indigo-600">
+                    <LayoutGrid size={20} strokeWidth={2.5} />
+                  </div>
+                ) : cat.isMore ? (
                   <div className="flex items-center gap-1 text-zinc-800">
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
                   </div>
-                ) : (
+                ) : cat.image ? (
                   <img 
                     src={cat.image} 
                     alt={cat.name} 
                     className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-full drop-shadow-xs" 
                   />
+                ) : (
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-indigo-600 font-black text-xs uppercase">
+                    {cat.name.slice(0, 2)}
+                  </div>
                 )}
               </div>
               <span className="text-[9.5px] sm:text-[10.5px] font-bold text-brand-graphite leading-tight line-clamp-2 px-0.5 font-heading text-center">

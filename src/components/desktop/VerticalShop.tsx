@@ -340,11 +340,17 @@ export const VerticalShop: React.FC = () => {
                 className="flex flex-col items-center cursor-pointer group text-center shrink-0 px-2 py-1 rounded-card hover:bg-slate-50/40 transition-colors duration-300"
               >
                 <div className="w-28 h-28 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-white border border-brand-border/80 shadow-soft group-hover:scale-[1.04] group-hover:shadow-premium group-hover:border-brand-blue/30 transition-all duration-300">
-                  <img
-                    src={cat.image || undefined}
-                    alt={cat.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                  />
+                  {cat.image ? (
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 text-indigo-600 font-black text-base uppercase">
+                      {cat.name.slice(0, 3)}
+                    </div>
+                  )}
                 </div>
                 <span className="text-sm font-extrabold text-brand-slate group-hover:text-brand-blue transition-colors duration-300 whitespace-nowrap tracking-wide mt-1 font-heading">
                   {cat.name}
