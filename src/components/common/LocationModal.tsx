@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { 
   MapPin, Navigation, Search, Check, X, 
-  AlertCircle, History, Trash2
+  AlertCircle, History, Trash2, Home, Briefcase
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
+import { useCustomer } from '../../context/CustomerContext';
 
 export interface DetectedLocation {
   formatted: string;
@@ -79,7 +80,8 @@ export const POPULAR_CITIES: PopularCityConfig[] = [
 ];
 
 export const LocationModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const { location, setLocation } = useApp();
+  const { location, setLocation, userCoords, navigateTo } = useApp();
+  const { addresses, setDefaultAddress } = useCustomer();
   const [manualInput, setManualInput] = useState(location.replace(/^📍\s*/, ''));
   const [isDetecting, setIsDetecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -199,6 +201,84 @@ export const LocationModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                 <X size={15} />
               </button>
             </div>
+
+            {/* Saved Delivery Addresses from User Account */}
+            {addresses.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 font-heading">
+                    Your Saved Addresses ({addresses.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      navigateTo('dashboard');
+                    }}
+                    className="text-[10.5px] text-brand-blue hover:underline font-bold cursor-pointer"
+                  >
+                    + Manage in Dashboard
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
+                  {addresses.map((addr) => {
+                    const formatted = [addr.line1, addr.line2, addr.city, addr.pincode].filter(Boolean).join(', ');
+                    const isSelected = (addr.line1 && location.includes(addr.line1)) || (addr.pincode && userCoords?.pincode === addr.pincode);
+
+                    return (
+                      <div
+                        key={addr.id}
+                        onClick={() => {
+                          setLocation(formatted, {
+                            lat: addr.latitude ?? null,
+                            lng: addr.longitude ?? null,
+                            city: addr.city,
+                            pincode: addr.pincode
+                          });
+                          setDefaultAddress(addr.id);
+                          localStorage.setItem('shopindia_active_address_id', addr.id);
+                          saveToRecent(formatted);
+                          onClose();
+                        }}
+                        className={`p-2.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-brand-blue bg-blue-50/50 text-brand-graphite shadow-2xs'
+                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            {addr.type === 'home' ? <Home size={13} /> : addr.type === 'work' ? <Briefcase size={13} /> : <MapPin size={13} />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-brand-graphite">{addr.label || 'Saved Address'}</span>
+                              {addr.isDefault && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 truncate max-w-[280px]">
+                              {addr.line1}, {addr.city} - {addr.pincode}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isSelected ? (
+                          <Check size={16} className="text-brand-blue font-bold shrink-0 ml-2" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-brand-blue bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg shrink-0 ml-2 transition-colors">
+                            Deliver Here
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Live GPS Detection Button */}
             <div className="mb-4">

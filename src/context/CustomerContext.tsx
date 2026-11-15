@@ -92,7 +92,21 @@ export const useCustomer = () => {
 };
 
 export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [addresses, setAddresses] = useState<Address[]>(seedAddresses());
+  const [addresses, setAddresses] = useState<Address[]>(() => {
+    try {
+      const saved = localStorage.getItem('shopindia_customer_addresses');
+      return saved ? JSON.parse(saved) : seedAddresses();
+    } catch {
+      return seedAddresses();
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('shopindia_customer_addresses', JSON.stringify(addresses));
+    } catch {}
+  }, [addresses]);
+
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(seedPayments().methods);
   const [transactions] = usePersistent<Transaction[]>('transactions', seedPayments().transactions);
   const [rewards] = usePersistent<Reward[]>('rewards', seedRewards());
@@ -167,7 +181,26 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           api.get<{ reviews: Review[] }>('/api/customer/reviews').catch(() => null)
         ]);
 
-        if (addrRes.status === 'fulfilled' && addrRes.value?.addresses) setAddresses(addrRes.value.addresses);
+        if (addrRes.status === 'fulfilled' && addrRes.value?.addresses) {
+          const loaded = addrRes.value.addresses;
+          setAddresses(loaded);
+
+          // Auto-sync active delivery location if current location is still default Bengaluru
+          const defaultAddr = loaded.find((a: Address) => a.isDefault) || loaded[0];
+          const currLoc = localStorage.getItem('shopindia_user_location');
+          if (defaultAddr && (!currLoc || currLoc === 'Bengaluru, Karnataka')) {
+            const formatted = [defaultAddr.line1, defaultAddr.line2, defaultAddr.city, defaultAddr.pincode].filter(Boolean).join(', ');
+            localStorage.setItem('shopindia_user_location', formatted);
+            localStorage.setItem('shopindia_user_coords', JSON.stringify({
+              lat: defaultAddr.latitude ?? null,
+              lng: defaultAddr.longitude ?? null,
+              city: defaultAddr.city,
+              pincode: defaultAddr.pincode
+            }));
+            localStorage.setItem('shopindia_active_address_id', defaultAddr.id);
+            window.dispatchEvent(new Event('shopindia:location_updated'));
+          }
+        }
         if (payRes.status === 'fulfilled' && payRes.value?.payments) setPaymentMethods(payRes.value.payments);
         if (wishRes.status === 'fulfilled' && wishRes.value?.wishlist) {
           setWishlist(prev => Array.from(new Set([...prev, ...(wishRes.value?.wishlist || [])])));
@@ -218,6 +251,19 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const base = isDefault ? prev.map((x) => ({ ...x, isDefault: false })) : prev;
         return [...base, newAddress];
       });
+
+      // Synchronize with global active delivery location
+      const formatted = [newAddress.line1, newAddress.line2, newAddress.city, newAddress.pincode].filter(Boolean).join(', ');
+      localStorage.setItem('shopindia_user_location', formatted);
+      localStorage.setItem('shopindia_user_coords', JSON.stringify({
+        lat: newAddress.latitude ?? null,
+        lng: newAddress.longitude ?? null,
+        city: newAddress.city,
+        pincode: newAddress.pincode
+      }));
+      localStorage.setItem('shopindia_active_address_id', newAddress.id);
+      window.dispatchEvent(new Event('shopindia:location_updated'));
+
       logActivity('ADDRESS_ADDED', { entityType: 'address' });
     } catch (err) {
       console.error(err);
@@ -257,7 +303,23 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setDefaultAddress = useCallback(async (id: string) => {
     try {
       await api.put(`/api/customer/addresses/${id}/default`, {});
-      setAddresses((prev) => prev.map((a) => ({ ...a, isDefault: a.id === id })));
+      setAddresses((prev) => {
+        const updated = prev.map((a) => ({ ...a, isDefault: a.id === id }));
+        const active = updated.find(a => a.id === id);
+        if (active) {
+          const formatted = [active.line1, active.line2, active.city, active.pincode].filter(Boolean).join(', ');
+          localStorage.setItem('shopindia_user_location', formatted);
+          localStorage.setItem('shopindia_user_coords', JSON.stringify({
+            lat: active.latitude ?? null,
+            lng: active.longitude ?? null,
+            city: active.city,
+            pincode: active.pincode
+          }));
+          localStorage.setItem('shopindia_active_address_id', active.id);
+          window.dispatchEvent(new Event('shopindia:location_updated'));
+        }
+        return updated;
+      });
     } catch (err) {
       console.error(err);
       throw err;

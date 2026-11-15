@@ -18,7 +18,7 @@ interface CheckoutDrawerProps {
 
 export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose, subtotal, discount, delivery, platformFee = 0, total }) => {
   const { addresses, addAddress, profile } = useCustomer();
-  const { cart, placeOrder, currentVertical } = useApp();
+  const { cart, placeOrder, currentVertical, setLocation } = useApp();
 
   const isShopVertical = currentVertical === 'shop' || cart.some(item => ((item.product as any)?.category?.vertical || (item.product as any)?.vertical || '').toLowerCase() === 'shop');
 
@@ -326,6 +326,13 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
                             longitude: detectedCoords?.longitude,
                             isDefault: true
                           });
+                          const formatted = [newAddr.line1, newAddr.city, newAddr.pincode].filter(Boolean).join(', ');
+                          setLocation(formatted, {
+                            lat: detectedCoords?.latitude ?? null,
+                            lng: detectedCoords?.longitude ?? null,
+                            city: newAddr.city,
+                            pincode: newAddr.pincode
+                          });
                           setIsAddingAddress(false);
                           setLocationFeedback(null);
                         }}
@@ -343,7 +350,20 @@ export const CheckoutDrawer: React.FC<CheckoutDrawerProps> = ({ isOpen, onClose,
                 ) : (
                   <div className="flex flex-col gap-2">
                     {addresses.map(addr => (
-                      <label key={addr.id} className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-all ${selectedAddress === addr.id ? 'border-brand-blue bg-blue-50/50' : 'border-brand-border bg-white hover:border-brand-border/80'}`}>
+                      <label
+                        key={addr.id}
+                        onClick={() => {
+                          setSelectedAddress(addr.id);
+                          const formatted = [addr.line1, addr.line2, addr.city, addr.pincode].filter(Boolean).join(', ');
+                          setLocation(formatted, {
+                            lat: addr.latitude ?? null,
+                            lng: addr.longitude ?? null,
+                            city: addr.city,
+                            pincode: addr.pincode
+                          });
+                        }}
+                        className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-all ${selectedAddress === addr.id ? 'border-brand-blue bg-blue-50/50' : 'border-brand-border bg-white hover:border-brand-border/80'}`}
+                      >
                         <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedAddress === addr.id ? 'border-brand-blue' : 'border-slate-300'}`}>
                           {selectedAddress === addr.id && <div className="w-2 h-2 rounded-full bg-brand-blue" />}
                         </div>

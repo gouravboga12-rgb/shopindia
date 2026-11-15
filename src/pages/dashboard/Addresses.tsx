@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCustomer } from '../../context/CustomerContext';
+import { useApp } from '../../context/AppContext';
 import { PageHeader, EmptyState, Badge, PrimaryButton, fieldCls } from '../../components/dashboard/DashboardUI';
 import {
   MapPin,
@@ -30,6 +31,7 @@ const typeIcon = (t: AddressType) =>
 
 export const AddressesPage: React.FC = () => {
   const { addresses, addAddress, updateAddress, removeAddress, setDefaultAddress, profile } = useCustomer();
+  const { location, setLocation, userCoords } = useApp();
   const [editing, setEditing] = useState<Address | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Omit<Address, 'id'>>({
@@ -44,6 +46,8 @@ export const AddressesPage: React.FC = () => {
     country: 'India',
     pincode: '',
     landmark: '',
+    latitude: undefined,
+    longitude: undefined,
     isDefault: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,9 +80,37 @@ export const AddressesPage: React.FC = () => {
       country: 'India',
       pincode: '',
       landmark: '',
+      latitude: undefined,
+      longitude: undefined,
       isDefault: false,
     };
   }
+
+  const formatAddressForStore = (a: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string }) => {
+    const parts = [a.line1, a.line2, a.city, a.pincode].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : `${a.city || 'Bengaluru'}, ${a.state || 'Karnataka'}`;
+  };
+
+  const isAddressActive = (a: Address) => {
+    const storedActiveId = localStorage.getItem('shopindia_active_address_id');
+    if (storedActiveId) return storedActiveId === a.id;
+    if (a.isDefault) return true;
+    if (a.line1 && location && location.includes(a.line1)) return true;
+    if (a.pincode && userCoords?.pincode === a.pincode) return true;
+    return false;
+  };
+
+  const activateAddress = (a: Address) => {
+    const formatted = formatAddressForStore(a);
+    setLocation(formatted, {
+      lat: a.latitude ?? null,
+      lng: a.longitude ?? null,
+      city: a.city,
+      pincode: a.pincode
+    });
+    localStorage.setItem('shopindia_active_address_id', a.id);
+    setDefaultAddress(a.id);
+  };
 
   // Handle outside click for location search dropdown
   useEffect(() => {
@@ -150,6 +182,8 @@ export const AddressesPage: React.FC = () => {
       state: stateCandidate || f.state,
       pincode: pincodeCandidate || f.pincode,
       landmark: landmarkCandidate || f.landmark,
+      latitude: geo.latitude || f.latitude,
+      longitude: geo.longitude || f.longitude,
     }));
 
     setReviewedLocation({
@@ -209,8 +243,21 @@ export const AddressesPage: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      if (editing) await updateAddress({ ...form, id: editing.id });
-      else await addAddress(form);
+      if (editing) {
+        await updateAddress({ ...form, id: editing.id });
+        if (form.isDefault || isAddressActive(editing)) {
+          activateAddress({ ...form, id: editing.id });
+        }
+      } else {
+        await addAddress(form);
+        const formatted = formatAddressForStore(form);
+        setLocation(formatted, {
+          lat: form.latitude ?? null,
+          lng: form.longitude ?? null,
+          city: form.city,
+          pincode: form.pincode
+        });
+      }
       setOpen(false);
     } catch (err) {
       alert('Failed to save address.');
@@ -239,76 +286,114 @@ export const AddressesPage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {addresses.map((a) => (
-          <div
-            key={a.id}
-            className={`bg-white border rounded-card shadow-premium p-5 flex flex-col gap-3 ${
-              a.isDefault ? 'border-brand-blue/50 ring-1 ring-brand-blue/10' : 'border-brand-border'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-lg bg-brand-blue/10 text-brand-blue flex items-center justify-center">
-                  {typeIcon(a.type)}
+        {addresses.map((a) => {
+          const activeDelivery = isAddressActive(a);
+          return (
+            <div
+              key={a.id}
+              className={`bg-white border rounded-card shadow-premium p-5 flex flex-col gap-3 transition-all ${
+                activeDelivery
+                  ? 'border-brand-blue ring-2 ring-brand-blue/20 bg-blue-50/10'
+                  : a.isDefault
+                  ? 'border-brand-blue/50 ring-1 ring-brand-blue/10'
+                  : 'border-brand-border'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${activeDelivery ? 'bg-brand-blue text-white shadow-xs' : 'bg-brand-blue/10 text-brand-blue'}`}>
+                    {typeIcon(a.type)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-bold text-sm text-brand-graphite">{a.label}</p>
+                      {activeDelivery && (
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Active Store Location
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-brand-slate">
+                      {a.fullName} · {a.mobile}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-sm text-brand-graphite">{a.label}</p>
-                  <p className="text-xs text-brand-slate">
-                    {a.fullName} · {a.mobile}
-                  </p>
-                </div>
+                {a.isDefault && (
+                  <Badge tone="green">
+                    <Check className="w-3 h-3 inline -mt-0.5 mr-0.5" /> Default
+                  </Badge>
+                )}
               </div>
-              {a.isDefault && (
-                <Badge tone="green">
-                  <Check className="w-3 h-3 inline -mt-0.5 mr-0.5" /> Default
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-brand-slate font-medium leading-relaxed">
-              {a.line1}
-              {a.line2 ? `, ${a.line2}` : ''}, {a.city}, {a.state} - {a.pincode}, {a.country}
-              {a.landmark ? `\nLandmark: ${a.landmark}` : ''}
-            </p>
-            <div className="flex items-center justify-between pt-3 border-t border-brand-border/40">
-              {!a.isDefault ? (
-                <button onClick={() => setDefaultAddress(a.id)} className="text-xs font-bold text-brand-blue hover:underline">
-                  Set as default
-                </button>
-              ) : (
-                <span />
-              )}
-              <div className="flex gap-1.5">
-                <button
-                  disabled={isDeleting === a.id}
-                  onClick={() => startEdit(a)}
-                  aria-label="Edit"
-                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-brand-slate disabled:opacity-50"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  disabled={isDeleting === a.id}
-                  onClick={async () => {
-                    if (confirm('Are you sure you want to delete this address?')) {
-                      setIsDeleting(a.id);
-                      try {
-                        await removeAddress(a.id);
-                      } catch (err) {
-                        alert('Failed to delete address.');
-                      } finally {
-                        setIsDeleting(null);
+              <p className="text-xs text-brand-slate font-medium leading-relaxed">
+                {a.line1}
+                {a.line2 ? `, ${a.line2}` : ''}, {a.city}, {a.state} - {a.pincode}, {a.country}
+                {a.landmark ? `\nLandmark: ${a.landmark}` : ''}
+              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t border-brand-border/40">
+                <div className="flex items-center gap-2">
+                  {activeDelivery ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Delivering here</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => activateAddress(a)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-brand-blue hover:bg-blue-700 text-white shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      <MapPin className="w-3 h-3" />
+                      <span>Deliver to this Address</span>
+                    </button>
+                  )}
+
+                  {!a.isDefault && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDefaultAddress(a.id);
+                        activateAddress(a);
+                      }}
+                      className="text-xs font-bold text-slate-500 hover:text-brand-blue hover:underline ml-1 cursor-pointer"
+                    >
+                      Set as default
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <button
+                    disabled={isDeleting === a.id}
+                    onClick={() => startEdit(a)}
+                    aria-label="Edit"
+                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-brand-slate disabled:opacity-50 cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    disabled={isDeleting === a.id}
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to delete this address?')) {
+                        setIsDeleting(a.id);
+                        try {
+                          await removeAddress(a.id);
+                        } catch (err) {
+                          alert('Failed to delete address.');
+                        } finally {
+                          setIsDeleting(null);
+                        }
                       }
-                    }
-                  }}
-                  aria-label="Delete"
-                  className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 disabled:opacity-50"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                    }}
+                    aria-label="Delete"
+                    className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {open && (

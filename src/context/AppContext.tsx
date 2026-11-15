@@ -165,6 +165,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Listen for active address & location updates across app
+  useEffect(() => {
+    const handleLocationSync = () => {
+      const loc = localStorage.getItem('shopindia_user_location');
+      if (loc) setLocationState(loc);
+      try {
+        const storedCoords = localStorage.getItem('shopindia_user_coords');
+        if (storedCoords) setUserCoords(JSON.parse(storedCoords));
+      } catch {}
+    };
+
+    window.addEventListener('shopindia:location_updated', handleLocationSync);
+    return () => window.removeEventListener('shopindia:location_updated', handleLocationSync);
+  }, []);
+
   // Cart
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [lastAddedProduct, setLastAddedProduct] = useState<{ product: Product; timestamp: number } | null>(null);

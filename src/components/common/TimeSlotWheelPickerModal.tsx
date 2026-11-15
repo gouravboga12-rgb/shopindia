@@ -53,7 +53,7 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
   onConfirm,
 }) => {
   const { location } = useApp();
-  const { profile } = useCustomer();
+  const { profile, addresses } = useCustomer();
 
   // Mode Selection: 'instant' vs 'scheduled' (Parrow Skills Model)
   const initialMode = supportedBookingModes === 'scheduled' ? 'scheduled' : 'instant';
@@ -69,6 +69,16 @@ export const TimeSlotWheelPickerModal: React.FC<TimeSlotWheelPickerModalProps> =
   const [selectedHour, setSelectedHour] = useState<string>('10');
   const [selectedMinute, setSelectedMinute] = useState<string>('00');
   const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>('AM');
+
+  // Pre-fill address details from customer's saved default address
+  useEffect(() => {
+    if (addresses.length > 0 && !addressDetails) {
+      const active = addresses.find(a => a.isDefault) || addresses[0];
+      if (active?.line1) {
+        setAddressDetails(`${active.line1}${active.line2 ? ', ' + active.line2 : ''}${active.landmark ? ', Landmark: ' + active.landmark : ''}`);
+      }
+    }
+  }, [addresses]);
 
   // Sync customer phone when available
   useEffect(() => {
