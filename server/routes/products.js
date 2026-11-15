@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
             isOnline: true,
           },
         },
-        category: { select: { id: true, name: true, slug: true } },
+        category: { select: { id: true, name: true, slug: true, vertical: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -130,7 +130,7 @@ router.get('/', async (req, res) => {
       const vertical = mapVertical(p.fulfillmentType);
       const subVertical = mapSubVertical(
         p.fulfillmentType,
-        p.category?.name || p.categoryId,
+        p.category,
         p.tags,
         p.name
       );
@@ -395,10 +395,13 @@ function mapVertical(fulfillmentType) {
   }
 }
 
-function mapSubVertical(fulfillmentType, categoryId, tags, name) {
-  const text = `${categoryId || ''} ${(tags || []).join(' ')} ${name || ''}`.toLowerCase();
-
+function mapSubVertical(fulfillmentType, category, tags, name) {
   if (fulfillmentType === 'quick_commerce') {
+    const catVertical = (category?.vertical || '').toLowerCase();
+    if (catVertical.startsWith('quick_')) {
+      return catVertical.replace('quick_', '');
+    }
+    const text = `${typeof category === 'string' ? category : (category?.name || '')} ${(tags || []).join(' ')} ${name || ''}`.toLowerCase();
     if (
       text.includes('pharma') ||
       text.includes('medicine') ||

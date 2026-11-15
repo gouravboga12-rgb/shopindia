@@ -3,9 +3,10 @@ import { useApp } from '../../context/AppContext';
 import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
+import { useQuickDepartments } from '../../hooks/useQuickDepartments';
 import {
   Plus, Minus, Clock, Heart,
-  Zap, UtensilsCrossed, Pill, Store
+  Zap, Store
 } from 'lucide-react';
 import type { Product } from '../../data/types';
 import { FoodCustomizationModal } from '../common/FoodCustomizationModal';
@@ -14,20 +15,13 @@ import { PlatformOperatingHoursModal } from '../common/PlatformOperatingHoursMod
 import { requireCustomerAuth } from '../../lib/customerAuth';
 import { api } from '../../lib/api';
 
-type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
-
-const MOBILE_SUB_TABS = [
-  { id: 'grocery' as QuickSubVertical, label: 'Instant', icon: Zap, color: 'bg-emerald-600' },
-  { id: 'food' as QuickSubVertical, label: 'Food', icon: UtensilsCrossed, color: 'bg-orange-600' },
-  { id: 'pharmacy' as QuickSubVertical, label: 'Pharma', icon: Pill, color: 'bg-blue-600' },
-];
-
 export const VerticalQuickCommerceMobile: React.FC = () => {
   const { cart, addToCart, updateQuantity, navigateTo, location, setCurrentVertical } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
+  const { departments: quickDepts } = useQuickDepartments();
 
-  const [activeSubVertical, setActiveSubVertical] = useState<QuickSubVertical>('grocery');
+  const [activeSubVertical, setActiveSubVertical] = useState<string>('grocery');
   const [activeCat, setActiveCat] = useState('');
   const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non_veg'>('all');
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
@@ -63,7 +57,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
   );
   const isFridayBreak = Boolean(operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals));
 
-  const handleSubVerticalChange = (sub: QuickSubVertical) => {
+  const handleSubVerticalChange = (sub: string) => {
     setActiveSubVertical(sub);
     setActiveCat('');
     setDietaryFilter('all');
@@ -71,7 +65,7 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
 
   const quickProducts = products.filter((p) => {
     if (p.vertical !== 'quick') return false;
-    if (p.subVertical) return p.subVertical === activeSubVertical;
+    if (p.subVertical) return p.subVertical.toLowerCase() === activeSubVertical.toLowerCase();
 
     const text = `${p.category || ''} ${p.title || ''} ${p.description || ''}`.toLowerCase();
     if (activeSubVertical === 'pharmacy') {
@@ -80,7 +74,10 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
     if (activeSubVertical === 'food') {
       return text.includes('food') || text.includes('biryani') || text.includes('pizza') || text.includes('burger') || text.includes('meal') || text.includes('paneer') || text.includes('kitchen') || text.includes('roll');
     }
-    return !text.includes('pharma') && !text.includes('medicine') && !text.includes('biryani') && !text.includes('pizza') && !text.includes('burger');
+    if (activeSubVertical === 'grocery') {
+      return !text.includes('pharma') && !text.includes('medicine') && !text.includes('biryani') && !text.includes('pizza') && !text.includes('burger');
+    }
+    return text.includes(activeSubVertical.toLowerCase().replace(/_/g, ' '));
   });
 
   const baseCurrentProducts = !activeCat || activeCat === 'All'
@@ -123,41 +120,40 @@ export const VerticalQuickCommerceMobile: React.FC = () => {
 
   // Dynamic live categories from database (100% dynamic, zero fake fallbacks)
   const subCategories = useMemo(() => {
+    const activeDept = quickDepts.find(d => d.id === activeSubVertical);
+    const targetKey = activeDept?.verticalKey || `quick_${activeSubVertical}`;
     const fromApi = apiCategories
       .filter((c) => {
         if (c.isActive === false) return false;
         const v = (c.vertical || '').toLowerCase();
-        if (activeSubVertical === 'grocery') return v === 'quick_grocery' || v === 'quick';
-        if (activeSubVertical === 'food') return v === 'quick_food';
-        if (activeSubVertical === 'pharmacy') return v === 'quick_pharmacy';
-        return v === 'quick';
+        return v === targetKey || (activeSubVertical === 'grocery' && v === 'quick');
       })
       .map((c) => c.name);
 
     const fromProds = quickProducts.map((p) => p.category).filter(Boolean);
     const merged = Array.from(new Set([...fromApi, ...fromProds]));
     return ['All', ...merged];
-  }, [apiCategories, activeSubVertical, quickProducts]);
+  }, [apiCategories, activeSubVertical, quickProducts, quickDepts]);
 
   return (
     <div className="w-full flex flex-col gap-3 py-3 px-3 bg-[#FAF9F6] min-h-screen text-slate-800 font-sans pb-32">
       {/* 1. Mobile Sub-Vertical Pill Switcher */}
-      <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-        {MOBILE_SUB_TABS.map((tab) => {
-          const Icon = tab.icon;
+      <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-x-auto">
+        {quickDepts.map((tab) => {
           const isActive = activeSubVertical === tab.id;
+          const activeBg = tab.id === 'food' ? 'bg-orange-600 text-white' : tab.id === 'pharmacy' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white';
           return (
             <button
               key={tab.id}
               onClick={() => handleSubVerticalChange(tab.id)}
-              className={`flex-1 py-2 px-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 min-w-[85px] py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                 isActive
-                  ? `${tab.color} text-white shadow-md`
+                  ? `${activeBg} shadow-md`
                   : 'text-slate-600 hover:text-slate-900 bg-slate-50'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
+              <span className="text-sm">{tab.icon}</span>
+              <span>{tab.label.replace('Instant ', '').replace(' Delivery', '').replace(' Medicines', '')}</span>
             </button>
           );
         })}

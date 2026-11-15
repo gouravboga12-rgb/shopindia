@@ -32,6 +32,103 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
+const DEFAULT_QUICK_DEPARTMENTS = [
+  { id: 'grocery', label: 'Instant Grocery', icon: '🥦', badge: '10 MINS', color: 'emerald', verticalKey: 'quick_grocery', tagline: '10-20 Min Delivery from Dark Store' },
+  { id: 'food', label: 'Food & Dining', icon: '🍲', badge: 'LIVE KITCHENS', color: 'orange', verticalKey: 'quick_food', tagline: 'Hot & Fresh Meals from Verified Kitchens' },
+  { id: 'pharmacy', label: 'Pharmacy', icon: '💊', badge: 'CERTIFIED PHARMA', color: 'blue', verticalKey: 'quick_pharmacy', tagline: 'Rx Medicines & Health Essentials' }
+];
+
+// GET /api/admin/categories/departments
+router.get('/departments', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({ where: { key: 'quick_departments' } });
+    let departments = DEFAULT_QUICK_DEPARTMENTS;
+    if (setting && setting.value) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        if (Array.isArray(parsed) && parsed.length > 0) departments = parsed;
+      } catch (_) {}
+    }
+    res.json({ success: true, departments });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/categories/departments — add or update department
+router.post('/departments', async (req, res) => {
+  try {
+    const { id, label, icon = '⚡', badge = 'INSTANT', color = 'purple', tagline = 'Quick Delivery' } = req.body;
+    if (!label) return res.status(400).json({ error: 'Department label is required' });
+
+    const rawId = id || slugify(label);
+    const cleanId = rawId.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^quick_/, '');
+    const verticalKey = `quick_${cleanId}`;
+
+    const setting = await prisma.appSetting.findUnique({ where: { key: 'quick_departments' } });
+    let departments = [...DEFAULT_QUICK_DEPARTMENTS];
+    if (setting && setting.value) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        if (Array.isArray(parsed)) departments = parsed;
+      } catch (_) {}
+    }
+
+    const existingIdx = departments.findIndex(d => d.id === cleanId || d.verticalKey === verticalKey);
+    const newDept = {
+      id: cleanId,
+      label,
+      icon,
+      badge: (badge || 'INSTANT').toUpperCase(),
+      color,
+      verticalKey,
+      tagline,
+      isCustom: !['grocery', 'food', 'pharmacy'].includes(cleanId)
+    };
+
+    if (existingIdx >= 0) {
+      departments[existingIdx] = { ...departments[existingIdx], ...newDept };
+    } else {
+      departments.push(newDept);
+    }
+
+    await prisma.appSetting.upsert({
+      where: { key: 'quick_departments' },
+      update: { value: JSON.stringify(departments) },
+      create: { key: 'quick_departments', value: JSON.stringify(departments) }
+    });
+
+    res.json({ success: true, department: newDept, departments });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/categories/departments/:id
+router.delete('/departments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (['grocery', 'food', 'pharmacy'].includes(id)) {
+      return res.status(400).json({ error: 'Core default departments (Grocery, Food, Pharmacy) cannot be deleted.' });
+    }
+
+    const setting = await prisma.appSetting.findUnique({ where: { key: 'quick_departments' } });
+    if (!setting) return res.json({ success: true });
+
+    let departments = JSON.parse(setting.value || '[]');
+    departments = departments.filter(d => d.id !== id && d.verticalKey !== `quick_${id}`);
+
+    await prisma.appSetting.update({
+      where: { key: 'quick_departments' },
+      data: { value: JSON.stringify(departments) }
+    });
+
+    res.json({ success: true, departments });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/admin/categories — list with product counts
 router.get('/', async (req, res) => {
   try {

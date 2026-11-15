@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useQuickDepartments } from '../../hooks/useQuickDepartments';
 import { Plus, Edit2, Trash2, Search, X, Package, Zap, ShoppingBag, CheckCircle, AlertCircle, RefreshCw, Star, Video, Play } from 'lucide-react';
 
 const parseDescriptionAndReviews = (raw: string) => {
@@ -19,6 +20,7 @@ const parseDescriptionAndReviews = (raw: string) => {
 };
 
 export const VendorProducts: React.FC = () => {
+  const { departments: quickDepts } = useQuickDepartments();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -38,7 +40,7 @@ export const VendorProducts: React.FC = () => {
   const [price, setPrice] = useState<number>(0);
   const [stock, setStock] = useState<number>(10);
   const [fulfillmentType, setFulfillmentType] = useState<'traditional' | 'quick_commerce'>('traditional');
-  const [subType, setSubType] = useState<'retail' | 'grocery' | 'food' | 'pharmacy'>('retail');
+  const [subType, setSubType] = useState<string>('retail');
   const [isVeg, setIsVeg] = useState(true);
   const [isRx, setIsRx] = useState(false);
   const [categoryId, setCategoryId] = useState('');
@@ -187,10 +189,21 @@ export const VendorProducts: React.FC = () => {
     setFulfillmentType(channel);
 
     const tags = p.tags || [];
-    if (tags.includes('food')) setSubType('food');
-    else if (tags.includes('pharmacy')) setSubType('pharmacy');
-    else if (channel === 'quick_commerce') setSubType('grocery');
-    else setSubType('retail');
+    const cat = categories.find((c: any) => c.id === p.categoryId);
+    const catV = (cat?.vertical || '').toLowerCase();
+    if (channel === 'quick_commerce') {
+      if (catV.startsWith('quick_')) {
+        setSubType(catV.replace('quick_', ''));
+      } else if (tags.includes('food')) {
+        setSubType('food');
+      } else if (tags.includes('pharmacy')) {
+        setSubType('pharmacy');
+      } else {
+        setSubType('grocery');
+      }
+    } else {
+      setSubType('retail');
+    }
 
     setIsVeg(!tags.includes('Non-Veg'));
     setIsRx(tags.includes('rx'));
@@ -385,16 +398,16 @@ export const VendorProducts: React.FC = () => {
     }
   };
 
-  // Filtered categories for dropdown
+  // Strictly isolate categories for dropdown
   const filteredCategories = categories.filter((c: any) => {
     const v = (c.vertical || '').toLowerCase();
     if (fulfillmentType === 'traditional') {
-      return v === 'shop' || (!v.startsWith('quick') && !v.startsWith('services'));
+      return v === 'shop';
     }
-    // Quick Commerce
-    if (subType === 'food') return v === 'quick_food' || v.includes('food');
-    if (subType === 'pharmacy') return v === 'quick_pharmacy' || v.includes('pharmacy');
-    return v === 'quick_grocery' || v === 'quick' || v.startsWith('quick');
+    // Quick Commerce: match active department vertical key strictly
+    const activeDept = quickDepts.find(d => d.id === subType);
+    const targetKey = activeDept?.verticalKey || `quick_${subType}`;
+    return v === targetKey;
   });
 
   const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q.toLowerCase()));
@@ -666,6 +679,7 @@ export const VendorProducts: React.FC = () => {
                   onClick={() => {
                     setFulfillmentType('traditional');
                     setSubType('retail');
+                    setCategoryId('');
                   }}
                   className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
                     fulfillmentType === 'traditional'
@@ -685,6 +699,7 @@ export const VendorProducts: React.FC = () => {
                   onClick={() => {
                     setFulfillmentType('quick_commerce');
                     setSubType('grocery');
+                    setCategoryId('');
                   }}
                   className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
                     fulfillmentType === 'quick_commerce'
@@ -704,24 +719,27 @@ export const VendorProducts: React.FC = () => {
             {/* Quick Shopping Sub-type if Quick selected */}
             {fulfillmentType === 'quick_commerce' && (
               <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-2">
-                <label className="block text-xs font-bold text-amber-900">Quick Shopping Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'grocery', label: '🥦 Grocery' },
-                    { id: 'food', label: '🍲 Food' },
-                    { id: 'pharmacy', label: '💊 Pharmacy' },
-                  ].map(t => (
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-amber-900">Select Quick Shopping Department *</label>
+                  <span className="text-[10px] text-amber-700 font-medium">Synced from Super Admin</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {quickDepts.map(t => (
                     <button
                       type="button"
                       key={t.id}
-                      onClick={() => setSubType(t.id as any)}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all ${
+                      onClick={() => {
+                        setSubType(t.id);
+                        setCategoryId('');
+                      }}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         subType === t.id
                           ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                           : 'bg-white text-gray-700 border-amber-200 hover:bg-amber-100/50'
                       }`}
                     >
-                      {t.label}
+                      <span>{t.icon}</span>
+                      <span className="truncate">{t.label}</span>
                     </button>
                   ))}
                 </div>

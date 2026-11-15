@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useQuickDepartments } from '../../hooks/useQuickDepartments';
 import {
   Plus, Edit2, Trash2, Eye, EyeOff, Tag, Award, Star, Search,
   ShoppingBag, Zap, Wrench, UtensilsCrossed, Apple, Pill, Car, Home,
-  Info, Check
+  Info, Check, Sparkles
 } from 'lucide-react';
 
 interface Category {
@@ -113,6 +114,13 @@ const VERTICAL_METADATA: Record<string, {
 export const CategoriesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'categories' | 'brands'>('categories');
 
+  // Dynamic Quick Departments
+  const { departments: quickDepts, refresh: refreshDepts } = useQuickDepartments();
+  const [deptModal, setDeptModal] = useState(false);
+  const [deptForm, setDeptForm] = useState({ id: '', label: '', icon: '⚡', badge: 'INSTANT', color: 'emerald', tagline: '' });
+  const [deptError, setDeptError] = useState<string | null>(null);
+  const [deptSaving, setDeptSaving] = useState(false);
+
   // Categories State
   const [cats, setCats] = useState<Category[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
@@ -122,7 +130,35 @@ export const CategoriesPage: React.FC = () => {
   const [catError, setCatError] = useState<string | null>(null);
   const [catUploading, setCatUploading] = useState(false);
   const [catSearch, setCatSearch] = useState('');
-  const [channelFilter, setChannelFilter] = useState<'all' | 'shop' | 'quick' | 'quick_grocery' | 'quick_food' | 'quick_pharmacy' | 'services'>('all');
+  const [channelFilter, setChannelFilter] = useState<string>('all');
+
+  // Helper to dynamically resolve Category Badge and Information
+  const getCategoryMeta = (vertical: string) => {
+    if (VERTICAL_METADATA[vertical]) return VERTICAL_METADATA[vertical];
+    const customDept = quickDepts.find(d => d.verticalKey === vertical || d.id === vertical || `quick_${d.id}` === vertical);
+    if (customDept) {
+      return {
+        label: customDept.label,
+        channel: 'quick' as const,
+        channelName: `Quick: ${customDept.label}`,
+        badgeBg: 'bg-emerald-50',
+        badgeText: 'text-emerald-700',
+        badgeBorder: 'border-emerald-200',
+        usedFor: `Quick Shopping Hyperlocal (${customDept.tagline || '10-20 min rider delivery'})`,
+        icon: Zap
+      };
+    }
+    return {
+      label: vertical,
+      channel: 'shop' as const,
+      channelName: vertical.toUpperCase(),
+      badgeBg: 'bg-slate-100',
+      badgeText: 'text-slate-700',
+      badgeBorder: 'border-slate-200',
+      usedFor: 'General Catalog',
+      icon: Tag
+    };
+  };
 
   // Brands State
   const [brands, setBrands] = useState<BrandItem[]>([]);
@@ -162,9 +198,6 @@ export const CategoriesPage: React.FC = () => {
   // --- Category Counts ---
   const shopCount = cats.filter(c => (c.vertical || '').toLowerCase() === 'shop').length;
   const quickCount = cats.filter(c => (c.vertical || '').startsWith('quick')).length;
-  const groceryCount = cats.filter(c => c.vertical === 'quick_grocery').length;
-  const foodCount = cats.filter(c => c.vertical === 'quick_food').length;
-  const pharmacyCount = cats.filter(c => c.vertical === 'quick_pharmacy').length;
   const servicesCount = cats.filter(c => (c.vertical || '').startsWith('services')).length;
 
   // --- Category Filter Handler ---
@@ -172,14 +205,12 @@ export const CategoriesPage: React.FC = () => {
     const v = (c.vertical || '').toLowerCase();
     if (channelFilter === 'shop' && v !== 'shop') return false;
     if (channelFilter === 'quick' && !v.startsWith('quick')) return false;
-    if (channelFilter === 'quick_grocery' && v !== 'quick_grocery') return false;
-    if (channelFilter === 'quick_food' && v !== 'quick_food') return false;
-    if (channelFilter === 'quick_pharmacy' && v !== 'quick_pharmacy') return false;
+    if (channelFilter.startsWith('quick_') && v !== channelFilter) return false;
     if (channelFilter === 'services' && !v.startsWith('services')) return false;
 
     if (catSearch.trim()) {
       const q = catSearch.toLowerCase();
-      const meta = VERTICAL_METADATA[c.vertical];
+      const meta = getCategoryMeta(c.vertical);
       return (
         c.name.toLowerCase().includes(q) ||
         v.includes(q) ||
@@ -199,8 +230,7 @@ export const CategoriesPage: React.FC = () => {
     setEditingCat(null);
     // If a channel filter is active, default the new category to that channel
     const defaultVertical = channelFilter === 'shop' ? 'shop' :
-      channelFilter === 'quick_food' ? 'quick_food' :
-      channelFilter === 'quick_pharmacy' ? 'quick_pharmacy' :
+      channelFilter.startsWith('quick_') ? channelFilter :
       channelFilter === 'services' ? 'services_home' :
       channelFilter === 'quick' ? 'quick_grocery' : 'shop';
 
@@ -214,6 +244,41 @@ export const CategoriesPage: React.FC = () => {
     setCatForm({ name: c.name, vertical: c.vertical, image: c.image || '', slug: c.slug || '' });
     setCatError(null);
     setCatModal(true);
+  };
+
+  const openCreateDept = () => {
+    setDeptForm({ id: '', label: '', icon: '🐾', badge: 'INSTANT', color: 'emerald', tagline: '10-20 Min Quick Delivery' });
+    setDeptError(null);
+    setDeptModal(true);
+  };
+
+  const saveDept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeptError(null);
+    try {
+      setDeptSaving(true);
+      await api.post('/api/admin/categories/departments', deptForm);
+      setDeptModal(false);
+      await refreshDepts();
+      // Auto select the new department in the active category form
+      const cleanId = deptForm.label.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      setCatForm(prev => ({ ...prev, vertical: `quick_${cleanId}` }));
+    } catch (err: any) {
+      setDeptError(err.message || 'Failed to save department');
+    } finally {
+      setDeptSaving(false);
+    }
+  };
+
+  const deleteDept = async (id: string, label: string) => {
+    if (!confirm(`Delete custom major department "${label}"? Any existing categories under it will remain safe.`)) return;
+    try {
+      await api.delete(`/api/admin/categories/departments/${id}`);
+      await refreshDepts();
+      if (channelFilter === `quick_${id}`) setChannelFilter('all');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete department');
+    }
   };
 
   const handleCatImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -447,7 +512,7 @@ export const CategoriesPage: React.FC = () => {
           </div>
 
           {/* Vertical Channel Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200/80">
+          <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
             <button
               onClick={() => setChannelFilter('all')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -485,40 +550,44 @@ export const CategoriesPage: React.FC = () => {
               <span>All Quick Shopping ({quickCount})</span>
             </button>
 
-            <button
-              onClick={() => setChannelFilter('quick_grocery')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                channelFilter === 'quick_grocery'
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200/70'
-              }`}
-            >
-              <Apple className="w-3 h-3" />
-              <span>Grocery ({groceryCount})</span>
-            </button>
+            {/* Dynamic Major Quick Shopping Departments */}
+            {quickDepts.map(dept => {
+              const count = cats.filter(c => c.vertical === dept.verticalKey).length;
+              const isSelected = channelFilter === dept.verticalKey;
+              return (
+                <div key={dept.id} className="inline-flex items-center">
+                  <button
+                    onClick={() => setChannelFilter(dept.verticalKey)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      isSelected
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200/70'
+                    }`}
+                  >
+                    <span>{dept.icon}</span>
+                    <span>{dept.label} ({count})</span>
+                  </button>
+                  {dept.isCustom && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); deleteDept(dept.id, dept.label); }}
+                      title={`Delete custom department ${dept.label}`}
+                      className="ml-1 p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
 
             <button
-              onClick={() => setChannelFilter('quick_food')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                channelFilter === 'quick_food'
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'bg-white text-orange-700 hover:bg-orange-50 border border-orange-200/70'
-              }`}
+              onClick={openCreateDept}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-dashed border-emerald-300 hover:bg-emerald-100/70 transition-all cursor-pointer whitespace-nowrap"
+              title="Add a new Major Department for Quick Shopping"
             >
-              <UtensilsCrossed className="w-3 h-3" />
-              <span>Food Delivery ({foodCount})</span>
-            </button>
-
-            <button
-              onClick={() => setChannelFilter('quick_pharmacy')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                channelFilter === 'quick_pharmacy'
-                  ? 'bg-cyan-600 text-white shadow-xs'
-                  : 'bg-white text-cyan-700 hover:bg-cyan-50 border border-cyan-200/70'
-              }`}
-            >
-              <Pill className="w-3 h-3" />
-              <span>Pharmacy ({pharmacyCount})</span>
+              <Plus className="w-3 h-3" />
+              <span>New Major Dept</span>
             </button>
 
             <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block"></div>
@@ -571,16 +640,7 @@ export const CategoriesPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : filteredCats.map(c => {
-                  const meta = VERTICAL_METADATA[c.vertical] || {
-                    label: c.vertical,
-                    channel: 'shop',
-                    channelName: c.vertical.toUpperCase(),
-                    badgeBg: 'bg-slate-100',
-                    badgeText: 'text-slate-700',
-                    badgeBorder: 'border-slate-200',
-                    usedFor: 'General Catalog',
-                    icon: Tag
-                  };
+                  const meta = getCategoryMeta(c.vertical);
                   const Icon = meta.icon;
 
                   return (
@@ -848,33 +908,45 @@ export const CategoriesPage: React.FC = () => {
 
                 {/* 2. Quick Shopping Options */}
                 <div className="p-3 bg-emerald-50/40 rounded-2xl border border-emerald-200/80 space-y-2">
-                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
-                    <span>⚡ Quick Shopping (Hyperlocal 10-20 Min Rider Delivery)</span>
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { id: 'quick_grocery', label: '🥦 Instant Grocery', desc: 'Fruits, dairy, snacks' },
-                      { id: 'quick_food', label: '🍲 Food & Dining', desc: 'Restaurant dishes' },
-                      { id: 'quick_pharmacy', label: '💊 Pharmacy', desc: 'Meds & healthcare' },
-                      { id: 'quick', label: '⚡ Other Quick Dept', desc: 'Custom instant store' },
-                    ].map(opt => (
-                      <button
-                        type="button"
-                        key={opt.id}
-                        onClick={() => setCatForm({ ...catForm, vertical: opt.id })}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                          catForm.vertical === opt.id
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-emerald-200 hover:bg-emerald-100/50'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{opt.label}</div>
-                        <div className={`text-[10px] mt-0.5 ${catForm.vertical === opt.id ? 'text-emerald-100' : 'text-slate-400'}`}>
-                          {opt.desc}
-                        </div>
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
+                      <span>⚡ Quick Shopping (Hyperlocal 10-20 Min Rider Delivery)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={openCreateDept}
+                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>New Major Dept</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {quickDepts.map(opt => {
+                      const isSelected = catForm.vertical === opt.verticalKey;
+                      return (
+                        <button
+                          type="button"
+                          key={opt.verticalKey}
+                          onClick={() => setCatForm({ ...catForm, vertical: opt.verticalKey })}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-white text-slate-700 border-emerald-200 hover:bg-emerald-100/50'
+                          }`}
+                        >
+                          <div className="text-xs font-bold flex items-center gap-1.5">
+                            <span>{opt.icon}</span>
+                            <span className="truncate">{opt.label}</span>
+                          </div>
+                          <div className={`text-[10px] mt-0.5 truncate ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
+                            {opt.badge} • {opt.tagline || '10-20 mins'}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1073,6 +1145,109 @@ export const CategoriesPage: React.FC = () => {
                 className="flex-1 py-2.5 bg-[#0F2C59] text-white rounded-xl text-xs font-bold hover:bg-[#1a3d73] disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 {editingBrand ? 'Save Changes' : 'Create Brand'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* ────────────────── MAJOR DEPARTMENT MODAL ────────────────── */}
+      {deptModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form onSubmit={saveDept} className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shadow-xs">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">New Quick Shopping Major Department</h3>
+                <p className="text-[11px] text-slate-500">Create a top-level department like Pet Care, Baby Essentials, etc.</p>
+              </div>
+            </div>
+
+            {deptError && <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-xs font-semibold">{deptError}</div>}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Department Name *</label>
+              <input
+                required
+                value={deptForm.label}
+                onChange={e => setDeptForm({ ...deptForm, label: e.target.value })}
+                placeholder="e.g. Pet Care / Baby Essentials / Pooja Needs"
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Icon / Emoji</label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  value={deptForm.icon}
+                  onChange={e => setDeptForm({ ...deptForm, icon: e.target.value })}
+                  placeholder="⚡"
+                  className="w-16 px-3 py-2 border border-slate-200 rounded-xl text-center text-lg font-bold"
+                />
+                <div className="flex flex-wrap gap-1.5 flex-1">
+                  {['🐾', '👶', '🪔', '⚡', '🧴', '🎮', '🍎', '🍰', '☕', '🥦', '💊'].map(emo => (
+                    <button
+                      type="button"
+                      key={emo}
+                      onClick={() => setDeptForm({ ...deptForm, icon: emo })}
+                      className={`w-8 h-8 rounded-lg border text-sm flex items-center justify-center cursor-pointer transition-colors ${
+                        deptForm.icon === emo ? 'bg-emerald-100 border-emerald-400' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
+                      }`}
+                    >
+                      {emo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Badge Text</label>
+                <input
+                  value={deptForm.badge}
+                  onChange={e => setDeptForm({ ...deptForm, badge: e.target.value.toUpperCase() })}
+                  placeholder="15 MINS"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tagline</label>
+                <input
+                  value={deptForm.tagline}
+                  onChange={e => setDeptForm({ ...deptForm, tagline: e.target.value })}
+                  placeholder="10-20 Min Delivery"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 space-y-1">
+              <span className="font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-emerald-600" /> Dynamic Synchronization:
+              </span>
+              <p className="opacity-90 leading-relaxed">
+                Saving this department will instantly make it available for <strong>Vendor Product Uploads</strong>, <strong>Admin Category Creation</strong>, and the <strong>User Storefront Tabs</strong>.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeptModal(false)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={deptSaving}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer shadow-xs transition-colors"
+              >
+                {deptSaving ? 'Saving...' : 'Create Major Department'}
               </button>
             </div>
           </form>

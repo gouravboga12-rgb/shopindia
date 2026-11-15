@@ -18,9 +18,9 @@ function calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.max(0.5, Math.round(R * c * 10) / 10);
 }
@@ -79,7 +79,7 @@ router.get('/pricing-config', async (req, res) => {
 router.post('/quote', async (req, res) => {
   try {
     const { items = [], vertical = 'traditional', latitude, longitude, addressId } = req.body || {};
-    
+
     let userLat = latitude ? parseFloat(latitude) : null;
     let userLng = longitude ? parseFloat(longitude) : null;
     if ((!userLat || !userLng) && addressId) {
@@ -89,7 +89,7 @@ router.post('/quote', async (req, res) => {
           userLat = addr.latitude || userLat;
           userLng = addr.longitude || userLng;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const productIds = items.map(i => i.productId).filter(Boolean);
@@ -296,7 +296,7 @@ router.get('/', customerAuth, async (req, res) => {
 
     const mappedOrders = orders.map((o) => {
       let vert = o.type === 'quick_commerce' ? 'quick' : (o.type === 'hvac_service' || o.type === 'hvac') ? 'services' : 'shop';
-      
+
       if (o.type === 'traditional' || !o.type) {
         const catV = (o.items?.[0]?.product?.category?.vertical || '').toLowerCase();
         if (catV === 'quick' || catV === 'quick_commerce') {
@@ -313,7 +313,7 @@ router.get('/', customerAuth, async (req, res) => {
       const itemsSubtotal = o.items.reduce((s, it) => s + (it.price * it.quantity), 0);
       const orderSubtotal = o.subtotal ?? itemsSubtotal;
       const orderDiff = Math.max(0, (o.total || 0) - orderSubtotal);
-      
+
       let deliveryFee = o.delivery?.deliveryFee ?? 0;
       let platformFee = 0;
       if (vert === 'quick') {
@@ -419,14 +419,14 @@ router.post('/', async (req, res) => {
     const productIds = items.map((it) => it.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, status: 'active' },
-      select: { 
-        id: true, 
-        name: true, 
-        basePrice: true, 
+      select: {
+        id: true,
+        name: true,
+        basePrice: true,
         vendorPrice: true,
         mrp: true,
-        vendorId: true, 
-        stock: true, 
+        vendorId: true,
+        stock: true,
         isOutOfStock: true,
         fulfillmentType: true,
         categoryId: true,
@@ -640,13 +640,13 @@ router.post('/', async (req, res) => {
       const match = location.match(/\b\d{6}\b/);
       if (match) {
         deliveryPincode = match[0];
-        
+
         // 1. Try checking ServiceArea mapping
         const sap = await prisma.serviceAreaPincode.findFirst({
           where: { pincode: deliveryPincode },
           include: { serviceArea: true },
         });
-        
+
         if (sap && sap.serviceArea && sap.serviceArea.branchId) {
           branchId = sap.serviceArea.branchId;
         } else {
@@ -935,15 +935,15 @@ router.post('/', async (req, res) => {
           title: isQuick
             ? (isMultiStore ? `Arriving in 10-25 mins! ⚡ (${createdOrders.length} Stores)` : 'Arriving in 10-15 mins! ⚡')
             : isService
-            ? 'Service Booked Successfully 🛠️'
-            : 'Order Placed Successfully! 🎉',
+              ? 'Service Booked Successfully 🛠️'
+              : 'Order Placed Successfully! 🎉',
           message: isMultiStore
             ? `Your multi-store order #${notifOrderRef} has been placed. ${createdOrders.length} separate delivery riders are being assigned to pick up from each store.`
             : isQuick
-            ? `Your 10-Min order #${notifOrderRef} is placed and being packed at the dark store.`
-            : isService
-            ? `Your service appointment #${notifOrderRef} has been booked. Technician will arrive at scheduled time.`
-            : `Your E-Commerce order #${notifOrderRef} is confirmed! Estimated delivery in 2-4 business days.`,
+              ? `Your 10-Min order #${notifOrderRef} is placed and being packed at the dark store.`
+              : isService
+                ? `Your service appointment #${notifOrderRef} has been booked. Technician will arrive at scheduled time.`
+                : `Your E-Commerce order #${notifOrderRef} is confirmed! Estimated delivery in 2-4 business days.`,
           channel: 'IN_APP',
           isRead: false,
           link: `/orders/${createdOrders[0].id}`,

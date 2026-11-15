@@ -3,9 +3,10 @@ import { useApp } from '../../context/AppContext';
 import { useCustomer } from '../../context/CustomerContext';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
+import { useQuickDepartments } from '../../hooks/useQuickDepartments';
 import {
   Plus, Minus, Clock, ShoppingCart, ArrowRight, Heart, LayoutGrid,
-  Zap, UtensilsCrossed, Pill, Sparkles, Store
+  Zap, Sparkles, Store, Pill
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Product } from '../../data/types';
@@ -15,44 +16,13 @@ import { PlatformOperatingHoursModal } from '../common/PlatformOperatingHoursMod
 import { requireCustomerAuth } from '../../lib/customerAuth';
 import { api } from '../../lib/api';
 
-type QuickSubVertical = 'grocery' | 'food' | 'pharmacy';
-
-const SUB_VERTICAL_TABS = [
-  {
-    id: 'grocery' as QuickSubVertical,
-    label: 'Instant Grocery',
-    tagline: '10-20 Min Delivery from Dark Store',
-    icon: Zap,
-    color: 'from-emerald-500 to-teal-600',
-    activeBg: 'bg-emerald-600 text-white',
-    badge: '10 MINS',
-  },
-  {
-    id: 'food' as QuickSubVertical,
-    label: 'Food Delivery',
-    tagline: 'Hot & Fresh Meals from Top Kitchens',
-    icon: UtensilsCrossed,
-    color: 'from-orange-500 to-amber-600',
-    activeBg: 'bg-orange-600 text-white',
-    badge: 'LIVE KITCHENS',
-  },
-  {
-    id: 'pharmacy' as QuickSubVertical,
-    label: 'Pharmacy Medicines',
-    tagline: 'Rx Medicines & Health Essentials',
-    icon: Pill,
-    color: 'from-blue-600 to-cyan-600',
-    activeBg: 'bg-blue-600 text-white',
-    badge: 'CERTIFIED PHARMA',
-  },
-];
-
 export const VerticalQuickCommerce: React.FC = () => {
   const { cart, addToCart, updateQuantity, navigateTo, location, setCurrentVertical } = useApp();
   const { products } = useProducts();
   const { categories: apiCategories } = useCategories();
+  const { departments: quickDepts } = useQuickDepartments();
 
-  const [activeSubVertical, setActiveSubVertical] = useState<QuickSubVertical>('grocery');
+  const [activeSubVertical, setActiveSubVertical] = useState<string>('grocery');
   const [selectedCatId, setSelectedCatId] = useState<string>('');
   const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non_veg'>('all');
   const { wishlist, toggleWishlist: customerToggleWishlist } = useCustomer();
@@ -89,7 +59,7 @@ export const VerticalQuickCommerce: React.FC = () => {
   const isFridayBreak = Boolean(operatingStatus?.fridayBreak?.isActive && isTarget(operatingStatus.fridayBreak.verticals));
 
   // Reset category & dietary filter on sub-vertical change
-  const handleSubVerticalChange = (sub: QuickSubVertical) => {
+  const handleSubVerticalChange = (sub: string) => {
     setActiveSubVertical(sub);
     setSelectedCatId('');
     setDietaryFilter('all');
@@ -98,7 +68,7 @@ export const VerticalQuickCommerce: React.FC = () => {
   // Filter products by vertical and active sub-vertical
   const quickProducts = products.filter((p) => {
     if (p.vertical !== 'quick') return false;
-    if (p.subVertical) return p.subVertical === activeSubVertical;
+    if (p.subVertical) return p.subVertical.toLowerCase() === activeSubVertical.toLowerCase();
 
     // Fallback classification based on category or title
     const text = `${p.category || ''} ${p.title || ''} ${p.description || ''}`.toLowerCase();
@@ -108,7 +78,10 @@ export const VerticalQuickCommerce: React.FC = () => {
     if (activeSubVertical === 'food') {
       return text.includes('food') || text.includes('biryani') || text.includes('pizza') || text.includes('burger') || text.includes('meal') || text.includes('paneer') || text.includes('kitchen') || text.includes('roll');
     }
-    return !text.includes('pharma') && !text.includes('medicine') && !text.includes('biryani') && !text.includes('pizza') && !text.includes('burger');
+    if (activeSubVertical === 'grocery') {
+      return !text.includes('pharma') && !text.includes('medicine') && !text.includes('biryani') && !text.includes('pizza') && !text.includes('burger');
+    }
+    return text.includes(activeSubVertical.toLowerCase().replace(/_/g, ' '));
   });
 
   const baseFilteredProducts = selectedCatId === '' || selectedCatId === 'All Items' || selectedCatId === 'All Food' || selectedCatId === 'All Medicines'
@@ -154,14 +127,13 @@ export const VerticalQuickCommerce: React.FC = () => {
 
   // Dynamically derive live category aisles from Admin API + Products (100% dynamic, zero fake fallbacks)
   const subCategories = useMemo(() => {
+    const activeDept = quickDepts.find(d => d.id === activeSubVertical);
+    const targetKey = activeDept?.verticalKey || `quick_${activeSubVertical}`;
     const fromApi = apiCategories
       .filter((c) => {
         if (c.isActive === false) return false;
         const v = (c.vertical || '').toLowerCase();
-        if (activeSubVertical === 'grocery') return v === 'quick_grocery' || v === 'quick';
-        if (activeSubVertical === 'food') return v === 'quick_food';
-        if (activeSubVertical === 'pharmacy') return v === 'quick_pharmacy';
-        return v === 'quick';
+        return v === targetKey || (activeSubVertical === 'grocery' && v === 'quick');
       })
       .map((c) => c.name);
 
@@ -170,7 +142,9 @@ export const VerticalQuickCommerce: React.FC = () => {
 
     const merged = Array.from(new Set([...fromApi, ...fromProds]));
     return [defaultLabel, ...merged];
-  }, [apiCategories, activeSubVertical, quickProducts]);
+  }, [apiCategories, activeSubVertical, quickProducts, quickDepts]);
+
+  const activeDeptObj = quickDepts.find(d => d.id === activeSubVertical);
 
   return (
     <div className="w-full flex flex-col min-h-screen bg-brand-bg text-brand-graphite relative select-none font-sans">
@@ -178,20 +152,20 @@ export const VerticalQuickCommerce: React.FC = () => {
       <div className="max-w-[1440px] mx-auto w-full px-8 pt-6">
         <div className="bg-white/80 backdrop-blur-md p-2 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-            {SUB_VERTICAL_TABS.map((tab) => {
-              const Icon = tab.icon;
+            {quickDepts.map((tab) => {
               const isActive = activeSubVertical === tab.id;
+              const activeBg = tab.id === 'food' ? 'bg-orange-600 text-white' : tab.id === 'pharmacy' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white';
               return (
                 <button
                   key={tab.id}
                   onClick={() => handleSubVerticalChange(tab.id)}
-                  className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap cursor-pointer ${
                     isActive
-                      ? `${tab.activeBg} shadow-lg shadow-black/10 scale-[1.02]`
+                      ? `${activeBg} shadow-lg shadow-black/10 scale-[1.02]`
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  <span className="text-base">{tab.icon}</span>
                   <span className="font-heading tracking-wide">{tab.label}</span>
                   <span
                     className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-black tracking-wider ${
@@ -208,7 +182,7 @@ export const VerticalQuickCommerce: React.FC = () => {
           <div className="text-xs font-semibold text-slate-500 px-3 hidden lg:flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
             <span>
-              {SUB_VERTICAL_TABS.find((t) => t.id === activeSubVertical)?.tagline}
+              {activeDeptObj?.tagline || '10-20 Min Quick Delivery from Verified Stores'}
             </span>
           </div>
         </div>
@@ -222,7 +196,9 @@ export const VerticalQuickCommerce: React.FC = () => {
               ? 'from-emerald-700 via-teal-800 to-emerald-950'
               : activeSubVertical === 'food'
               ? 'from-orange-600 via-amber-700 to-orange-950'
-              : 'from-blue-700 via-indigo-800 to-slate-950'
+              : activeSubVertical === 'pharmacy'
+              ? 'from-blue-700 via-indigo-800 to-slate-950'
+              : 'from-emerald-800 via-teal-900 to-slate-950'
           }`}
         >
           <div className="relative z-10 max-w-2xl space-y-2">
@@ -231,16 +207,19 @@ export const VerticalQuickCommerce: React.FC = () => {
               {activeSubVertical === 'grocery' && 'Delivered in 10-15 Mins'}
               {activeSubVertical === 'food' && 'Hot & Fresh In 25-35 Mins'}
               {activeSubVertical === 'pharmacy' && 'Verified Pharmacy Dispatch in 20 Mins'}
+              {!['grocery', 'food', 'pharmacy'].includes(activeSubVertical) && `${activeDeptObj?.badge || 'INSTANT'} • Express 15-25 Mins`}
             </span>
             <h2 className="text-2xl md:text-3xl font-black font-heading tracking-tight">
               {activeSubVertical === 'grocery' && 'Fresh Groceries, Snacks & Daily Essentials'}
               {activeSubVertical === 'food' && 'Order Food Online from Verified Kitchens'}
               {activeSubVertical === 'pharmacy' && '100% Genuine Medicines & Health Wellness'}
+              {!['grocery', 'food', 'pharmacy'].includes(activeSubVertical) && `${activeDeptObj?.label || 'Instant'} Store`}
             </h2>
             <p className="text-xs md:text-sm text-white/80 font-medium">
               {activeSubVertical === 'grocery' && 'Dark-store stocked with fresh fruits, farm dairy, and top FMCG brands.'}
               {activeSubVertical === 'food' && 'Live preparation tracking with food safety hygiene guarantee.'}
               {activeSubVertical === 'pharmacy' && '100% genuine OTC wellness essentials, vitamins, first-aid & health care delivered.'}
+              {!['grocery', 'food', 'pharmacy'].includes(activeSubVertical) && (activeDeptObj?.tagline || 'Hyperlocal delivery straight to your doorstep.')}
             </p>
           </div>
         </div>
