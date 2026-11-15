@@ -154,6 +154,8 @@ router.post('/quote', async (req, res) => {
       itemGroups.get(gKey).items.push(it);
     }
 
+    const uniqueVendors = Array.from(new Set(Array.from(itemGroups.values()).map(g => g.vendorId).filter(Boolean)));
+
     let quoteSubtotal = 0;
     let quoteDeliveryFee = 0;
     let quotePlatformFee = 0;

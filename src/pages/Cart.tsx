@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { CheckoutDrawer } from '../components/common/CheckoutDrawer';
 import { requireCustomerAuth } from '../lib/customerAuth';
 import { PlatformOperatingHoursModal, type OperatingHoursStatus } from '../components/common/PlatformOperatingHoursModal';
+import { api } from '../lib/api';
 
 export const CartPage: React.FC = () => {
   const { cart, updateQuantity, removeFromCart, getCartTotal, navigateTo, currentVertical } = useApp();
@@ -20,9 +21,11 @@ export const CartPage: React.FC = () => {
   const [pricingConfig, setPricingConfig] = useState<any>({
     shiprocket_base_fee: 49,
     shiprocket_free_threshold: 499,
+    shiprocket_free_delivery_enabled: 'false',
     quick_customer_base_fee: 35,
     quick_customer_per_km: 7,
     quick_free_threshold: 999,
+    quick_free_delivery_enabled: 'false',
     platform_charge_pct: 3.0
   });
 
@@ -33,8 +36,7 @@ export const CartPage: React.FC = () => {
   } | null>(null);
 
   useEffect(() => {
-    fetch('/api/orders/pricing-config')
-      .then(r => r.json())
+    api.get<{ settings?: any; operatingStatus?: any }>('/api/orders/pricing-config')
       .then(d => {
         if (d?.settings) {
           setPricingConfig(d.settings);
@@ -59,14 +61,9 @@ export const CartPage: React.FC = () => {
         price: i.product.price,
         quantity: i.quantity
       })),
-      vertical: currentVertical
+      vertical: currentVertical === 'quick' ? 'quick_commerce' : (currentVertical === 'services' ? 'hvac_service' : 'traditional')
     };
-    fetch('/api/orders/quote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(r => r.json())
+    api.post<{ success?: boolean; quote?: any }>('/api/orders/quote', payload)
       .then(data => {
         if (data?.success && data.quote) {
           setPricingQuote({
@@ -89,7 +86,11 @@ export const CartPage: React.FC = () => {
   const freeThreshold = isQuick
     ? (parseFloat(pricingConfig.quick_free_threshold) || 999)
     : (parseFloat(pricingConfig.shiprocket_free_threshold) || 499);
-  const fallbackDelivery = cartTotal === 0 || cartTotal >= freeThreshold ? 0 : baseDelivery;
+  const isFreeDeliveryEnabled = isQuick
+    ? String(pricingConfig.quick_free_delivery_enabled) === 'true'
+    : String(pricingConfig.shiprocket_free_delivery_enabled) === 'true';
+
+  const fallbackDelivery = cartTotal === 0 ? 0 : (isFreeDeliveryEnabled && cartTotal >= freeThreshold ? 0 : baseDelivery);
 
   const deliveryCharges = pricingQuote != null ? pricingQuote.deliveryFee : fallbackDelivery;
   const platformFee = pricingQuote != null
