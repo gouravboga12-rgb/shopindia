@@ -287,7 +287,7 @@ router.get('/', async (req, res) => {
         subVertical,
         stock: p.stock,
         isOutOfStock: p.isOutOfStock || p.stock <= 0,
-        isAssured: true,
+        isAssured: false,
         // Hyper-local vendor metadata
         vendor: {
           id: p.vendor?.id,

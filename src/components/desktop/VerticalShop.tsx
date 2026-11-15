@@ -557,11 +557,6 @@ export const VerticalShop: React.FC = () => {
                         alt={product.title}
                         className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 ease-out mix-blend-multiply"
                       />
-                      {product.isAssured && (
-                        <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-white/95 text-[9px] font-black italic px-1.5 py-0.5 rounded shadow-sm border border-brand-blue/10">
-                          <span className="text-brand-blue">Shop</span><span className="text-brand-orange">Assured</span>
-                        </div>
-                      )}
                     </div>
 
                     {/* Details */}
@@ -848,12 +843,6 @@ export const VerticalShop: React.FC = () => {
                                 alt={product.title}
                                 className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 ease-out mix-blend-multiply"
                               />
-                              {product.isAssured && (
-                                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-0.5 bg-white/95 text-xs font-black italic px-1.5 py-0.5 rounded shadow-sm border border-brand-blue/10 select-none">
-                                  <span className="text-brand-blue">ShopIndia</span>
-                                  <span className="text-brand-orange">Assured</span>
-                                </div>
-                              )}
                             </div>
 
                             <div className="p-5 flex flex-col flex-1">

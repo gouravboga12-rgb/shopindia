@@ -307,13 +307,6 @@ export const ProductDetailPage: React.FC = () => {
               ) : (
                 <img src={activeMedia?.url || product.image} alt={product.title} className="max-h-full max-w-full object-contain rounded" />
               )}
-
-              {product.isAssured && (
-                <div className="absolute bottom-4 left-4 z-10 flex items-center gap-0.5 bg-blue-50/95 text-xs font-black italic px-2 py-0.5 rounded border border-brand-blue/20 backdrop-blur-sm select-none shadow-sm">
-                  <span className="text-brand-blue">ShopIndia</span>
-                  <span className="text-brand-orange">Assured</span>
-                </div>
-              )}
             </div>
 
             {/* Media Thumbnails Gallery (Multiple Photos + Video) */}
@@ -679,13 +672,6 @@ export const ProductDetailPage: React.FC = () => {
               alt={product.title}
               className="max-h-full max-w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.12)] z-10 transition-transform duration-500 ease-out hover:scale-[1.03]"
             />
-          )}
-
-          {product.isAssured && (
-            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-0.5 bg-white/95 text-xs font-black italic px-2 py-1 rounded-full border border-blue-100 shadow-[0_4px_12px_rgba(0,0,0,0.08)] backdrop-blur-md">
-              <span className="text-brand-blue">ShopIndia</span>
-              <span className="text-brand-orange">Assured</span>
-            </div>
           )}
         </div>
 
