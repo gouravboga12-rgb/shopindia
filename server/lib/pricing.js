@@ -93,48 +93,58 @@ async function resolvePricingRule({ productId, vendorId, categoryId, vertical = 
     if (r) return r;
   }
 
-  // 4. Vertical level ('shop' | 'quick' | 'services')
-  if (vertical) {
-    const r = list.find(r => r.scope === 'vertical' && r.vertical === vertical);
-    if (r) return r;
-    const { settings } = await getCachedRules();
-    if (vertical === 'services' && settings && settings['service_commission_pct']) {
-      return {
-        id: 'settings_services',
-        scope: 'vertical',
-        vertical: 'services',
-        commissionPct: parseFloat(settings['service_commission_pct']),
-        includeGateway: true,
-        isActive: true
-      };
-    }
-    if (vertical === 'shop' && settings && settings['shop_commission_pct']) {
-      return {
-        id: 'settings_shop',
-        scope: 'vertical',
-        vertical: 'shop',
-        commissionPct: parseFloat(settings['shop_commission_pct']),
-        includeGateway: true,
-        isActive: true
-      };
-    }
-    if (vertical === 'quick' && settings && settings['quick_commission_pct']) {
-      return {
-        id: 'settings_quick',
-        scope: 'vertical',
-        vertical: 'quick',
-        commissionPct: parseFloat(settings['quick_commission_pct']),
-        includeGateway: true,
-        isActive: true
-      };
-    }
+  // 4. Vertical level ('shop' | 'quick' | 'services') with strict canonical isolation
+  const normVertical = (vertical || 'shop').toLowerCase();
+  const canonicalVertical = (normVertical === 'quick_commerce' || normVertical === 'quick')
+    ? 'quick'
+    : (normVertical === 'services' || normVertical === 'hvac_service' || normVertical === 'hvac')
+      ? 'services'
+      : 'shop';
+
+  // 4a. Check database vertical pricing rule
+  const verticalRule = list.find(r => r.scope === 'vertical' && (r.vertical === canonicalVertical || r.vertical === normVertical));
+  if (verticalRule) return verticalRule;
+
+  // 4b. Strict isolated fallback to appSetting for the specific vertical (no cross-vertical leaking)
+  const { settings } = await getCachedRules();
+  if (canonicalVertical === 'services') {
+    const pct = settings && settings['service_commission_pct'] != null ? parseFloat(settings['service_commission_pct']) : 15.0;
+    return {
+      id: 'settings_services',
+      scope: 'vertical',
+      vertical: 'services',
+      commissionPct: isNaN(pct) ? 15.0 : pct,
+      includeGateway: true,
+      isActive: true
+    };
+  }
+  if (canonicalVertical === 'quick') {
+    const pct = settings && settings['quick_commission_pct'] != null ? parseFloat(settings['quick_commission_pct']) : 10.0;
+    return {
+      id: 'settings_quick',
+      scope: 'vertical',
+      vertical: 'quick',
+      commissionPct: isNaN(pct) ? 10.0 : pct,
+      includeGateway: true,
+      isActive: true
+    };
+  }
+  if (canonicalVertical === 'shop') {
+    const pct = settings && settings['shop_commission_pct'] != null ? parseFloat(settings['shop_commission_pct']) : 10.0;
+    return {
+      id: 'settings_shop',
+      scope: 'vertical',
+      vertical: 'shop',
+      commissionPct: isNaN(pct) ? 10.0 : pct,
+      includeGateway: true,
+      isActive: true
+    };
   }
 
   // 5. Global level
   const globalRule = list.find(r => r.scope === 'global');
   if (globalRule) return globalRule;
 
-  const { settings } = await getCachedRules();
   const fallbackPct = settings && settings['shop_commission_pct'] ? parseFloat(settings['shop_commission_pct']) : 10.00;
 
   // Fallback default rule
@@ -372,7 +382,7 @@ async function calculateCartTotals({
         productId: item.productId,
         vendorId: item.vendorId,
         categoryId: item.categoryId,
-        vertical: isItemService ? 'services' : (fulfillmentType === 'quick_commerce' || fulfillmentType === 'quick' ? 'quick' : 'shop')
+        vertical: item.vertical || (isItemService ? 'services' : (fulfillmentType === 'quick_commerce' || fulfillmentType === 'quick' ? 'quick' : 'shop'))
       }
     });
 

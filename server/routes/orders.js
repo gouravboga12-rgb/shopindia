@@ -119,6 +119,12 @@ router.post('/quote', async (req, res) => {
           itemChannel = 'traditional';
         }
       }
+      const itemVertical = (itemChannel === 'hvac_service' || catV === 'services' || catV === 'hvac')
+        ? 'services'
+        : (itemChannel === 'quick_commerce' || catV === 'quick')
+          ? 'quick'
+          : 'shop';
+
       return {
         productId: it.productId,
         vendorId: p?.vendorId || it.vendorId,
@@ -126,7 +132,7 @@ router.post('/quote', async (req, res) => {
         price: p?.basePrice || it.price || 0,
         quantity: it.quantity || 1,
         fulfillmentType: itemChannel,
-        vertical: catV || (itemChannel === 'hvac_service' ? 'services' : itemChannel === 'quick_commerce' ? 'quick' : 'shop')
+        vertical: itemVertical
       };
     });
 
@@ -440,20 +446,6 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: `Product "${product.name}" is out of stock.` });
       }
 
-      // Resolve pricing breakdown per item via Central Pricing Engine
-      const itemPricing = await calculateItemPricing({
-        vendorPrice: product.vendorPrice,
-        basePrice: product.basePrice,
-        mrp: product.mrp,
-        context: {
-          productId: product.id,
-          vendorId: product.vendorId,
-          categoryId: product.categoryId
-        }
-      });
-
-      const qty = Number(it.quantity) || 1;
-
       const rawVertical = (product.category?.vertical || '').toLowerCase();
       let itemChannel = product.fulfillmentType;
       if (!itemChannel || itemChannel === 'traditional') {
@@ -466,6 +458,27 @@ router.post('/', async (req, res) => {
         }
       }
 
+      const itemVertical = (itemChannel === 'hvac_service' || rawVertical === 'services' || rawVertical === 'hvac')
+        ? 'services'
+        : (itemChannel === 'quick_commerce' || rawVertical === 'quick')
+          ? 'quick'
+          : 'shop';
+
+      // Resolve pricing breakdown per item via Central Pricing Engine with strict vertical isolation
+      const itemPricing = await calculateItemPricing({
+        vendorPrice: product.vendorPrice,
+        basePrice: product.basePrice,
+        mrp: product.mrp,
+        context: {
+          productId: product.id,
+          vendorId: product.vendorId,
+          categoryId: product.categoryId,
+          vertical: itemVertical
+        }
+      });
+
+      const qty = Number(it.quantity) || 1;
+
       resolved.push({
         productId: product.id,
         vendorId: product.vendorId,
@@ -476,7 +489,7 @@ router.post('/', async (req, res) => {
         platformFee: itemPricing.platformFee,
         gatewayFeeShare: itemPricing.gatewayBuffer,
         fulfillmentType: itemChannel,
-        vertical: rawVertical || (itemChannel === 'hvac_service' ? 'services' : itemChannel === 'quick_commerce' ? 'quick' : 'shop'),
+        vertical: itemVertical,
         categoryId: product.categoryId,
         categoryName: product.category?.name
       });

@@ -150,13 +150,17 @@ router.put('/:id', async (req, res) => {
   try {
     const { variants: _v, images, vendor: _vd, category: _cat, _count: _cnt, ...data } = req.body;
 
+    if (data.mrp !== undefined) {
+      data.mrp = (data.mrp != null && data.mrp !== '' && !isNaN(parseFloat(data.mrp))) ? parseFloat(data.mrp) : null;
+    }
+
     if (data.basePrice != null && data.vendorPrice != null && Number(data.basePrice) > 0 && Number(data.vendorPrice) > 0) {
       data.basePrice = parseFloat(data.basePrice);
       data.vendorPrice = parseFloat(data.vendorPrice);
     } else if (data.vendorPrice != null && Number(data.vendorPrice) > 0) {
       const pricing = await calculateItemPricing({
         vendorPrice: parseFloat(data.vendorPrice),
-        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        mrp: data.mrp || null,
         context: { vendorId: data.vendorId, categoryId: data.categoryId }
       });
       data.basePrice = pricing.customerPrice;
@@ -164,7 +168,7 @@ router.put('/:id', async (req, res) => {
     } else if (data.basePrice != null) {
       const pricing = await calculateItemPricing({
         basePrice: parseFloat(data.basePrice),
-        mrp: data.mrp ? parseFloat(data.mrp) : null,
+        mrp: data.mrp || null,
         context: { vendorId: data.vendorId, categoryId: data.categoryId }
       });
       data.vendorPrice = pricing.vendorPrice;

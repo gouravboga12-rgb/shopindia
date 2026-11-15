@@ -12,6 +12,7 @@ export const ProductsPage: React.FC = () => {
   // Edit Modal State
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
+  const [editMrp, setEditMrp] = useState<number>(0);
   const [editStock, setEditStock] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<string>('active');
   const [saving, setSaving] = useState(false);
@@ -31,6 +32,7 @@ export const ProductsPage: React.FC = () => {
   const openEditModal = (p: any) => {
     setEditingProduct(p);
     setEditPrice(Number(p.basePrice || 0));
+    setEditMrp(Number(p.mrp || 0));
     setEditStock(Number(p.stock || 0));
     setEditStatus(p.status || 'active');
   };
@@ -42,6 +44,7 @@ export const ProductsPage: React.FC = () => {
     try {
       const payload: any = {
         basePrice: editPrice,
+        mrp: editMrp > 0 ? editMrp : null,
         stock: editStock,
         status: editStatus,
       };
@@ -282,8 +285,16 @@ export const ProductsPage: React.FC = () => {
                     </td>
 
                     {/* Price */}
-                    <td className="px-5 py-4 font-numbers font-black text-gray-900">
-                      ₹{p.basePrice}
+                    <td className="px-5 py-4 font-numbers">
+                      <div className="font-black text-gray-900">₹{p.basePrice}</div>
+                      {p.mrp && Number(p.mrp) > Number(p.basePrice) && (
+                        <div className="flex items-center gap-1.5 text-[11px] mt-0.5">
+                          <span className="text-gray-400 line-through">₹{p.mrp}</span>
+                          <span className="text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded">
+                            {Math.round(((Number(p.mrp) - Number(p.basePrice)) / Number(p.mrp)) * 100)}% off
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Stock */}
@@ -364,16 +375,27 @@ export const ProductsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Base Price (₹)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Selling Price (₹)</label>
                 <input
                   type="number"
                   required
                   value={editPrice}
                   onChange={e => setEditPrice(Number(e.target.value))}
+                  className="w-full px-3 py-2 border rounded-xl text-sm font-numbers font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">MRP / Strikethrough (₹)</label>
+                <input
+                  type="number"
+                  placeholder="Optional printed price"
+                  value={editMrp || ''}
+                  onChange={e => setEditMrp(Number(e.target.value))}
                   className="w-full px-3 py-2 border rounded-xl text-sm font-numbers"
                 />
+                <span className="text-[10px] text-gray-400 block mt-0.5">Calculates discount % for shoppers</span>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Inventory / Capacity</label>
