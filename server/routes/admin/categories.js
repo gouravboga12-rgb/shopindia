@@ -33,9 +33,9 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 });
 
 const DEFAULT_QUICK_DEPARTMENTS = [
-  { id: 'grocery', label: 'Instant Grocery', icon: '🥦', badge: '10 MINS', color: 'emerald', verticalKey: 'quick_grocery', tagline: 'ShopIndia Local • One App for Your Neighbourhood.' },
-  { id: 'food', label: 'Food & Dining', icon: '🍲', badge: 'LIVE KITCHENS', color: 'orange', verticalKey: 'quick_food', tagline: 'Hot & Fresh Meals from Verified Kitchens' },
-  { id: 'pharmacy', label: 'Pharmacy', icon: '💊', badge: 'CERTIFIED PHARMA', color: 'blue', verticalKey: 'quick_pharmacy', tagline: 'Rx Medicines & Health Essentials' }
+  { id: 'grocery', label: 'Instant Grocery', icon: '🥦', badge: '10 MINS', color: 'emerald', verticalKey: 'quick_grocery', tagline: 'ShopIndia Local: One App for Your Neighbourhood.' },
+  { id: 'food', label: 'Food & Dining', icon: '🍲', badge: 'LIVE KITCHENS', color: 'orange', verticalKey: 'quick_food', tagline: 'Discover Delicious Food Around You' },
+  { id: 'pharmacy', label: 'Pharmacy', icon: '💊', badge: 'CERTIFIED PHARMA', color: 'blue', verticalKey: 'quick_pharmacy', tagline: 'Discover Pharmacies & Health Essentials Near You' }
 ];
 
 // GET /api/admin/categories/departments

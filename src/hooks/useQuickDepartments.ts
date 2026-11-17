@@ -19,7 +19,7 @@ export const DEFAULT_DEPARTMENTS: QuickDepartment[] = [
     badge: '10 MINS',
     color: 'emerald',
     verticalKey: 'quick_grocery',
-    tagline: 'ShopIndia Local • One App for Your Neighbourhood.'
+    tagline: 'ShopIndia Local: One App for Your Neighbourhood.'
   },
   {
     id: 'food',
@@ -28,7 +28,7 @@ export const DEFAULT_DEPARTMENTS: QuickDepartment[] = [
     badge: 'LIVE KITCHENS',
     color: 'orange',
     verticalKey: 'quick_food',
-    tagline: 'Hot & Fresh Meals from Verified Kitchens'
+    tagline: 'Discover Delicious Food Around You'
   },
   {
     id: 'pharmacy',
@@ -37,7 +37,7 @@ export const DEFAULT_DEPARTMENTS: QuickDepartment[] = [
     badge: 'CERTIFIED PHARMA',
     color: 'blue',
     verticalKey: 'quick_pharmacy',
-    tagline: 'Rx Medicines & Health Essentials'
+    tagline: 'Discover Pharmacies & Health Essentials Near You'
   }
 ];
 
