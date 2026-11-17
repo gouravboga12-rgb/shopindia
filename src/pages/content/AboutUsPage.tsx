@@ -11,13 +11,13 @@ export const AboutUsPage: React.FC = () => {
         {/* Hero Section */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold tracking-wide uppercase">
-            About Shop India
+            About Shopindia
           </div>
           <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight">
             Empowering Neighborhood Commerce Across Bharat
           </h1>
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Shop India is India’s first unified platform seamlessly bridging pan-India e-commerce retail, 10–20 minute neighborhood quick delivery, and trusted doorstep technician services under one roof.
+            Shopindia is India’s first unified platform seamlessly bridging pan-India e-commerce retail, 10–20 minute neighborhood quick delivery, and trusted doorstep technician services under one roof.
           </p>
         </div>
 
@@ -29,7 +29,7 @@ export const AboutUsPage: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
                 <ShoppingBag className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-black text-slate-900">Shop India (E-Commerce)</h3>
+              <h3 className="text-xl font-black text-slate-900">Shopindia (E-Commerce)</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Connects consumers with verified manufacturers, brands, and traditional retailers across India with reliable courier delivery via Shiprocket across 28,000+ pincodes.
               </p>
@@ -38,7 +38,7 @@ export const AboutUsPage: React.FC = () => {
               onClick={() => { setCurrentVertical('shop'); navigateTo('home'); }}
               className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
             >
-              Explore Shop India →
+              Explore Shopindia →
             </button>
           </div>
 
@@ -84,7 +84,7 @@ export const AboutUsPage: React.FC = () => {
         {/* Our Core Values */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 space-y-8">
           <div className="text-center max-w-xl mx-auto space-y-2">
-            <h3 className="text-2xl font-black text-slate-900">Why Shop India?</h3>
+            <h3 className="text-2xl font-black text-slate-900">Why Shopindia?</h3>
             <p className="text-xs text-slate-500">Built to empower both local sellers and everyday consumers.</p>
           </div>
 
