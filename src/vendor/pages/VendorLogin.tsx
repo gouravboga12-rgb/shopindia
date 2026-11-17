@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { Store, Eye, EyeOff, Loader2, MapPin, Navigation, Zap, Upload, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { reverseGeocodeMapbox } from '../../lib/mapbox';
+import { Store, Eye, EyeOff, Loader2, MapPin, Navigation, Upload, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRegister = false }) => {
@@ -27,7 +28,7 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
   const [pincode, setPincode] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
-  const [supportsQuick, setSupportsQuick] = useState<boolean>(true);
+  const [supportsQuick] = useState<boolean>(true);
   const [category, setCategory] = useState<string>('grocery');
   const [detectingGps, setDetectingGps] = useState(false);
 
@@ -84,20 +85,20 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
-        setLat(Math.round(latitude * 1000000) / 1000000);
-        setLng(Math.round(longitude * 1000000) / 1000000);
+        const roundedLat = Math.round(latitude * 1000000) / 1000000;
+        const roundedLng = Math.round(longitude * 1000000) / 1000000;
+        setLat(roundedLat);
+        setLng(roundedLng);
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          const data = await res.json();
-          const addr = data.address || {};
-          if (addr.city || addr.town || addr.village) setCity(addr.city || addr.town || addr.village);
-          if (addr.state) setState(addr.state);
-          if (addr.postcode) setPincode(addr.postcode);
-          const road = [addr.road, addr.suburb, addr.neighbourhood].filter(Boolean).join(', ');
-          if (road) setStreet(road);
+          // Multi-provider reverse geocode (Mapbox API -> backend proxy -> Nominatim fallback)
+          const geo = await reverseGeocodeMapbox(longitude, latitude);
+          const roadPart = [geo.houseNumber, geo.road].filter(Boolean).join(' ');
+          const areaParts = [geo.colony, geo.neighborhood, geo.village, geo.mandal].filter(Boolean);
+          const detectedStreet = [roadPart, ...areaParts].filter(Boolean).join(', ') || geo.line1 || '';
+          if (detectedStreet) setStreet(detectedStreet);
+          if (geo.city || geo.district) setCity(geo.city || geo.district || '');
+          if (geo.state) setState(geo.state);
+          if (geo.pincode) setPincode(geo.pincode);
         } catch {}
         setDetectingGps(false);
       },
@@ -283,28 +284,6 @@ export const VendorLogin: React.FC<{ initialRegister?: boolean }> = ({ initialRe
                       <span className="font-bold">✓ Geo-Pinned</span>
                     </div>
                   )}
-                </div>
-
-                {/* Quick Commerce Enable Toggle */}
-                <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/70 rounded-2xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-emerald-600" />
-                      Quick 10-Min Instant Delivery
-                    </span>
-                    <p className="text-[10.5px] text-gray-500">
-                      Enable instant hyperlocal doorstep fulfillment within 5–10 km
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={supportsQuick}
-                      onChange={e => setSupportsQuick(e.target.checked)}
-                      className="rounded accent-emerald-600"
-                    />
-                    <span>Enabled</span>
-                  </label>
                 </div>
 
                 {/* KYC & Business Documents Upload Section */}

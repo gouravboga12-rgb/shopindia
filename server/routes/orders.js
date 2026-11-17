@@ -942,7 +942,7 @@ router.post('/', async (req, res) => {
           message: isMultiStore
             ? `Your multi-store order #${notifOrderRef} has been placed. ${createdOrders.length} separate delivery riders are being assigned to pick up from each store.`
             : isQuick
-              ? `Your 10-Min order #${notifOrderRef} is placed and being packed at the store.`
+              ? `Your 10-Min order #${notifOrderRef} is placed and being packed at the dark store.`
               : isService
                 ? `Your service appointment #${notifOrderRef} has been booked. Technician will arrive at scheduled time.`
                 : `Your E-Commerce order #${notifOrderRef} is confirmed! Estimated delivery in 2-4 business days.`,

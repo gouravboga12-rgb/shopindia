@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { reverseGeocodeMapbox } from '../../lib/mapbox';
 import {
   Store, MapPin, Navigation, Landmark, ShieldCheck,
   Save, AlertTriangle, CheckCircle2, RefreshCw, Zap,
@@ -123,33 +124,36 @@ export const VendorSettings: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        const roundedLat = Math.round(latitude * 1000000) / 1000000;
+        const roundedLng = Math.round(longitude * 1000000) / 1000000;
+
         setForm(prev => ({
           ...prev,
-          lat: Math.round(latitude * 1000000) / 1000000,
-          lng: Math.round(longitude * 1000000) / 1000000,
+          lat: roundedLat,
+          lng: roundedLng,
         }));
 
         try {
-          // Reverse geocode to auto-fill address details
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          const data = await res.json();
-          const addr = data.address || {};
-          const city = addr.city || addr.town || addr.village || addr.city_district || '';
-          const state = addr.state || '';
-          const postcode = addr.postcode || '';
-          const street = [addr.road, addr.suburb, addr.neighbourhood].filter(Boolean).join(', ');
+          // Multi-provider reverse geocode (Mapbox API -> backend proxy -> client Nominatim)
+          const geo = await reverseGeocodeMapbox(longitude, latitude);
+
+          const roadPart = [geo.houseNumber, geo.road].filter(Boolean).join(' ');
+          const areaParts = [geo.colony, geo.neighborhood, geo.village, geo.mandal].filter(Boolean);
+          const detectedStreet = [roadPart, ...areaParts].filter(Boolean).join(', ') || geo.line1 || '';
+          const detectedCity = geo.city || geo.district || '';
+          const detectedState = geo.state || '';
+          const detectedPincode = geo.pincode || '';
 
           setForm(prev => ({
             ...prev,
-            street: prev.street || street || null,
-            city: prev.city || city || null,
-            state: prev.state || state || null,
-            pincode: prev.pincode || postcode || null,
+            lat: roundedLat,
+            lng: roundedLng,
+            street: detectedStreet || prev.street || '',
+            city: detectedCity || prev.city || '',
+            state: detectedState || prev.state || '',
+            pincode: detectedPincode || prev.pincode || '',
           }));
-          setSuccessMsg('GPS coordinates and address detected successfully!');
+          setSuccessMsg('GPS coordinates and address detected successfully! You can refine the address fields below.');
         } catch {
           setSuccessMsg(`GPS Coordinates detected: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
         } finally {
@@ -286,7 +290,7 @@ export const VendorSettings: React.FC = () => {
           }`}
         >
           <Compass className="w-4 h-4" />
-          Mapbox GPS & Quick Radius
+          Store Location & GPS
         </button>
 
         <button
@@ -651,55 +655,6 @@ export const VendorSettings: React.FC = () => {
                     onChange={e => setForm({ ...form, lng: e.target.value ? parseFloat(e.target.value) : null })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
-                </div>
-              </div>
-
-              {/* Delivery Radius Slider (Strict 5 km - 10 km Limit) */}
-              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-emerald-600" />
-                      Quick Commerce Delivery Radius (5 - 10 km)
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      Nearby customers within this 5–10 km radius can purchase your store products for instant quick shopping. Shop India products appear pan-India.
-                    </p>
-                  </div>
-                  <span className="text-base font-extrabold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-lg">
-                    {Math.min(10, Math.max(5, form.deliveryRadiusKm || 5))} km
-                  </span>
-                </div>
-
-                <input
-                  type="range"
-                  min="5"
-                  max="10"
-                  step="1"
-                  value={Math.min(10, Math.max(5, form.deliveryRadiusKm || 5))}
-                  onChange={e => setForm({ ...form, deliveryRadiusKm: parseFloat(e.target.value) })}
-                  className="w-full accent-emerald-600 cursor-pointer"
-                />
-                <div className="flex justify-between items-center text-[11px] font-semibold text-gray-500 pt-1">
-                  <span>5 km (Ultra Local)</span>
-                  <span>7.5 km (City Zone)</span>
-                  <span>10 km (Maximum Quick Radius)</span>
-                </div>
-                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                  {[5, 6, 7, 8, 9, 10].map(rad => (
-                    <button
-                      key={rad}
-                      type="button"
-                      onClick={() => setForm({ ...form, deliveryRadiusKm: rad })}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                        (form.deliveryRadiusKm || 5) === rad
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
-                      }`}
-                    >
-                      {rad} km
-                    </button>
-                  ))}
                 </div>
               </div>
 

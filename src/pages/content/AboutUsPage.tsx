@@ -50,7 +50,7 @@ export const AboutUsPage: React.FC = () => {
               </div>
               <h3 className="text-xl font-black text-slate-900">Quick Shopping (Hyperlocal)</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Lightning-fast 10 to 20 minute delivery of fresh groceries, produce, milk, and household essentials fulfilled directly from neighborhood stores and local hubs.
+                Lightning-fast 10 to 20 minute delivery of fresh groceries, produce, milk, and household essentials fulfilled directly from neighborhood kirana stores and dark stores.
               </p>
             </div>
             <button
