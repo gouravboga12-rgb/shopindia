@@ -19,7 +19,7 @@ export const DEFAULT_DEPARTMENTS: QuickDepartment[] = [
     badge: '10 MINS',
     color: 'emerald',
     verticalKey: 'quick_grocery',
-    tagline: '10-20 Min Delivery from Dark Store'
+    tagline: 'ShopIndia Local • One App for Your Neighbourhood.'
   },
   {
     id: 'food',

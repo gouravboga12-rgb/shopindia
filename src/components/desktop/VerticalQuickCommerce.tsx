@@ -180,9 +180,17 @@ export const VerticalQuickCommerce: React.FC = () => {
           </div>
 
           <div className="text-xs font-semibold text-slate-500 px-3 hidden lg:flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" />
             <span>
-              {activeDeptObj?.tagline || '10-20 Min Quick Delivery from Verified Stores'}
+              {activeDeptObj?.id === 'grocery' ? (
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-slate-900 font-bold">ShopIndia Local</span>
+                  <span className="text-slate-300">•</span>
+                  <span>One App for Your Neighbourhood.</span>
+                </span>
+              ) : (
+                activeDeptObj?.tagline || 'ShopIndia Local • One App for Your Neighbourhood.'
+              )}
             </span>
           </div>
         </div>
@@ -216,7 +224,7 @@ export const VerticalQuickCommerce: React.FC = () => {
               {!['grocery', 'food', 'pharmacy'].includes(activeSubVertical) && `${activeDeptObj?.label || 'Instant'} Store`}
             </h2>
             <p className="text-xs md:text-sm text-white/80 font-medium">
-              {activeSubVertical === 'grocery' && 'Dark-store stocked with fresh fruits, farm dairy, and top FMCG brands.'}
+              {activeSubVertical === 'grocery' && 'ShopIndia Local stocked with fresh fruits, farm dairy, and top FMCG brands from your neighbourhood.'}
               {activeSubVertical === 'food' && 'Live preparation tracking with food safety hygiene guarantee.'}
               {activeSubVertical === 'pharmacy' && '100% genuine OTC wellness essentials, vitamins, first-aid & health care delivered.'}
               {!['grocery', 'food', 'pharmacy'].includes(activeSubVertical) && (activeDeptObj?.tagline || 'Hyperlocal delivery straight to your doorstep.')}

@@ -4,7 +4,7 @@ const prisma = require('../lib/prisma');
 const router = express.Router();
 
 const DEFAULT_QUICK_DEPARTMENTS = [
-  { id: 'grocery', label: 'Instant Grocery', icon: '🥦', badge: '10 MINS', color: 'emerald', verticalKey: 'quick_grocery', tagline: '10-20 Min Delivery from Dark Store' },
+  { id: 'grocery', label: 'Instant Grocery', icon: '🥦', badge: '10 MINS', color: 'emerald', verticalKey: 'quick_grocery', tagline: 'ShopIndia Local • One App for Your Neighbourhood.' },
   { id: 'food', label: 'Food & Dining', icon: '🍲', badge: 'LIVE KITCHENS', color: 'orange', verticalKey: 'quick_food', tagline: 'Hot & Fresh Meals from Verified Kitchens' },
   { id: 'pharmacy', label: 'Pharmacy', icon: '💊', badge: 'CERTIFIED PHARMA', color: 'blue', verticalKey: 'quick_pharmacy', tagline: 'Rx Medicines & Health Essentials' }
 ];

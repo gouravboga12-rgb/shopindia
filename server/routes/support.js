@@ -84,7 +84,7 @@ const DEFAULT_SUPPORT_FAQS = [
     category: 'Quick Shopping',
     vertical: 'quick',
     question: 'How fast is Quick Shopping delivery?',
-    answer: 'Quick Shopping grocery and food orders are delivered within 10 to 20 minutes from our nearest local dark stores and vendor hubs by dedicated express delivery partners.',
+    answer: 'Quick Shopping grocery and food orders are delivered within 10 to 20 minutes from our nearest ShopIndia Local hubs and neighborhood stores by dedicated express delivery partners.',
     canRaiseTicket: false
   },
   {

@@ -106,7 +106,7 @@ export const ServiceAreasPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Service Areas & Merchant Coverage</h1>
-          <p className="text-sm text-gray-500">Live operational locations of vendors, quick-commerce dark stores, and regional service hubs</p>
+          <p className="text-sm text-gray-500">Live operational locations of vendors, quick-commerce stores, and regional service hubs</p>
         </div>
       </div>
 

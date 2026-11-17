@@ -43,6 +43,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       localStorage.removeItem('shopindia_admin_user');
       localStorage.removeItem('shopindia_vendor_token');
       localStorage.removeItem('shopindia_vendor_user');
+      localStorage.removeItem('shopindia_regional_admin_token');
+      localStorage.removeItem('shopindia_regional_admin_user');
+      localStorage.removeItem('shopindia_rider_token');
+      localStorage.removeItem('shopindia_rider_user');
       window.location.reload();
       return Promise.reject(new Error('Session expired'));
     }
