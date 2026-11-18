@@ -780,7 +780,7 @@ export const SupportPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
             {/* Modal Header */}
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/80">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/80 shrink-0">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
@@ -856,7 +856,7 @@ export const SupportPage: React.FC = () => {
 
             {/* Rich Order & Product Details Context Card */}
             {selectedTicket.order && (
-              <div className="mx-6 mt-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div className="mx-6 mt-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl shrink-0">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60 text-xs">
                   <div className="flex items-center gap-2">
                     <Package className="w-4 h-4 text-blue-600" />
@@ -924,7 +924,21 @@ export const SupportPage: React.FC = () => {
             )}
 
             {/* Modal Content: Scrollable Message Thread with Message Edit & Delete */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/40 min-h-[350px]">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/40 min-h-0">
+              {/* Internal Notes from Territory / Regional Admin */}
+              {selectedTicket.internalNotes && (
+                <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-bold text-[10.5px] uppercase tracking-wider text-amber-800">
+                      Internal Territory Notes (Regional Hub):
+                    </p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-amber-950 font-medium">
+                      {selectedTicket.internalNotes}
+                    </p>
+                  </div>
+                </div>
+              )}
               {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
                 selectedTicket.messages.map((m: any, idx: number) => {
                   const isStaff = m.senderRole === 'support' || m.senderRole === 'admin';
@@ -1048,7 +1062,7 @@ export const SupportPage: React.FC = () => {
             </div>
 
             {/* Modal Footer: Reply & Quick Status Bar */}
-            <div className="p-4 border-t border-gray-100 bg-white space-y-3">
+            <div className="p-4 border-t border-gray-100 bg-white space-y-3 shrink-0 shadow-xs">
               <form onSubmit={sendReply} className="flex gap-2">
                 <input
                   value={replyText}

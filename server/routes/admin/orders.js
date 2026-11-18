@@ -118,7 +118,7 @@ router.patch('/:id/status', async (req, res) => {
           category: 'order',
           title,
           message,
-          channel: 'in_app',
+          channel: 'IN_APP',
           isRead: false,
           link: `/orders/${order.id}`,
         }
@@ -218,7 +218,7 @@ router.post('/:id/refund', async (req, res) => {
           category: 'refund',
           title: 'Refund Initiated! 💳',
           message: `Your refund of ₹${amt.toLocaleString('en-IN')} for order #${existing.orderNumber} has been initiated via Razorpay (Ref: ${rzpRefundId}). It will reflect in your original payment account in 3–5 working days.`,
-          channel: 'in_app',
+          channel: 'IN_APP',
           isRead: false,
           link: `/orders/${existing.id}`,
         },

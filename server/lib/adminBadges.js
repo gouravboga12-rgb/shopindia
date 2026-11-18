@@ -16,7 +16,7 @@ async function fetchAdminBadgeCounts() {
     prisma.riderProfile.count({ where: { isApproved: false } }),
     prisma.regionalAdminProfile.count({ where: { status: 'pending_approval' } }),
     prisma.ticket.count({ where: { status: { in: ['open', 'in_progress'] } } }),
-    prisma.order.count({ where: { refundStatus: 'pending' } }),
+    prisma.ticket.count({ where: { refundStatus: 'pending' } }),
   ]);
 
   return {

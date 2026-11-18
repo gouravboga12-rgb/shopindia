@@ -221,8 +221,10 @@ router.get('/tickets', async (req, res) => {
 /** GET /api/admin/support/tickets/:id */
 router.get('/tickets/:id', async (req, res) => {
   try {
-    const ticket = await prisma.ticket.findUnique({
-      where: { id: req.params.id },
+    const ticket = await prisma.ticket.findFirst({
+      where: {
+        OR: [{ id: req.params.id }, { ticketNumber: req.params.id }],
+      },
       include: {
         customer: { select: { name: true, email: true, phone: true } },
         assignedTo: { select: { name: true, email: true } },
@@ -299,6 +301,11 @@ router.get('/tickets/:id', async (req, res) => {
 router.patch('/tickets/:id/status', async (req, res) => {
   try {
     const { status, assignedTo, tier, priority } = req.body;
+    const target = await prisma.ticket.findFirst({
+      where: { OR: [{ id: req.params.id }, { ticketNumber: req.params.id }] },
+    });
+    if (!target) return res.status(404).json({ error: 'Ticket not found.' });
+
     const data = {};
     if (status) data.status = status;
     if (assignedTo) data.assignedToId = assignedTo;
@@ -306,7 +313,7 @@ router.patch('/tickets/:id/status', async (req, res) => {
     if (priority) data.priority = priority;
 
     const ticket = await prisma.ticket.update({
-      where: { id: req.params.id },
+      where: { id: target.id },
       data,
       include: { messages: true },
     });
@@ -321,16 +328,21 @@ router.post('/tickets/:id/reply', async (req, res) => {
     const { text } = req.body;
     if (!text || !text.trim()) return res.status(400).json({ error: 'Reply text required' });
 
+    const target = await prisma.ticket.findFirst({
+      where: { OR: [{ id: req.params.id }, { ticketNumber: req.params.id }] },
+    });
+    if (!target) return res.status(404).json({ error: 'Ticket not found.' });
+
     await prisma.ticketMessage.create({
       data: {
-        ticketId: req.params.id,
+        ticketId: target.id,
         senderRole: 'support',
         text: text.trim(),
         sentAt: new Date(),
       },
     });
     const ticket = await prisma.ticket.update({
-      where: { id: req.params.id },
+      where: { id: target.id },
       data: { status: 'in_progress' },
       include: { messages: true },
     });
