@@ -113,10 +113,19 @@ export const RegionalSettings: React.FC = () => {
         setLatitude(geocoded.latitude);
         setLongitude(geocoded.longitude);
       }
-      if (geocoded.fullAddress || geocoded.formattedAddress) {
-        setAddress(geocoded.fullAddress || geocoded.formattedAddress || '');
+
+      // Auto-generate Regional Hub Name if detected
+      const areaOrMandal = geocoded.mandal || geocoded.colony || geocoded.village || geocoded.neighborhood || geocoded.road;
+      const cityOrDistrict = (geocoded.district || geocoded.city || 'Hub').replace(/–/g, '-');
+      const autoRegionName = areaOrMandal ? `${areaOrMandal} Hub (${cityOrDistrict})` : `${cityOrDistrict} Regional Hub`;
+      if (autoRegionName) {
+        setRegionName(autoRegionName);
       }
-      if (geocoded.district) setDistrict(geocoded.district);
+
+      if (geocoded.district || geocoded.city) {
+        setDistrict((geocoded.district || geocoded.city || '').replace(/–/g, '-'));
+      }
+
       if (geocoded.state) {
         const stateLower = geocoded.state.toLowerCase();
         const match = INDIAN_STATES_AND_UTS.find(
@@ -124,9 +133,11 @@ export const RegionalSettings: React.FC = () => {
         );
         if (match) setState(match);
       }
+
       if (geocoded.pincode) {
         const detectedPin = geocoded.pincode;
         setPincodesInput((prev) => {
+          if (!prev.trim()) return detectedPin;
           const existing = prev
             .split(',')
             .map((p) => p.trim())
@@ -137,7 +148,12 @@ export const RegionalSettings: React.FC = () => {
           return prev;
         });
       }
-      setSaveSuccessMsg('GPS coordinates and base station location detected via Mapbox!');
+
+      if (geocoded.fullAddress || geocoded.formattedAddress) {
+        setAddress(geocoded.fullAddress || geocoded.formattedAddress || '');
+      }
+
+      setSaveSuccessMsg('GPS coordinates, territory details, and address detected successfully!');
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     } catch (err: unknown) {
       setSaveErrorMsg(err instanceof Error ? err.message : 'Failed to detect live GPS location.');
