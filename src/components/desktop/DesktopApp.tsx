@@ -19,6 +19,7 @@ import { RefundPolicyPage } from '../../pages/content/RefundPolicyPage';
 import { TermsAndConditionsPage } from '../../pages/content/TermsAndConditionsPage';
 import { PrivacyPolicyPage } from '../../pages/content/PrivacyPolicyPage';
 import { AboutUsPage } from '../../pages/content/AboutUsPage';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 
 export const DesktopApp: React.FC = () => {
   const { currentVertical, currentPath } = useApp();
@@ -75,7 +76,9 @@ export const DesktopApp: React.FC = () => {
     <div className="min-h-screen flex flex-col w-full bg-[#FAF9F6] text-gray-800">
       <DesktopHeader />
       <main className="flex-1 w-full">
-        {renderContent()}
+        <ErrorBoundary>
+          {renderContent()}
+        </ErrorBoundary>
       </main>
       <DesktopFooter />
       <CartSuccessToast />

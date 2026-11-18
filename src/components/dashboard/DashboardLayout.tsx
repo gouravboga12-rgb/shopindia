@@ -32,9 +32,9 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
 
 
   const counts: Partial<Record<DashboardTab, number>> = {
-    cart: cart.length,
-    wishlist: wishlist.length,
-    notifications: unread,
+    cart: (cart || []).length,
+    wishlist: (wishlist || []).length,
+    notifications: unread || 0,
   };
 
   const handleSelect = (t: DashboardTab) => {
@@ -53,11 +53,11 @@ export const DashboardLayout: React.FC<{ activeTab: DashboardTab; onTabChange: (
           {/* User Profile Card */}
           <div className="bg-white border border-brand-border/80 rounded-2xl p-5 mb-5 shadow-soft flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-brand-blue/10 flex items-center justify-center text-brand-blue font-black uppercase text-xl">
-              {profile.name?.[0] || 'U'}
+              {profile?.name?.[0] || 'U'}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-extrabold text-brand-graphite truncate font-heading">{profile.name}</p>
-              <p className="text-xs font-bold text-brand-slate uppercase tracking-wider truncate mt-0.5">{profile.email}</p>
+              <p className="text-sm font-extrabold text-brand-graphite truncate font-heading">{profile?.name || 'Guest User'}</p>
+              <p className="text-xs font-bold text-brand-slate uppercase tracking-wider truncate mt-0.5">{profile?.email || 'guest@shopindia.com'}</p>
             </div>
           </div>
 

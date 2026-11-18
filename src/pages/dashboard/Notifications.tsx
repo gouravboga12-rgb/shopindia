@@ -4,13 +4,22 @@ import { PageHeader, EmptyState, Badge } from '../../components/dashboard/Dashbo
 import { Bell, CheckCheck, Trash2, Package, Truck, Tag, Percent, TrendingDown, PackagePlus } from 'lucide-react';
 import type { NotificationCategory } from '../../data/dashboardTypes';
 
-const CAT_META: Record<NotificationCategory, { label: string; icon: React.ReactNode; tone: string }> = {
+const DEFAULT_META: { label: string; icon: React.ReactNode; tone: string } = {
+  label: 'Alert',
+  icon: <Bell className="w-3.5 h-3.5" />,
+  tone: 'blue',
+};
+
+const CAT_META: Record<string, { label: string; icon: React.ReactNode; tone: string }> = {
   order: { label: 'Order Updates', icon: <Package className="w-3.5 h-3.5" />, tone: 'blue' },
   shipping: { label: 'Shipping Updates', icon: <Truck className="w-3.5 h-3.5" />, tone: 'green' },
   promotion: { label: 'Promotions', icon: <Tag className="w-3.5 h-3.5" />, tone: 'purple' },
   coupon: { label: 'Coupons', icon: <Percent className="w-3.5 h-3.5" />, tone: 'amber' },
   price_drop: { label: 'Price Drops', icon: <TrendingDown className="w-3.5 h-3.5" />, tone: 'red' },
   stock: { label: 'Stock Alerts', icon: <PackagePlus className="w-3.5 h-3.5" />, tone: 'emerald' },
+  alert: { label: 'Broadcast Alerts', icon: <Bell className="w-3.5 h-3.5" />, tone: 'amber' },
+  system: { label: 'System Notices', icon: <Bell className="w-3.5 h-3.5" />, tone: 'slate' },
+  support: { label: 'Support Updates', icon: <Bell className="w-3.5 h-3.5" />, tone: 'indigo' },
 };
 
 const FILTERS: ('all' | NotificationCategory)[] = ['all', 'order', 'shipping', 'promotion', 'coupon', 'price_drop', 'stock'];
@@ -60,7 +69,7 @@ export const NotificationsPage: React.FC = () => {
       <div className="flex gap-2 flex-wrap">
         {FILTERS.map((f) => (
           <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${filter === f ? 'bg-brand-blue text-white border-brand-blue' : 'bg-white border-brand-border text-brand-slate hover:border-brand-blue/40'}`}>
-            {f === 'all' ? 'All' : CAT_META[f as NotificationCategory].label}
+            {f === 'all' ? 'All' : (CAT_META[f]?.label || f)}
           </button>
         ))}
       </div>
@@ -69,7 +78,7 @@ export const NotificationsPage: React.FC = () => {
 
       <div className="flex flex-col gap-2.5">
         {filtered.map((n) => {
-          const meta = CAT_META[n.category];
+          const meta = CAT_META[n.category] || DEFAULT_META;
           return (
             <div key={n.id} onClick={() => !n.isRead && markNotificationRead(n.id)} className={`bg-white border rounded-card shadow-premium p-4 flex items-start gap-3 cursor-pointer transition-colors ${n.isRead ? 'border-brand-border opacity-75' : 'border-brand-blue/20 bg-blue-50/20'}`}>
               <div className="w-9 h-9 rounded-xl bg-brand-blue/5 text-brand-blue flex items-center justify-center flex-shrink-0">{meta.icon}</div>
@@ -81,7 +90,7 @@ export const NotificationsPage: React.FC = () => {
                 <p className="text-xs text-brand-slate mt-0.5">{n.message}</p>
                 <div className="flex items-center gap-2 mt-1.5">
                   <Badge tone="slate">{meta.label}</Badge>
-                  <span className="text-xs text-brand-slate">{new Date(n.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-xs text-brand-slate">{n.createdAt ? new Date(n.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recently'}</span>
                 </div>
               </div>
               <button onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }} aria-label="Delete notification" className="p-1.5 rounded-lg text-brand-slate hover:bg-red-50 hover:text-red-500 flex-shrink-0">

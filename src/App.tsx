@@ -8,6 +8,7 @@ import { AdminPortal } from './admin/AdminPortal';
 import { RegionalAdminPortal } from './regional-admin/RegionalAdminPortal';
 import { VendorPortal } from './vendor/VendorPortal';
 import { RiderPortal } from './rider/RiderPortal';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainLayout: React.FC = () => {
   const isMobile = useIsMobile();
@@ -54,11 +55,13 @@ function App() {
   }
 
   return (
-    <CustomerProvider>
-      <AppProvider>
-        <MainLayout />
-      </AppProvider>
-    </CustomerProvider>
+    <ErrorBoundary>
+      <CustomerProvider>
+        <AppProvider>
+          <MainLayout />
+        </AppProvider>
+      </CustomerProvider>
+    </ErrorBoundary>
   );
 }
 

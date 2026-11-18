@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ServiceQuickSupport } from '../common/ServiceQuickSupport';
 import { LocationModal } from '../common/LocationModal';
 import { CartSuccessToast } from '../common/CartSuccessToast';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import servicesImg from '../../assets/services.png';
 
 export const MobileApp: React.FC = () => {
@@ -310,7 +311,9 @@ export const MobileApp: React.FC = () => {
             transition={{ duration: 0.25, ease: 'easeInOut' }}
             className="w-full"
           >
-            {renderActiveScreen()}
+            <ErrorBoundary>
+              {renderActiveScreen()}
+            </ErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </div>

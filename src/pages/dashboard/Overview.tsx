@@ -28,7 +28,7 @@ export const OverviewPage: React.FC<{ onNavigate: (t: DashboardTab) => void }> =
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-brand-blue to-blue-800 rounded-2xl p-8 text-white shadow-premium relative overflow-hidden">
         <div className="relative z-10">
-          <h1 className="text-2xl font-black font-heading mb-2">Welcome back, {profile.name?.split(' ')[0] || 'User'}!</h1>
+          <h1 className="text-2xl font-black font-heading mb-2">Welcome back, {profile?.name?.split(' ')[0] || 'User'}!</h1>
           <p className="text-blue-100 text-sm font-medium max-w-md">Manage your orders, track deliveries, and discover new products curated just for you.</p>
         </div>
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12 translate-x-1/4" />
@@ -105,9 +105,9 @@ export const OverviewPage: React.FC<{ onNavigate: (t: DashboardTab) => void }> =
 
                   <div className="flex items-center justify-between pt-2 border-t border-brand-border/50 text-xs">
                     <span className="font-extrabold text-brand-graphite font-numbers">
-                      ₹{o.total.toLocaleString('en-IN')}{' '}
+                      ₹{Number(o.total || 0).toLocaleString('en-IN')}{' '}
                       <span className="text-[11px] font-medium text-brand-slate">
-                        · {o.items.length} {o.items.length === 1 ? 'item' : 'items'}
+                        · {(o.items || []).length} {(o.items || []).length === 1 ? 'item' : 'items'}
                       </span>
                     </span>
                     <Badge tone={statusTone(o.status)}>{statusText}</Badge>

@@ -54,7 +54,7 @@ export interface Reward {
   expiresAt?: string;
 }
 
-export type NotificationCategory = 'order' | 'shipping' | 'promotion' | 'coupon' | 'price_drop' | 'stock';
+export type NotificationCategory = 'order' | 'shipping' | 'promotion' | 'coupon' | 'price_drop' | 'stock' | 'alert' | 'system' | 'support' | (string & {});
 
 export interface DashboardNotification {
   id: string;
