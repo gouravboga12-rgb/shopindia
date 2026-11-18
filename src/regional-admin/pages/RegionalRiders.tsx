@@ -58,6 +58,8 @@ export const RegionalRiders: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [inspectRiderDocs, setInspectRiderDocs] = useState<RiderItem | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ title: string; url: string } | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchRiders = async () => {
     if (!token) return;
@@ -83,7 +85,11 @@ export const RegionalRiders: React.FC = () => {
 
   const handleVerify = async (riderId: string, approve: boolean) => {
     if (!token) return;
+    const targetRider = riders.find((r) => r.id === riderId);
+    const partnerName = targetRider?.user?.name || 'Partner';
     setActionLoading(riderId);
+    setErrorMsg(null);
+    setSuccessMsg(null);
     try {
       const res = await fetch(`/api/regional-admin/riders/${riderId}/verify`, {
         method: 'PATCH',
@@ -93,6 +99,7 @@ export const RegionalRiders: React.FC = () => {
         },
         body: JSON.stringify({ approved: approve }),
       });
+      const data = await res.json();
       if (res.ok) {
         setRiders((prev) =>
           prev.map((r) =>
@@ -102,14 +109,23 @@ export const RegionalRiders: React.FC = () => {
                   isApproved: approve,
                   isActive: approve,
                   isRejected: !approve,
-                  user: { ...r.user, status: approve ? 'active' : 'rejected' },
+                  user: { ...r.user, status: approve ? 'active' : 'suspended' },
                 }
               : r
           )
         );
+        setSuccessMsg(
+          approve
+            ? `✓ ${partnerName} KYC has been approved and partner is now activated!`
+            : `✕ ${partnerName} KYC has been rejected.`
+        );
+        setTimeout(() => setSuccessMsg(null), 5000);
+      } else {
+        setErrorMsg(data.error || 'Failed to update partner verification.');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to verify rider', e);
+      setErrorMsg(e.message || 'Network error while updating partner verification.');
     } finally {
       setActionLoading(null);
     }
@@ -163,6 +179,27 @@ export const RegionalRiders: React.FC = () => {
           <span>Refresh Partners</span>
         </button>
       </div>
+
+      {/* Alert Messages */}
+      {successMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center justify-between text-xs font-bold animate-in fade-in shadow-2xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900 text-xs font-bold cursor-pointer">✕</button>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center justify-between text-xs font-bold animate-in fade-in shadow-2xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-red-600 hover:text-red-900 text-xs font-bold cursor-pointer">✕</button>
+        </div>
+      )}
 
       {/* KYC Approvals Queue (Priority Alert) */}
       {pendingVerification.length > 0 && (
@@ -245,17 +282,17 @@ export const RegionalRiders: React.FC = () => {
                   <button
                     onClick={() => handleVerify(rider.id, true)}
                     disabled={actionLoading === rider.id}
-                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Approve Partner</span>
+                    <CheckCircle2 className={`w-4 h-4 ${actionLoading === rider.id ? 'animate-spin' : ''}`} />
+                    <span>{actionLoading === rider.id ? 'Approving...' : 'Approve Partner'}</span>
                   </button>
                   <button
                     onClick={() => handleVerify(rider.id, false)}
                     disabled={actionLoading === rider.id}
-                    className="py-2 px-3.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    className="py-2 px-3.5 bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 border border-red-200 font-bold text-xs rounded-xl transition-all cursor-pointer"
                   >
-                    Reject
+                    {actionLoading === rider.id ? '...' : 'Reject'}
                   </button>
                 </div>
               </div>
