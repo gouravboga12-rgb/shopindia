@@ -369,12 +369,13 @@ router.post(['/:id/decline', '/orders/:id/decline'], async (_req, res) => {
  * Get current ongoing delivery details and checkpoints.
  * Future scheduled service appointments (e.g. tomorrow) do not hijack this screen.
  */
-router.get('/active-job', async (req, res) => {
+router.get(['/active-job', '/orders/active-job'], async (req, res) => {
   try {
     const profile = await getRiderProfile(req.user.userId);
     if (!profile) return res.status(404).json({ error: 'Rider profile not found.' });
 
-    const activeJob = await prisma.delivery.findFirst({
+    // Fetch all active/assigned deliveries for this partner
+    const candidateJobs = await prisma.delivery.findMany({
       where: {
         riderProfileId: profile.id,
         status: { in: ['assigned', 'arrived_pickup', 'picked_up', 'arrived_customer'] },
@@ -390,28 +391,52 @@ router.get('/active-job', async (req, res) => {
               },
             },
             customer: { select: { id: true, name: true, phone: true } },
-            vendor: { select: { id: true, businessName: true, phone: true, street: true, city: true } },
+            vendor: { select: { id: true, businessName: true, phone: true, street: true, city: true, lat: true, lng: true } },
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (activeJob) {
-      // If this is a Glacons doorstep service
-      if (activeJob.order?.type === 'hvac_service') {
-        const isAlreadyEnRoute = activeJob.status === 'picked_up' || activeJob.status === 'arrived_customer';
-        if (!isAlreadyEnRoute) {
-          const notes = (activeJob.order?.notes || activeJob.pickupAddress || '').toLowerCase();
-          const isInstant = notes.includes('instant');
+    // Separate active live trips (quick commerce, food, parcel, or en-route services)
+    // from future advance scheduled services (which stay in the scheduled roster until started)
+    const liveJobs = [];
+    const scheduledUpcoming = [];
 
-          // If NOT an emergency instant match, scheduled appointments stay in the Scheduled Services roster
-          // until the technician explicitly taps "Start Trip" (which advances status to picked_up)
-          if (!isInstant) {
-            return res.json({ activeJob: null, activeDelivery: null, isScheduledUpcoming: true, scheduledDelivery: activeJob });
-          }
+    for (const job of candidateJobs) {
+      if (job.order?.type === 'hvac_service') {
+        const isAlreadyEnRoute = job.status === 'picked_up' || job.status === 'arrived_customer';
+        const notes = (job.order?.notes || job.pickupAddress || '').toLowerCase();
+        const isInstant = notes.includes('instant');
+
+        if (isAlreadyEnRoute || isInstant) {
+          liveJobs.push(job);
+        } else {
+          scheduledUpcoming.push(job);
         }
+      } else {
+        // Quick commerce, food, grocery, medicines, or retail deliveries are always immediate active jobs
+        liveJobs.push(job);
       }
+    }
 
+    // Sort live jobs by stage urgency: arrived_customer > picked_up > arrived_pickup > assigned
+    const stagePriority = {
+      arrived_customer: 4,
+      picked_up: 3,
+      arrived_pickup: 2,
+      assigned: 1,
+    };
+    liveJobs.sort((a, b) => {
+      const pA = stagePriority[a.status] || 0;
+      const pB = stagePriority[b.status] || 0;
+      if (pB !== pA) return pB - pA;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    const activeJob = liveJobs.length > 0 ? liveJobs[0] : null;
+
+    if (activeJob) {
       if (!activeJob.dropoffAddress || activeJob.dropoffAddress.replace(/[,\s]/g, '').length === 0) {
         activeJob.dropoffAddress = 'Customer Doorstep, Dilsukhnagar, Hyderabad';
       }
@@ -419,9 +444,20 @@ router.get('/active-job', async (req, res) => {
       if (!activeJob.pickupLng) activeJob.pickupLng = activeJob.order?.vendor?.lng || 78.5385;
       if (!activeJob.dropoffLat) activeJob.dropoffLat = activeJob.pickupLat + 0.015;
       if (!activeJob.dropoffLng) activeJob.dropoffLng = activeJob.pickupLng - 0.008;
+
+      return res.json({ activeJob, activeDelivery: activeJob });
     }
 
-    res.json({ activeJob: activeJob || null, activeDelivery: activeJob || null });
+    if (scheduledUpcoming.length > 0) {
+      return res.json({
+        activeJob: null,
+        activeDelivery: null,
+        isScheduledUpcoming: true,
+        scheduledDelivery: scheduledUpcoming[0],
+      });
+    }
+
+    res.json({ activeJob: null, activeDelivery: null });
   } catch (err) {
     console.error('Fetch active job error:', err);
     res.status(500).json({ error: err.message });

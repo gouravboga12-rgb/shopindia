@@ -407,12 +407,12 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const isInstant = notes.includes('instant');
         const isScheduledService = isService && !isInstant;
 
-        // If scheduled service, do NOT set activeDelivery so advance appointments don't hijack the screen
-        if (isScheduledService) {
-          setActiveDelivery(null);
-        } else {
+        // If scheduled service, do NOT overwrite activeDelivery so advance appointments don't hijack ongoing deliveries
+        if (!isScheduledService) {
           setActiveDelivery(data.delivery);
-          // Sync from server 300ms later to get full active job details and prevent blank flash
+          setTimeout(() => refreshData(), 300);
+        } else {
+          // Refresh background counts without clearing ongoing live delivery
           setTimeout(() => refreshData(), 300);
         }
         setIncomingBroadcast(null);
